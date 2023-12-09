@@ -13,11 +13,11 @@ import (
 
 type Operation struct {
 	// eg: ~/.version-fox/.cache/node
-	localPath string
+	LocalPath string
 	// eg: ~/.version-fox
 	vfConfigPath string
-	osType       util2.OSType
-	archType     util2.ArchType
+	OsType       util2.OSType
+	ArchType     util2.ArchType
 }
 
 func (s *Operation) Download(url *url.URL) (string, error) {
@@ -36,12 +36,12 @@ func (s *Operation) Download(url *url.URL) (string, error) {
 		return "", errors.New("source file not found")
 	}
 
-	err = os.MkdirAll(s.localPath, 0755)
+	err = os.MkdirAll(s.LocalPath, 0755)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(s.localPath, filepath.Base(url.Path))
+	path := filepath.Join(s.LocalPath, filepath.Base(url.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

@@ -17,7 +17,7 @@ type Manager struct {
 	configPath    string
 	sdkCachePath  string
 	envConfigPath string
-	sdkMap        map[string]Source
+	sdkMap        map[string]*Handler
 	osType        util.OSType
 	archType      util.ArchType
 }
@@ -62,13 +62,18 @@ func (s *Manager) List(arg Arg) error {
 	if source == nil {
 		return fmt.Errorf("%s not supported", arg.Name)
 	}
+	curVersion := source.Current()
 	list := source.List()
 	if len(list) == 0 {
 		fmt.Printf("-> %s\n", "no version installed")
 		return nil
 	}
 	for _, version := range list {
-		fmt.Printf("-> %s\n", version)
+		if version == curVersion {
+			fmt.Printf("-> %s  (current)\n", version)
+		} else {
+			fmt.Printf("-> %s\n", version)
+		}
 	}
 	return nil
 }
@@ -86,13 +91,13 @@ func (s *Manager) Current(sdkName string) error {
 func NewSdkManager() *Manager {
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
-		panic("get user home dir error")
+		panic("Get user home dir error")
 	}
 	manager := &Manager{
 		configPath:    filepath.Join(userHomeDir, ".version-fox"),
 		sdkCachePath:  filepath.Join(userHomeDir, ".version-fox", ".cache"),
 		envConfigPath: filepath.Join(userHomeDir, ".version-fox", "env.sh"),
-		sdkMap:        make(map[string]Source),
+		sdkMap:        make(map[string]*Handler),
 		osType:        util.GetOSType(),
 		archType:      util.GetArchType(),
 	}
@@ -101,8 +106,8 @@ func NewSdkManager() *Manager {
 		_, _ = os.Create(manager.envConfigPath)
 	}
 
-	if node, err := NewNodeSource(manager); err == nil {
-		manager.sdkMap[strings.ToLower(node.Name())] = node
+	if node, err := NewHandler(manager, NewNodeSource()); err == nil {
+		manager.sdkMap[strings.ToLower(node.Name)] = node
 	}
 
 	return manager
