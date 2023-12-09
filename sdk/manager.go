@@ -33,9 +33,24 @@ type Manager struct {
 	configPath    string
 	sdkCachePath  string
 	envConfigPath string
+	luaScriptPath string
 	sdkMap        map[string]*Handler
 	osType        util.OSType
 	archType      util.ArchType
+}
+
+func (s *Manager) LoadExtScript() {
+	_ = filepath.Walk(s.luaScriptPath, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".lua") {
+			if node, err := NewHandler(s, NewLuaSource(path)); err == nil {
+				s.sdkMap[strings.ToLower(node.Name)] = node
+			}
+		}
+		return nil
+	})
 }
 
 func (s *Manager) Install(config Arg) error {
@@ -113,18 +128,21 @@ func NewSdkManager() *Manager {
 		configPath:    filepath.Join(userHomeDir, ".version-fox"),
 		sdkCachePath:  filepath.Join(userHomeDir, ".version-fox", ".cache"),
 		envConfigPath: filepath.Join(userHomeDir, ".version-fox", "env.sh"),
+		luaScriptPath: filepath.Join(userHomeDir, ".version-fox", "source-script"),
 		sdkMap:        make(map[string]*Handler),
 		osType:        util.GetOSType(),
 		archType:      util.GetArchType(),
 	}
 	_ = os.MkdirAll(manager.sdkCachePath, 0755)
+	_ = os.MkdirAll(manager.luaScriptPath, 0755)
 	if !util.FileExists(manager.envConfigPath) {
 		_, _ = os.Create(manager.envConfigPath)
 	}
 
-	if node, err := NewHandler(manager, NewNodeSource()); err == nil {
-		manager.sdkMap[strings.ToLower(node.Name)] = node
-	}
+	//if node, err := NewHandler(manager, NewNodeSource()); err == nil {
+	//	manager.sdkMap[strings.ToLower(node.Name)] = node
+	//}
+	manager.LoadExtScript()
 
 	return manager
 }

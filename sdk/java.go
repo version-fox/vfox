@@ -15,3 +15,32 @@
  */
 
 package sdk
+
+import (
+	"github.com/aooohan/version-fox/env"
+	"net/url"
+)
+
+const DOWNLOAD_URL = "https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.9.1%2B1/OpenJDK11U-jdk_x64_linux_hotspot_11.0.9.1_1.tar.gz"
+
+type JavaSource string
+
+func (j JavaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JavaSource) FileExt(handler *Handler) string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JavaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JavaSource) Name() string {
+	//TODO implement me
+	panic("implement me")
+}

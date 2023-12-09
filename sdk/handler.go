@@ -144,20 +144,21 @@ func (b *Handler) envVersionKey() string {
 }
 
 func NewHandler(manager *Manager, source Source) (*Handler, error) {
+	name := source.Name()
 	operation := &Operation{
-		LocalPath:    filepath.Join(manager.sdkCachePath, source.Name()),
+		LocalPath:    filepath.Join(manager.sdkCachePath, name),
 		vfConfigPath: manager.configPath,
 		OsType:       manager.osType,
 		ArchType:     manager.archType,
 	}
-	envManger, err := env.NewEnvManager(manager.configPath, manager.sdkCachePath, source.Name())
+	envManger, err := env.NewEnvManager(manager.configPath, manager.sdkCachePath, name)
 	if err != nil {
 		return nil, err
 	}
 	return &Handler{
 		Operation:  operation,
 		EnvManager: envManger,
-		Name:       source.Name(),
+		Name:       name,
 		Source:     source,
 	}, nil
 }
