@@ -4,15 +4,12 @@ import (
 	"github.com/aooohan/version-fox/sdk"
 	"github.com/urfave/cli/v2"
 	"os"
-	"runtime"
 	"strings"
 )
 
 const Version = "0.0.1"
 
 func main() {
-	println("VersionFox " + runtime.GOARCH)
-
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
 		Aliases: []string{"v", "V"},
@@ -36,14 +33,16 @@ func main() {
 	app.Suggest = true
 	app.Commands = []*cli.Command{
 		{
-			Name:   "install",
-			Usage:  "install a version of sdk",
-			Action: sdkVersionParser(manager.Install),
+			Name:    "install",
+			Aliases: []string{"i"},
+			Usage:   "install a version of sdk",
+			Action:  sdkVersionParser(manager.Install),
 		},
 		{
-			Name:   "uninstall",
-			Usage:  "uninstall a version of sdk",
-			Action: sdkVersionParser(manager.Uninstall),
+			Name:    "uninstall",
+			Aliases: []string{"un"},
+			Usage:   "uninstall a version of sdk",
+			Action:  sdkVersionParser(manager.Uninstall),
 		},
 		{
 			Name:   "search",
@@ -51,9 +50,16 @@ func main() {
 			Action: sdkVersionParser(manager.Search),
 		},
 		{
-			Name:   "use",
-			Usage:  "use a version of sdk",
-			Action: sdkVersionParser(manager.Use),
+			Name:    "use",
+			Aliases: []string{"u"},
+			Usage:   "use a version of sdk",
+			Action:  sdkVersionParser(manager.Use),
+		},
+		{
+			Name:    "list",
+			Aliases: []string{"ls"},
+			Usage:   "list all versions of the target sdk",
+			Action:  sdkVersionParser(manager.List),
 		},
 	}
 

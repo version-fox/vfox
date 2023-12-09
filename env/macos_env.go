@@ -29,7 +29,17 @@ type macosEnvManager struct {
 }
 
 func (m *macosEnvManager) ReShell() error {
-	return exec.Command(m.shellInfo.ShellPath).Run()
+	command := exec.Command(m.shellInfo.ShellPath)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Start(); err != nil {
+		return err
+	}
+	if err := command.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *macosEnvManager) Load(kvs []*KV) error {

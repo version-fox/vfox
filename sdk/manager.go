@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/aooohan/version-fox/util"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -31,7 +30,6 @@ func (s *Manager) Install(config Arg) error {
 	if err := source.Install(Version(config.Version)); err != nil {
 		return err
 	}
-	exec.Command(os.Getenv("SHELL"))
 	return nil
 }
 
@@ -65,8 +63,12 @@ func (s *Manager) List(arg Arg) error {
 		return fmt.Errorf("%s not supported", arg.Name)
 	}
 	list := source.List()
+	if len(list) == 0 {
+		fmt.Printf("-> %s\n", "no version installed")
+		return nil
+	}
 	for _, version := range list {
-		println(fmt.Sprintf("-> \t  %s", version))
+		fmt.Printf("-> %s\n", version)
 	}
 	return nil
 }
