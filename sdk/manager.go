@@ -45,7 +45,11 @@ func (s *Manager) LoadExtScript() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".lua") {
-			if node, err := NewHandler(s, NewLuaSource(path)); err == nil {
+			source := NewLuaSource(path)
+			if source == nil {
+				return nil
+			}
+			if node, err := NewHandler(s, source); err == nil {
 				s.sdkMap[strings.ToLower(node.Name)] = node
 			}
 		}

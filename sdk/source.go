@@ -37,6 +37,28 @@ type LuaSource struct {
 	state *lua.LState
 }
 
+func (l LuaSource) checkValid() error {
+	if l.state == nil {
+		return fmt.Errorf("lua vm is nil")
+	}
+	if l.state.GetGlobal("search") == lua.LNil {
+		return fmt.Errorf("search function not found")
+	}
+	if l.state.GetGlobal("download_url") == lua.LNil {
+		return fmt.Errorf("download_url function not found")
+	}
+	if l.state.GetGlobal("file_ext") == lua.LNil {
+		return fmt.Errorf("file_ext function not found")
+	}
+	if l.state.GetGlobal("env_keys") == lua.LNil {
+		return fmt.Errorf("env_keys function not found")
+	}
+	if l.state.GetGlobal("name") == lua.LNil {
+		return fmt.Errorf("name function not found")
+	}
+	return nil
+}
+
 func (l LuaSource) Close() {
 	l.state.Close()
 }
@@ -160,10 +182,15 @@ func NewLuaSource(path string) *LuaSource {
 	file, _ := os.ReadFile(path)
 	L := lua.NewState()
 	if err := L.DoString(string(file)); err != nil {
-		fmt.Printf("Failed to load plugin: %s, path:%s\n", err.Error(), path)
+		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil
 	}
-	return &LuaSource{
+	source := &LuaSource{
 		state: L,
 	}
+	if err := source.checkValid(); err != nil {
+		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", err.Error(), path)
+		return nil
+	}
+	return source
 }
