@@ -42,8 +42,29 @@ func (l LuaSource) Close() {
 }
 
 func (l LuaSource) Search(handler *Handler, version Version) []Version {
-	//TODO implement me
-	panic("implement me")
+	L := l.state
+	ctxTable := l.convert2LTable(L, handler, version)
+	if err := L.CallByParam(lua.P{
+		Fn:      L.GetGlobal("search"),
+		NRet:    1,
+		Protect: true,
+	}, ctxTable); err != nil {
+		panic(err)
+	}
+
+	table := L.ToTable(-1) // returned value
+	L.Pop(1)               // remove received value
+
+	var result []Version
+	table.ForEach(func(key lua.LValue, value lua.LValue) {
+		rV, ok := value.(lua.LString)
+		if !ok {
+			panic("expected a string")
+		}
+		result = append(result, Version(rV.String()))
+	})
+
+	return result
 }
 
 func (l LuaSource) convert2LTable(L *lua.LState, handler *Handler, version Version) *lua.LTable {

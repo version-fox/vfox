@@ -23,6 +23,14 @@ function name()
     return "node"
 end
 
+function name()
+    return {
+        "node",
+        "npm",
+        "npx"
+    }
+end
+
 function env_keys(ctx)
     version_path = ctx.version_path
     return {
