@@ -77,7 +77,7 @@ func (s *Manager) Search(config Arg) error {
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return s.sdkMap[config.Name].Search(Version(config.Version))
+	return s.sdkMap[config.Name].Search("")
 }
 
 func (s *Manager) Use(config Arg) error {
@@ -117,6 +117,12 @@ func (s *Manager) Current(sdkName string) error {
 	current := source.Current()
 	println(fmt.Sprintf("-> \t  %s", current))
 	return nil
+}
+
+func (s *Manager) Close() {
+	for _, handler := range s.sdkMap {
+		handler.Close()
+	}
 }
 
 func NewSdkManager() *Manager {

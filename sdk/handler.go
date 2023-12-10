@@ -81,9 +81,16 @@ func (b *Handler) Uninstall(version Version) error {
 	return b.Use(firstVersion)
 }
 
-func (b *Handler) Search(version Version) error {
-	//TODO implement me
-	panic("implement me")
+func (b *Handler) Search(args string) error {
+	versions := b.Source.Search(b, Version(args))
+	if len(versions) == 0 {
+		fmt.Printf("No available %s version.\n", b.Name)
+		return nil
+	}
+	for _, version := range versions {
+		fmt.Printf("-> %s\n", version)
+	}
+	return nil
 }
 
 func (b *Handler) Use(version Version) error {
@@ -125,6 +132,10 @@ func (b *Handler) List() []Version {
 func (b *Handler) Current() Version {
 	value, _ := b.EnvManager.Get(b.envVersionKey())
 	return Version(value)
+}
+
+func (b *Handler) Close() {
+	b.Source.Close()
 }
 
 func (b *Handler) checkExists(version Version) bool {

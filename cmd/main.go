@@ -20,7 +20,9 @@ import (
 	"github.com/aooohan/version-fox/sdk"
 	"github.com/urfave/cli/v2"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 )
 
 const Version = "0.0.1"
@@ -37,6 +39,16 @@ func main() {
 	}
 
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM)
+
+	go func() {
+		<-signals
+		manager.Close()
+		os.Exit(0)
+	}()
 
 	app := &cli.App{}
 	app.Name = "VersionFox"

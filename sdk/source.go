@@ -17,6 +17,7 @@
 package sdk
 
 import (
+	"fmt"
 	"github.com/aooohan/version-fox/env"
 	lua "github.com/yuin/gopher-lua"
 	"net/url"
@@ -25,13 +26,24 @@ import (
 
 type Source interface {
 	DownloadUrl(handler *Handler, version Version) *url.URL
+	Search(handler *Handler, version Version) []Version
 	FileExt(handler *Handler) string
 	EnvKeys(handler *Handler, version Version) []*env.KV
 	Name() string
+	Close()
 }
 
 type LuaSource struct {
-	script string
+	state *lua.LState
+}
+
+func (l LuaSource) Close() {
+	l.state.Close()
+}
+
+func (l LuaSource) Search(handler *Handler, version Version) []Version {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (l LuaSource) convert2LTable(L *lua.LState, handler *Handler, version Version) *lua.LTable {
@@ -44,12 +56,7 @@ func (l LuaSource) convert2LTable(L *lua.LState, handler *Handler, version Versi
 }
 
 func (l LuaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
-	L := lua.NewState()
-	defer L.Close()
-
-	if err := L.DoString(l.script); err != nil {
-		panic(err)
-	}
+	L := l.state
 	ctxTable := l.convert2LTable(L, handler, version)
 
 	if err := L.CallByParam(lua.P{
@@ -68,12 +75,7 @@ func (l LuaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
 }
 
 func (l LuaSource) FileExt(handler *Handler) string {
-	L := lua.NewState()
-	defer L.Close()
-
-	if err := L.DoString(l.script); err != nil {
-		panic(err)
-	}
+	L := l.state
 	ctxTable := l.convert2LTable(L, handler, "-")
 
 	if err := L.CallByParam(lua.P{
@@ -90,12 +92,7 @@ func (l LuaSource) FileExt(handler *Handler) string {
 }
 
 func (l LuaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
-	L := lua.NewState()
-	defer L.Close()
-
-	if err := L.DoString(l.script); err != nil {
-		panic(err)
-	}
+	L := l.state
 	ctxTable := l.convert2LTable(L, handler, version)
 	if err := L.CallByParam(lua.P{
 		Fn:      L.GetGlobal("env_keys"),
@@ -123,12 +120,7 @@ func (l LuaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
 }
 
 func (l LuaSource) Name() string {
-	L := lua.NewState()
-	defer L.Close()
-
-	if err := L.DoString(l.script); err != nil {
-		panic(err)
-	}
+	L := l.state
 
 	if err := L.CallByParam(lua.P{
 		Fn:      L.GetGlobal("name"),
@@ -143,7 +135,14 @@ func (l LuaSource) Name() string {
 	return ret.String()
 }
 
-func NewLuaSource(path string) LuaSource {
+func NewLuaSource(path string) *LuaSource {
 	file, _ := os.ReadFile(path)
-	return LuaSource{script: string(file)}
+	L := lua.NewState()
+	if err := L.DoString(string(file)); err != nil {
+		fmt.Printf("Failed to load plugin: %s, path:%s\n", err.Error(), path)
+		return nil
+	}
+	return &LuaSource{
+		state: L,
+	}
 }
