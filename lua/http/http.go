@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package lua
+package http
 
 import (
 	lua "github.com/yuin/gopher-lua"
@@ -22,28 +22,42 @@ import (
 	"net/http"
 )
 
-const metatableName = "request_metatable"
-
-func RegisterHttpClient(L *lua.LState) {
-	mt := L.NewTypeMetatable(metatableName)
-	L.SetGlobal("http_client", mt)
-	L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"get":  getRequest,
-		"post": getRequest,
-	}))
+// Preload adds json to the given Lua state's package.preload table. After it
+// has been preloaded, it can be loaded using require:
+//
+//	local json = require("http")
+func Preload(L *lua.LState) {
+	L.PreloadModule("http", Loader)
 }
 
-//	http_client:get({
-//		url = "http://www.baidu.com",j
-//		headers = {
-//			["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-//	  }
-//	}) returns (response, error)
+// Loader is the module loader function.
+func Loader(L *lua.LState) int {
+	t := L.NewTable()
+	L.SetFuncs(t, api)
+	L.Push(t)
+	return 1
+}
+
+var api = map[string]lua.LGFunction{
+	"get": getRequest,
+	// TODO wait to extend
+}
+
+// getRequest performs a http get request
+// @param url string
+// @param headers table
+// @return resp table
+// @return err string
+// local http = require("http")
 //
-//	response: {
-//	  code = http_code (200, 201, ..., 500, ...),
-//	  body = string
-//	  headers = table
+//	http.get({
+//	    url = "http://ip.jsontest.com/"
+//	}) return (response, error)
+//
+//	response : {
+//	    body = "",
+//	    status_code = 200,
+//	    headers = table
 //	}
 func getRequest(L *lua.LState) int {
 	param := L.CheckTable(1)
@@ -53,7 +67,7 @@ func getRequest(L *lua.LState) int {
 		L.Push(lua.LString("url is required"))
 	}
 	client := &http.Client{}
-	req, err := http.NewRequest(url.String(), url.String(), nil)
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
