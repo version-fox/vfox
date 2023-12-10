@@ -58,7 +58,7 @@ func (d *Downloader) Download(url *url.URL) (string, error) {
 
 	bar := progressbar.DefaultBytes(
 		resp.ContentLength,
-		"downloading",
+		"Downloading",
 	)
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {
