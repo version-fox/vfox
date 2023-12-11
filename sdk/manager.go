@@ -81,7 +81,7 @@ func (s *Manager) Search(config Arg) error {
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return s.sdkMap[config.Name].Search("")
+	return s.sdkMap[config.Name].Search(config.Version)
 }
 
 func (s *Manager) Use(config Arg) error {
@@ -93,6 +93,13 @@ func (s *Manager) Use(config Arg) error {
 }
 
 func (s *Manager) List(arg Arg) error {
+	if arg.Name == "" {
+		for name, _ := range s.sdkMap {
+			fmt.Println("All current plugins: ")
+			fmt.Printf("-> %s\n", name)
+		}
+		return nil
+	}
 	source := s.sdkMap[arg.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", arg.Name)

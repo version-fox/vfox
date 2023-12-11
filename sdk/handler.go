@@ -46,9 +46,14 @@ func (b *Handler) Install(version Version) error {
 		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
 		return err
 	}
-	fileName := strings.TrimSuffix(filepath.Base(filePath), b.Source.FileExt(b))
+	decompressor := util.NewDecompressor(filePath)
+	if decompressor == nil {
+		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
+		return fmt.Errorf("unknown file type")
+	}
+	fileName := decompressor.Filename()
 	destPath := filepath.Dir(filePath)
-	err = util.DecompressGzipTar(filePath, destPath)
+	err = decompressor.Decompress(destPath)
 	if err != nil {
 		return err
 	}

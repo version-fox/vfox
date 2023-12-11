@@ -30,11 +30,11 @@ import (
 //
 // internal fork from https://github.com/layeh/gopher-json/
 func Preload(L *lua.LState) {
-	L.PreloadModule("json", Loader)
+	L.PreloadModule("json", loader)
 }
 
-// Loader is the module loader function.
-func Loader(L *lua.LState) int {
+// loader is the module loader function.
+func loader(L *lua.LState) int {
 	t := L.NewTable()
 	L.SetFuncs(t, api)
 	L.Push(t)

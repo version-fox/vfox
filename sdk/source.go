@@ -19,6 +19,7 @@ package sdk
 import (
 	"fmt"
 	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/lua_module"
 	lua "github.com/yuin/gopher-lua"
 	"net/url"
 	"os"
@@ -27,7 +28,6 @@ import (
 type Source interface {
 	DownloadUrl(handler *Handler, version Version) *url.URL
 	Search(handler *Handler, version Version) []Version
-	FileExt(handler *Handler) string
 	EnvKeys(handler *Handler, version Version) []*env.KV
 	Name() string
 	Close()
@@ -39,16 +39,13 @@ type LuaSource struct {
 
 func (l LuaSource) checkValid() error {
 	if l.state == nil {
-		return fmt.Errorf("lua vm is nil")
+		return fmt.Errorf("lua_module vm is nil")
 	}
 	if l.state.GetGlobal("search") == lua.LNil {
 		return fmt.Errorf("search function not found")
 	}
 	if l.state.GetGlobal("download_url") == lua.LNil {
 		return fmt.Errorf("download_url function not found")
-	}
-	if l.state.GetGlobal("file_ext") == lua.LNil {
-		return fmt.Errorf("file_ext function not found")
 	}
 	if l.state.GetGlobal("env_keys") == lua.LNil {
 		return fmt.Errorf("env_keys function not found")
@@ -117,23 +114,6 @@ func (l LuaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
 	return u
 }
 
-func (l LuaSource) FileExt(handler *Handler) string {
-	L := l.state
-	ctxTable := l.convert2LTable(L, handler, "-")
-
-	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("file_ext"),
-		NRet:    1,
-		Protect: true,
-	}, ctxTable); err != nil {
-		panic(err)
-	}
-
-	ret := L.Get(-1) // returned value
-	L.Pop(1)         // remove received value
-	return ret.String()
-}
-
 func (l LuaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
 	L := l.state
 	ctxTable := l.convert2LTable(L, handler, version)
@@ -180,7 +160,9 @@ func (l LuaSource) Name() string {
 
 func NewLuaSource(path string) *LuaSource {
 	file, _ := os.ReadFile(path)
+	// TODO: use filename as the plugin name
 	L := lua.NewState()
+	lua_module.Preload(L)
 	if err := L.DoString(string(file)); err != nil {
 		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil

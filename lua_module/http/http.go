@@ -27,11 +27,11 @@ import (
 //
 //	local json = require("http")
 func Preload(L *lua.LState) {
-	L.PreloadModule("http", Loader)
+	L.PreloadModule("http", loader)
 }
 
-// Loader is the module loader function.
-func Loader(L *lua.LState) int {
+// loader is the module loader function.
+func loader(L *lua.LState) int {
 	t := L.NewTable()
 	L.SetFuncs(t, api)
 	L.Push(t)

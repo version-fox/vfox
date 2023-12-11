@@ -98,7 +98,7 @@ func TestCustomRequire(t *testing.T) {
 	s := lua.NewState()
 	defer s.Close()
 
-	s.PreloadModule("JSON", Loader)
+	s.PreloadModule("JSON", loader)
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}

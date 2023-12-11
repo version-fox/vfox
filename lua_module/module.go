@@ -14,16 +14,16 @@
  *    limitations under the License.
  */
 
-package util
+package lua_module
 
 import (
-	"os"
+	"github.com/aooohan/version-fox/lua_module/http"
+	"github.com/aooohan/version-fox/lua_module/json"
+	lua "github.com/yuin/gopher-lua"
 )
 
-func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return err == nil
+func Preload(L *lua.LState) {
+	http.Preload(L)
+	json.Preload(L)
+	http.Preload(L)
 }
