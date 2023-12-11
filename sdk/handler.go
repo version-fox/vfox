@@ -40,7 +40,7 @@ type Handler struct {
 	// sdk name
 	Name string
 	// sdk source
-	Source Source
+	Source Plugin
 }
 
 func (b *Handler) Install(version Version) error {
@@ -49,7 +49,12 @@ func (b *Handler) Install(version Version) error {
 		fmt.Printf("%s has been installed, no need to install it.\n", label)
 		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
 	}
-	downloadUrl := b.Source.DownloadUrl(b, version)
+	downloadUrl := b.Source.DownloadUrl(
+		&PluginContext{
+			Handler: b,
+			Version: version,
+		},
+	)
 	filePath, err := b.Download(downloadUrl)
 	if err != nil {
 		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
@@ -96,7 +101,12 @@ func (b *Handler) Uninstall(version Version) error {
 }
 
 func (b *Handler) Search(args string) error {
-	versions := b.Source.Search(b, Version(args))
+	versions := b.Source.Search(
+		&PluginContext{
+			Handler: b,
+			Version: Version(args),
+		},
+	)
 	if len(versions) == 0 {
 		fmt.Printf("No available %s version.\n", b.Name)
 		return nil
@@ -113,7 +123,12 @@ func (b *Handler) Use(version Version) error {
 		fmt.Printf("%s is not installed, please install it first.\n", label)
 		return fmt.Errorf("%s is not installed, please install it first.\n", label)
 	}
-	keys := b.Source.EnvKeys(b, version)
+	keys := b.Source.EnvKeys(
+		&PluginContext{
+			Handler: b,
+			Version: version,
+		},
+	)
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),
@@ -214,7 +229,7 @@ func (b *Handler) envVersionKey() string {
 	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Name))
 }
 
-func NewHandler(manager *Manager, source Source) (*Handler, error) {
+func NewHandler(manager *Manager, source Plugin) (*Handler, error) {
 	name := source.Name()
 	envManger, err := env.NewEnvManager(manager.configPath, name)
 	if err != nil {

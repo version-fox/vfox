@@ -25,19 +25,17 @@ import (
 	"os"
 )
 
-type Source interface {
-	DownloadUrl(handler *Handler, version Version) *url.URL
-	Search(handler *Handler, version Version) []Version
-	EnvKeys(handler *Handler, version Version) []*env.KV
-	Name() string
-	Close()
+const (
+	LUA_PLUGIN_OBJ_KEY = "PLUGIN"
+)
+
+type LuaPlugin struct {
+	state     *lua.LState
+	pluginObj lua.LValue
+	name      string
 }
 
-type LuaSource struct {
-	state *lua.LState
-}
-
-func (l LuaSource) checkValid() error {
+func (l LuaPlugin) checkValid() error {
 	if l.state == nil {
 		return fmt.Errorf("lua_module vm is nil")
 	}
@@ -56,15 +54,15 @@ func (l LuaSource) checkValid() error {
 	return nil
 }
 
-func (l LuaSource) Close() {
+func (l LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l LuaSource) Search(handler *Handler, version Version) []Version {
+func (l LuaPlugin) Search(ctx *PluginContext) []Version {
 	L := l.state
-	ctxTable := l.convert2LTable(L, handler, version)
+	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("search"),
+		Fn:      L.GetGlobal("Search"),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -86,21 +84,23 @@ func (l LuaSource) Search(handler *Handler, version Version) []Version {
 	return result
 }
 
-func (l LuaSource) convert2LTable(L *lua.LState, handler *Handler, version Version) *lua.LTable {
+func (l LuaPlugin) convert2LTable(L *lua.LState, ctx *PluginContext) *lua.LTable {
+	handler := ctx.Handler
+	version := ctx.Version
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version_path", lua.LString(handler.VersionPath(version)))
-	L.SetField(ctxTable, "os_type", lua.LString(handler.Operation.OsType))
-	L.SetField(ctxTable, "arch_type", lua.LString(handler.Operation.ArchType))
+	L.SetField(ctxTable, "os_type", lua.LString(handler.sdkManager.osType))
+	L.SetField(ctxTable, "arch_type", lua.LString(handler.sdkManager.osType))
 	L.SetField(ctxTable, "version", lua.LString(version))
 	return ctxTable
 }
 
-func (l LuaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
+func (l LuaPlugin) DownloadUrl(ctx *PluginContext) *url.URL {
 	L := l.state
-	ctxTable := l.convert2LTable(L, handler, version)
+	ctxTable := l.convert2LTable(L, ctx)
 
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("download_url"),
+		Fn:      L.GetGlobal("DownloadUrl"),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -114,11 +114,11 @@ func (l LuaSource) DownloadUrl(handler *Handler, version Version) *url.URL {
 	return u
 }
 
-func (l LuaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
+func (l LuaPlugin) EnvKeys(ctx *PluginContext) []*env.KV {
 	L := l.state
-	ctxTable := l.convert2LTable(L, handler, version)
+	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("env_keys"),
+		Fn:      L.GetGlobal("EnvKeys"),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -142,7 +142,7 @@ func (l LuaSource) EnvKeys(handler *Handler, version Version) []*env.KV {
 	return envKeys
 }
 
-func (l LuaSource) Name() string {
+func (l LuaPlugin) Name() string {
 	L := l.state
 
 	if err := L.CallByParam(lua.P{
@@ -158,7 +158,7 @@ func (l LuaSource) Name() string {
 	return ret.String()
 }
 
-func NewLuaSource(path string) *LuaSource {
+func NewLuaSource(path string) *LuaPlugin {
 	file, _ := os.ReadFile(path)
 	// TODO: use filename as the plugin name
 	L := lua.NewState()
@@ -167,8 +167,14 @@ func NewLuaSource(path string) *LuaSource {
 		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil
 	}
-	source := &LuaSource{
-		state: L,
+	pluginOjb := L.GetGlobal(LUA_PLUGIN_OBJ_KEY)
+	if pluginOjb.Type() == lua.LTNil {
+		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", "plugin object not found", path)
+		return nil
+	}
+	source := &LuaPlugin{
+		state:     L,
+		pluginObj: pluginOjb,
 	}
 	if err := source.checkValid(); err != nil {
 		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", err.Error(), path)
