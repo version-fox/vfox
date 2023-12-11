@@ -21,7 +21,6 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/aooohan/version-fox/util"
 	"os"
 	"os/exec"
 	"os/user"
@@ -38,13 +37,16 @@ const (
 
 type macosEnvManager struct {
 	shellInfo *ShellInfo
-	// ~/.version_fox/.cache/node/env.sh
-	sdkEnvPath string
 	// ~/.version_fox/env.sh
 	vfEnvPath string
+	envMap    map[string]string
+	// $PATH
+	pathMap map[string]string
 }
 
 func (m *macosEnvManager) ReShell() error {
+	// flush env to file
+	m.Flush()
 	command := exec.Command(m.shellInfo.ShellPath)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
@@ -59,73 +61,105 @@ func (m *macosEnvManager) ReShell() error {
 }
 
 func (m *macosEnvManager) Load(kvs []*KV) error {
-	if err := appendEnvSourceIfNotExist(m.vfEnvPath, m.sdkEnvPath); err != nil {
-		return err
-	}
-	if !util.FileExists(m.sdkEnvPath) {
-		_, _ = os.Create(m.sdkEnvPath)
-	}
-	// create if it not exists, else trunc
-	file, err := os.OpenFile(m.sdkEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 	for _, kv := range kvs {
-		var str string
 		if kv.Key == "PATH" {
-			str = fmt.Sprintf("export %s=%s:$%s\n", kv.Key, kv.Value, kv.Key)
+			m.pathMap[kv.Value] = kv.Value
 		} else {
-			str = fmt.Sprintf("export %s=%s\n", kv.Key, kv.Value)
-		}
-		if _, err := file.WriteString(str); err != nil {
-			return err
+			m.envMap[kv.Key] = kv.Value
 		}
 	}
 	return nil
 }
 
-func (m *macosEnvManager) Get(key string) (string, error) {
-	line, err := m.checkEnvKey(key)
+func (m *macosEnvManager) Flush() {
+	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return "", err
-	}
-	if line == "" {
-		return "", fmt.Errorf("key %s not set", key)
-	}
-	return strings.Split(line, "=")[1], nil
-
-}
-
-func (m *macosEnvManager) checkEnvKey(key string) (string, error) {
-	file, err := os.Open(m.sdkEnvPath)
-	if err != nil {
-		return "", err
+		fmt.Printf("Failed to open the file %s, err:%s\n", m.vfEnvPath, err.Error())
+		return
 	}
 	defer file.Close()
-	key = fmt.Sprintf("export %s=", key)
+	for k, v := range m.envMap {
+		str := fmt.Sprintf("export %s=%s\n", k, v)
+		if _, err := file.WriteString(str); err != nil {
+			fmt.Printf("Failed to flush env variable to file,value: err:%s\n", err.Error())
+			return
+		}
+	}
+
+	pathValue := fmt.Sprintf("export PATH=%s\n", m.pathEnvValue())
+	if _, err := file.WriteString(pathValue); err != nil {
+		fmt.Printf("Failed to flush PATH variable to file, err:%s\n", err.Error())
+		return
+	}
+}
+
+func (m *macosEnvManager) Get(key string) (string, error) {
+	if key == "PATH" {
+		return m.pathEnvValue(), nil
+	} else {
+		return m.envMap[key], nil
+	}
+}
+
+func (m *macosEnvManager) pathEnvValue() string {
+	var pathValues []string
+	for k, _ := range m.pathMap {
+		pathValues = append(pathValues, k)
+	}
+	pathValues = append(pathValues, "$PATH")
+	return strings.Join(pathValues, ":")
+}
+
+func (m *macosEnvManager) loadEnvFile() error {
+	file, err := os.Open(m.vfEnvPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, key) {
-			return line, nil
+		if strings.HasPrefix(line, "export") {
+			line = strings.TrimPrefix(line, "export")
+			line = strings.TrimSpace(line)
+			kv := strings.Split(line, "=")
+			if len(kv) == 2 {
+				key := kv[0]
+				value := kv[1]
+				if key == "PATH" {
+					pathArray := strings.Split(value, ":")
+					for _, path := range pathArray {
+						if path == "$PATH" {
+							continue
+						}
+						m.pathMap[path] = path
+					}
+				} else {
+					m.envMap[key] = value
+				}
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return "", err
+		return err
 	}
-	return "", nil
+	return nil
 }
 
-func NewEnvManager(vfConfigPath, sdkCachePath, sdkName string) (Manager, error) {
+func NewEnvManager(vfConfigPath, sdkName string) (Manager, error) {
 	shellInfo, err := NewShellInfo()
 	if err != nil {
 		return nil, err
 	}
 	manager := &macosEnvManager{
-		shellInfo:  shellInfo,
-		sdkEnvPath: filepath.Join(sdkCachePath, sdkName, "env.sh"),
-		vfEnvPath:  filepath.Join(vfConfigPath, "env.sh"),
+		shellInfo: shellInfo,
+		vfEnvPath: filepath.Join(vfConfigPath, "env.sh"),
+		envMap:    make(map[string]string),
+		pathMap:   make(map[string]string),
+	}
+	err = manager.loadEnvFile()
+	if err != nil {
+		fmt.Printf("Failed to load env file: %s, err:%s\n", manager.vfEnvPath, err.Error())
 	}
 	if err := appendEnvSourceIfNotExist(manager.shellInfo.ConfigPath, manager.vfEnvPath); err != nil {
 		return nil, err

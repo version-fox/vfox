@@ -19,6 +19,7 @@ package env
 type ShellType string
 
 type Manager interface {
+	Flush()
 	Load([]*KV) error
 	Get(key string) (string, error)
 	ReShell() error

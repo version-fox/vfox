@@ -140,7 +140,12 @@ func (b *Handler) Current() Version {
 }
 
 func (b *Handler) Close() {
+	b.EnvManager.Flush()
 	b.Source.Close()
+}
+
+func (b *Handler) Update() {
+	// TODO 插件升级系统
 }
 
 func (b *Handler) checkExists(version Version) bool {
@@ -167,7 +172,7 @@ func NewHandler(manager *Manager, source Source) (*Handler, error) {
 		OsType:       manager.osType,
 		ArchType:     manager.archType,
 	}
-	envManger, err := env.NewEnvManager(manager.configPath, manager.sdkCachePath, name)
+	envManger, err := env.NewEnvManager(manager.configPath, name)
 	if err != nil {
 		return nil, err
 	}
