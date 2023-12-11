@@ -115,6 +115,13 @@ func (s *Manager) Current(sdkName string) error {
 	return nil
 }
 
+func (s *Manager) loadSdk() {
+	for _, p := range s.PluginManager.List() {
+		newSdk, _ := NewSdk(s, p)
+		s.sdkMap[p.Name()] = newSdk
+	}
+}
+
 func (s *Manager) Close() {
 	s.PluginManager.Close()
 	for _, handler := range s.sdkMap {
@@ -129,6 +136,13 @@ func NewSdkManager() *Manager {
 	}
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
 	configPath := filepath.Join(userHomeDir, ".version-fox")
+	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", ".cache")
+	envConfigPath := filepath.Join(userHomeDir, ".version-fox", "env.sh")
+	_ = os.MkdirAll(sdkCachePath, 0755)
+	_ = os.MkdirAll(pluginPath, 0755)
+	if !util.FileExists(envConfigPath) {
+		_, _ = os.Create(envConfigPath)
+	}
 	pluginManager, err := plugin.NewPluginManager(pluginPath)
 	if err != nil {
 		panic("Init plugin manager error")
@@ -139,19 +153,16 @@ func NewSdkManager() *Manager {
 	}
 	manager := &Manager{
 		configPath:    configPath,
-		sdkCachePath:  filepath.Join(userHomeDir, ".version-fox", ".cache"),
-		envConfigPath: filepath.Join(userHomeDir, ".version-fox", "env.sh"),
+		sdkCachePath:  sdkCachePath,
+		envConfigPath: envConfigPath,
 		PluginManager: pluginManager,
 		EnvManager:    envManger,
 		sdkMap:        make(map[string]*Sdk),
 		osType:        util.GetOSType(),
 		archType:      util.GetArchType(),
 	}
-	_ = os.MkdirAll(manager.sdkCachePath, 0755)
-	_ = os.MkdirAll(pluginPath, 0755)
-	if !util.FileExists(manager.envConfigPath) {
-		_, _ = os.Create(manager.envConfigPath)
-	}
+
+	manager.loadSdk()
 
 	return manager
 }

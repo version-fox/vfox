@@ -36,7 +36,7 @@ func (m *Manager) Remove(name string) error {
 	return nil
 }
 
-func (m *Manager) List(name string) []*LuaPlugin {
+func (m *Manager) List() []*LuaPlugin {
 	return nil
 }
 

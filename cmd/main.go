@@ -87,7 +87,10 @@ func main() {
 			Name:    "list",
 			Aliases: []string{"ls"},
 			Usage:   "list all versions of the target sdk",
-			Action:  sdkVersionParser(manager.List),
+			Action: func(ctx *cli.Context) error {
+				sdkName := ctx.Args().First()
+				return manager.List(sdk.Arg{Name: sdkName})
+			},
 		},
 	}
 
@@ -99,7 +102,7 @@ func sdkVersionParser(operation func(arg sdk.Arg) error) func(ctx *cli.Context) 
 	return func(ctx *cli.Context) error {
 		sdkArg := ctx.Args().First()
 		if sdkArg == "" {
-			return cli.Exit("sdk version is required", 1)
+			return cli.Exit("sdk name is required", 1)
 		}
 		argArr := strings.Split(sdkArg, "@")
 		argsLen := len(argArr)
