@@ -61,6 +61,43 @@ func main() {
 	app.Suggest = true
 	app.Commands = []*cli.Command{
 		{
+			Name:  "add",
+			Usage: "add a plugin of sdk",
+			Action: func(ctx *cli.Context) error {
+				args := ctx.Args()
+				l := args.Len()
+				if l < 2 {
+					return cli.Exit("invalid arguments", 1)
+				}
+				return manager.Add(args.Get(0), args.Get(1))
+			},
+		},
+		{
+			Name:  "remove",
+			Usage: "remove a plugin of sdk",
+			Action: func(ctx *cli.Context) error {
+				args := ctx.Args()
+				l := args.Len()
+				if l < 1 {
+					return cli.Exit("invalid arguments", 1)
+				}
+				return manager.Update(args.First())
+			},
+		},
+		{
+			Name:  "update",
+			Usage: "update a plugin of sdk",
+			Action: func(ctx *cli.Context) error {
+				args := ctx.Args()
+				l := args.Len()
+				if l < 1 {
+					return cli.Exit("invalid arguments", 1)
+				}
+				return manager.Remove(args.First())
+			},
+		},
+
+		{
 			Name:    "install",
 			Aliases: []string{"i"},
 			Usage:   "install a version of sdk",

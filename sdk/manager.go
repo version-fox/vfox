@@ -23,6 +23,7 @@ import (
 	"github.com/aooohan/version-fox/util"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Arg struct {
@@ -36,14 +37,13 @@ type Manager struct {
 	envConfigPath string
 	pluginPath    string
 	sdkMap        map[string]*Sdk
-	PluginManager *plugin.Manager
 	EnvManager    env.Manager
 	osType        util.OSType
 	archType      util.ArchType
 }
 
-func (s *Manager) Install(config Arg) error {
-	source := s.sdkMap[config.Name]
+func (m *Manager) Install(config Arg) error {
+	source := m.sdkMap[config.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
@@ -53,39 +53,39 @@ func (s *Manager) Install(config Arg) error {
 	return nil
 }
 
-func (s *Manager) Uninstall(config Arg) error {
-	source := s.sdkMap[config.Name]
+func (m *Manager) Uninstall(config Arg) error {
+	source := m.sdkMap[config.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return s.sdkMap[config.Name].Uninstall(Version(config.Version))
+	return m.sdkMap[config.Name].Uninstall(Version(config.Version))
 }
 
-func (s *Manager) Search(config Arg) error {
-	source := s.sdkMap[config.Name]
+func (m *Manager) Search(config Arg) error {
+	source := m.sdkMap[config.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return s.sdkMap[config.Name].Search(config.Version)
+	return m.sdkMap[config.Name].Search(config.Version)
 }
 
-func (s *Manager) Use(config Arg) error {
-	source := s.sdkMap[config.Name]
+func (m *Manager) Use(config Arg) error {
+	source := m.sdkMap[config.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return s.sdkMap[config.Name].Use(Version(config.Version))
+	return m.sdkMap[config.Name].Use(Version(config.Version))
 }
 
-func (s *Manager) List(arg Arg) error {
+func (m *Manager) List(arg Arg) error {
 	if arg.Name == "" {
-		for name, _ := range s.sdkMap {
+		for name, _ := range m.sdkMap {
 			fmt.Println("All current plugins: ")
 			fmt.Printf("-> %s\n", name)
 		}
 		return nil
 	}
-	source := s.sdkMap[arg.Name]
+	source := m.sdkMap[arg.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", arg.Name)
 	}
@@ -105,8 +105,8 @@ func (s *Manager) List(arg Arg) error {
 	return nil
 }
 
-func (s *Manager) Current(sdkName string) error {
-	source := s.sdkMap[sdkName]
+func (m *Manager) Current(sdkName string) error {
+	source := m.sdkMap[sdkName]
 	if source == nil {
 		return fmt.Errorf("%s not supported", sdkName)
 	}
@@ -115,18 +115,39 @@ func (s *Manager) Current(sdkName string) error {
 	return nil
 }
 
-func (s *Manager) loadSdk() {
-	for _, p := range s.PluginManager.List() {
-		newSdk, _ := NewSdk(s, p)
-		s.sdkMap[p.Name] = newSdk
+func (m *Manager) loadSdk() {
+	_ = filepath.Walk(m.pluginPath, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".lua") {
+			source := plugin.NewLuaSource(path)
+			if source == nil {
+				return nil
+			}
+			sdk, _ := NewSdk(m, source)
+			m.sdkMap[strings.ToLower(source.Name)] = sdk
+		}
+		return nil
+	})
+}
+
+func (m *Manager) Close() {
+	for _, handler := range m.sdkMap {
+		handler.Close()
 	}
 }
 
-func (s *Manager) Close() {
-	s.PluginManager.Close()
-	for _, handler := range s.sdkMap {
-		handler.Close()
-	}
+func (m *Manager) Remove(pluginName string) error {
+	return nil
+}
+
+func (m *Manager) Update(pluginName string) error {
+	return nil
+}
+
+func (m *Manager) Add(pluginName, url string) error {
+	return nil
 }
 
 func NewSdkManager() *Manager {
@@ -143,10 +164,6 @@ func NewSdkManager() *Manager {
 	if !util.FileExists(envConfigPath) {
 		_, _ = os.Create(envConfigPath)
 	}
-	pluginManager, err := plugin.NewPluginManager(pluginPath)
-	if err != nil {
-		panic("Init plugin manager error")
-	}
 	envManger, err := env.NewEnvManager(configPath)
 	if err != nil {
 		panic("Init env manager error")
@@ -155,7 +172,6 @@ func NewSdkManager() *Manager {
 		configPath:    configPath,
 		sdkCachePath:  sdkCachePath,
 		envConfigPath: envConfigPath,
-		PluginManager: pluginManager,
 		EnvManager:    envManger,
 		sdkMap:        make(map[string]*Sdk),
 		osType:        util.GetOSType(),
