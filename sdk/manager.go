@@ -118,7 +118,7 @@ func (s *Manager) Current(sdkName string) error {
 func (s *Manager) loadSdk() {
 	for _, p := range s.PluginManager.List() {
 		newSdk, _ := NewSdk(s, p)
-		s.sdkMap[p.Name()] = newSdk
+		s.sdkMap[p.Name] = newSdk
 	}
 }
 

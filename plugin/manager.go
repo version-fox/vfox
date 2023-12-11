@@ -57,7 +57,7 @@ func (m *Manager) Close() {
 }
 
 func NewPluginManager(pluginPath string) (*Manager, error) {
-	// TODO alias name
+	// TODO alias Name
 	var plugins = make(map[string]*LuaPlugin)
 	_ = filepath.Walk(pluginPath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
@@ -68,7 +68,7 @@ func NewPluginManager(pluginPath string) (*Manager, error) {
 			if source == nil {
 				return nil
 			}
-			plugins[strings.ToLower(source.Name())] = source
+			plugins[strings.ToLower(source.Name)] = source
 		}
 		return nil
 	})

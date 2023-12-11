@@ -103,7 +103,7 @@ func (b *Sdk) Search(args string) error {
 		},
 	)
 	if len(versions) == 0 {
-		fmt.Printf("No available %s version.\n", b.Plugin.Name())
+		fmt.Printf("No available %s version.\n", b.Plugin.Name)
 		return nil
 	}
 	for _, version := range versions {
@@ -212,15 +212,15 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 }
 
 func (b *Sdk) label(version Version) string {
-	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name()), version)
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
 func (b *Sdk) envVersionKey() string {
-	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name()))
+	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name))
 }
 
 func NewSdk(manager *Manager, source *plugin.LuaPlugin) (*Sdk, error) {
-	name := source.Name()
+	name := source.Name
 	return &Sdk{
 		sdkManager: manager,
 		sdkPath:    filepath.Join(manager.sdkCachePath, strings.ToLower(name)),

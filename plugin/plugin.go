@@ -41,8 +41,11 @@ type SearchResult string
 type LuaPlugin struct {
 	state     *lua.LState
 	pluginObj *lua.LTable
-	name      string
 	path      string
+	Name      string
+	Author    string
+	Version   string
+	UpdateUrl string
 }
 
 func (l *LuaPlugin) checkValid() error {
@@ -70,7 +73,7 @@ func (l *LuaPlugin) Search(ctx *Context) []SearchResult {
 	L := l.state
 	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("Search"),
+		Fn:      l.pluginObj.RawGetString("Search").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -108,7 +111,7 @@ func (l *LuaPlugin) DownloadUrl(ctx *Context) *url.URL {
 	ctxTable := l.convert2LTable(L, ctx)
 
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("DownloadUrl"),
+		Fn:      l.pluginObj.RawGetString("DownloadUrl").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -126,7 +129,7 @@ func (l *LuaPlugin) EnvKeys(ctx *Context) []*env.KV {
 	L := l.state
 	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("EnvKeys"),
+		Fn:      l.pluginObj.RawGetString("EnvKeys"),
 		NRet:    1,
 		Protect: true,
 	}, ctxTable); err != nil {
@@ -166,29 +169,13 @@ func (l *LuaPlugin) luaPrint() int {
 	return 0
 }
 
-func (l *LuaPlugin) Name() string {
-	L := l.state
-
-	if err := L.CallByParam(lua.P{
-		Fn:      L.GetGlobal("name"),
-		NRet:    1,
-		Protect: true,
-	}); err != nil {
-		panic(err)
-	}
-
-	ret := L.Get(-1) // returned value
-	L.Pop(1)         // remove received value
-	return ret.String()
-}
-
 func (l *LuaPlugin) Label(version string) string {
-	return fmt.Sprintf("%s@%s", l.Name(), version)
+	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
 func NewLuaSource(path string) *LuaPlugin {
 	file, _ := os.ReadFile(path)
-	// TODO: use filename as the plugin name
+	// TODO: use filename as the plugin Name
 	L := lua.NewState()
 	lua_module.Preload(L)
 	if err := L.DoString(string(file)); err != nil {
@@ -200,13 +187,30 @@ func NewLuaSource(path string) *LuaPlugin {
 		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", "plugin object not found", path)
 		return nil
 	}
+
+	PLUGIN := pluginOjb.(*lua.LTable)
+
 	source := &LuaPlugin{
 		state:     L,
-		pluginObj: pluginOjb.(*lua.LTable),
+		pluginObj: PLUGIN,
 	}
+
 	if err := source.checkValid(); err != nil {
 		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", err.Error(), path)
 		return nil
+	}
+
+	if name := PLUGIN.RawGetString("name"); name.Type() != lua.LTNil {
+		source.Name = name.String()
+	}
+	if version := PLUGIN.RawGetString("version"); version.Type() != lua.LTNil {
+		source.Version = version.String()
+	}
+	if updateUrl := PLUGIN.RawGetString("updateUrl"); updateUrl.Type() != lua.LTNil {
+		source.UpdateUrl = updateUrl.String()
+	}
+	if author := PLUGIN.RawGetString("author"); author.Type() != lua.LTNil {
+		source.Author = author.String()
 	}
 	return source
 }
