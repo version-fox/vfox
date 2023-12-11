@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package sdk
+package plugin
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	LUA_PLUGIN_OBJ_KEY = "PLUGIN"
+	LuaPluginObjKey = "PLUGIN"
 )
 
 type LuaPlugin struct {
@@ -35,7 +35,7 @@ type LuaPlugin struct {
 	name      string
 }
 
-func (l LuaPlugin) checkValid() error {
+func (l *LuaPlugin) checkValid() error {
 	if l.state == nil {
 		return fmt.Errorf("lua_module vm is nil")
 	}
@@ -54,11 +54,11 @@ func (l LuaPlugin) checkValid() error {
 	return nil
 }
 
-func (l LuaPlugin) Close() {
+func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l LuaPlugin) Search(ctx *PluginContext) []Version {
+func (l *LuaPlugin) Search(ctx *Context) []SearchResult {
 	L := l.state
 	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
@@ -72,30 +72,30 @@ func (l LuaPlugin) Search(ctx *PluginContext) []Version {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	var result []Version
+	var result []SearchResult
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		rV, ok := value.(lua.LString)
 		if !ok {
 			panic("expected a string")
 		}
-		result = append(result, Version(rV.String()))
+		result = append(result, SearchResult(rV.String()))
 	})
 
 	return result
 }
 
-func (l LuaPlugin) convert2LTable(L *lua.LState, ctx *PluginContext) *lua.LTable {
-	handler := ctx.Handler
-	version := ctx.Version
+func (l *LuaPlugin) convert2LTable(L *lua.LState, ctx *Context) *lua.LTable {
+	//handler := ctx.Handler
+	//version := ctx.Version
 	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "version_path", lua.LString(handler.VersionPath(version)))
-	L.SetField(ctxTable, "os_type", lua.LString(handler.sdkManager.osType))
-	L.SetField(ctxTable, "arch_type", lua.LString(handler.sdkManager.osType))
-	L.SetField(ctxTable, "version", lua.LString(version))
+	//L.SetField(ctxTable, "version_path", lua.LString(handler.VersionPath(version)))
+	//L.SetField(ctxTable, "os_type", lua.LString(handler.sdkManager.osType))
+	//L.SetField(ctxTable, "arch_type", lua.LString(handler.sdkManager.osType))
+	//L.SetField(ctxTable, "version", lua.LString(version))
 	return ctxTable
 }
 
-func (l LuaPlugin) DownloadUrl(ctx *PluginContext) *url.URL {
+func (l *LuaPlugin) DownloadUrl(ctx *Context) *url.URL {
 	L := l.state
 	ctxTable := l.convert2LTable(L, ctx)
 
@@ -114,7 +114,7 @@ func (l LuaPlugin) DownloadUrl(ctx *PluginContext) *url.URL {
 	return u
 }
 
-func (l LuaPlugin) EnvKeys(ctx *PluginContext) []*env.KV {
+func (l *LuaPlugin) EnvKeys(ctx *Context) []*env.KV {
 	L := l.state
 	ctxTable := l.convert2LTable(L, ctx)
 	if err := L.CallByParam(lua.P{
@@ -142,7 +142,7 @@ func (l LuaPlugin) EnvKeys(ctx *PluginContext) []*env.KV {
 	return envKeys
 }
 
-func (l LuaPlugin) Name() string {
+func (l *LuaPlugin) Name() string {
 	L := l.state
 
 	if err := L.CallByParam(lua.P{
@@ -167,7 +167,7 @@ func NewLuaSource(path string) *LuaPlugin {
 		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil
 	}
-	pluginOjb := L.GetGlobal(LUA_PLUGIN_OBJ_KEY)
+	pluginOjb := L.GetGlobal(LuaPluginObjKey)
 	if pluginOjb.Type() == lua.LTNil {
 		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", "plugin object not found", path)
 		return nil

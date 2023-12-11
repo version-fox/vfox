@@ -18,6 +18,7 @@ package sdk
 
 import (
 	"fmt"
+	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ func (s *Manager) LoadExtScript() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".lua") {
-			source := NewLuaSource(path)
+			source := plugin.NewLuaSource(path)
 			if source == nil {
 				return nil
 			}
@@ -156,9 +157,6 @@ func NewSdkManager() *Manager {
 		_, _ = os.Create(manager.envConfigPath)
 	}
 
-	//if node, err := NewHandler(manager, NewNodeSource()); err == nil {
-	//	manager.sdkMap[strings.ToLower(node.Name)] = node
-	//}
 	manager.LoadExtScript()
 
 	return manager

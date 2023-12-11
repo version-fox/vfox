@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
 	"github.com/schollz/progressbar/v3"
 	"io"
@@ -40,7 +41,7 @@ type Handler struct {
 	// sdk name
 	Name string
 	// sdk source
-	Source Plugin
+	plugin plugin.Plugin
 }
 
 func (b *Handler) Install(version Version) error {
@@ -49,10 +50,9 @@ func (b *Handler) Install(version Version) error {
 		fmt.Printf("%s has been installed, no need to install it.\n", label)
 		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
 	}
-	downloadUrl := b.Source.DownloadUrl(
-		&PluginContext{
-			Handler: b,
-			Version: version,
+	downloadUrl := b.plugin.DownloadUrl(
+		&plugin.Context{
+			Version: string(version),
 		},
 	)
 	filePath, err := b.Download(downloadUrl)
@@ -101,10 +101,9 @@ func (b *Handler) Uninstall(version Version) error {
 }
 
 func (b *Handler) Search(args string) error {
-	versions := b.Source.Search(
-		&PluginContext{
-			Handler: b,
-			Version: Version(args),
+	versions := b.plugin.Search(
+		&plugin.Context{
+			Version: args,
 		},
 	)
 	if len(versions) == 0 {
@@ -123,10 +122,9 @@ func (b *Handler) Use(version Version) error {
 		fmt.Printf("%s is not installed, please install it first.\n", label)
 		return fmt.Errorf("%s is not installed, please install it first.\n", label)
 	}
-	keys := b.Source.EnvKeys(
-		&PluginContext{
-			Handler: b,
-			Version: version,
+	keys := b.plugin.EnvKeys(
+		&plugin.Context{
+			Version: string(version),
 		},
 	)
 	keys = append(keys, &env.KV{
@@ -165,7 +163,7 @@ func (b *Handler) Current() Version {
 
 func (b *Handler) Close() {
 	b.envManager.Flush()
-	b.Source.Close()
+	b.plugin.Close()
 }
 
 func (b *Handler) Update() {
@@ -229,7 +227,7 @@ func (b *Handler) envVersionKey() string {
 	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Name))
 }
 
-func NewHandler(manager *Manager, source Plugin) (*Handler, error) {
+func NewHandler(manager *Manager, source plugin.Plugin) (*Handler, error) {
 	name := source.Name()
 	envManger, err := env.NewEnvManager(manager.configPath, name)
 	if err != nil {
@@ -240,6 +238,6 @@ func NewHandler(manager *Manager, source Plugin) (*Handler, error) {
 		envManager: envManger,
 		localPath:  filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
 		Name:       name,
-		Source:     source,
+		plugin:     source,
 	}, nil
 }

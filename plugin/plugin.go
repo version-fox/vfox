@@ -14,22 +14,26 @@
  *    limitations under the License.
  */
 
-package sdk
+package plugin
 
 import (
 	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/util"
 	"net/url"
 )
 
 type Plugin interface {
-	DownloadUrl(ctx *PluginContext) *url.URL
-	EnvKeys(ctx *PluginContext) []*env.KV
-	Search(ctx *PluginContext) []Version
+	DownloadUrl(ctx *Context) *url.URL
+	EnvKeys(ctx *Context) []*env.KV
+	Search(ctx *Context) []SearchResult
 	Name() string
 	Close()
 }
 
-type PluginContext struct {
-	Handler *Handler
-	Version Version
+type Context struct {
+	util.OSType
+	util.ArchType
+	Version string
 }
+
+type SearchResult string
