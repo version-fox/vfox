@@ -72,6 +72,7 @@ func (m *Manager) Search(config Arg) error {
 func (m *Manager) Use(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {
+		fmt.Printf("%s not supported\n", config.Name)
 		return fmt.Errorf("%s not supported", config.Name)
 	}
 	return m.sdkMap[config.Name].Use(Version(config.Version))
@@ -117,6 +118,9 @@ func (m *Manager) Current(sdkName string) error {
 
 func (m *Manager) loadSdk() {
 	_ = filepath.Walk(m.pluginPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
@@ -172,6 +176,7 @@ func NewSdkManager() *Manager {
 		configPath:    configPath,
 		sdkCachePath:  sdkCachePath,
 		envConfigPath: envConfigPath,
+		pluginPath:    pluginPath,
 		EnvManager:    envManger,
 		sdkMap:        make(map[string]*Sdk),
 		osType:        util.GetOSType(),

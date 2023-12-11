@@ -71,7 +71,7 @@ func (l *LuaPlugin) Search(version string) []string {
 		Fn:      l.pluginObj.RawGetString("Search").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
-	}, ctxTable); err != nil {
+	}, l.pluginObj, ctxTable); err != nil {
 		panic(err)
 	}
 
@@ -99,7 +99,7 @@ func (l *LuaPlugin) DownloadUrl(version string) *url.URL {
 		Fn:      l.pluginObj.RawGetString("DownloadUrl").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
-	}, ctxTable); err != nil {
+	}, l.pluginObj, ctxTable); err != nil {
 		panic(err)
 	}
 
@@ -119,7 +119,7 @@ func (l *LuaPlugin) EnvKeys(version, versionPath string) []*env.KV {
 		Fn:      l.pluginObj.RawGetString("EnvKeys"),
 		NRet:    1,
 		Protect: true,
-	}, ctxTable); err != nil {
+	}, l.pluginObj, ctxTable); err != nil {
 		panic(err)
 	}
 
@@ -165,15 +165,15 @@ func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaP
 	// TODO: use filename as the plugin Name
 	L := lua.NewState()
 	module.Preload(L)
-	// set OS_TYPE and ARCH_TYPE
-
-	L.SetGlobal(OsType, lua.LString(osType))
-	L.SetGlobal(ArchType, lua.LString(archType))
-
 	if err := L.DoString(string(file)); err != nil {
 		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil
 	}
+
+	// set OS_TYPE and ARCH_TYPE
+	L.SetGlobal(OsType, lua.LString(osType))
+	L.SetGlobal(ArchType, lua.LString(archType))
+
 	pluginOjb := L.GetGlobal(LuaPluginObjKey)
 	if pluginOjb.Type() == lua.LTNil {
 		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", "plugin object not found", path)

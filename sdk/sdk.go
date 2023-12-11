@@ -53,6 +53,7 @@ func (b *Sdk) Install(version Version) error {
 		return err
 	}
 	decompressor := util.NewDecompressor(filePath)
+	fmt.Printf("Unpacking %s...\n", filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
 		return fmt.Errorf("unknown file type")
@@ -68,7 +69,7 @@ func (b *Sdk) Install(version Version) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Install %s success!\n", label)
+	fmt.Printf("Install %s success!, path:%s \n", label, newDirPath)
 	// del cache file
 	_ = os.Remove(filePath)
 	return nil
@@ -188,9 +189,16 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 
 	defer f.Close()
 
-	bar := progressbar.DefaultBytes(
+	//bar := progressbar.DefaultBytes(
+	//	resp.ContentLength,
+	//	"Downloading",
+	//)
+	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		"Downloading",
+		progressbar.OptionSetRenderBlankState(true),
+		progressbar.OptionSetDescription("Downloading..."),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionClearOnFinish(),
 	)
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {

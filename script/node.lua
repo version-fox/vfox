@@ -1,37 +1,48 @@
+---  Default global variable
+---  OS_TYPE:  windows, linux, darwin
+---  ARCH_TYPE: 386, amd64, arm, arm64  ...
+
+OS_TYPE = ""
+ARCH_TYPE = ""
+
 nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
 
-function download_url(ctx)
-    os_type = ctx.os_type
-    arch_type = ctx.arch_type
+PLUGIN = {
+    name = "node",
+    author = "Lihan",
+    version = "0.0.1",
+    updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
+}
+
+--- Return to target version download link
+--- @param ctx table
+--- @field ctx.version string version
+--- @return string download url
+function PLUGIN:DownloadUrl(ctx)
     version = ctx.version
 
+    arch_type = ARCH_TYPE
+    ext = ".tar.gz"
     if arch_type == "amd64" then
         arch_type = "x64"
     end
-    return string.format(nodeDownloadUrl, version, version, os_type, arch_type, file_ext(ctx))
-end
-
-function file_ext(ctx)
-    os_type = ctx.os_type
-    if os_type == "windows" then
-        return ".zip"
+    if OS_TYPE == "windows" then
+        ext = ".zip"
     end
-    return ".tar.gz"
+    return string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
 end
 
-function name()
-    return "node"
+--- Returns the available download versions for the target context
+--- @param ctx table
+--- @field ctx.version string version
+function PLUGIN:Search(ctx)
+    return {}
 end
 
-function name()
-    return {
-        "node",
-        "npm",
-        "npx"
-    }
-end
-
-function env_keys(ctx)
+--- Return the need to set environment variables when use this version
+--- @param ctx table {version, version_path}
+--- @return {key = "JAVA_HOME", value = "xxxxxx"}
+function PLUGIN:EnvKeys(ctx)
     version_path = ctx.version_path
     return {
         {
