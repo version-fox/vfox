@@ -33,24 +33,20 @@ import (
 
 type Version string
 
-type Handler struct {
+type Sdk struct {
 	sdkManager *Manager
-	envManager env.Manager
+	Plugin     *plugin.LuaPlugin
 	// current sdk install path
-	localPath string
-	// sdk name
-	Name string
-	// sdk source
-	plugin plugin.Plugin
+	sdkPath string
 }
 
-func (b *Handler) Install(version Version) error {
+func (b *Sdk) Install(version Version) error {
 	label := b.label(version)
 	if b.checkExists(version) {
 		fmt.Printf("%s has been installed, no need to install it.\n", label)
 		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
 	}
-	downloadUrl := b.plugin.DownloadUrl(
+	downloadUrl := b.Plugin.DownloadUrl(
 		&plugin.Context{
 			Version: string(version),
 		},
@@ -82,7 +78,7 @@ func (b *Handler) Install(version Version) error {
 	return nil
 }
 
-func (b *Handler) Uninstall(version Version) error {
+func (b *Sdk) Uninstall(version Version) error {
 	if !b.checkExists(version) {
 		fmt.Printf("%s is not installed, no need to uninstall it.\n", b.label(version))
 		return fmt.Errorf("%s is not installed, no need to uninstall it.\n", b.label(version))
@@ -94,20 +90,20 @@ func (b *Handler) Uninstall(version Version) error {
 	fmt.Printf("Uninstall %s success!\n", b.label(version))
 	remainVersion := b.List()
 	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(b.localPath)
+		_ = os.RemoveAll(b.sdkPath)
 	}
 	firstVersion := remainVersion[0]
 	return b.Use(firstVersion)
 }
 
-func (b *Handler) Search(args string) error {
-	versions := b.plugin.Search(
+func (b *Sdk) Search(args string) error {
+	versions := b.Plugin.Search(
 		&plugin.Context{
 			Version: args,
 		},
 	)
 	if len(versions) == 0 {
-		fmt.Printf("No available %s version.\n", b.Name)
+		fmt.Printf("No available %s version.\n", b.Plugin.Name())
 		return nil
 	}
 	for _, version := range versions {
@@ -116,13 +112,13 @@ func (b *Handler) Search(args string) error {
 	return nil
 }
 
-func (b *Handler) Use(version Version) error {
+func (b *Sdk) Use(version Version) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
 		fmt.Printf("%s is not installed, please install it first.\n", label)
 		return fmt.Errorf("%s is not installed, please install it first.\n", label)
 	}
-	keys := b.plugin.EnvKeys(
+	keys := b.Plugin.EnvKeys(
 		&plugin.Context{
 			Version: string(version),
 		},
@@ -131,20 +127,20 @@ func (b *Handler) Use(version Version) error {
 		Key:   b.envVersionKey(),
 		Value: string(version),
 	})
-	err := b.envManager.Load(keys)
+	err := b.sdkManager.EnvManager.Load(keys)
 	if err != nil {
 		return fmt.Errorf("Use %s error, err: %s\n", label, err)
 	}
 	fmt.Printf("Now using %s\n", label)
-	return b.envManager.ReShell()
+	return b.sdkManager.EnvManager.ReShell()
 }
 
-func (b *Handler) List() []Version {
-	if !util.FileExists(b.localPath) {
+func (b *Sdk) List() []Version {
+	if !util.FileExists(b.sdkPath) {
 		return make([]Version, 0)
 	}
 	var versions []Version
-	err := filepath.Walk(b.localPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(b.sdkPath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() && strings.HasPrefix(info.Name(), "v-") {
 			versions = append(versions, Version(strings.TrimPrefix(info.Name(), "v-")))
 		}
@@ -156,29 +152,25 @@ func (b *Handler) List() []Version {
 	return versions
 }
 
-func (b *Handler) Current() Version {
-	value, _ := b.envManager.Get(b.envVersionKey())
+func (b *Sdk) Current() Version {
+	value, _ := b.sdkManager.EnvManager.Get(b.envVersionKey())
 	return Version(value)
 }
 
-func (b *Handler) Close() {
-	b.envManager.Flush()
-	b.plugin.Close()
+func (b *Sdk) Close() {
+	b.sdkManager.EnvManager.Flush()
+	b.Plugin.Close()
 }
 
-func (b *Handler) Update() {
-	// TODO 插件升级系统
-}
-
-func (b *Handler) checkExists(version Version) bool {
+func (b *Sdk) checkExists(version Version) bool {
 	return util.FileExists(b.VersionPath(version))
 }
 
-func (b *Handler) VersionPath(version Version) string {
-	return filepath.Join(b.localPath, fmt.Sprintf("v-%s", version))
+func (b *Sdk) VersionPath(version Version) string {
+	return filepath.Join(b.sdkPath, fmt.Sprintf("v-%s", version))
 }
 
-func (b *Handler) Download(url *url.URL) (string, error) {
+func (b *Sdk) Download(url *url.URL) (string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return "", err
@@ -194,12 +186,12 @@ func (b *Handler) Download(url *url.URL) (string, error) {
 		return "", errors.New("source file not found")
 	}
 
-	err = os.MkdirAll(b.localPath, 0755)
+	err = os.MkdirAll(b.sdkPath, 0755)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(b.localPath, filepath.Base(url.Path))
+	path := filepath.Join(b.sdkPath, filepath.Base(url.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -219,25 +211,19 @@ func (b *Handler) Download(url *url.URL) (string, error) {
 	return path, nil
 }
 
-func (b *Handler) label(version Version) string {
-	return fmt.Sprintf("%s@%s", strings.ToLower(b.Name), version)
+func (b *Sdk) label(version Version) string {
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name()), version)
 }
 
-func (b *Handler) envVersionKey() string {
-	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Name))
+func (b *Sdk) envVersionKey() string {
+	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name()))
 }
 
-func NewHandler(manager *Manager, source plugin.Plugin) (*Handler, error) {
+func NewSdk(manager *Manager, source *plugin.LuaPlugin) (*Sdk, error) {
 	name := source.Name()
-	envManger, err := env.NewEnvManager(manager.configPath, name)
-	if err != nil {
-		return nil, err
-	}
-	return &Handler{
+	return &Sdk{
 		sdkManager: manager,
-		envManager: envManger,
-		localPath:  filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
-		Name:       name,
-		plugin:     source,
+		sdkPath:    filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
+		Plugin:     source,
 	}, nil
 }

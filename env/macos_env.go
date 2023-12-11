@@ -146,7 +146,7 @@ func (m *macosEnvManager) loadEnvFile() error {
 	return nil
 }
 
-func NewEnvManager(vfConfigPath, sdkName string) (Manager, error) {
+func NewEnvManager(vfConfigPath string) (Manager, error) {
 	shellInfo, err := NewShellInfo()
 	if err != nil {
 		return nil, err

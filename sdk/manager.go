@@ -18,11 +18,11 @@ package sdk
 
 import (
 	"fmt"
+	"github.com/aooohan/version-fox/env"
 	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Arg struct {
@@ -34,28 +34,12 @@ type Manager struct {
 	configPath    string
 	sdkCachePath  string
 	envConfigPath string
-	luaScriptPath string
-	sdkMap        map[string]*Handler
+	pluginPath    string
+	sdkMap        map[string]*Sdk
+	PluginManager *plugin.Manager
+	EnvManager    env.Manager
 	osType        util.OSType
 	archType      util.ArchType
-}
-
-func (s *Manager) LoadExtScript() {
-	_ = filepath.Walk(s.luaScriptPath, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".lua") {
-			source := plugin.NewLuaSource(path)
-			if source == nil {
-				return nil
-			}
-			if node, err := NewHandler(s, source); err == nil {
-				s.sdkMap[strings.ToLower(node.Name)] = node
-			}
-		}
-		return nil
-	})
 }
 
 func (s *Manager) Install(config Arg) error {
@@ -132,6 +116,7 @@ func (s *Manager) Current(sdkName string) error {
 }
 
 func (s *Manager) Close() {
+	s.PluginManager.Close()
 	for _, handler := range s.sdkMap {
 		handler.Close()
 	}
@@ -142,22 +127,31 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Get user home dir error")
 	}
+	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
+	configPath := filepath.Join(userHomeDir, ".version-fox")
+	pluginManager, err := plugin.NewPluginManager(pluginPath)
+	if err != nil {
+		panic("Init plugin manager error")
+	}
+	envManger, err := env.NewEnvManager(configPath)
+	if err != nil {
+		panic("Init env manager error")
+	}
 	manager := &Manager{
-		configPath:    filepath.Join(userHomeDir, ".version-fox"),
+		configPath:    configPath,
 		sdkCachePath:  filepath.Join(userHomeDir, ".version-fox", ".cache"),
 		envConfigPath: filepath.Join(userHomeDir, ".version-fox", "env.sh"),
-		luaScriptPath: filepath.Join(userHomeDir, ".version-fox", "source-script"),
-		sdkMap:        make(map[string]*Handler),
+		PluginManager: pluginManager,
+		EnvManager:    envManger,
+		sdkMap:        make(map[string]*Sdk),
 		osType:        util.GetOSType(),
 		archType:      util.GetArchType(),
 	}
 	_ = os.MkdirAll(manager.sdkCachePath, 0755)
-	_ = os.MkdirAll(manager.luaScriptPath, 0755)
+	_ = os.MkdirAll(pluginPath, 0755)
 	if !util.FileExists(manager.envConfigPath) {
 		_, _ = os.Create(manager.envConfigPath)
 	}
-
-	manager.LoadExtScript()
 
 	return manager
 }

@@ -33,6 +33,7 @@ type LuaPlugin struct {
 	state     *lua.LState
 	pluginObj lua.LValue
 	name      string
+	path      string
 }
 
 func (l *LuaPlugin) checkValid() error {
@@ -142,6 +143,22 @@ func (l *LuaPlugin) EnvKeys(ctx *Context) []*env.KV {
 	return envKeys
 }
 
+func (l *LuaPlugin) luaPrint() int {
+	L := l.state
+	L.SetGlobal("print", L.NewFunction(func(L *lua.LState) int {
+		top := L.GetTop()
+		for i := 1; i <= top; i++ {
+			fmt.Print(L.ToStringMeta(L.Get(i)))
+			if i != top {
+				fmt.Print("\t")
+			}
+		}
+		fmt.Println()
+		return 0
+	}))
+	return 0
+}
+
 func (l *LuaPlugin) Name() string {
 	L := l.state
 
@@ -156,6 +173,10 @@ func (l *LuaPlugin) Name() string {
 	ret := L.Get(-1) // returned value
 	L.Pop(1)         // remove received value
 	return ret.String()
+}
+
+func (l *LuaPlugin) Label(version string) string {
+	return fmt.Sprintf("%s@%s", l.Name(), version)
 }
 
 func NewLuaSource(path string) *LuaPlugin {
