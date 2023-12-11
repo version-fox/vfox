@@ -17,9 +17,14 @@
 package sdk
 
 import (
+	"errors"
 	"fmt"
 	"github.com/aooohan/version-fox/env"
 	"github.com/aooohan/version-fox/util"
+	"github.com/schollz/progressbar/v3"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,10 +33,14 @@ import (
 type Version string
 
 type Handler struct {
-	Operation  *Operation
-	EnvManager env.Manager
-	Name       string
-	Source     Source
+	sdkManager *Manager
+	envManager env.Manager
+	// current sdk install path
+	localPath string
+	// sdk name
+	Name string
+	// sdk source
+	Source Source
 }
 
 func (b *Handler) Install(version Version) error {
@@ -41,7 +50,7 @@ func (b *Handler) Install(version Version) error {
 		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
 	}
 	downloadUrl := b.Source.DownloadUrl(b, version)
-	filePath, err := b.Operation.Download(downloadUrl)
+	filePath, err := b.Download(downloadUrl)
 	if err != nil {
 		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
 		return err
@@ -80,7 +89,7 @@ func (b *Handler) Uninstall(version Version) error {
 	fmt.Printf("Uninstall %s success!\n", b.label(version))
 	remainVersion := b.List()
 	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(b.Operation.LocalPath)
+		_ = os.RemoveAll(b.localPath)
 	}
 	firstVersion := remainVersion[0]
 	return b.Use(firstVersion)
@@ -109,20 +118,20 @@ func (b *Handler) Use(version Version) error {
 		Key:   b.envVersionKey(),
 		Value: string(version),
 	})
-	err := b.EnvManager.Load(keys)
+	err := b.envManager.Load(keys)
 	if err != nil {
 		return fmt.Errorf("Use %s error, err: %s\n", label, err)
 	}
 	fmt.Printf("Now using %s\n", label)
-	return b.EnvManager.ReShell()
+	return b.envManager.ReShell()
 }
 
 func (b *Handler) List() []Version {
-	if !util.FileExists(b.Operation.LocalPath) {
+	if !util.FileExists(b.localPath) {
 		return make([]Version, 0)
 	}
 	var versions []Version
-	err := filepath.Walk(b.Operation.LocalPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(b.localPath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() && strings.HasPrefix(info.Name(), "v-") {
 			versions = append(versions, Version(strings.TrimPrefix(info.Name(), "v-")))
 		}
@@ -135,12 +144,12 @@ func (b *Handler) List() []Version {
 }
 
 func (b *Handler) Current() Version {
-	value, _ := b.EnvManager.Get(b.envVersionKey())
+	value, _ := b.envManager.Get(b.envVersionKey())
 	return Version(value)
 }
 
 func (b *Handler) Close() {
-	b.EnvManager.Flush()
+	b.envManager.Flush()
 	b.Source.Close()
 }
 
@@ -153,7 +162,48 @@ func (b *Handler) checkExists(version Version) bool {
 }
 
 func (b *Handler) VersionPath(version Version) string {
-	return filepath.Join(b.Operation.LocalPath, fmt.Sprintf("v-%s", version))
+	return filepath.Join(b.localPath, fmt.Sprintf("v-%s", version))
+}
+
+func (b *Handler) Download(url *url.URL) (string, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", errors.New("source file not found")
+	}
+
+	err = os.MkdirAll(b.localPath, 0755)
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(b.localPath, filepath.Base(url.Path))
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	defer f.Close()
+
+	bar := progressbar.DefaultBytes(
+		resp.ContentLength,
+		"Downloading",
+	)
+	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func (b *Handler) label(version Version) string {
@@ -166,19 +216,14 @@ func (b *Handler) envVersionKey() string {
 
 func NewHandler(manager *Manager, source Source) (*Handler, error) {
 	name := source.Name()
-	operation := &Operation{
-		LocalPath:    filepath.Join(manager.sdkCachePath, name),
-		vfConfigPath: manager.configPath,
-		OsType:       manager.osType,
-		ArchType:     manager.archType,
-	}
 	envManger, err := env.NewEnvManager(manager.configPath, name)
 	if err != nil {
 		return nil, err
 	}
 	return &Handler{
-		Operation:  operation,
-		EnvManager: envManger,
+		sdkManager: manager,
+		envManager: envManger,
+		localPath:  filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
 		Name:       name,
 		Source:     source,
 	}, nil
