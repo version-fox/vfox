@@ -2,6 +2,9 @@
 ---  OS_TYPE:  windows, linux, darwin
 ---  ARCH_TYPE: 386, amd64, arm, arm64  ...
 
+OS_TYPE = ""
+ARCH_TYPE = ""
+
 PLUGIN = {
     name = "java",
     author = "Lihan",
@@ -13,20 +16,15 @@ PLUGIN = {
 --- Return to target version download link
 --- @param ctx table
 --- @field ctx.version string version
---- @field ctx.os_type string os type
---- @field ctx.arch_type string arch type
 --- @return string download url
 function PLUGIN:DownloadUrl(ctx)
-    -- TODO 从官网获取最新版本
-    -- TODO 也可以是本地已经装了的???
     return ""
 end
 
---- TODO 可能会出现不一致的版本情况 !! 也就是version怎么解析的问题
 
 --- Returns the available download versions for the target context
----
---- @param ctx table {version1,version2...}
+--- @param ctx table
+--- @field ctx.version string version
 function PLUGIN:Search(ctx)
     return search(ctx)
 end

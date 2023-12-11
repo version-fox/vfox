@@ -14,11 +14,11 @@
  *    limitations under the License.
  */
 
-package lua_module
+package module
 
 import (
-	"github.com/aooohan/version-fox/lua_module/http"
-	"github.com/aooohan/version-fox/lua_module/json"
+	"github.com/aooohan/version-fox/plugin/module/http"
+	"github.com/aooohan/version-fox/plugin/module/json"
 	lua "github.com/yuin/gopher-lua"
 )
 

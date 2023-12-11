@@ -46,11 +46,7 @@ func (b *Sdk) Install(version Version) error {
 		fmt.Printf("%s has been installed, no need to install it.\n", label)
 		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
 	}
-	downloadUrl := b.Plugin.DownloadUrl(
-		&plugin.Context{
-			Version: string(version),
-		},
-	)
+	downloadUrl := b.Plugin.DownloadUrl(string(version))
 	filePath, err := b.Download(downloadUrl)
 	if err != nil {
 		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
@@ -96,12 +92,8 @@ func (b *Sdk) Uninstall(version Version) error {
 	return b.Use(firstVersion)
 }
 
-func (b *Sdk) Search(args string) error {
-	versions := b.Plugin.Search(
-		&plugin.Context{
-			Version: args,
-		},
-	)
+func (b *Sdk) Search(version string) error {
+	versions := b.Plugin.Search(version)
 	if len(versions) == 0 {
 		fmt.Printf("No available %s version.\n", b.Plugin.Name)
 		return nil
@@ -118,11 +110,7 @@ func (b *Sdk) Use(version Version) error {
 		fmt.Printf("%s is not installed, please install it first.\n", label)
 		return fmt.Errorf("%s is not installed, please install it first.\n", label)
 	}
-	keys := b.Plugin.EnvKeys(
-		&plugin.Context{
-			Version: string(version),
-		},
-	)
+	keys := b.Plugin.EnvKeys(string(version), b.VersionPath(version))
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),

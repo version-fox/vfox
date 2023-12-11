@@ -121,7 +121,7 @@ func (m *Manager) loadSdk() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".lua") {
-			source := plugin.NewLuaSource(path)
+			source := plugin.NewLuaSource(path, m.osType, m.archType)
 			if source == nil {
 				return nil
 			}

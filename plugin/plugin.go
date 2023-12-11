@@ -19,7 +19,7 @@ package plugin
 import (
 	"fmt"
 	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/lua_module"
+	"github.com/aooohan/version-fox/plugin/module"
 	"github.com/aooohan/version-fox/util"
 	lua "github.com/yuin/gopher-lua"
 	"net/url"
@@ -28,15 +28,9 @@ import (
 
 const (
 	LuaPluginObjKey = "PLUGIN"
+	OsType          = "OS_TYPE"
+	ArchType        = "ARCH_TYPE"
 )
-
-type Context struct {
-	util.OSType
-	util.ArchType
-	Version string
-}
-
-type SearchResult string
 
 type LuaPlugin struct {
 	state     *lua.LState
@@ -69,9 +63,10 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) Search(ctx *Context) []SearchResult {
+func (l *LuaPlugin) Search(version string) []string {
 	L := l.state
-	ctxTable := l.convert2LTable(L, ctx)
+	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "version", lua.LString(version))
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("Search").(*lua.LFunction),
 		NRet:    1,
@@ -83,32 +78,22 @@ func (l *LuaPlugin) Search(ctx *Context) []SearchResult {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	var result []SearchResult
+	var result []string
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		rV, ok := value.(lua.LString)
 		if !ok {
 			panic("expected a string")
 		}
-		result = append(result, SearchResult(rV.String()))
+		result = append(result, rV.String())
 	})
 
 	return result
 }
 
-func (l *LuaPlugin) convert2LTable(L *lua.LState, ctx *Context) *lua.LTable {
-	//handler := ctx.Handler
-	//version := ctx.Version
-	ctxTable := L.NewTable()
-	//L.SetField(ctxTable, "version_path", lua.LString(handler.VersionPath(version)))
-	//L.SetField(ctxTable, "os_type", lua.LString(handler.sdkManager.osType))
-	//L.SetField(ctxTable, "arch_type", lua.LString(handler.sdkManager.osType))
-	//L.SetField(ctxTable, "version", lua.LString(version))
-	return ctxTable
-}
-
-func (l *LuaPlugin) DownloadUrl(ctx *Context) *url.URL {
+func (l *LuaPlugin) DownloadUrl(version string) *url.URL {
 	L := l.state
-	ctxTable := l.convert2LTable(L, ctx)
+	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "version", lua.LString(version))
 
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("DownloadUrl").(*lua.LFunction),
@@ -125,9 +110,11 @@ func (l *LuaPlugin) DownloadUrl(ctx *Context) *url.URL {
 	return u
 }
 
-func (l *LuaPlugin) EnvKeys(ctx *Context) []*env.KV {
+func (l *LuaPlugin) EnvKeys(version, versionPath string) []*env.KV {
 	L := l.state
-	ctxTable := l.convert2LTable(L, ctx)
+	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "version", lua.LString(version))
+	L.SetField(ctxTable, "version_path", lua.LString(versionPath))
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("EnvKeys"),
 		NRet:    1,
@@ -173,11 +160,16 @@ func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
-func NewLuaSource(path string) *LuaPlugin {
+func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaPlugin {
 	file, _ := os.ReadFile(path)
 	// TODO: use filename as the plugin Name
 	L := lua.NewState()
-	lua_module.Preload(L)
+	module.Preload(L)
+	// set OS_TYPE and ARCH_TYPE
+
+	L.SetGlobal(OsType, lua.LString(osType))
+	L.SetGlobal(ArchType, lua.LString(archType))
+
 	if err := L.DoString(string(file)); err != nil {
 		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
 		return nil
