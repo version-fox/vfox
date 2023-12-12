@@ -81,7 +81,7 @@ func main() {
 				if l < 1 {
 					return cli.Exit("invalid arguments", 1)
 				}
-				return manager.Update(args.First())
+				return manager.Remove(args.First())
 			},
 		},
 		{

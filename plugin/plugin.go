@@ -34,7 +34,6 @@ const (
 type LuaPlugin struct {
 	state     *lua.LState
 	pluginObj *lua.LTable
-	path      string
 	Name      string
 	Author    string
 	Version   string

@@ -198,6 +198,7 @@ func (m *Manager) loadSdk() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".lua") {
+			// filename first as sdk name
 			content, _ := m.loadLuaFromFileOrUrl(path)
 			source, err := plugin.NewLuaPlugin(content, m.osType, m.archType)
 			if err != nil {
@@ -205,7 +206,8 @@ func (m *Manager) loadSdk() {
 				return nil
 			}
 			sdk, _ := NewSdk(m, source)
-			m.sdkMap[strings.ToLower(source.Name)] = sdk
+			name := strings.TrimSuffix(filepath.Base(path), ".lua")
+			m.sdkMap[strings.ToLower(name)] = sdk
 		}
 		return nil
 	})
@@ -218,6 +220,33 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) Remove(pluginName string) error {
+	source := m.sdkMap[pluginName]
+	if source == nil {
+		pterm.Println("This plugin has not been added.")
+		return fmt.Errorf("%s not installed", pluginName)
+	}
+	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
+	result, _ := pterm.DefaultInteractiveConfirm.
+		WithTextStyle(&pterm.ThemeDefault.DefaultText).
+		WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+		WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+		WithDefaultText("Please confirm").
+		Show()
+	if result {
+		pPath := filepath.Join(m.pluginPath, pluginName+".lua")
+		pterm.Printf("Removing %s plugin...\n", pPath)
+		err := os.RemoveAll(pPath)
+		if err != nil {
+			pterm.Printf("Remove %s plugin failed, err: %s\n", pluginName, err)
+			return fmt.Errorf("remove failed")
+		}
+		pterm.Printf("Removing %s sdk...\n", source.sdkPath)
+		// TODO also remove the env config
+		err = os.RemoveAll(source.sdkPath)
+		pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
+	} else {
+		pterm.Println("Remove canceled.")
+	}
 	return nil
 }
 
