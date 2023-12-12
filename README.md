@@ -70,5 +70,5 @@ contributions you make are greatly appreciated.
 
 ## License
 
-Distributed under the Apache 2.0 License. See `LICENSE` for more information.
+Distributed under the Apache 2.0 License. See [LICENSE](./LICENSE) for more information.
 
