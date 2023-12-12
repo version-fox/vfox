@@ -73,6 +73,7 @@ func (m *Manager) Uninstall(config Arg) error {
 	return source.Use(firstVersion)
 }
 
+// TODO need to support pagination
 func (m *Manager) Search(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {

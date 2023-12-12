@@ -7,6 +7,8 @@ ARCH_TYPE = ""
 
 nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
 
+--- https://nodejs.org/dist/index.json
+
 PLUGIN = {
     name = "node",
     author = "Lihan",

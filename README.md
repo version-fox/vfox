@@ -1,4 +1,7 @@
-# VersionFox(vf)
+<p>
+  <img src="./logo.png" alt="Logo" width="180" height="180">
+</p>
+<h1 style="margin-top: -40px">VersionFox</h1>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/aooohan/version-fox)](https://goreportcard.com/report/github.com/aooohan/version-fox)
 [![Go Reference](https://pkg.go.dev/badge/github.com/aooohan/version-fox.svg)](https://pkg.go.dev/github.com/aooohan/version-fox)
@@ -11,17 +14,7 @@ sdk via the command line.
 
 ### Examples
 
-plugin == sdk 
 ```bash
-$ vf add <name> <plugin-url>
-$ vf remove <name> (will remove plugins and installed sdk)
-$ vf install <name>@<version>
-$ vf uninstall <name>@<version>
-$ vf use <name>@<version>
-$ vf ls [<name>] (list installed sdk)
-
-
-
 $ vf install node@20.10.0
 Install node@20.10.0 success!
 
@@ -51,7 +44,10 @@ $ vf ls node
 -> 18.10.0 (current)
 ```
 
-## Supported SDKs
+## TODO
+
+
+## Supported SDK Plugins
 
 - [x] Node.js https://nodejs.org/dist/
 - [ ] Python
@@ -60,10 +56,6 @@ $ vf ls node
 - [ ] Rust
 - [ ] Ruby
   // etc...
-
-## IDEA  !!!
-
-- [ ] --local --global
 
 ## Contributing
 
@@ -79,27 +71,4 @@ contributions you make are greatly appreciated.
 ## License
 
 Distributed under the Apache 2.0 License. See `LICENSE` for more information.
-
-## Storage structure
-
--> .version-fox
--> env.sh
--> plugin
--> [plugin-name].lua
--> [plugin2-name].lua
--> .cache
--> [sdk1-name]
--> [v-version]
--> [sdk1-name]
--> [v-version]
-
-## Arch
-
--> SdkManager
--> Handler
--> Source
-
-## TODO
-
-
 
