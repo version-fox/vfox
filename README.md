@@ -1,5 +1,5 @@
-<p>
-  <img src="./logo.png" alt="Logo" width="180" height="180">
+<p style="style="margin-bottom: -20px;" align="center">
+  <img src="./logo.png" alt="Logo" width="250" height="250">
 </p>
 <h1 style="margin-top: -40px">VersionFox</h1>
 
