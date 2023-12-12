@@ -1,62 +1,50 @@
--- Last Modification: 2023-12-10
--- Description: Java script for version manager
--- Author: Lihan
--- Api doc: https://api.adoptium.net/q/swagger-ui
+---  Default global variable
+---  OS_TYPE:  windows, linux, darwin
+---  ARCH_TYPE: 386, amd64, arm, arm64  ...
 
-local http = require("http")
-local json = require("json")
+OS_TYPE = ""
+ARCH_TYPE = ""
 
+nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
 
-SearchUrl = "https://api.adoptium.net/v3/assets/latest/%s/hotspot?os=%s&architecture=%s"
-AvailableVersionsUrl = "https://api.adoptium.net/v3/info/available_releases"
+--- https://nodejs.org/dist/index.json
 
-function download_url(ctx)
-    os_type = ctx.os_type
-    arch_type = ctx.arch_type
+PLUGIN = {
+    name = "java",
+    author = "Lihan",
+    version = "0.0.1",
+    updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
+}
+
+--- Return to target version download link
+--- @param ctx table
+--- @field ctx.version string version
+--- @return string download url
+function PLUGIN:DownloadUrl(ctx)
     version = ctx.version
-    http.get({
-        url = url,
-        headers = {
-            ["Accept"] = "application/vnd.github.v3+json",
-        },
 
-    })
-
+    arch_type = ARCH_TYPE
+    ext = ".tar.gz"
     if arch_type == "amd64" then
         arch_type = "x64"
     end
-    return string.format(DownloadUrl, version, version, os_type, arch_type, file_ext(ctx))
+    if OS_TYPE == "windows" then
+        ext = ".zip"
+    end
+    return string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
 end
 
-function search(ctx)
-    os_type = ctx.os_type
-    arch_type = ctx.arch_type
-    version = ctx.version
-    if arch_type == "amd64" then
-        arch_type = "x64"
-    end
-    if os_type == 'darwin' then
-        os_type = 'mac'
-    end
-    local url = string.format(SearchUrl, version, os_type, arch_type)
-    local resp, errMsg = http.get({ url = url })
-    if errMsg ~= nil then
-        print("Error: " .. errMsg)
-        return nil, errMsg
-    end
-    local jsonBody = json.decode(resp.body)
-    local result = {}
-    for k, v in pairs(jsonBody) do
-        result[k] = v.release_name
-    end
-    return result
+--- Returns the available download versions for the target context
+--- @param ctx table
+--- @field ctx.version string version
+function PLUGIN:Search(ctx)
+    return {}
 end
 
-function name()
-    return "java"
-end
-
-function env_keys(ctx)
+--- Return the need to set environment variables when use this version
+--- @param ctx table {version, version_path}
+--- @return {key = "JAVA_HOME", value = "xxxxxx"}
+function PLUGIN:EnvKeys(ctx)
     version_path = ctx.version_path
     return {
         {

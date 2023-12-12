@@ -23,7 +23,6 @@ import (
 	"github.com/aooohan/version-fox/util"
 	lua "github.com/yuin/gopher-lua"
 	"net/url"
-	"os"
 )
 
 const (
@@ -160,14 +159,11 @@ func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
-func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaPlugin {
-	file, _ := os.ReadFile(path)
-	// TODO: use filename as the plugin Name
+func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
 	L := lua.NewState()
 	module.Preload(L)
-	if err := L.DoString(string(file)); err != nil {
-		fmt.Printf("Failed to load plugin: %s\nPlugin Path:%s\n", err.Error(), path)
-		return nil
+	if err := L.DoString(content); err != nil {
+		return nil, fmt.Errorf("content cannot be executed")
 	}
 
 	// set OS_TYPE and ARCH_TYPE
@@ -176,8 +172,7 @@ func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaP
 
 	pluginOjb := L.GetGlobal(LuaPluginObjKey)
 	if pluginOjb.Type() == lua.LTNil {
-		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", "plugin object not found", path)
-		return nil
+		return nil, fmt.Errorf("plugin object not found")
 	}
 
 	PLUGIN := pluginOjb.(*lua.LTable)
@@ -188,8 +183,7 @@ func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaP
 	}
 
 	if err := source.checkValid(); err != nil {
-		fmt.Printf("Plugin is invalid! err:%s \nPlugin Path: %s\n", err.Error(), path)
-		return nil
+		return nil, err
 	}
 
 	if name := PLUGIN.RawGetString("name"); name.Type() != lua.LTNil {
@@ -204,5 +198,5 @@ func NewLuaSource(path string, osType util.OSType, archType util.ArchType) *LuaP
 	if author := PLUGIN.RawGetString("author"); author.Type() != lua.LTNil {
 		source.Author = author.String()
 	}
-	return source
+	return source, nil
 }

@@ -23,6 +23,8 @@ import (
 	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,18 +107,18 @@ func (m *Manager) Use(config Arg) error {
 		}
 		selectPrinter := pterm.InteractiveSelectPrinter{
 			TextStyle:     &pterm.ThemeDefault.DefaultText,
-			DefaultText:   "Please select an option",
-			Options:       []string{},
 			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			Options:       arr,
 			DefaultOption: "",
 			MaxHeight:     5,
 			Selector:      "->",
 			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
 			Filter:        true,
+			OnInterruptFunc: func() {
+				os.Exit(0)
+			},
 		}
-		result, _ := selectPrinter.
-			WithOptions(arr).
-			Show(fmt.Sprintf("Please select a version of %s", config.Name))
+		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", config.Name))
 
 		return source.Use(Version(result))
 
@@ -196,8 +198,10 @@ func (m *Manager) loadSdk() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".lua") {
-			source := plugin.NewLuaSource(path, m.osType, m.archType)
-			if source == nil {
+			content, _ := m.loadLuaFromFileOrUrl(path)
+			source, err := plugin.NewLuaPlugin(content, m.osType, m.archType)
+			if err != nil {
+				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				return nil
 			}
 			sdk, _ := NewSdk(m, source)
@@ -222,7 +226,70 @@ func (m *Manager) Update(pluginName string) error {
 }
 
 func (m *Manager) Add(pluginName, url string) error {
+	pterm.Printf("Adding plugin from %s...\n", url)
+	content, err := m.loadLuaFromFileOrUrl(url)
+	if err != nil {
+		pterm.Printf("Failed to load %s plugin, err: %s\n", url, err)
+		return fmt.Errorf("install failed")
+	}
+	pterm.Println("Checking plugin...")
+	source, err := plugin.NewLuaPlugin(content, m.osType, m.archType)
+	if err != nil {
+		pterm.Printf("Check %s plugin failed, err: %s", url, err)
+	}
+	destPath := filepath.Join(m.pluginPath, pluginName+".lua")
+	err = os.WriteFile(destPath, []byte(content), 0644)
+	if err != nil {
+		pterm.Printf("Add %s plugin failed, err: %s\n", url, err)
+		return fmt.Errorf("write file error")
+	}
+	pterm.Println("Plugin info:")
+	pterm.Println("Name   ", "->", pterm.LightBlue(source.Name))
+	pterm.Println("Author ", "->", pterm.LightBlue(source.Author))
+	pterm.Println("Version", "->", pterm.LightBlue(source.Version))
+	pterm.Println("Path   ", "->", pterm.LightBlue(destPath))
+	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pluginName))
+	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vf install %s@<version>", pluginName)))
 	return nil
+}
+
+func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
+	if !strings.HasSuffix(path, ".lua") {
+		return "", fmt.Errorf("not a lua file")
+	}
+	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
+		resp, err := http.Get(path)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		cd := resp.Header.Get("Content-Disposition")
+		if strings.HasPrefix(cd, "attachment") {
+			return "", fmt.Errorf("not a lua file")
+		}
+		if resp.StatusCode == http.StatusNotFound {
+			return "", fmt.Errorf("file not found")
+		}
+		if str, err := io.ReadAll(resp.Body); err != nil {
+			return "", err
+		} else {
+			return string(str), nil
+		}
+	}
+
+	if !util.FileExists(path) {
+		return "", fmt.Errorf("file not found")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	str, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	return string(str), nil
+
 }
 
 func NewSdkManager() *Manager {
