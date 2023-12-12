@@ -22,12 +22,14 @@ import (
 	"github.com/aooohan/version-fox/env"
 	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
+	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -43,8 +45,8 @@ type Sdk struct {
 func (b *Sdk) Install(version Version) error {
 	label := b.label(version)
 	if b.checkExists(version) {
-		fmt.Printf("%s has been installed, no need to install it.\n", label)
-		return fmt.Errorf("%s has been installed, no need to install it.\n", label)
+		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
+		return fmt.Errorf("%s has been installed\n", label)
 	}
 	downloadUrl := b.Plugin.DownloadUrl(string(version))
 	filePath, err := b.Download(downloadUrl)
@@ -53,13 +55,13 @@ func (b *Sdk) Install(version Version) error {
 		return err
 	}
 	decompressor := util.NewDecompressor(filePath)
-	fmt.Printf("Unpacking %s...\n", filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
 		return fmt.Errorf("unknown file type")
 	}
 	fileName := decompressor.Filename()
 	destPath := filepath.Dir(filePath)
+	pterm.Printf("Unpacking %s...\n", filePath)
 	err = decompressor.Decompress(destPath)
 	if err != nil {
 		return err
@@ -69,47 +71,42 @@ func (b *Sdk) Install(version Version) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Install %s success!, path:%s \n", label, newDirPath)
+	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
+	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
 	// del cache file
 	_ = os.Remove(filePath)
 	return nil
 }
 
 func (b *Sdk) Uninstall(version Version) error {
+	label := b.label(version)
 	if !b.checkExists(version) {
-		fmt.Printf("%s is not installed, no need to uninstall it.\n", b.label(version))
-		return fmt.Errorf("%s is not installed, no need to uninstall it.\n", b.label(version))
+		pterm.Printf("%s is not installed...\n", pterm.Red(label))
+		return fmt.Errorf("%s is not installed", label)
 	}
 	err := os.RemoveAll(b.VersionPath(version))
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Uninstall %s success!\n", b.label(version))
-	remainVersion := b.List()
-	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(b.sdkPath)
-	}
-	firstVersion := remainVersion[0]
-	return b.Use(firstVersion)
+	pterm.Printf("Uninstalled %s successfully!\n", label)
+	return nil
 }
 
-func (b *Sdk) Search(version string) error {
+func (b *Sdk) Search(version string) []Version {
 	versions := b.Plugin.Search(version)
-	if len(versions) == 0 {
-		fmt.Printf("No available %s version.\n", b.Plugin.Name)
-		return nil
-	}
+	var result []Version
 	for _, version := range versions {
-		fmt.Printf("-> %s\n", version)
+		v := Version(version)
+		result = append(result, v)
 	}
-	return nil
+	return result
 }
 
 func (b *Sdk) Use(version Version) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
-		fmt.Printf("%s is not installed, please install it first.\n", label)
-		return fmt.Errorf("%s is not installed, please install it first.\n", label)
+		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
+		return fmt.Errorf("%s is not installed", label)
 	}
 	keys := b.Plugin.EnvKeys(string(version), b.VersionPath(version))
 	keys = append(keys, &env.KV{
@@ -120,7 +117,7 @@ func (b *Sdk) Use(version Version) error {
 	if err != nil {
 		return fmt.Errorf("Use %s error, err: %s\n", label, err)
 	}
-	fmt.Printf("Now using %s\n", label)
+	pterm.Printf("Now using %s\n", pterm.LightGreen(label))
 	return b.sdkManager.EnvManager.ReShell()
 }
 
@@ -138,6 +135,9 @@ func (b *Sdk) List() []Version {
 	if err != nil {
 		return nil
 	}
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i] > versions[j]
+	})
 	return versions
 }
 
@@ -189,16 +189,9 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 
 	defer f.Close()
 
-	//bar := progressbar.DefaultBytes(
-	//	resp.ContentLength,
-	//	"Downloading",
-	//)
-	bar := progressbar.NewOptions64(
+	bar := progressbar.DefaultBytes(
 		resp.ContentLength,
-		progressbar.OptionSetRenderBlankState(true),
-		progressbar.OptionSetDescription("Downloading..."),
-		progressbar.OptionFullWidth(),
-		progressbar.OptionClearOnFinish(),
+		"Downloading",
 	)
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {

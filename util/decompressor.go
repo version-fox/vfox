@@ -20,8 +20,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"fmt"
-	"github.com/schollz/progressbar/v3"
 	"io"
 	"os"
 	"path/filepath"
@@ -51,17 +49,11 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
-	bar := progressbar.NewOptions(-1,
-		progressbar.OptionSetRenderBlankState(true),
-		progressbar.OptionSetDescription("Decompressing..."),
-		progressbar.OptionFullWidth(),
-	)
 
 	for {
 		header, err := tr.Next()
 		switch {
 		case err == io.EOF:
-			fmt.Println()
 			return nil
 		case err != nil:
 			return err
@@ -89,7 +81,6 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 			f.Close()
 
 		}
-		_ = bar.Add(1)
 	}
 }
 
@@ -112,13 +103,11 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 		return err
 	}
 	defer r.Close()
-	bar := progressbar.Default(int64(len(r.File)), "Decompressing...")
 	for _, f := range r.File {
 		err := z.processZipFile(f, dest)
 		if err != nil {
 			return err
 		}
-		_ = bar.Add(1)
 	}
 	return nil
 }

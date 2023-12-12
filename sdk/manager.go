@@ -21,6 +21,8 @@ import (
 	"github.com/aooohan/version-fox/env"
 	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
+	"github.com/pterm/pterm"
+	"github.com/pterm/pterm/putils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,6 +47,7 @@ type Manager struct {
 func (m *Manager) Install(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {
+		pterm.PrintOnErrorf("%s not supported\n", config.Name)
 		return fmt.Errorf("%s not supported", config.Name)
 	}
 	if err := source.Install(Version(config.Version)); err != nil {
@@ -58,15 +61,33 @@ func (m *Manager) Uninstall(config Arg) error {
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return m.sdkMap[config.Name].Uninstall(Version(config.Version))
+	if err := source.Uninstall(Version(config.Version)); err != nil {
+		return err
+	}
+	remainVersion := source.List()
+	if len(remainVersion) == 0 {
+		_ = os.RemoveAll(source.sdkPath)
+	}
+	pterm.Println("Auto switch to the other version.")
+	firstVersion := remainVersion[0]
+	return source.Use(firstVersion)
 }
 
 func (m *Manager) Search(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {
+		pterm.Printf("%s not supported\n", config.Name)
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	return m.sdkMap[config.Name].Search(config.Version)
+	result := source.Search(config.Version)
+	if len(result) == 0 {
+		pterm.Println("No available version.")
+		return nil
+	}
+	for _, version := range result {
+		pterm.Println("->", fmt.Sprintf("v%s", version))
+	}
+	return nil
 }
 
 func (m *Manager) Use(config Arg) error {
@@ -75,15 +96,47 @@ func (m *Manager) Use(config Arg) error {
 		fmt.Printf("%s not supported\n", config.Name)
 		return fmt.Errorf("%s not supported", config.Name)
 	}
+	if config.Version == "" {
+		list := source.List()
+		var arr []string
+		for _, version := range list {
+			arr = append(arr, string(version))
+		}
+		selectPrinter := pterm.InteractiveSelectPrinter{
+			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			DefaultText:   "Please select an option",
+			Options:       []string{},
+			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			DefaultOption: "",
+			MaxHeight:     5,
+			Selector:      "->",
+			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			Filter:        true,
+		}
+		result, _ := selectPrinter.
+			WithOptions(arr).
+			Show(fmt.Sprintf("Please select a version of %s", config.Name))
+
+		return source.Use(Version(result))
+
+	}
 	return m.sdkMap[config.Name].Use(Version(config.Version))
 }
 
 func (m *Manager) List(arg Arg) error {
 	if arg.Name == "" {
-		for name, _ := range m.sdkMap {
-			fmt.Println("All current plugins: ")
-			fmt.Printf("-> %s\n", name)
+		tree := pterm.LeveledList{}
+		for name, sdk := range m.sdkMap {
+			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
+			for _, version := range sdk.List() {
+				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})
+			}
 		}
+		// Generate tree from LeveledList.
+		root := putils.TreeFromLeveledList(tree)
+		root.Text = "All installed sdk versions"
+		// Render TreePrinter
+		_ = pterm.DefaultTree.WithRoot(root).Render()
 		return nil
 	}
 	source := m.sdkMap[arg.Name]
@@ -93,26 +146,43 @@ func (m *Manager) List(arg Arg) error {
 	curVersion := source.Current()
 	list := source.List()
 	if len(list) == 0 {
-		fmt.Printf("-> %s\n", "no version installed")
+		pterm.Println("No available version.")
 		return nil
 	}
 	for _, version := range list {
 		if version == curVersion {
-			fmt.Printf("-> %s  (current)\n", version)
+			pterm.Println("->", fmt.Sprintf("v%s", version), pterm.LightGreen("<— current"))
 		} else {
-			fmt.Printf("-> %s\n", version)
+			pterm.Println("->", fmt.Sprintf("v%s", version))
 		}
 	}
+
 	return nil
 }
 
 func (m *Manager) Current(sdkName string) error {
+	if sdkName == "" {
+		for name, sdk := range m.sdkMap {
+			current := sdk.Current()
+			if current == "" {
+				pterm.Printf("%s -> N/A \n", name)
+			} else {
+				pterm.Printf("%s -> %s\n", name, pterm.LightGreen("v"+string(current)))
+			}
+		}
+		return nil
+	}
 	source := m.sdkMap[sdkName]
 	if source == nil {
+		pterm.Printf("%s not supported\n", sdkName)
 		return fmt.Errorf("%s not supported", sdkName)
 	}
 	current := source.Current()
-	println(fmt.Sprintf("-> \t  %s", current))
+	if current == "" {
+		pterm.Printf("No current version of %s\n", sdkName)
+		return nil
+	}
+	pterm.Println("->", pterm.LightGreen("v"+string(current)))
 	return nil
 }
 

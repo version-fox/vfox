@@ -129,10 +129,19 @@ func main() {
 				return manager.List(sdk.Arg{Name: sdkName})
 			},
 		},
+		{
+			Name:      "current",
+			Aliases:   []string{"c"},
+			Usage:     "show current version of the targeted sdk",
+			UsageText: "show current version of all SDK's if no parameters are passed",
+			Action: func(ctx *cli.Context) error {
+				sdkName := ctx.Args().First()
+				return manager.Current(sdkName)
+			},
+		},
 	}
 
 	_ = app.Run(os.Args)
-
 }
 
 func sdkVersionParser(operation func(arg sdk.Arg) error) func(ctx *cli.Context) error {
@@ -153,7 +162,7 @@ func sdkVersionParser(operation func(arg sdk.Arg) error) func(ctx *cli.Context) 
 		} else {
 			return operation(sdk.Arg{
 				Name:    strings.ToLower(argArr[0]),
-				Version: "latest",
+				Version: "",
 			})
 		}
 	}
