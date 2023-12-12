@@ -84,9 +84,13 @@ func (b *Sdk) Uninstall(version Version) error {
 		pterm.Printf("%s is not installed...\n", pterm.Red(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	err := os.RemoveAll(b.VersionPath(version))
+	path := b.VersionPath(version)
+	err := os.RemoveAll(path)
 	if err != nil {
 		return err
+	}
+	if b.Current() == version {
+		b.clearEnvConfig(version, path)
 	}
 	pterm.Printf("Uninstalled %s successfully!\n", label)
 	return nil
@@ -149,6 +153,22 @@ func (b *Sdk) Current() Version {
 func (b *Sdk) Close() {
 	b.sdkManager.EnvManager.Flush()
 	b.Plugin.Close()
+}
+func (b *Sdk) clearCurrentEnvConfig() {
+	b.clearEnvConfig(b.Current(), b.VersionPath(b.Current()))
+}
+
+func (b *Sdk) clearEnvConfig(version Version, path string) {
+	envKV := b.Plugin.EnvKeys(string(version), path)
+	envManager := b.sdkManager.EnvManager
+	for _, kv := range envKV {
+		if kv.Key == "PATH" {
+			_ = envManager.Remove(kv.Value)
+		} else {
+			_ = envManager.Remove(kv.Key)
+		}
+	}
+	_ = envManager.Remove(b.envVersionKey())
 }
 
 func (b *Sdk) checkExists(version Version) bool {

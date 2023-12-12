@@ -22,6 +22,7 @@ type Manager interface {
 	Flush()
 	Load([]*KV) error
 	Get(key string) (string, error)
+	Remove(key string) error
 	ReShell() error
 }
 

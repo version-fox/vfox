@@ -63,16 +63,22 @@ func (m *Manager) Uninstall(config Arg) error {
 	if source == nil {
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	if err := source.Uninstall(Version(config.Version)); err != nil {
+	version := Version(config.Version)
+	cv := source.Current()
+	if err := source.Uninstall(version); err != nil {
 		return err
 	}
 	remainVersion := source.List()
 	if len(remainVersion) == 0 {
 		_ = os.RemoveAll(source.sdkPath)
+		return nil
 	}
-	pterm.Println("Auto switch to the other version.")
-	firstVersion := remainVersion[0]
-	return source.Use(firstVersion)
+	if cv == version {
+		pterm.Println("Auto switch to the other version.")
+		firstVersion := remainVersion[0]
+		return source.Use(firstVersion)
+	}
+	return nil
 }
 
 // TODO need to support pagination
@@ -233,6 +239,7 @@ func (m *Manager) Remove(pluginName string) error {
 		WithDefaultText("Please confirm").
 		Show()
 	if result {
+		source.clearCurrentEnvConfig()
 		pPath := filepath.Join(m.pluginPath, pluginName+".lua")
 		pterm.Printf("Removing %s plugin...\n", pPath)
 		err := os.RemoveAll(pPath)
@@ -241,7 +248,6 @@ func (m *Manager) Remove(pluginName string) error {
 			return fmt.Errorf("remove failed")
 		}
 		pterm.Printf("Removing %s sdk...\n", source.sdkPath)
-		// TODO also remove the env config
 		err = os.RemoveAll(source.sdkPath)
 		pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	} else {

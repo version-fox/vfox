@@ -70,6 +70,14 @@ func (m *macosEnvManager) Load(kvs []*KV) error {
 	}
 	return nil
 }
+func (m *macosEnvManager) Remove(key string) error {
+	if key == "PATH" {
+		return fmt.Errorf("can not remove PATH variable")
+	}
+	delete(m.envMap, key)
+	delete(m.pathMap, key)
+	return nil
+}
 
 func (m *macosEnvManager) Flush() {
 	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
