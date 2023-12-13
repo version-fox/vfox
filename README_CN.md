@@ -7,12 +7,23 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/aooohan/version-fox.svg)](https://pkg.go.dev/github.com/aooohan/version-fox)
 [![GitHub](https://img.shields.io/github/license/aooohan/version-fox)]()
 
-## Intro
+## 介绍
 
-`vf` is a tool for sdk version management, which allows you to quickly install and use different versions of targeted
-sdk via the command line.
+`vf` 是一个用于管理SDK版本的工具，它允许你通过命令行快速安装和切换不同版本的SDK, 并且SDK是以Lua脚本形式作为插件进行提供,
+也就是说这允许你实现自己的SDK来源, 或者使用别人分享的插件来安装SDK. 这都取决于你的想象力. ;)
+
+### 安装
+
+TODO
+
+### 使用
+
+### 插件
+
+仓库...
 
 ### Examples
+```bash
 
 ```bash
 $ vf install node@20.10.0
@@ -45,7 +56,6 @@ $ vf ls node
 ```
 
 ## TODO
-
 
 ## Supported SDK Plugins
 
