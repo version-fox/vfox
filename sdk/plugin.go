@@ -29,6 +29,7 @@ const (
 	LuaPluginObjKey = "PLUGIN"
 	OsType          = "OS_TYPE"
 	ArchType        = "ARCH_TYPE"
+	PluginVersion   = "0.0.1"
 )
 
 type LuaPlugin struct {
@@ -61,10 +62,10 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) Available(version string) []*AvailableVersion {
+func (l *LuaPlugin) Available() []*AvailableVersion {
 	L := l.state
 	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "version", lua.LString(version))
+	L.SetField(ctxTable, "plugin_version", lua.LString(PluginVersion))
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("Available").(*lua.LFunction),
 		NRet:    1,

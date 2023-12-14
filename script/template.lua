@@ -21,9 +21,8 @@ function PLUGIN:DownloadUrl(ctx)
     return ""
 end
 
---- Returns the available download versions for the target context
---- @param ctx table
---- @field ctx.version string version
+--- Returns the available download versions
+--- @param ctx table nothing, only convenient for expansion in future.
 --- @return table
 ---         version will as a input argument to DownloadUrl
 ---         notes  on target version, eg LTS, EOL etc.

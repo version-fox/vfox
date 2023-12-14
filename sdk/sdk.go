@@ -95,8 +95,8 @@ func (b *Sdk) Uninstall(version Version) error {
 	return nil
 }
 
-func (b *Sdk) Available(version string) []*AvailableVersion {
-	return b.Plugin.Available(version)
+func (b *Sdk) Available() []*AvailableVersion {
+	return b.Plugin.Available()
 }
 
 func (b *Sdk) Use(version Version) error {

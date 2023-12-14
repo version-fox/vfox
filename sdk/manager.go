@@ -19,6 +19,7 @@ package sdk
 import (
 	"fmt"
 	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/printer"
 	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
@@ -80,22 +81,48 @@ func (m *Manager) Uninstall(config Arg) error {
 	return nil
 }
 
-// TODO need to support pagination
-func (m *Manager) Available(config Arg) error {
-	source := m.sdkMap[config.Name]
+func (m *Manager) Available(sdkName string) error {
+	source := m.sdkMap[sdkName]
 	if source == nil {
-		pterm.Printf("%s not supported\n", config.Name)
-		return fmt.Errorf("%s not supported", config.Name)
+		pterm.Printf("%s not supported\n", sdkName)
+		return fmt.Errorf("%s not supported", sdkName)
 	}
-	result := source.Available(config.Version)
+	result := source.Available()
 	if len(result) == 0 {
 		pterm.Println("No Available version.")
 		return nil
 	}
-	for _, version := range result {
-		pterm.Println("->", fmt.Sprintf("v%s", version))
+	kvSelect := printer.PageKVSelect{
+		TopText: "Please select a version of " + sdkName,
+		Filter:  true,
+		Size:    20,
+		SourceFunc: func(page, size int) ([]*printer.KV, error) {
+			start := page * size
+			end := start + size
+
+			if start > len(result) {
+				return nil, fmt.Errorf("page is out of range")
+			}
+			if end > len(result) {
+				end = len(result)
+			}
+			versions := result[start:end]
+			var arr []*printer.KV
+			for _, version := range versions {
+				arr = append(arr, &printer.KV{
+					Key:   string(version.Version),
+					Value: fmt.Sprintf("v%s (%s)", version.Version, version.Note),
+				})
+			}
+			return arr, nil
+		},
 	}
-	return nil
+	version, err := kvSelect.Show()
+	if err != nil {
+		pterm.Printf("Select version error, err: %s\n", err)
+		return err
+	}
+	return source.Install(Version(version.Key))
 }
 
 func (m *Manager) Use(config Arg) error {
