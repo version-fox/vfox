@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
+	"os"
 	"sort"
 )
 
@@ -151,7 +152,9 @@ func (s *PageKVSelect) Show() (*KV, error) {
 			s.index = 0
 			area.Update(s.renderSelect())
 		case keys.CtrlC:
-			return true, nil
+			s.result = nil
+			os.Exit(0)
+			return true, fmt.Errorf("keyboard interrupt")
 		case keys.Down:
 			s.changeIndex(1)
 			area.Update(s.renderSelect())
@@ -183,7 +186,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 		return false, nil // Return false to continue listening
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start keyboard listener: %w", err)
+		return nil, err
 	}
 
 	return s.result, nil

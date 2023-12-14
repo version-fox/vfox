@@ -109,9 +109,15 @@ func (m *Manager) Available(sdkName string) error {
 			versions := result[start:end]
 			var arr []*printer.KV
 			for _, version := range versions {
+				var note string
+				if version.Note != "" {
+					note = fmt.Sprintf("(%s)", version.Note)
+				} else {
+					note = ""
+				}
 				arr = append(arr, &printer.KV{
 					Key:   string(version.Version),
-					Value: fmt.Sprintf("v%s (%s)", version.Version, version.Note),
+					Value: fmt.Sprintf("v%s %s", version.Version, note),
 				})
 			}
 			return arr, nil

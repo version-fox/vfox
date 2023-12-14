@@ -1,13 +1,15 @@
 ---  Default global variable
 ---  OS_TYPE:  windows, linux, darwin
 ---  ARCH_TYPE: 386, amd64, arm, arm64  ...
+local http = require("http")
+local json = require("json")
 
 OS_TYPE = ""
 ARCH_TYPE = ""
 
 nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
 
---- https://nodejs.org/dist/index.json
+VersionSourceUrl = "https://nodejs.org/dist/index.json"
 
 PLUGIN = {
     name = "node",
@@ -16,15 +18,11 @@ PLUGIN = {
     updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
 }
 
---- Return to target version download link
---- @param ctx table
---- @field ctx.version string version
---- @return string download url
 function PLUGIN:DownloadUrl(ctx)
-    version = ctx.version
+    local version = ctx.version
 
-    arch_type = ARCH_TYPE
-    ext = ".tar.gz"
+    local arch_type = ARCH_TYPE
+    local ext = ".tar.gz"
     if arch_type == "amd64" then
         arch_type = "x64"
     end
@@ -34,16 +32,24 @@ function PLUGIN:DownloadUrl(ctx)
     return string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
 end
 
---- Returns the available download versions for the target context
---- @param ctx table
---- @field ctx.version string
 function PLUGIN:Available(ctx)
-    return {}
+    local resp, err = http.get({
+        url = VersionSourceUrl
+    })
+    if err ~= nil or resp.status_code ~= 200 then
+        return {}
+    end
+    local body = json.decode(resp.body)
+    local result = {}
+    for _, v in ipairs(body) do
+        table.insert(result, {
+            version = string.gsub(v.version, "^v", ""),
+            note = v.lts and "LTS" or ""
+        })
+    end
+    return result
 end
 
---- Return the need to set environment variables when use this version
---- @param ctx table {version, version_path}
---- @return {key = "JAVA_HOME", value = "xxxxxx"}
 function PLUGIN:EnvKeys(ctx)
     version_path = ctx.version_path
     return {
