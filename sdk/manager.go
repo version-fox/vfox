@@ -19,7 +19,6 @@ package sdk
 import (
 	"fmt"
 	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
@@ -206,7 +205,7 @@ func (m *Manager) loadSdk() {
 		if strings.HasSuffix(path, ".lua") {
 			// filename first as sdk name
 			content, _ := m.loadLuaFromFileOrUrl(path)
-			source, err := plugin.NewLuaPlugin(content, m.osType, m.archType)
+			source, err := NewLuaPlugin(content, m.osType, m.archType)
 			if err != nil {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				return nil
@@ -268,7 +267,7 @@ func (m *Manager) Add(pluginName, url string) error {
 		return fmt.Errorf("install failed")
 	}
 	pterm.Println("Checking plugin...")
-	source, err := plugin.NewLuaPlugin(content, m.osType, m.archType)
+	source, err := NewLuaPlugin(content, m.osType, m.archType)
 	if err != nil {
 		pterm.Printf("Check %s plugin failed, err: %s", url, err)
 	}

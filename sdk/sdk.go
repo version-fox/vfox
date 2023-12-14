@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/plugin"
 	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
@@ -37,7 +36,7 @@ type Version string
 
 type Sdk struct {
 	sdkManager *Manager
-	Plugin     *plugin.LuaPlugin
+	Plugin     *LuaPlugin
 	// current sdk install path
 	sdkPath string
 }
@@ -96,14 +95,8 @@ func (b *Sdk) Uninstall(version Version) error {
 	return nil
 }
 
-func (b *Sdk) Available(version string) []Version {
-	versions := b.Plugin.Available(version)
-	var result []Version
-	for _, version := range versions {
-		v := Version(version)
-		result = append(result, v)
-	}
-	return result
+func (b *Sdk) Available(version string) []*AvailableVersion {
+	return b.Plugin.Available(version)
 }
 
 func (b *Sdk) Use(version Version) error {
@@ -228,7 +221,7 @@ func (b *Sdk) envVersionKey() string {
 	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name))
 }
 
-func NewSdk(manager *Manager, source *plugin.LuaPlugin) (*Sdk, error) {
+func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	name := source.Name
 	return &Sdk{
 		sdkManager: manager,

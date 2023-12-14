@@ -17,131 +17,177 @@
 package main
 
 import (
+	"fmt"
+	"github.com/aooohan/version-fox/printer"
 	"github.com/aooohan/version-fox/sdk"
 	"github.com/urfave/cli/v2"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 )
 
 const Version = "0.0.1"
 
 func main() {
-	cli.VersionFlag = &cli.BoolFlag{
-		Name:    "version",
-		Aliases: []string{"v", "V"},
-		Usage:   "print version",
-		Action: func(ctx *cli.Context, b bool) error {
-			println(Version)
-			return nil
+	//cli.VersionFlag = &cli.BoolFlag{
+	//	Name:    "version",
+	//	Aliases: []string{"v", "V"},
+	//	Usage:   "print version",
+	//	Action: func(ctx *cli.Context, b bool) error {
+	//		println(Version)
+	//		return nil
+	//	},
+	//}
+	//
+	//manager := sdk.NewSdkManager()
+	//defer manager.Close()
+	//
+	//signals := make(chan os.Signal, 1)
+	//signal.Notify(signals, syscall.SIGTERM)
+	//
+	//go func() {
+	//	<-signals
+	//	manager.Close()
+	//	os.Exit(0)
+	//}()
+	//
+	//app := &cli.App{}
+	//app.Name = "VersionFox"
+	//app.Usage = "VersionFox is a tool for sdk version management"
+	//app.UsageText = "vf [command] [command options]"
+	//// TODO copyright
+	//app.Copyright = "TODO Copyright"
+	//app.Version = Version
+	//app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
+	//app.Suggest = true
+	//app.Commands = []*cli.Command{
+	//	{
+	//		Name:  "add",
+	//		Usage: "add a plugin of sdk",
+	//		Action: func(ctx *cli.Context) error {
+	//			args := ctx.Args()
+	//			l := args.Len()
+	//			if l < 2 {
+	//				return cli.Exit("invalid arguments", 1)
+	//			}
+	//			return manager.Add(args.Get(0), args.Get(1))
+	//		},
+	//	},
+	//	{
+	//		Name:  "remove",
+	//		Usage: "remove a plugin of sdk",
+	//		Action: func(ctx *cli.Context) error {
+	//			args := ctx.Args()
+	//			l := args.Len()
+	//			if l < 1 {
+	//				return cli.Exit("invalid arguments", 1)
+	//			}
+	//			return manager.Remove(args.First())
+	//		},
+	//	},
+	//	{
+	//		Name:  "update",
+	//		Usage: "update a plugin of sdk",
+	//		Action: func(ctx *cli.Context) error {
+	//			args := ctx.Args()
+	//			l := args.Len()
+	//			if l < 1 {
+	//				return cli.Exit("invalid arguments", 1)
+	//			}
+	//			return manager.Remove(args.First())
+	//		},
+	//	},
+	//
+	//	{
+	//		Name:    "install",
+	//		Aliases: []string{"i"},
+	//		Usage:   "install a version of sdk",
+	//		Action:  sdkVersionParser(manager.Install),
+	//	},
+	//	{
+	//		Name:    "uninstall",
+	//		Aliases: []string{"un"},
+	//		Usage:   "uninstall a version of sdk",
+	//		Action:  sdkVersionParser(manager.Uninstall),
+	//	},
+	//	{
+	//		Name:   "search",
+	//		Usage:  "search a version of sdk",
+	//		Action: sdkVersionParser(manager.Available),
+	//	},
+	//	{
+	//		Name:    "use",
+	//		Aliases: []string{"u"},
+	//		Usage:   "use a version of sdk",
+	//		Action:  sdkVersionParser(manager.Use),
+	//	},
+	//	{
+	//		Name:    "list",
+	//		Aliases: []string{"ls"},
+	//		Usage:   "list all versions of the target sdk",
+	//		Action: func(ctx *cli.Context) error {
+	//			sdkName := ctx.Args().First()
+	//			return manager.List(sdk.Arg{Name: sdkName})
+	//		},
+	//	},
+	//	{
+	//		Name:      "current",
+	//		Aliases:   []string{"c"},
+	//		Usage:     "show current version of the targeted sdk",
+	//		UsageText: "show current version of all SDK's if no parameters are passed",
+	//		Action: func(ctx *cli.Context) error {
+	//			sdkName := ctx.Args().First()
+	//			return manager.Current(sdkName)
+	//		},
+	//	},
+	//}
+	//
+	//_ = app.Run(os.Args)
+	source := []*printer.KV{
+		{
+			Key:   "v1.0.0",
+			Value: "v1.0.0" + "LTS",
+		},
+		{
+			Key:   "20.11.1",
+			Value: "v20.11.1(Not support)",
+		},
+		{
+			Key:   "3.2.2",
+			Value: "v3.2.2(LTS)",
+		},
+		{
+			Key:   "32.22.2",
+			Value: "v32.22.2",
+		},
+		{
+			Key:   "33.11.24",
+			Value: "v33.11.25",
 		},
 	}
+	s := &printer.PageKVSelect{
+		Tips:   "Select a version",
+		Filter: true,
+		SourceFunc: func(page, size int) ([]*printer.KV, error) {
 
-	manager := sdk.NewSdkManager()
-	defer manager.Close()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM)
-
-	go func() {
-		<-signals
-		manager.Close()
-		os.Exit(0)
-	}()
-
-	app := &cli.App{}
-	app.Name = "VersionFox"
-	app.Usage = "VersionFox is a tool for sdk version management"
-	app.UsageText = "vf [command] [command options]"
-	// TODO copyright
-	app.Copyright = "TODO Copyright"
-	app.Version = Version
-	app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
-	app.Suggest = true
-	app.Commands = []*cli.Command{
-		{
-			Name:  "add",
-			Usage: "add a plugin of sdk",
-			Action: func(ctx *cli.Context) error {
-				args := ctx.Args()
-				l := args.Len()
-				if l < 2 {
-					return cli.Exit("invalid arguments", 1)
-				}
-				return manager.Add(args.Get(0), args.Get(1))
-			},
+			return source, nil
+			//// 计算开始和结束索引
+			//start := page * size
+			//end := start + size
+			//
+			//// 检查索引是否超出范围
+			//if start > len(source) {
+			//	return []*printer.KV{}, nil
+			//}
+			//if end > len(source) {
+			//	end = len(source)
+			//}
+			//
+			//// 返回分页后的元素
+			//return source[start:end], nil
 		},
-		{
-			Name:  "remove",
-			Usage: "remove a plugin of sdk",
-			Action: func(ctx *cli.Context) error {
-				args := ctx.Args()
-				l := args.Len()
-				if l < 1 {
-					return cli.Exit("invalid arguments", 1)
-				}
-				return manager.Remove(args.First())
-			},
-		},
-		{
-			Name:  "update",
-			Usage: "update a plugin of sdk",
-			Action: func(ctx *cli.Context) error {
-				args := ctx.Args()
-				l := args.Len()
-				if l < 1 {
-					return cli.Exit("invalid arguments", 1)
-				}
-				return manager.Remove(args.First())
-			},
-		},
-
-		{
-			Name:    "install",
-			Aliases: []string{"i"},
-			Usage:   "install a version of sdk",
-			Action:  sdkVersionParser(manager.Install),
-		},
-		{
-			Name:    "uninstall",
-			Aliases: []string{"un"},
-			Usage:   "uninstall a version of sdk",
-			Action:  sdkVersionParser(manager.Uninstall),
-		},
-		{
-			Name:   "search",
-			Usage:  "search a version of sdk",
-			Action: sdkVersionParser(manager.Search),
-		},
-		{
-			Name:    "use",
-			Aliases: []string{"u"},
-			Usage:   "use a version of sdk",
-			Action:  sdkVersionParser(manager.Use),
-		},
-		{
-			Name:    "list",
-			Aliases: []string{"ls"},
-			Usage:   "list all versions of the target sdk",
-			Action: func(ctx *cli.Context) error {
-				sdkName := ctx.Args().First()
-				return manager.List(sdk.Arg{Name: sdkName})
-			},
-		},
-		{
-			Name:      "current",
-			Aliases:   []string{"c"},
-			Usage:     "show current version of the targeted sdk",
-			UsageText: "show current version of all SDK's if no parameters are passed",
-			Action: func(ctx *cli.Context) error {
-				sdkName := ctx.Args().First()
-				return manager.Current(sdkName)
-			},
-		},
+		Size: 3,
 	}
-
-	_ = app.Run(os.Args)
+	res, _ := s.Show()
+	fmt.Printf("结果: %s", res)
 }
 
 func sdkVersionParser(operation func(arg sdk.Arg) error) func(ctx *cli.Context) error {

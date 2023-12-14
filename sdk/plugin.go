@@ -14,12 +14,12 @@
  *    limitations under the License.
  */
 
-package plugin
+package sdk
 
 import (
 	"fmt"
 	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/plugin/module"
+	"github.com/aooohan/version-fox/lua_module"
 	"github.com/aooohan/version-fox/util"
 	lua "github.com/yuin/gopher-lua"
 	"net/url"
@@ -61,7 +61,7 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) Available(version string) []string {
+func (l *LuaPlugin) Available(version string) []*AvailableVersion {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
@@ -76,13 +76,15 @@ func (l *LuaPlugin) Available(version string) []string {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	var result []string
+	var result []*AvailableVersion
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
-		rV, ok := value.(lua.LString)
+		kvTable, ok := value.(*lua.LTable)
 		if !ok {
-			panic("expected a string")
+			panic("expected a table")
 		}
-		result = append(result, rV.String())
+		key = kvTable.RawGetString("version")
+		value = kvTable.RawGetString("note")
+		result = append(result, &AvailableVersion{Version: key.String(), Note: value.String()})
 	})
 
 	return result
@@ -160,7 +162,7 @@ func (l *LuaPlugin) Label(version string) string {
 
 func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
 	L := lua.NewState()
-	module.Preload(L)
+	lua_module.Preload(L)
 	if err := L.DoString(content); err != nil {
 		return nil, fmt.Errorf("content cannot be executed")
 	}
@@ -198,10 +200,4 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 		source.Author = author.String()
 	}
 	return source, nil
-}
-
-type Version struct {
-	version string
-	// LTS or other thing
-	note string
 }

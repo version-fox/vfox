@@ -29,7 +29,7 @@ func Preload(L *lua.LState) {
 	L.PreloadModule("html", Loader)
 }
 
-// Loader is the module loader function.
+// Loader is the lua_module loader function.
 func Loader(L *lua.LState) int {
 	docMt := L.NewTypeMetatable(luaHtmlDocumentTypeName)
 	L.SetField(docMt, "__index", L.SetFuncs(L.NewTable(), documentMethods))
