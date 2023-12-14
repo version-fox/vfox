@@ -31,11 +31,12 @@ type PageKVSelect struct {
 	options            []*KV
 	Size               int
 	result             *KV
+	isEmpty            bool
 	fuzzySearchString  string
 	fuzzySearchMatches []*KV
 	Filter             bool
 	SourceFunc         func(page, size int) ([]*KV, error)
-	Tips               string
+	TopText            string
 }
 
 type KV struct {
@@ -56,9 +57,9 @@ func (s *PageKVSelect) changeIndex(value int) {
 func (s *PageKVSelect) renderSelect() string {
 	var content string
 	if s.Filter {
-		content += pterm.Sprintf("%s %s: %s\n", s.Tips, pterm.LightGreen("[type to search]"), s.fuzzySearchString)
+		content += pterm.Sprintf("%s %s: %s\n", s.TopText, pterm.LightGreen("[type to search]"), s.fuzzySearchString)
 	} else {
-		content += pterm.Sprintf("%s:\n", s.Tips)
+		content += pterm.Sprintf("%s:\n", s.TopText)
 	}
 	if s.options == nil || len(s.options) == 0 {
 		return pterm.Sprintln("No data")
@@ -104,6 +105,9 @@ func (s *PageKVSelect) renderSelect() string {
 func (s *PageKVSelect) loadPageData(page int) (err error) {
 	s.options, err = s.SourceFunc(page, s.Size)
 	s.index = 0
+	if s.options != nil {
+		s.isEmpty = len(s.options) < s.Size
+	}
 	return err
 }
 
@@ -163,11 +167,13 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				area.Update(s.renderSelect())
 			}
 		case keys.Right:
-			page++
-			if err := s.loadPageData(page); err != nil {
-				return true, err
+			if !s.isEmpty {
+				page++
+				if err := s.loadPageData(page); err != nil {
+					return true, err
+				}
+				area.Update(s.renderSelect())
 			}
-			area.Update(s.renderSelect())
 		case keys.Enter:
 			s.result = s.options[s.index]
 			return true, nil
