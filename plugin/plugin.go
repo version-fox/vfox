@@ -45,8 +45,8 @@ func (l *LuaPlugin) checkValid() error {
 		return fmt.Errorf("lua vm is nil")
 	}
 	obj := l.pluginObj
-	if obj.RawGetString("Search") == lua.LNil {
-		return fmt.Errorf("search function not found")
+	if obj.RawGetString("Available") == lua.LNil {
+		return fmt.Errorf("available function not found")
 	}
 	if obj.RawGetString("DownloadUrl") == lua.LNil {
 		return fmt.Errorf("download_url function not found")
@@ -61,12 +61,12 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) Search(version string) []string {
+func (l *LuaPlugin) Available(version string) []string {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
 	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("Search").(*lua.LFunction),
+		Fn:      l.pluginObj.RawGetString("Available").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
@@ -198,4 +198,10 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 		source.Author = author.String()
 	}
 	return source, nil
+}
+
+type Version struct {
+	version string
+	// LTS or other thing
+	note string
 }

@@ -25,7 +25,7 @@ end
 --- Returns the available download versions for the target context
 --- @param ctx table
 --- @field ctx.version string version
-function PLUGIN:Search(ctx)
+function PLUGIN:Available(ctx)
     return search(ctx)
 end
 

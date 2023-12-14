@@ -6,6 +6,10 @@ OS_TYPE = ""
 ARCH_TYPE = ""
 
 nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
+SearchUrl = "https://api.adoptium.net/v3/assets/latest/%s/hotspot?os=%s&architecture=%s"
+AvailableVersionsUrl = "https://api.adoptium.net/v3/info/available_releases"
+
+
 
 --- https://nodejs.org/dist/index.json
 
@@ -37,7 +41,7 @@ end
 --- Returns the available download versions for the target context
 --- @param ctx table
 --- @field ctx.version string version
-function PLUGIN:Search(ctx)
+function PLUGIN:Available(ctx)
     return {}
 end
 

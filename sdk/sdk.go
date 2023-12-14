@@ -96,8 +96,8 @@ func (b *Sdk) Uninstall(version Version) error {
 	return nil
 }
 
-func (b *Sdk) Search(version string) []Version {
-	versions := b.Plugin.Search(version)
+func (b *Sdk) Available(version string) []Version {
+	versions := b.Plugin.Available(version)
 	var result []Version
 	for _, version := range versions {
 		v := Version(version)

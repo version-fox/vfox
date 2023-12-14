@@ -82,15 +82,15 @@ func (m *Manager) Uninstall(config Arg) error {
 }
 
 // TODO need to support pagination
-func (m *Manager) Search(config Arg) error {
+func (m *Manager) Available(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {
 		pterm.Printf("%s not supported\n", config.Name)
 		return fmt.Errorf("%s not supported", config.Name)
 	}
-	result := source.Search(config.Version)
+	result := source.Available(config.Version)
 	if len(result) == 0 {
-		pterm.Println("No available version.")
+		pterm.Println("No Available version.")
 		return nil
 	}
 	for _, version := range result {
@@ -155,7 +155,7 @@ func (m *Manager) List(arg Arg) error {
 	curVersion := source.Current()
 	list := source.List()
 	if len(list) == 0 {
-		pterm.Println("No available version.")
+		pterm.Println("No Available version.")
 		return nil
 	}
 	for _, version := range list {
