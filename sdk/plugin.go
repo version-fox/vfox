@@ -130,7 +130,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L.SetField(ctxTable, "version", lua.LString(version))
 
 	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("PostInstall").(*lua.LFunction),
+		Fn:      l.pluginObj.RawGetString("PreInstall").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {

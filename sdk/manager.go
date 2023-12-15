@@ -89,7 +89,7 @@ func (m *Manager) Available(sdkName string) error {
 	}
 	result, err := source.Available()
 	if err != nil {
-		pterm.Printf("Plugin error: %s\n", err)
+		pterm.Printf("Plugin [Available] error: %s\n", err)
 		return err
 	}
 	if len(result) == 0 {
@@ -177,6 +177,10 @@ func (m *Manager) Use(config Arg) error {
 
 func (m *Manager) List(arg Arg) error {
 	if arg.Name == "" {
+		if len(m.sdkMap) == 0 {
+			pterm.Println("You don't have any sdk installed yet.")
+			return nil
+		}
 		tree := pterm.LeveledList{}
 		for name, sdk := range m.sdkMap {
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})

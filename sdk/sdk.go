@@ -58,7 +58,7 @@ func (b *Sdk) Install(version Version) error {
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
-		pterm.Printf("Plugin error: %s\n", err.Error())
+		pterm.Printf("Plugin [PreInstall] error: %s\n", err.Error())
 		return err
 	}
 	if installInfo == nil {
@@ -161,7 +161,7 @@ func (b *Sdk) Use(version Version) error {
 	}
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
-		pterm.Printf("Plugin error: err:%s\n", err.Error())
+		pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
 		return err
 	}
 	keys = append(keys, &env.KV{
