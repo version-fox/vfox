@@ -38,7 +38,7 @@ type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
-	sdkPath string
+	sdkRootPath string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -56,14 +56,39 @@ func (b *Sdk) Install(version Version) error {
 		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
 		return fmt.Errorf("%s has been installed\n", label)
 	}
-	installInfo, err := b.Plugin.InstallInfo(string(version))
+	installInfo, err := b.Plugin.InstallInfo(version)
 	if err != nil {
 		pterm.Printf("Failed to invoke the InstallInfo method of plugin [%s], err:%s\n", b.Plugin.Name, err.Error())
 		return err
 	}
-	filePath, err := b.Download(installInfo.Url)
+	mainSdk := installInfo.Main
+	err = b.installSdk(mainSdk, newDirPath)
 	if err != nil {
-		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
+		return err
+	}
+	if len(installInfo.Additional) > 0 {
+		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
+		for _, oSdk := range installInfo.Additional {
+			err = b.installSdk(oSdk, newDirPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	success = true
+	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
+	return nil
+}
+func (b *Sdk) installSdk(info *Info, sdkDestPath string) error {
+	pterm.Printf("Installing %s...\n", info.label())
+	u, err := url.Parse(info.Path)
+	label := info.label()
+	if err != nil {
+		return err
+	}
+	filePath, err := b.Download(u)
+	if err != nil {
+		fmt.Printf("Failed to download %s file, err:%s", label, err.Error())
 		return err
 	}
 	defer func() {
@@ -76,48 +101,16 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("unknown file type")
 	}
 	pterm.Printf("Unpacking %s...\n", filePath)
-	err = decompressor.Decompress(newDirPath)
+	err = decompressor.Decompress(sdkDestPath)
 	if err != nil {
 		return err
 	}
-	err = os.Rename(filepath.Join(newDirPath, decompressor.Filename()), filepath.Join(newDirPath, b.Plugin.Name+"-"+string(version)))
+	err = os.Rename(filepath.Join(sdkDestPath, decompressor.Filename()), filepath.Join(sdkDestPath, info.Name+"-"+string(info.Version)))
 	if err != nil {
 		pterm.Printf("Failed to rename file, err:%s\n", err.Error())
 		return err
 	}
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
-	if len(installInfo.Additional) > 0 {
-		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
-		for _, additional := range installInfo.Additional {
-			itemLabel := additional.Name + "@" + additional.Version
-			pterm.Printf("Installing %s...\n", itemLabel)
-			filePath, err := b.Download(additional.Url)
-			if err != nil {
-				println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
-				return err
-			}
-			decompressor := util.NewDecompressor(filePath)
-			if decompressor == nil {
-				fmt.Printf("Unable to process current file type, file: %s\n", filePath)
-				return fmt.Errorf("unknown file type")
-			}
-			pterm.Printf("Unpacking %s...\n", filePath)
-			err = decompressor.Decompress(newDirPath)
-			if err != nil {
-				return err
-			}
-			err = os.Rename(filepath.Join(newDirPath, decompressor.Filename()), filepath.Join(newDirPath, additional.Name+"-"+additional.Version))
-			if err != nil {
-				pterm.Printf("Failed to rename file, err:%s\n", err.Error())
-				return err
-			}
-			// del cache file
-			_ = os.Remove(filePath)
-			pterm.Printf("Install %s success! \n", pterm.LightGreen(itemLabel))
-		}
-	}
-	success = true
-	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
 	return nil
 }
 
@@ -139,7 +132,7 @@ func (b *Sdk) Uninstall(version Version) error {
 	return nil
 }
 
-func (b *Sdk) Available() []*AvailableVersion {
+func (b *Sdk) Available() ([]*Package, error) {
 	return b.Plugin.Available()
 }
 
@@ -149,12 +142,12 @@ func (b *Sdk) Use(version Version) error {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	localSdkInfo, err := b.getLocalSdkVersion(version)
+	sdkPackage, err := b.getLocalSdkPackage(version)
 	if err != nil {
 		pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 		return err
 	}
-	keys := b.Plugin.EnvKeys(localSdkInfo)
+	keys := b.Plugin.EnvKeys(sdkPackage)
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),
@@ -164,25 +157,25 @@ func (b *Sdk) Use(version Version) error {
 		return fmt.Errorf("Use %s error, err: %s\n", label, err)
 	}
 	var outputLabel string
-	if len(localSdkInfo.Additional) != 0 {
+	if len(sdkPackage.Additional) != 0 {
 		var additionalLabels []string
-		for _, additional := range localSdkInfo.Additional {
+		for _, additional := range sdkPackage.Additional {
 			additionalLabels = append(additionalLabels, fmt.Sprintf("%s v%s", additional.Name, additional.Version))
 		}
 		outputLabel = fmt.Sprintf("%s (%s)", label, strings.Join(additionalLabels, ","))
 	} else {
 		outputLabel = label
 	}
-	pterm.Printf("Now using %s\n.", pterm.LightGreen(outputLabel))
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(outputLabel))
 	return b.sdkManager.EnvManager.ReShell()
 }
 
 func (b *Sdk) List() []Version {
-	if !util.FileExists(b.sdkPath) {
+	if !util.FileExists(b.sdkRootPath) {
 		return make([]Version, 0)
 	}
 	var versions []Version
-	err := filepath.Walk(b.sdkPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(b.sdkRootPath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() && strings.HasPrefix(info.Name(), "v-") {
 			versions = append(versions, Version(strings.TrimPrefix(info.Name(), "v-")))
 		}
@@ -211,8 +204,8 @@ func (b *Sdk) clearCurrentEnvConfig() {
 }
 
 func (b *Sdk) clearEnvConfig(version Version) {
-	sdkVersion, _ := b.getLocalSdkVersion(version)
-	envKV := b.Plugin.EnvKeys(sdkVersion)
+	sdkPackage, _ := b.getLocalSdkPackage(version)
+	envKV := b.Plugin.EnvKeys(sdkPackage)
 	envManager := b.sdkManager.EnvManager
 	for _, kv := range envKV {
 		if kv.Key == "PATH" {
@@ -224,13 +217,13 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	_ = envManager.Remove(b.envVersionKey())
 }
 
-func (b *Sdk) getLocalSdkVersion(version Version) (*LocalSdkVersion, error) {
+func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 	versionPath := b.VersionPath(version)
-	sdkVersion := &LocalSdkVersion{
-		Version:    version,
-		Name:       b.Plugin.Name,
-		Additional: make([]*LocalSdkVersion, 0),
+	mainSdk := &Info{
+		Name:    b.Plugin.Name,
+		Version: version,
 	}
+	var additional []*Info
 	dir, err := os.ReadDir(versionPath)
 	if err != nil {
 		return nil, err
@@ -244,10 +237,10 @@ func (b *Sdk) getLocalSdkVersion(version Version) (*LocalSdkVersion, error) {
 			name := split[0]
 			v := split[1]
 			if name == b.Plugin.Name {
-				sdkVersion.Path = filepath.Join(versionPath, d.Name())
+				mainSdk.Path = filepath.Join(versionPath, d.Name())
 				continue
 			}
-			sdkVersion.Additional = append(sdkVersion.Additional, &LocalSdkVersion{
+			additional = append(additional, &Info{
 				Name:    name,
 				Version: Version(v),
 				Path:    filepath.Join(versionPath, d.Name()),
@@ -257,7 +250,10 @@ func (b *Sdk) getLocalSdkVersion(version Version) (*LocalSdkVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sdkVersion, nil
+	return &Package{
+		Main:       mainSdk,
+		Additional: additional,
+	}, nil
 }
 
 func (b *Sdk) checkExists(version Version) bool {
@@ -265,7 +261,7 @@ func (b *Sdk) checkExists(version Version) bool {
 }
 
 func (b *Sdk) VersionPath(version Version) string {
-	return filepath.Join(b.sdkPath, fmt.Sprintf("v-%s", version))
+	return filepath.Join(b.sdkRootPath, fmt.Sprintf("v-%s", version))
 }
 
 func (b *Sdk) Download(url *url.URL) (string, error) {
@@ -284,12 +280,12 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 		return "", errors.New("source file not found")
 	}
 
-	err = os.MkdirAll(b.sdkPath, 0755)
+	err = os.MkdirAll(b.sdkRootPath, 0755)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(b.sdkPath, filepath.Base(url.Path))
+	path := filepath.Join(b.sdkRootPath, filepath.Base(url.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -298,10 +294,25 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 
 	defer f.Close()
 
-	bar := progressbar.DefaultBytes(
+	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		"Downloading",
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionOnCompletion(func() {
+			fmt.Fprintf(os.Stderr, "\n")
+		}),
+		progressbar.OptionSetDescription("Downloading..."),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
 	)
+	defer bar.Close()
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {
 		return "", err
@@ -320,8 +331,8 @@ func (b *Sdk) envVersionKey() string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	name := source.Name
 	return &Sdk{
-		sdkManager: manager,
-		sdkPath:    filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
-		Plugin:     source,
+		sdkManager:  manager,
+		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
+		Plugin:      source,
 	}, nil
 }

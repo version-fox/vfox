@@ -22,7 +22,6 @@ import (
 	"github.com/aooohan/version-fox/lua_module"
 	"github.com/aooohan/version-fox/util"
 	lua "github.com/yuin/gopher-lua"
-	"net/url"
 )
 
 const (
@@ -62,7 +61,7 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) Available() []*AvailableVersion {
+func (l *LuaPlugin) Available() ([]*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "plugin_version", lua.LString(PluginVersion))
@@ -71,27 +70,58 @@ func (l *LuaPlugin) Available() []*AvailableVersion {
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	var result []*AvailableVersion
+	var err error
+	var result []*Package
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
 		if !ok {
-			panic("expected a table")
+			err = fmt.Errorf("the return value is not a table")
+			return
 		}
-		key = kvTable.RawGetString("version")
-		value = kvTable.RawGetString("note")
-		result = append(result, &AvailableVersion{Version: key.String(), Note: value.String()})
-	})
+		v := kvTable.RawGetString("version").String()
+		note := kvTable.RawGetString("note").String()
+		mainSdk := &Info{
+			Name:    l.Name,
+			Version: Version(v),
+			Note:    note,
+		}
+		var additionalArr []*Info
+		additional := kvTable.RawGetString("additional")
+		if additional.Type() != lua.LTNil {
+			additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
+				itemTable, ok := value.(*lua.LTable)
+				if !ok {
+					err = fmt.Errorf("the return value is not a table")
+					return
+				}
+				item := Info{
+					Name:    itemTable.RawGetString("name").String(),
+					Version: Version(itemTable.RawGetString("version").String()),
+				}
+				additionalArr = append(additionalArr, &item)
+			})
+		}
 
-	return result
+		result = append(result, &Package{
+			Main:       mainSdk,
+			Additional: additionalArr,
+		})
+
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-func (l *LuaPlugin) InstallInfo(version string) (*InstallInfo, error) {
+func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
@@ -109,13 +139,15 @@ func (l *LuaPlugin) InstallInfo(version string) (*InstallInfo, error) {
 
 	v := table.RawGetString("version").String()
 	muStr := table.RawGetString("url").String()
-	mu, err := url.Parse(muStr)
-	if err != nil {
-		return nil, err
+	mainSdk := &Info{
+		Name:    l.Name,
+		Version: Version(v),
+		Path:    muStr,
 	}
-	var additionalArr []*InstallAdditional
+	var additionalArr []*Info
 	additional := table.RawGetString("additional")
 	if additional.Type() != lua.LTNil {
+		var err error
 		additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
 			kvTable, ok := value.(*lua.LTable)
 			if !ok {
@@ -123,36 +155,31 @@ func (l *LuaPlugin) InstallInfo(version string) (*InstallInfo, error) {
 				return
 			}
 			s := kvTable.RawGetString("url").String()
-			u, err := url.Parse(s)
-			if err != nil {
-				return
-			}
-			item := InstallAdditional{
+			item := Info{
 				Name:    kvTable.RawGetString("name").String(),
-				Version: kvTable.RawGetString("version").String(),
-				Url:     u,
+				Version: Version(kvTable.RawGetString("version").String()),
+				Path:    s,
 			}
 			additionalArr = append(additionalArr, &item)
 		})
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &InstallInfo{
-		Version:    v,
-		Url:        mu,
+	return &Package{
+		Main:       mainSdk,
 		Additional: additionalArr,
 	}, nil
 }
 
-func (l *LuaPlugin) EnvKeys(version *LocalSdkVersion) []*env.KV {
+func (l *LuaPlugin) EnvKeys(sdkPackage *Package) []*env.KV {
 	L := l.state
 	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "path", lua.LString(version.Path))
-	if len(version.Additional) != 0 {
+	L.SetField(ctxTable, "path", lua.LString(sdkPackage.Main.Path))
+	if len(sdkPackage.Additional) != 0 {
 		additionalTable := L.NewTable()
-		for _, v := range version.Additional {
+		for _, v := range sdkPackage.Additional {
 			L.SetField(additionalTable, v.Name, lua.LString(v.Path))
 		}
 		L.SetField(ctxTable, "additional_path", additionalTable)

@@ -18,10 +18,28 @@ package sdk
 
 import "net/url"
 
+type Package struct {
+	Main       *Info
+	Additional []*Info
+}
+
+type Info struct {
+	Name    string
+	Version Version
+	Path    string
+	Note    string
+}
+
+func (i *Info) label() string {
+	return i.Name + "@" + string(i.Version)
+}
+
 type AvailableVersion struct {
 	Version string
 	// LTS or other thing
 	Note string
+
+	Additional []*LocalSdkVersion
 }
 
 type LocalSdkVersion struct {

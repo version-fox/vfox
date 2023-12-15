@@ -40,7 +40,13 @@ function PLUGIN:Available(ctx)
     return {
         {
             version = "xxxx",
-            note = "LTS"
+            note = "LTS",
+            additional = {
+                {
+                    name = "npm",
+                    version = "xxx",
+                }
+            }
         }
     }
 end

@@ -70,7 +70,7 @@ func (m *Manager) Uninstall(config Arg) error {
 	}
 	remainVersion := source.List()
 	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(source.sdkPath)
+		_ = os.RemoveAll(source.sdkRootPath)
 		return nil
 	}
 	if cv == version {
@@ -87,7 +87,11 @@ func (m *Manager) Available(sdkName string) error {
 		pterm.Printf("%s not supported\n", sdkName)
 		return fmt.Errorf("%s not supported", sdkName)
 	}
-	result := source.Available()
+	result, err := source.Available()
+	if err != nil {
+		pterm.Printf("Get available version error, err: %s\n", err)
+		return err
+	}
 	if len(result) == 0 {
 		pterm.Println("No Available version.")
 		return nil
@@ -108,16 +112,23 @@ func (m *Manager) Available(sdkName string) error {
 			}
 			versions := result[start:end]
 			var arr []*printer.KV
-			for _, version := range versions {
-				var note string
-				if version.Note != "" {
-					note = fmt.Sprintf("(%s)", version.Note)
+			for _, p := range versions {
+				var value string
+				if p.Main.Note != "" {
+					value = fmt.Sprintf("v%s (%s)", p.Main.Version, p.Main.Note)
 				} else {
-					note = ""
+					value = fmt.Sprintf("v%s", p.Main.Version)
+				}
+				if len(p.Additional) != 0 {
+					var additional []string
+					for _, a := range p.Additional {
+						additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
+					}
+					value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
 				}
 				arr = append(arr, &printer.KV{
-					Key:   string(version.Version),
-					Value: fmt.Sprintf("v%s %s", version.Version, note),
+					Key:   string(p.Main.Version),
+					Value: value,
 				})
 			}
 			return arr, nil
@@ -279,8 +290,8 @@ func (m *Manager) Remove(pluginName string) error {
 			pterm.Printf("Remove %s plugin failed, err: %s\n", pluginName, err)
 			return fmt.Errorf("remove failed")
 		}
-		pterm.Printf("Removing %s sdk...\n", source.sdkPath)
-		err = os.RemoveAll(source.sdkPath)
+		pterm.Printf("Removing %s sdk...\n", source.sdkRootPath)
+		err = os.RemoveAll(source.sdkRootPath)
 		pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	} else {
 		pterm.Println("Remove canceled.")
