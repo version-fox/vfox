@@ -17,8 +17,18 @@ PLUGIN = {
 --- @param ctx table
 --- @field ctx.version string version
 --- @return string download url
-function PLUGIN:DownloadUrl(ctx)
-    return ""
+function PLUGIN:InstallInfo(ctx)
+    return {
+        version = "xxx",
+        url = "xxx",
+        additional = {
+            {
+                name = "npm",
+                version = "xxx",
+                url = "xxx",
+            }
+        }
+    }
 end
 
 --- Returns the available download versions
@@ -42,6 +52,9 @@ end
 --- HOME environment variable in the PATH.
 --- {key = "JAVA_HOME", value = "xxxxxx"}
 function PLUGIN:EnvKeys(ctx)
+    local mainPath = ctx.version_path
+    local otherPath = ctx.additional_path["sdk-name"]
+
     return {
         {
             key = "JAVA_HOME",

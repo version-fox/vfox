@@ -16,8 +16,32 @@
 
 package sdk
 
+import "net/url"
+
 type AvailableVersion struct {
 	Version string
 	// LTS or other thing
 	Note string
+}
+
+type LocalSdkVersion struct {
+	Name       string
+	Version    Version
+	Path       string
+	Additional []*LocalSdkVersion
+}
+
+type InstallInfo struct {
+	// sdk name
+	Name string
+	// download url for main sdk
+	Url        *url.URL
+	Version    string // additional thing to install
+	Additional []*InstallAdditional
+}
+
+type InstallAdditional struct {
+	Name    string
+	Url     *url.URL
+	Version string
 }

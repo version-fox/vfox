@@ -42,38 +42,82 @@ type Sdk struct {
 }
 
 func (b *Sdk) Install(version Version) error {
+	success := false
+	newDirPath := b.VersionPath(version)
+
+	// Delete directory after failed installation
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(newDirPath)
+		}
+	}()
 	label := b.label(version)
 	if b.checkExists(version) {
 		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
 		return fmt.Errorf("%s has been installed\n", label)
 	}
-	downloadUrl := b.Plugin.DownloadUrl(string(version))
-	filePath, err := b.Download(downloadUrl)
+	installInfo, err := b.Plugin.InstallInfo(string(version))
+	if err != nil {
+		pterm.Printf("Failed to invoke the InstallInfo method of plugin [%s], err:%s\n", b.Plugin.Name, err.Error())
+		return err
+	}
+	filePath, err := b.Download(installInfo.Url)
 	if err != nil {
 		println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
 		return err
 	}
+	defer func() {
+		// del cache file
+		_ = os.Remove(filePath)
+	}()
 	decompressor := util.NewDecompressor(filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
 		return fmt.Errorf("unknown file type")
 	}
-	fileName := decompressor.Filename()
-	destPath := filepath.Dir(filePath)
 	pterm.Printf("Unpacking %s...\n", filePath)
-	err = decompressor.Decompress(destPath)
+	err = decompressor.Decompress(newDirPath)
 	if err != nil {
 		return err
 	}
-	newDirPath := b.VersionPath(version)
-	err = os.Rename(filepath.Join(destPath, fileName), newDirPath)
+	err = os.Rename(filepath.Join(newDirPath, decompressor.Filename()), filepath.Join(newDirPath, b.Plugin.Name+"-"+string(version)))
 	if err != nil {
+		pterm.Printf("Failed to rename file, err:%s\n", err.Error())
 		return err
 	}
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
+	if len(installInfo.Additional) > 0 {
+		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
+		for _, additional := range installInfo.Additional {
+			itemLabel := additional.Name + "@" + additional.Version
+			pterm.Printf("Installing %s...\n", itemLabel)
+			filePath, err := b.Download(additional.Url)
+			if err != nil {
+				println(fmt.Sprintf("Failed to download %s file, err:%s", label, err.Error()))
+				return err
+			}
+			decompressor := util.NewDecompressor(filePath)
+			if decompressor == nil {
+				fmt.Printf("Unable to process current file type, file: %s\n", filePath)
+				return fmt.Errorf("unknown file type")
+			}
+			pterm.Printf("Unpacking %s...\n", filePath)
+			err = decompressor.Decompress(newDirPath)
+			if err != nil {
+				return err
+			}
+			err = os.Rename(filepath.Join(newDirPath, decompressor.Filename()), filepath.Join(newDirPath, additional.Name+"-"+additional.Version))
+			if err != nil {
+				pterm.Printf("Failed to rename file, err:%s\n", err.Error())
+				return err
+			}
+			// del cache file
+			_ = os.Remove(filePath)
+			pterm.Printf("Install %s success! \n", pterm.LightGreen(itemLabel))
+		}
+	}
+	success = true
 	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
-	// del cache file
-	_ = os.Remove(filePath)
 	return nil
 }
 
@@ -83,13 +127,13 @@ func (b *Sdk) Uninstall(version Version) error {
 		pterm.Printf("%s is not installed...\n", pterm.Red(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
+	if b.Current() == version {
+		b.clearEnvConfig(version)
+	}
 	path := b.VersionPath(version)
 	err := os.RemoveAll(path)
 	if err != nil {
 		return err
-	}
-	if b.Current() == version {
-		b.clearEnvConfig(version, path)
 	}
 	pterm.Printf("Uninstalled %s successfully!\n", label)
 	return nil
@@ -105,16 +149,31 @@ func (b *Sdk) Use(version Version) error {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	keys := b.Plugin.EnvKeys(string(version), b.VersionPath(version))
+	localSdkInfo, err := b.getLocalSdkVersion(version)
+	if err != nil {
+		pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
+		return err
+	}
+	keys := b.Plugin.EnvKeys(localSdkInfo)
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),
 	})
-	err := b.sdkManager.EnvManager.Load(keys)
+	err = b.sdkManager.EnvManager.Load(keys)
 	if err != nil {
 		return fmt.Errorf("Use %s error, err: %s\n", label, err)
 	}
-	pterm.Printf("Now using %s\n", pterm.LightGreen(label))
+	var outputLabel string
+	if len(localSdkInfo.Additional) != 0 {
+		var additionalLabels []string
+		for _, additional := range localSdkInfo.Additional {
+			additionalLabels = append(additionalLabels, fmt.Sprintf("%s v%s", additional.Name, additional.Version))
+		}
+		outputLabel = fmt.Sprintf("%s (%s)", label, strings.Join(additionalLabels, ","))
+	} else {
+		outputLabel = label
+	}
+	pterm.Printf("Now using %s\n.", pterm.LightGreen(outputLabel))
 	return b.sdkManager.EnvManager.ReShell()
 }
 
@@ -148,11 +207,12 @@ func (b *Sdk) Close() {
 	b.Plugin.Close()
 }
 func (b *Sdk) clearCurrentEnvConfig() {
-	b.clearEnvConfig(b.Current(), b.VersionPath(b.Current()))
+	b.clearEnvConfig(b.Current())
 }
 
-func (b *Sdk) clearEnvConfig(version Version, path string) {
-	envKV := b.Plugin.EnvKeys(string(version), path)
+func (b *Sdk) clearEnvConfig(version Version) {
+	sdkVersion, _ := b.getLocalSdkVersion(version)
+	envKV := b.Plugin.EnvKeys(sdkVersion)
 	envManager := b.sdkManager.EnvManager
 	for _, kv := range envKV {
 		if kv.Key == "PATH" {
@@ -162,6 +222,42 @@ func (b *Sdk) clearEnvConfig(version Version, path string) {
 		}
 	}
 	_ = envManager.Remove(b.envVersionKey())
+}
+
+func (b *Sdk) getLocalSdkVersion(version Version) (*LocalSdkVersion, error) {
+	versionPath := b.VersionPath(version)
+	sdkVersion := &LocalSdkVersion{
+		Version:    version,
+		Name:       b.Plugin.Name,
+		Additional: make([]*LocalSdkVersion, 0),
+	}
+	dir, err := os.ReadDir(versionPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range dir {
+		if d.IsDir() {
+			split := strings.Split(d.Name(), "-")
+			if len(split) != 2 {
+				continue
+			}
+			name := split[0]
+			v := split[1]
+			if name == b.Plugin.Name {
+				sdkVersion.Path = filepath.Join(versionPath, d.Name())
+				continue
+			}
+			sdkVersion.Additional = append(sdkVersion.Additional, &LocalSdkVersion{
+				Name:    name,
+				Version: Version(v),
+				Path:    filepath.Join(versionPath, d.Name()),
+			})
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return sdkVersion, nil
 }
 
 func (b *Sdk) checkExists(version Version) bool {

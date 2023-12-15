@@ -49,7 +49,7 @@ func (l *LuaPlugin) checkValid() error {
 	if obj.RawGetString("Available") == lua.LNil {
 		return fmt.Errorf("available function not found")
 	}
-	if obj.RawGetString("DownloadUrl") == lua.LNil {
+	if obj.RawGetString("InstallInfo") == lua.LNil {
 		return fmt.Errorf("download_url function not found")
 	}
 	if obj.RawGetString("EnvKeys") == lua.LNil {
@@ -91,31 +91,72 @@ func (l *LuaPlugin) Available() []*AvailableVersion {
 	return result
 }
 
-func (l *LuaPlugin) DownloadUrl(version string) *url.URL {
+func (l *LuaPlugin) InstallInfo(version string) (*InstallInfo, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
 
 	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("DownloadUrl").(*lua.LFunction),
+		Fn:      l.pluginObj.RawGetString("InstallInfo").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	ret := L.Get(-1) // returned value
-	L.Pop(1)         // remove received value
+	table := L.ToTable(-1) // returned value
+	L.Pop(1)               // remove received value
 
-	u, _ := url.Parse(ret.String())
-	return u
+	v := table.RawGetString("version").String()
+	muStr := table.RawGetString("url").String()
+	mu, err := url.Parse(muStr)
+	if err != nil {
+		return nil, err
+	}
+	var additionalArr []*InstallAdditional
+	additional := table.RawGetString("additional")
+	if additional.Type() != lua.LTNil {
+		additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
+			kvTable, ok := value.(*lua.LTable)
+			if !ok {
+				err = fmt.Errorf("the return value is not a table")
+				return
+			}
+			s := kvTable.RawGetString("url").String()
+			u, err := url.Parse(s)
+			if err != nil {
+				return
+			}
+			item := InstallAdditional{
+				Name:    kvTable.RawGetString("name").String(),
+				Version: kvTable.RawGetString("version").String(),
+				Url:     u,
+			}
+			additionalArr = append(additionalArr, &item)
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &InstallInfo{
+		Version:    v,
+		Url:        mu,
+		Additional: additionalArr,
+	}, nil
 }
 
-func (l *LuaPlugin) EnvKeys(version, versionPath string) []*env.KV {
+func (l *LuaPlugin) EnvKeys(version *LocalSdkVersion) []*env.KV {
 	L := l.state
 	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "version", lua.LString(version))
-	L.SetField(ctxTable, "version_path", lua.LString(versionPath))
+	L.SetField(ctxTable, "path", lua.LString(version.Path))
+	if len(version.Additional) != 0 {
+		additionalTable := L.NewTable()
+		for _, v := range version.Additional {
+			L.SetField(additionalTable, v.Name, lua.LString(v.Path))
+		}
+		L.SetField(ctxTable, "additional_path", additionalTable)
+	}
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("EnvKeys"),
 		NRet:    1,

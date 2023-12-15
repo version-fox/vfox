@@ -8,6 +8,7 @@ OS_TYPE = ""
 ARCH_TYPE = ""
 
 nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
+npmDownloadUrl = "https://github.com/npm/cli/archive/v%s.%s"
 
 VersionSourceUrl = "https://nodejs.org/dist/index.json"
 
@@ -18,7 +19,7 @@ PLUGIN = {
     updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
 }
 
-function PLUGIN:DownloadUrl(ctx)
+function PLUGIN:InstallInfo(ctx)
     local version = ctx.version
 
     local arch_type = ARCH_TYPE
@@ -29,7 +30,19 @@ function PLUGIN:DownloadUrl(ctx)
     if OS_TYPE == "windows" then
         ext = ".zip"
     end
-    return string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
+    local node_url = string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
+    --local npm_url = string.format(npmDownloadUrl, version, ext)
+    return {
+        version = version,
+        url = node_url,
+        additional = {
+            {
+                name = "npm",
+                version = "7.24.0",
+                url = "https://github.com/npm/cli/archive/v7.24.0.tar.gz",
+            }
+        }
+    }
 end
 
 function PLUGIN:Available(ctx)
@@ -51,11 +64,16 @@ function PLUGIN:Available(ctx)
 end
 
 function PLUGIN:EnvKeys(ctx)
-    version_path = ctx.version_path
+    local version_path = ctx.path
+    local npm_path = ctx.additional_path['npm']
     return {
         {
             key = "PATH",
             value = version_path .. "/bin"
+        },
+        {
+            key = "PATH",
+            value = npm_path .. "/bin"
         }
     }
 end

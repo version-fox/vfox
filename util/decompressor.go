@@ -49,7 +49,7 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
-
+	first := true
 	for {
 		header, err := tr.Next()
 		switch {
@@ -61,6 +61,10 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 			continue
 		}
 		target := filepath.Join(dest, header.Name)
+		if first && strings.Contains(header.Name, "/") {
+			first = false
+			g.filename = strings.Split(header.Name, "/")[0]
+		}
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
@@ -103,10 +107,15 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 		return err
 	}
 	defer r.Close()
+	first := true
 	for _, f := range r.File {
 		err := z.processZipFile(f, dest)
 		if err != nil {
 			return err
+		}
+		if first {
+			first = false
+			z.filename = strings.Split(f.Name, "/")[0]
 		}
 	}
 	return nil
