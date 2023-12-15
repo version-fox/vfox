@@ -48,8 +48,8 @@ func (l *LuaPlugin) checkValid() error {
 	if obj.RawGetString("Available") == lua.LNil {
 		return fmt.Errorf("[Available] function not found")
 	}
-	if obj.RawGetString("PostInstall") == lua.LNil {
-		return fmt.Errorf("[PostInstall] function not found")
+	if obj.RawGetString("PreInstall") == lua.LNil {
+		return fmt.Errorf("[PreInstall] function not found")
 	}
 	if obj.RawGetString("EnvKeys") == lua.LNil {
 		return fmt.Errorf("[EnvKeys] function not found")
@@ -192,8 +192,12 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L.SetField(ctxTable, "sdkInfo", sdkArr)
 	L.SetField(ctxTable, "rootPath", lua.LString(rootPath))
 
+	function := l.pluginObj.RawGetString("PostInstall")
+	if function.Type() == lua.LTNil {
+		return nil
+	}
 	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("PostInstall").(*lua.LFunction),
+		Fn:      function.(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
