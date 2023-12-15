@@ -153,7 +153,7 @@ func (b *Sdk) Use(version Version) error {
 	}
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
-		pterm.Printf("Plugin error: Failed to get env keys, err:%s\n", err.Error())
+		pterm.Printf("Plugin error: err:%s\n", err.Error())
 		return err
 	}
 	keys = append(keys, &env.KV{
