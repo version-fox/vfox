@@ -61,13 +61,13 @@ func (l *LuaPlugin) Close() {
 	l.state.Close()
 }
 
-func (l *LuaPlugin) checkTable(v lua.LValue) error {
+func (l *LuaPlugin) checkIsNotTableOrNilOrEmpty(v lua.LValue) bool {
 	if v.Type() == lua.LTNil {
-		return fmt.Errorf("returned value is nil")
+		return true
 	} else if tb, ok := v.(*lua.LTable); !ok || tb.Len() == 0 {
-		return fmt.Errorf("returned value is not a table or table is empty")
+		return true
 	} else {
-		return nil
+		return false
 	}
 }
 
@@ -86,10 +86,11 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	err := l.checkTable(table)
-	if err != nil {
-		return nil, err
+	c := l.checkIsNotTableOrNilOrEmpty(table)
+	if c {
+		return []*Package{}, nil
 	}
+	var err error
 	var result []*Package
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
@@ -149,9 +150,9 @@ func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-	err := l.checkTable(table)
-	if err != nil {
-		return nil, err
+	c := l.checkIsNotTableOrNilOrEmpty(table)
+	if c {
+		return nil, nil
 	}
 	v := table.RawGetString("version").String()
 	muStr := table.RawGetString("url").String()
@@ -210,11 +211,11 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-	err := l.checkTable(table)
-	if err != nil {
-		return nil, err
+	c := l.checkIsNotTableOrNilOrEmpty(table)
+	if c {
+		return nil, fmt.Errorf("no environment variables provided")
 	}
-
+	var err error
 	var envKeys []*env.KV
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)

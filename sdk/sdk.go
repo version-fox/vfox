@@ -58,8 +58,12 @@ func (b *Sdk) Install(version Version) error {
 	}
 	installInfo, err := b.Plugin.InstallInfo(version)
 	if err != nil {
-		pterm.Printf("Plugin error: failed to get install info, err:%s\n", err.Error())
+		pterm.Printf("Plugin error: %s\n", err.Error())
 		return err
+	}
+	if installInfo == nil {
+		pterm.Println("No information about the current version")
+		return fmt.Errorf("no version")
 	}
 	mainSdk := installInfo.Main
 	err = b.installSdk(mainSdk, newDirPath)
