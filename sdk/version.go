@@ -16,8 +16,6 @@
 
 package sdk
 
-import "net/url"
-
 type Package struct {
 	Main       *Info
 	Additional []*Info
@@ -32,34 +30,4 @@ type Info struct {
 
 func (i *Info) label() string {
 	return i.Name + "@" + string(i.Version)
-}
-
-type AvailableVersion struct {
-	Version string
-	// LTS or other thing
-	Note string
-
-	Additional []*LocalSdkVersion
-}
-
-type LocalSdkVersion struct {
-	Name       string
-	Version    Version
-	Path       string
-	Additional []*LocalSdkVersion
-}
-
-type InstallInfo struct {
-	// sdk name
-	Name string
-	// download url for main sdk
-	Url        *url.URL
-	Version    string // additional thing to install
-	Additional []*InstallAdditional
-}
-
-type InstallAdditional struct {
-	Name    string
-	Url     *url.URL
-	Version string
 }
