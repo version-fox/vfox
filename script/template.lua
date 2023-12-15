@@ -1,6 +1,3 @@
----  Default global variable
----  OS_TYPE:  windows, linux, darwin
----  ARCH_TYPE: 386, amd64, arm, arm64  ...
 
 OS_TYPE = ""
 ARCH_TYPE = ""
@@ -17,7 +14,7 @@ PLUGIN = {
 --- @param ctx table
 --- @field ctx.version string version
 --- @return string download url
-function PLUGIN:InstallInfo(ctx)
+function PLUGIN:PreInstall(ctx)
     return {
         version = "xxx",
         url = "xxx",
@@ -29,6 +26,15 @@ function PLUGIN:InstallInfo(ctx)
             }
         }
     }
+end
+
+--- Expansion point
+function PLUGIN:PostInstall(ctx)
+    local rootPath = ctx.rootPath
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
 end
 
 --- Returns the available download versions

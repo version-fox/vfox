@@ -56,7 +56,7 @@ func (b *Sdk) Install(version Version) error {
 		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
 		return fmt.Errorf("%s has been installed\n", label)
 	}
-	installInfo, err := b.Plugin.InstallInfo(version)
+	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
 		pterm.Printf("Plugin error: %s\n", err.Error())
 		return err
@@ -66,34 +66,46 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("no version")
 	}
 	mainSdk := installInfo.Main
-	err = b.installSdk(mainSdk, newDirPath)
+	var installedSdkInfos []*Info
+	path, err := b.installSdk(mainSdk, newDirPath)
 	if err != nil {
 		return err
 	}
+	installedSdkInfos = append(installedSdkInfos, &Info{
+		Name:    mainSdk.Name,
+		Version: mainSdk.Version,
+		Path:    path,
+	})
 	if len(installInfo.Additional) > 0 {
 		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
 		for _, oSdk := range installInfo.Additional {
-			err = b.installSdk(oSdk, newDirPath)
+			path, err = b.installSdk(oSdk, newDirPath)
 			if err != nil {
 				return err
 			}
+			installedSdkInfos = append(installedSdkInfos, &Info{
+				Name:    oSdk.Name,
+				Version: oSdk.Version,
+				Path:    path,
+			})
 		}
 	}
 	success = true
+	_ = b.Plugin.PostInstall(newDirPath, installedSdkInfos)
 	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
 	return nil
 }
-func (b *Sdk) installSdk(info *Info, sdkDestPath string) error {
+func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 	pterm.Printf("Installing %s...\n", info.label())
 	u, err := url.Parse(info.Path)
 	label := info.label()
 	if err != nil {
-		return err
+		return "", err
 	}
 	filePath, err := b.Download(u)
 	if err != nil {
 		fmt.Printf("Failed to download %s file, err:%s", label, err.Error())
-		return err
+		return "", err
 	}
 	defer func() {
 		// del cache file
@@ -102,20 +114,16 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) error {
 	decompressor := util.NewDecompressor(filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
-		return fmt.Errorf("unknown file type")
+		return "", fmt.Errorf("unknown file type")
 	}
 	pterm.Printf("Unpacking %s...\n", filePath)
-	err = decompressor.Decompress(sdkDestPath)
+	path := filepath.Join(sdkDestPath, info.Name+"-"+string(info.Version))
+	err = decompressor.Decompress(path)
 	if err != nil {
-		return err
-	}
-	err = os.Rename(filepath.Join(sdkDestPath, decompressor.Filename()), filepath.Join(sdkDestPath, info.Name+"-"+string(info.Version)))
-	if err != nil {
-		pterm.Printf("Failed to rename file, err:%s\n", err.Error())
-		return err
+		return "", err
 	}
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
-	return nil
+	return path, nil
 }
 
 func (b *Sdk) Uninstall(version Version) error {

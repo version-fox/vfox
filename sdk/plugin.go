@@ -48,8 +48,8 @@ func (l *LuaPlugin) checkValid() error {
 	if obj.RawGetString("Available") == lua.LNil {
 		return fmt.Errorf("[Available] function not found")
 	}
-	if obj.RawGetString("InstallInfo") == lua.LNil {
-		return fmt.Errorf("[InstallInfo] function not found")
+	if obj.RawGetString("PostInstall") == lua.LNil {
+		return fmt.Errorf("[PostInstall] function not found")
 	}
 	if obj.RawGetString("EnvKeys") == lua.LNil {
 		return fmt.Errorf("[EnvKeys] function not found")
@@ -124,13 +124,13 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	return result, nil
 }
 
-func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
+func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
 
 	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("InstallInfo").(*lua.LFunction),
+		Fn:      l.pluginObj.RawGetString("PostInstall").(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
@@ -176,6 +176,31 @@ func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 		Main:       mainSdk,
 		Additional: additionalArr,
 	}, nil
+}
+
+func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
+	L := l.state
+	sdkArr := L.NewTable()
+	for _, v := range sdks {
+		sdkTable := L.NewTable()
+		L.SetField(sdkTable, "name", lua.LString(v.Name))
+		L.SetField(sdkTable, "version", lua.LString(v.Version))
+		L.SetField(sdkTable, "path", lua.LString(v.Path))
+		L.SetField(sdkArr, v.Name, sdkTable)
+	}
+	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "sdkInfo", sdkArr)
+	L.SetField(ctxTable, "rootPath", lua.LString(rootPath))
+
+	if err := L.CallByParam(lua.P{
+		Fn:      l.pluginObj.RawGetString("PostInstall").(*lua.LFunction),
+		NRet:    1,
+		Protect: true,
+	}, l.pluginObj, ctxTable); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
