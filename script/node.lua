@@ -19,7 +19,7 @@ PLUGIN = {
     updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
 }
 
-function PLUGIN:InstallInfo(ctx)
+function PLUGIN:PreInstall(ctx)
     local version = ctx.version
 
     local arch_type = ARCH_TYPE
@@ -35,13 +35,6 @@ function PLUGIN:InstallInfo(ctx)
     return {
         version = version,
         url = node_url,
-        additional = {
-            {
-                name = "npm",
-                version = "7.24.0",
-                url = "https://github.com/npm/cli/archive/v7.24.0.tar.gz",
-            }
-        }
     }
 end
 
@@ -57,23 +50,33 @@ function PLUGIN:Available(ctx)
     for _, v in ipairs(body) do
         table.insert(result, {
             version = string.gsub(v.version, "^v", ""),
-            note = v.lts and "LTS" or ""
+            note = v.lts and "LTS" or "",
+            additional = {
+                {
+                    name = "npm",
+                    version = v.npm,
+                }
+            }
         })
     end
     return result
 end
 
+--- Expansion point
+function PLUGIN:PostInstall(ctx)
+    local rootPath = ctx.rootPath
+    local sdkInfo = ctx.sdkInfo['node']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
+end
+
 function PLUGIN:EnvKeys(ctx)
     local version_path = ctx.path
-    local npm_path = ctx.additional_path['npm']
     return {
         {
             key = "PATH",
             value = version_path .. "/bin"
         },
-        {
-            key = "PATH",
-            value = npm_path .. "/bin"
-        }
     }
 end

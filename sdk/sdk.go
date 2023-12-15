@@ -24,6 +24,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -283,13 +284,20 @@ func (b *Sdk) VersionPath(version Version) string {
 	return filepath.Join(b.sdkRootPath, fmt.Sprintf("v-%s", version))
 }
 
-func (b *Sdk) Download(url *url.URL) (string, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func (b *Sdk) Download(u *url.URL) (string, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			var netErr net.Error
+			if errors.As(urlErr.Err, &netErr) && netErr.Timeout() {
+				return "", errors.New("request timeout")
+			}
+		}
 		return "", err
 	}
 
@@ -304,7 +312,7 @@ func (b *Sdk) Download(url *url.URL) (string, error) {
 		return "", err
 	}
 
-	path := filepath.Join(b.sdkRootPath, filepath.Base(url.Path))
+	path := filepath.Join(b.sdkRootPath, filepath.Base(u.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

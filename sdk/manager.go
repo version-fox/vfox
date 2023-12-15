@@ -202,7 +202,7 @@ func (m *Manager) List(arg Arg) error {
 	curVersion := source.Current()
 	list := source.List()
 	if len(list) == 0 {
-		pterm.Println("No Available version.")
+		pterm.Println("No available version.")
 		return nil
 	}
 	for _, version := range list {
@@ -383,7 +383,7 @@ func NewSdkManager() *Manager {
 	}
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
 	configPath := filepath.Join(userHomeDir, ".version-fox")
-	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", ".cache")
+	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
 	envConfigPath := filepath.Join(userHomeDir, ".version-fox", "env.sh")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
