@@ -46,19 +46,29 @@ func (l *LuaPlugin) checkValid() error {
 	}
 	obj := l.pluginObj
 	if obj.RawGetString("Available") == lua.LNil {
-		return fmt.Errorf("available function not found")
+		return fmt.Errorf("[Available] function not found")
 	}
 	if obj.RawGetString("InstallInfo") == lua.LNil {
-		return fmt.Errorf("download_url function not found")
+		return fmt.Errorf("[InstallInfo] function not found")
 	}
 	if obj.RawGetString("EnvKeys") == lua.LNil {
-		return fmt.Errorf("env_keys function not found")
+		return fmt.Errorf("[EnvKeys] function not found")
 	}
 	return nil
 }
 
 func (l *LuaPlugin) Close() {
 	l.state.Close()
+}
+
+func (l *LuaPlugin) checkTable(v lua.LValue) error {
+	if v.Type() == lua.LTNil {
+		return fmt.Errorf("returned value is nil")
+	} else if tb, ok := v.(*lua.LTable); !ok || tb.Len() == 0 {
+		return fmt.Errorf("returned value is not a table or table is empty")
+	} else {
+		return nil
+	}
 }
 
 func (l *LuaPlugin) Available() ([]*Package, error) {
@@ -76,7 +86,10 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	var err error
+	err := l.checkTable(table)
+	if err != nil {
+		return nil, err
+	}
 	var result []*Package
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
@@ -93,7 +106,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		}
 		var additionalArr []*Info
 		additional := kvTable.RawGetString("additional")
-		if additional.Type() != lua.LTNil {
+		if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
 			additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
 				itemTable, ok := value.(*lua.LTable)
 				if !ok {
@@ -136,7 +149,10 @@ func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-
+	err := l.checkTable(table)
+	if err != nil {
+		return nil, err
+	}
 	v := table.RawGetString("version").String()
 	muStr := table.RawGetString("url").String()
 	mainSdk := &Info{
@@ -146,7 +162,7 @@ func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 	}
 	var additionalArr []*Info
 	additional := table.RawGetString("additional")
-	if additional.Type() != lua.LTNil {
+	if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
 		var err error
 		additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
 			kvTable, ok := value.(*lua.LTable)
@@ -194,9 +210,12 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
+	err := l.checkTable(table)
+	if err != nil {
+		return nil, err
+	}
 
 	var envKeys []*env.KV
-	var err error
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
 		if !ok {
@@ -212,6 +231,14 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 	}
 
 	return envKeys, nil
+}
+
+func (l *LuaPlugin) getTableField(table *lua.LTable, fieldName string) (lua.LValue, error) {
+	value := table.RawGetString(fieldName)
+	if value.Type() == lua.LTNil {
+		return nil, fmt.Errorf("field '%s' not found", fieldName)
+	}
+	return value, nil
 }
 
 func (l *LuaPlugin) luaPrint() int {
