@@ -175,14 +175,14 @@ func (b *Sdk) List() []Version {
 		return make([]Version, 0)
 	}
 	var versions []Version
-	err := filepath.Walk(b.sdkRootPath, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() && strings.HasPrefix(info.Name(), "v-") {
-			versions = append(versions, Version(strings.TrimPrefix(info.Name(), "v-")))
-		}
-		return nil
-	})
+	dir, err := os.ReadDir(b.sdkRootPath)
 	if err != nil {
 		return nil
+	}
+	for _, d := range dir {
+		if d.IsDir() && strings.HasPrefix(d.Name(), "v-") {
+			versions = append(versions, Version(strings.TrimPrefix(d.Name(), "v-")))
+		}
 	}
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i] > versions[j]

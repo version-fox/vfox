@@ -239,27 +239,29 @@ func (m *Manager) Current(sdkName string) error {
 }
 
 func (m *Manager) loadSdk() {
-	_ = filepath.Walk(m.pluginPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	dir, err := os.ReadDir(m.pluginPath)
+	if err != nil {
+		pterm.Printf("Read plugin dir error, err: %s\n", err)
+		return
+	}
+	for _, d := range dir {
+		if d.IsDir() {
+			continue
 		}
-		if info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".lua") {
+		if strings.HasSuffix(d.Name(), ".lua") {
 			// filename first as sdk name
+			path := filepath.Join(m.pluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
 			source, err := NewLuaPlugin(content, m.osType, m.archType)
 			if err != nil {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
-				return nil
+				continue
 			}
 			sdk, _ := NewSdk(m, source)
 			name := strings.TrimSuffix(filepath.Base(path), ".lua")
 			m.sdkMap[strings.ToLower(name)] = sdk
 		}
-		return nil
-	})
+	}
 }
 
 func (m *Manager) Close() {
