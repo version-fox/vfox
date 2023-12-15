@@ -58,7 +58,7 @@ func (b *Sdk) Install(version Version) error {
 	}
 	installInfo, err := b.Plugin.InstallInfo(version)
 	if err != nil {
-		pterm.Printf("Failed to invoke the InstallInfo method of plugin [%s], err:%s\n", b.Plugin.Name, err.Error())
+		pterm.Printf("Plugin error: failed to get install info, err:%s\n", err.Error())
 		return err
 	}
 	mainSdk := installInfo.Main
@@ -147,7 +147,11 @@ func (b *Sdk) Use(version Version) error {
 		pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 		return err
 	}
-	keys := b.Plugin.EnvKeys(sdkPackage)
+	keys, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		pterm.Printf("Plugin error: Failed to get env keys, err:%s\n", err.Error())
+		return err
+	}
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),
@@ -205,7 +209,10 @@ func (b *Sdk) clearCurrentEnvConfig() {
 
 func (b *Sdk) clearEnvConfig(version Version) {
 	sdkPackage, _ := b.getLocalSdkPackage(version)
-	envKV := b.Plugin.EnvKeys(sdkPackage)
+	envKV, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		return
+	}
 	envManager := b.sdkManager.EnvManager
 	for _, kv := range envKV {
 		if kv.Key == "PATH" {

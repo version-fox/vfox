@@ -89,7 +89,7 @@ func (m *Manager) Available(sdkName string) error {
 	}
 	result, err := source.Available()
 	if err != nil {
-		pterm.Printf("Get available version error, err: %s\n", err)
+		pterm.Printf("Plugin error: failed to get available list, err: %s\n", err)
 		return err
 	}
 	if len(result) == 0 {

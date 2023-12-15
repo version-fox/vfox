@@ -173,7 +173,7 @@ func (l *LuaPlugin) InstallInfo(version Version) (*Package, error) {
 	}, nil
 }
 
-func (l *LuaPlugin) EnvKeys(sdkPackage *Package) []*env.KV {
+func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "path", lua.LString(sdkPackage.Main.Path))
@@ -189,24 +189,29 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) []*env.KV {
 		NRet:    1,
 		Protect: true,
 	}, l.pluginObj, ctxTable); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
 	var envKeys []*env.KV
+	var err error
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
 		if !ok {
-			panic("expected a table")
+			err = fmt.Errorf("the return value is not a table")
+			return
 		}
 		key = kvTable.RawGetString("key")
 		value = kvTable.RawGetString("value")
 		envKeys = append(envKeys, &env.KV{Key: key.String(), Value: value.String()})
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return envKeys
+	return envKeys, nil
 }
 
 func (l *LuaPlugin) luaPrint() int {
