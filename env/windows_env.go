@@ -203,7 +203,6 @@ func NewShellInfo() *ShellInfo {
 	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", ppid), "get", "ExecutablePath", "/format:list")
 	output, _ = cmd.Output()
 	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
-	println(path)
 	return &ShellInfo{
 		ShellType:  ShellType(parentProcessName),
 		ShellPath:  path,
