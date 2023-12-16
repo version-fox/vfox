@@ -135,7 +135,16 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
 	}
 	defer rc.Close()
 
-	fpath := filepath.Join(dest, f.Name)
+	// Split the file name into a slice
+	parts := strings.Split(f.Name, "/")
+	if len(parts) > 1 {
+		// Remove the first element
+		parts = parts[1:]
+	}
+	// Join the remaining elements to get the new file name
+	fname := strings.Join(parts, "/")
+
+	fpath := filepath.Join(dest, fname)
 	if f.FileInfo().IsDir() {
 		err := os.MkdirAll(fpath, os.ModePerm)
 		if err != nil {

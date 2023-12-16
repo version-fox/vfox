@@ -17,12 +17,13 @@
 package main
 
 import (
-	"github.com/aooohan/version-fox/sdk"
-	"github.com/urfave/cli/v2"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/aooohan/version-fox/sdk"
+	"github.com/urfave/cli/v2"
 )
 
 const Version = "0.0.1"
