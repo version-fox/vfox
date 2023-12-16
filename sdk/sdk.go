@@ -19,10 +19,6 @@ package sdk
 import (
 	"errors"
 	"fmt"
-	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/util"
-	"github.com/pterm/pterm"
-	"github.com/schollz/progressbar/v3"
 	"io"
 	"net"
 	"net/http"
@@ -31,6 +27,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/util"
+	"github.com/pterm/pterm"
+	"github.com/schollz/progressbar/v3"
 )
 
 type Version string
@@ -165,6 +166,7 @@ func (b *Sdk) Use(version Version) error {
 		pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
 		return err
 	}
+	b.clearCurrentEnvConfig()
 	keys = append(keys, &env.KV{
 		Key:   b.envVersionKey(),
 		Value: string(version),

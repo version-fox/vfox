@@ -72,7 +72,6 @@ func (w *windowsEnvManager) Flush() {
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
-
 	oldPath, err := w.Get("PATH")
 	if err != nil {
 		return
