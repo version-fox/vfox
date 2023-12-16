@@ -145,7 +145,6 @@ func (w *windowsEnvManager) Remove(key string) error {
 func (w *windowsEnvManager) ReShell() error {
 	// flush env to file
 	w.Flush()
-	println(w.shellInfo.ShellPath)
 	command := exec.Command(w.shellInfo.ShellPath)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout

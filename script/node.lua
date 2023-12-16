@@ -24,13 +24,15 @@ function PLUGIN:PreInstall(ctx)
 
     local arch_type = ARCH_TYPE
     local ext = ".tar.gz"
+    local osType = OS_TYPE
     if arch_type == "amd64" then
         arch_type = "x64"
     end
     if OS_TYPE == "windows" then
         ext = ".zip"
+        osType = "win"
     end
-    local node_url = string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
+    local node_url = string.format(nodeDownloadUrl, version, version, osType, arch_type, ext)
     --local npm_url = string.format(npmDownloadUrl, version, ext)
     return {
         version = version,
@@ -73,10 +75,19 @@ end
 
 function PLUGIN:EnvKeys(ctx)
     local version_path = ctx.path
-    return {
-        {
-            key = "PATH",
-            value = version_path .. "/bin"
-        },
-    }
+    if OS_TYPE == "windows" then
+        return {
+            {
+                key = "PATH",
+                value = version_path
+            },
+        }
+    else
+        return {
+            {
+                key = "PATH",
+                value = version_path .. "/bin"
+            },
+        }
+    end
 end

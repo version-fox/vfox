@@ -18,16 +18,17 @@ package sdk
 
 import (
 	"fmt"
-	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/printer"
-	"github.com/aooohan/version-fox/util"
-	"github.com/pterm/pterm"
-	"github.com/pterm/pterm/putils"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/aooohan/version-fox/env"
+	"github.com/aooohan/version-fox/printer"
+	"github.com/aooohan/version-fox/util"
+	"github.com/pterm/pterm"
+	"github.com/pterm/pterm/putils"
 )
 
 type Arg struct {
@@ -368,6 +369,8 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
+
 	str, err := io.ReadAll(file)
 	if err != nil {
 		return "", err
