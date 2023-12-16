@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin || linux
 
 /*
  *    Copyright 2023 [lihan aooohan@gmail.com]
