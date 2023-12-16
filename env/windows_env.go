@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"unsafe"
 
 	"github.com/pterm/pterm"
 	"golang.org/x/sys/windows/registry"
@@ -56,6 +58,7 @@ func (w *windowsEnvManager) loadPathValue() error {
 }
 
 func (w *windowsEnvManager) Flush() {
+	defer w.key.Close()
 	customPaths := make([]string, 0, len(w.pathMap))
 	if len(w.pathMap) > 0 {
 		for path := range w.pathMap {
@@ -97,7 +100,7 @@ func (w *windowsEnvManager) Flush() {
 		sysNewPaths = append(sysNewPaths, v)
 	}
 	os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
-	defer w.key.Close()
+	_ = w.broadcastEnvironment()
 }
 
 func (w *windowsEnvManager) Load(kvs []*KV) error {
@@ -149,6 +152,22 @@ func (w *windowsEnvManager) ReShell() error {
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {
 		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
+		return err
+	}
+	return nil
+}
+
+func (w *windowsEnvManager) broadcastEnvironment() error {
+	r, _, err := syscall.NewLazyDLL("user32.dll").NewProc("SendMessageTimeoutW").Call(
+		0xffff, // HWND_BROADCAST
+		0x1a,   // WM_SETTINGCHANGE
+		0,
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Environment"))),
+		0x02, // SMTO_ABORTIFHUNG
+		5000, // 5 seconds
+		0,
+	)
+	if r == 0 {
 		return err
 	}
 	return nil
