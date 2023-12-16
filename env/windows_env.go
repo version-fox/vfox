@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
+	"github.com/pterm/pterm"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -72,20 +72,31 @@ func (w *windowsEnvManager) Flush() {
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
+	// user env
 	oldPath, err := w.Get("PATH")
 	if err != nil {
 		return
 	}
 	s := strings.Split(oldPath, ";")
+	userNewPaths := append([]string{}, customPaths...)
 	for _, v := range s {
 		if _, ok := w.deletedPathMap[v]; ok {
 			continue
 		}
-		customPaths = append(customPaths, v)
+		userNewPaths = append(userNewPaths, v)
 	}
-	newPath := strings.Join(customPaths, ";")
-	w.key.SetStringValue("PATH", newPath)
-	os.Setenv("PATH", newPath)
+	w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";"))
+	// sys env
+	sysPath := os.Getenv("PATH")
+	s2 := strings.Split(sysPath, ";")
+	sysNewPaths := append([]string{}, customPaths...)
+	for _, v := range s2 {
+		if _, ok := w.deletedPathMap[v]; ok {
+			continue
+		}
+		sysNewPaths = append(sysNewPaths, v)
+	}
+	os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
 	defer w.key.Close()
 }
 
@@ -131,14 +142,13 @@ func (w *windowsEnvManager) Remove(key string) error {
 func (w *windowsEnvManager) ReShell() error {
 	// flush env to file
 	w.Flush()
+	println(w.shellInfo.ShellPath)
 	command := exec.Command(w.shellInfo.ShellPath)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	if err := command.Start(); err != nil {
-		return err
-	}
-	if err := command.Wait(); err != nil {
+	if err := command.Run(); err != nil {
+		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
 		return err
 	}
 	return nil
@@ -171,28 +181,13 @@ func NewShellInfo() *ShellInfo {
 	output, _ := cmd.Output()
 	fields := strings.Split(string(output), ",")
 	parentProcessName := strings.Trim(fields[0], "\" ")
-	switch filepath.Base(parentProcessName) {
-	case "powershell.exe":
-		return &ShellInfo{
-			ShellType:  "powershell",
-			ShellPath:  "powershell",
-			ConfigPath: "",
-		}
-	case "cmd.exe":
-		return &ShellInfo{
-			ShellType:  "cmd",
-			ShellPath:  "cmd",
-			ConfigPath: "",
-		}
-	default:
-		// Get the full path of the git-bash.exe
-		cmd := exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", ppid), "get", "ExecutablePath", "/format:list")
-		output, _ := cmd.Output()
-		path := strings.TrimSpace(strings.TrimPrefix(string(output), "ExecutablePath="))
-		return &ShellInfo{
-			ShellType:  ShellType(parentProcessName),
-			ShellPath:  path,
-			ConfigPath: "",
-		}
+	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", ppid), "get", "ExecutablePath", "/format:list")
+	output, _ = cmd.Output()
+	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
+	println(path)
+	return &ShellInfo{
+		ShellType:  ShellType(parentProcessName),
+		ShellPath:  path,
+		ConfigPath: "",
 	}
 }
