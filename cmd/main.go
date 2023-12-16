@@ -54,13 +54,25 @@ func main() {
 	app := &cli.App{}
 	app.Name = "VersionFox"
 	app.Usage = "VersionFox is a tool for sdk version management"
-	app.UsageText = "vf [command] [command options]"
+	app.UsageText = "vfox [command] [command options]"
 	// TODO copyright
 	app.Copyright = "TODO Copyright"
 	app.Version = Version
 	app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
 	app.Suggest = true
 	app.Commands = []*cli.Command{
+		{
+			Name:  "info",
+			Usage: "show info of plugin",
+			Action: func(ctx *cli.Context) error {
+				args := ctx.Args()
+				l := args.Len()
+				if l < 2 {
+					return cli.Exit("invalid arguments", 1)
+				}
+				return manager.Add(args.Get(0), args.Get(1))
+			},
+		},
 		{
 			Name:  "add",
 			Usage: "add a plugin of sdk",

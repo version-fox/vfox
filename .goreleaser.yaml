@@ -1,0 +1,152 @@
+# .goreleaser.yaml
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: 'vfox'
+    main: './cmd'
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+      - ppc64
+    goarm:
+      - "7"
+    ignore:
+      - goos: windows
+        goarch: arm
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }} -X main.builtBy=goreleaser -X main.treeState={{ .IsGitDirty }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^test:"
+      - "^chore"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Dependency updates
+      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
+      order: 300
+    - title: "New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 100
+    - title: "Security updates"
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 150
+    - title: "Bug fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 200
+    - title: "Documentation updates"
+      regexp: ^.*?doc(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: "Build process updates"
+      regexp: ^.*?build(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: Other work
+      order: 9999
+
+archives:
+  - name_template: >-
+      {{- .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end -}}
+    format_overrides:
+      - goos: windows
+        format: zip
+    builds_info:
+      group: root
+      owner: root
+    files:
+      - README.md
+      - LICENSE
+
+brews:
+  - name: 'vfox'
+    repository:
+      owner: aooohan
+      name: homebrew-vfox-tap
+      token: "{{ .Env.HOMEBREW_TOKEN }}"
+    folder: Formula
+    goarm: "7"
+    homepage: https://github.com/aooohan/version-fox
+    description: A cross-platform SDK version manager with a simple cli.
+    url_template: "https://github.com/aooohan/version-fox/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    license: "Apache-2.0"
+    commit_author:
+      name: lihan
+      email: aooohan@gmail.com
+#    dependencies:
+#      - name: go
+#        type: optional
+#      - name: git
+    test: |
+      system "#{bin}/vfox version"
+
+
+#winget:
+#  - name: vfox
+#    publisher: lihan
+#    license: 'Apache-2.0'
+#    homepage: https://github.com/aooohan/version-fox
+#    short_description: A cross-platform SDK version manager with a simple cli.
+#    repository:
+#      owner: aooohan
+#      name: vfox-winget-pkgs
+#      branch: "vfox-{{.Version}}"
+#      pull_request:
+#        enabled: true
+#        draft: true
+#        base:
+#          owner: microsoft
+#          name: winget-pkgs
+#          branch: master
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    output: true
+    artifacts: checksum
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - --yes
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "${artifact}@${digest}"
+      - --yes
+
+release:
+  name_template: "v{{ .Version }}"
+  footer: |
+    **Full Changelog**: https://github.com/aooohan/version-fox/compare/{{ .PreviousTag }}...{{ if .IsNightly }}nightly{{ else }}{{ .Tag }}{{ end }}

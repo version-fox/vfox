@@ -94,7 +94,7 @@ func (b *Sdk) Install(version Version) error {
 	}
 	success = true
 	_ = b.Plugin.PostInstall(newDirPath, installedSdkInfos)
-	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vf use %s", label)))
+	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
 func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
