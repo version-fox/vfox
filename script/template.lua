@@ -1,35 +1,44 @@
 
+--- Common libraries provided by VersionFox (optional)
+local http = require("http")
+local json = require("json")
+local html = require("html")
+
+--- The following two parameters are injected by VersionFox at runtime
+--- Operating system type at runtime (Windows, Linux, Darwin)
 OS_TYPE = ""
+--- Operating system architecture at runtime (amd64, arm64, etc.)
 ARCH_TYPE = ""
 
 PLUGIN = {
+    --- Plugin name
     name = "java",
+    --- Plugin author
     author = "Lihan",
+    --- Plugin version
     version = "0.0.1",
-    -- github 或 http TODO 升级功能
-    updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
+    -- Update URL
+    updateUrl = "{URL}/sdk.lua",
 }
 
---- Return to target version download link
+--- Return information about the specified version based on ctx.version, including version, download URL, etc.
 --- @param ctx table
---- @field ctx.version string version
---- @return string download url
+--- @field ctx.version string User-input version
+--- @return table Version information
 function PLUGIN:PreInstall(ctx)
     return {
+        --- Version number
         version = "xxx",
+        --- Download URL
         url = "xxx",
-        additional = {
-            {
-                name = "npm",
-                version = "xxx",
-                url = "xxx",
-            }
-        }
     }
 end
 
---- Expansion point
+--- Extension point, called after PreInstall, can perform additional operations,
+--- such as file operations for the SDK installation directory
+--- Currently can be left unimplemented!
 function PLUGIN:PostInstall(ctx)
+    --- ctx.rootPath SDK installation directory
     local rootPath = ctx.rootPath
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
@@ -37,11 +46,9 @@ function PLUGIN:PostInstall(ctx)
     local name = sdkInfo.name
 end
 
---- Returns the available download versions
---- @param ctx table nothing, only convenient for expansion in future.
---- @return table
----         version will as a input argument to DownloadUrl
----         notes  on target version, eg LTS, EOL etc.
+--- Return all available versions provided by this plugin
+--- @param ctx table Empty table used as context, for future extension
+--- @return table Descriptions of available versions and accompanying tool descriptions
 function PLUGIN:Available(ctx)
     return {
         {
@@ -50,31 +57,28 @@ function PLUGIN:Available(ctx)
             additional = {
                 {
                     name = "npm",
-                    version = "xxx",
+                    version = "8.8.8",
                 }
             }
         }
     }
 end
 
---- Return the need to set environment variables when use this version
---- @param ctx table {version, version_path}
---- @return table Some variables must be set, it is recommended to set
---- the corresponding HOME environment variable, and use the corresponding
---- HOME environment variable in the PATH.
---- {key = "JAVA_HOME", value = "xxxxxx"}
+--- Each SDK may have different environment variable configurations.
+--- This allows plugins to define custom environment variables (including PATH settings)
+--- Note: Be sure to distinguish between environment variable settings for different platforms!
+--- @param ctx table Context information
+--- @field ctx.version_path string SDK installation directory
 function PLUGIN:EnvKeys(ctx)
     local mainPath = ctx.version_path
-    local otherPath = ctx.additional_path["sdk-name"]
-
     return {
         {
             key = "JAVA_HOME",
-            value = ctx.version_path .. "/bin"
+            value = mainPath
         },
         {
             key = "PATH",
-            value = version_path .. "/bin"
+            value = mainPath .. "/bin"
         }
     }
 end
