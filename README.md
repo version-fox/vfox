@@ -433,6 +433,11 @@ vfox current                   Show the current version of all SDKs
 vfox help                      Show this help message
 ```
 
+## TODO
+
+- [ ] Supports bash, zsh, powershell auto-completion.
+- 
+
 ## Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any

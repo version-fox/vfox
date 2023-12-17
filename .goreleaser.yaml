@@ -105,6 +105,29 @@ brews:
     test: |
       system "#{bin}/vfox version"
 
+nfpms:
+  - file_name_template: "{{ .ConventionalFileName }}"
+    id: vfox
+    homepage: https://github.com/aooohan/version-fox
+    description: |-
+      A cross-platform SDK version manager with a simple cli.
+      Swiftly install and switch between different SDK versions 
+      using Lua scripts as plugins. Simplify your version management 
+      with VersionFox.
+    maintainer: Han Li <aooohan@gmail.com>
+    license: 'Apache-2.0'
+    vendor: VersionFox
+    bindir: /usr/bin
+    section: utils
+      - src: ./LICENSE
+        dst: /usr/share/doc/vfox/copyright
+        file_info:
+          mode: 0644
+    formats:
+      - apk
+      - deb
+      - rpm
+      - archlinux
 
 #winget:
 #  - name: vfox
