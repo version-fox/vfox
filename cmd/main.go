@@ -51,12 +51,13 @@ func main() {
 		os.Exit(0)
 	}()
 
-	app := &cli.App{}
+	app := &cli.App{
+		EnableBashCompletion: true,
+	}
 	app.Name = "VersionFox"
 	app.Usage = "VersionFox is a tool for sdk version management"
 	app.UsageText = "vfox [command] [command options]"
-	// TODO copyright
-	app.Copyright = "TODO Copyright"
+	app.Copyright = "Copyright 2023 Han Li. All rights reserved."
 	app.Version = Version
 	app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
 	app.Suggest = true
