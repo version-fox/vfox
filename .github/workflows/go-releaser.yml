@@ -2,7 +2,7 @@ name: goreleaser
 
 on:
   push:
-    tags: ['v*']
+    tags: [ 'v*' ]
 
 permissions:
   contents: write
@@ -32,3 +32,56 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TOKEN}}
+
+      - name: Publish rpm to Gemfury
+        env:
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+        run: |
+          for filename in dist/vfox*.rpm; do
+            curl -F package=@"$filename" https://{$FURY_TOKEN}@push.fury.io/versionfox/
+          done
+
+  compile-inno-setup:
+    name: Compile setup and publish
+    needs: release
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: inno_setup
+    steps:
+      - name: Checkout version-fox
+        uses: actions/checkout@v3
+      - name: Get version-fox version
+        id: version-fox-version
+        uses: actions/github-script@v6
+        with:
+          github-token: NO_NEED
+          result-encoding: string
+          script: return "${{ github.event.release.tag_name }}".substring(1)
+      - name: Install Inno Setup
+        run: |
+          curl --retry 10 --retry-all-errors -L -o installer.exe https://jrsoftware.org/download.php/is.exe
+          ./installer.exe /verysilent /allusers /dir=inst
+          sleep 60
+      - name: Download version-fox packages
+        env:
+          VFOX_VERSION: ${{ steps.version-fox-version.outputs.result }}
+          DOWNLOAD_URL: https://github.com/${{ github.event.repository.full_name }}/releases/download
+        run: |
+          curl -L -o i386.zip    ${{ env.DOWNLOAD_URL }}/v${{ env.VFOX_VERSION }}/vfox_${{ env.VFOX_VERSION }}_windows_i386.zip    && unzip i386.zip
+          curl -L -o x86_64.zip  ${{ env.DOWNLOAD_URL }}/v${{ env.VFOX_VERSION }}/vfox_${{ env.VFOX_VERSION }}_windows_x86_64.zip  && unzip x86_64.zip
+          curl -L -o aarch64.zip ${{ env.DOWNLOAD_URL }}/v${{ env.VFOX_VERSION }}/vfox_${{ env.VFOX_VERSION }}_windows_aarch64.zip && unzip aarch64.zip
+      - name: Compile by Inno Setup
+        env:
+          TRZSZ_VERSION: ${{ steps.version-fox-version.outputs.result }}
+        run: |
+          ./inst/iscc vfox_windows_i386.iss
+          ./inst/iscc vfox_windows_x86_64.iss
+          ./inst/iscc vfox_windows_aarch64.iss
+      - name: Upload Inno Setup Assets
+        uses: trzsz/upload-release-assets@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_id: ${{ github.event.release.id }}
+          assets_path: inno_setup/Output/*.exe

@@ -1,4 +1,5 @@
 # .goreleaser.yaml
+project_name: vfox
 before:
   hooks:
     - go mod tidy
@@ -16,7 +17,6 @@ builds:
       - amd64
       - arm
       - arm64
-      - ppc64
     goarm:
       - "7"
     ignore:
@@ -67,12 +67,16 @@ changelog:
 
 archives:
   - name_template: >-
-      {{- .ProjectName }}_
-      {{- title .Os }}_
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- if eq .Os "darwin" }}macos_
+      {{- else }}{{ .Os }}_{{ end }}
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm64" }}aarch64
+      {{- else if eq .Arch "arm" }}armv{{ .Arm }}
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end -}}
+    wrap_in_directory: true
     format_overrides:
       - goos: windows
         format: zip
@@ -98,15 +102,24 @@ brews:
     commit_author:
       name: lihan
       email: aooohan@gmail.com
-#    dependencies:
-#      - name: go
-#        type: optional
-#      - name: git
+    #    dependencies:
+    #      - name: go
+    #        type: optional
+    #      - name: git
     test: |
       system "#{bin}/vfox version"
 
 nfpms:
-  - file_name_template: "{{ .ConventionalFileName }}"
+  - file_name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- if eq .Os "darwin" }}macos_
+      {{- else }}{{ .Os }}_{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm64" }}aarch64
+      {{- else if eq .Arch "arm" }}armv{{ .Arm }}
+      {{- else }}{{ .Arch }}{{ end }}
     id: vfox
     homepage: https://github.com/aooohan/version-fox
     description: |-
@@ -119,15 +132,15 @@ nfpms:
     vendor: VersionFox
     bindir: /usr/bin
     section: utils
+    contents:
       - src: ./LICENSE
         dst: /usr/share/doc/vfox/copyright
         file_info:
           mode: 0644
     formats:
-      - apk
-      - deb
       - rpm
-      - archlinux
+    rpm:
+      group: Development/Tools
 
 #winget:
 #  - name: vfox
