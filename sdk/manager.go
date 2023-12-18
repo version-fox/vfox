@@ -388,25 +388,20 @@ func NewSdkManager() *Manager {
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
 	configPath := filepath.Join(userHomeDir, ".version-fox")
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	envConfigPath := filepath.Join(userHomeDir, ".version-fox", "env.sh")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
-	if !util.FileExists(envConfigPath) {
-		_, _ = os.Create(envConfigPath)
-	}
 	envManger, err := env.NewEnvManager(configPath)
 	if err != nil {
 		panic("Init env manager error")
 	}
 	manager := &Manager{
-		configPath:    configPath,
-		sdkCachePath:  sdkCachePath,
-		envConfigPath: envConfigPath,
-		pluginPath:    pluginPath,
-		EnvManager:    envManger,
-		sdkMap:        make(map[string]*Sdk),
-		osType:        util.GetOSType(),
-		archType:      util.GetArchType(),
+		configPath:   configPath,
+		sdkCachePath: sdkCachePath,
+		pluginPath:   pluginPath,
+		EnvManager:   envManger,
+		sdkMap:       make(map[string]*Sdk),
+		osType:       util.GetOSType(),
+		archType:     util.GetArchType(),
 	}
 
 	manager.loadSdk()

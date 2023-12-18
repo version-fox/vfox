@@ -21,6 +21,7 @@ package env
 import (
 	"bufio"
 	"fmt"
+	"github.com/aooohan/version-fox/util"
 	"os"
 	"os/exec"
 	"os/user"
@@ -159,9 +160,13 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	envPath := filepath.Join(vfConfigPath, "env.sh")
+	if !util.FileExists(envPath) {
+		_, _ = os.Create(envPath)
+	}
 	manager := &macosEnvManager{
 		shellInfo: shellInfo,
-		vfEnvPath: filepath.Join(vfConfigPath, "env.sh"),
+		vfEnvPath: envPath,
 		envMap:    make(map[string]string),
 		pathMap:   make(map[string]string),
 	}
