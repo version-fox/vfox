@@ -60,6 +60,21 @@ func TestContinuousFind(t *testing.T) {
 	evalLua(str, t)
 }
 
+func TestEach(t *testing.T) {
+	const str = `	
+	local html = require("html")
+	local doc = html.parse("<html><body><div id='test'>hello world</div><div>aabbb</div></body></html>")
+	doc:find("div"):each(function(i, selection)
+		if i == 1 then
+			assert(selection:text() == "hello world")
+		elseif i == 2 then
+			assert(selection:text() == "aabbb")
+		end
+	end)
+	`
+	evalLua(str, t)
+}
+
 func evalLua(str string, t *testing.T) {
 	s := lua.NewState()
 	defer s.Close()

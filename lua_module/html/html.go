@@ -50,6 +50,26 @@ var selectionMethods = map[string]lua.LGFunction{
 	"html":  selectionHtml,
 	"find":  selectionFind,
 	"first": selectionFirst,
+	"each":  selectionEach,
+}
+
+func selectionEach(L *lua.LState) int {
+	s := checkSelection(L)
+	f := L.CheckFunction(2)
+	s.Each(func(i int, selection *goquery.Selection) {
+		ud := L.NewUserData()
+		ud.Value = selection
+		L.SetMetatable(ud, L.GetTypeMetatable(luaSelectionTypeName))
+		err := L.CallByParam(lua.P{
+			Fn:      f,
+			NRet:    0,
+			Protect: true,
+		}, lua.LNumber(i+1), ud)
+		if err != nil {
+			L.RaiseError(err.Error())
+		}
+	})
+	return 0
 }
 
 func newHtmlDocument(L *lua.LState) int {
