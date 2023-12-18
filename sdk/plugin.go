@@ -286,7 +286,7 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 	L := lua.NewState()
 	lua_module.Preload(L)
 	if err := L.DoString(content); err != nil {
-		return nil, fmt.Errorf("content cannot be executed")
+		return nil, err
 	}
 
 	// set OS_TYPE and ARCH_TYPE

@@ -320,7 +320,8 @@ func (m *Manager) Add(pluginName, url string) error {
 	pterm.Println("Checking plugin...")
 	source, err := NewLuaPlugin(content, m.osType, m.archType)
 	if err != nil {
-		pterm.Printf("Check %s plugin failed, err: %s", url, err)
+		pterm.Printf("Check %s plugin failed, err: %s\n", url, err)
+		return err
 	}
 	destPath := filepath.Join(m.pluginPath, pluginName+".lua")
 	err = os.WriteFile(destPath, []byte(content), 0644)
