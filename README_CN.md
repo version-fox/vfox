@@ -5,7 +5,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
 [![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
-[![GitHub](https://img.shields.io/github/license/version-fox/vfox)]()
+[![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
@@ -33,8 +33,35 @@ $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh |
 
 ### Linux
 
-在Linux上, 你可以直接下载二进制文件:
+- 使用APT安装
 
+  <details><summary><code>sudo apt install vfox</code></summary>
+
+  ```sh
+   echo "deb [trusted=yes] https://apt.fury.io/versionfox/ /" | sudo tee /etc/apt/sources.list.d/versionfox.list
+   sudo apt-get update
+   sudo apt-get install vfox
+  ```
+
+  </details>
+
+- 使用YUM安装
+
+  <details><summary><code>sudo yum install vfox</code></summary>
+
+   ```sh
+    echo '[vfox]
+   name=VersionFox Repo
+   baseurl=https://yum.fury.io/versionfox/
+   enabled=1
+   gpgcheck=0' | sudo tee /etc/yum.repos.d/trzsz.repo
+
+    sudo yum install vfox
+    ```
+
+  </details>
+
+当然,你也可以直接下载二进制文件:
 ```bash
 $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```

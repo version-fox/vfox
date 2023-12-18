@@ -2,9 +2,12 @@
   <img src="./logo.png" alt="Logo" width="250" height="250">
 </p>
 <h1 style="margin-top: -40px">VersionFox</h1>
+
 [![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
 [![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
-[![GitHub](https://img.shields.io/github/license/version-fox/vfox)]()
+[![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
+
+
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
@@ -33,8 +36,6 @@ $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh |
 ```
 
 ### Linux
-
-On Linux, you can download the binary directly:
 
 - Install with APT
 
