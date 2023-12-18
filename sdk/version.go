@@ -26,6 +26,7 @@ type Info struct {
 	Version Version
 	Path    string
 	Note    string
+	SHA256  string
 }
 
 func (i *Info) label() string {

@@ -113,6 +113,7 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 		// del cache file
 		_ = os.Remove(filePath)
 	}()
+	// TODO  Check SHA256
 	decompressor := util.NewDecompressor(filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
