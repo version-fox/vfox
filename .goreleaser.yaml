@@ -90,17 +90,17 @@ archives:
 brews:
   - name: 'vfox'
     repository:
-      owner: aooohan
-      name: homebrew-vfox-tap
+      owner: version-fox
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TOKEN }}"
     folder: Formula
     goarm: "7"
-    homepage: https://github.com/aooohan/version-fox
+    homepage: https://github.com/version-fox/vfox
     description: A cross-platform SDK version manager with a simple cli.
-    url_template: "https://github.com/aooohan/version-fox/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/version-fox/vfox/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     license: "Apache-2.0"
     commit_author:
-      name: lihan
+      name: "Han Li"
       email: aooohan@gmail.com
     #    dependencies:
     #      - name: go
@@ -121,7 +121,7 @@ nfpms:
       {{- else if eq .Arch "arm" }}armv{{ .Arm }}
       {{- else }}{{ .Arch }}{{ end }}
     id: vfox
-    homepage: https://github.com/aooohan/version-fox
+    homepage: https://github.com/version-fox/vfox
     description: |-
       A cross-platform SDK version manager with a simple cli.
       Swiftly install and switch between different SDK versions 
@@ -146,7 +146,7 @@ nfpms:
 #  - name: vfox
 #    publisher: lihan
 #    license: 'Apache-2.0'
-#    homepage: https://github.com/aooohan/version-fox
+#    homepage: https://github.com/version-fox/vfox
 #    short_description: A cross-platform SDK version manager with a simple cli.
 #    repository:
 #      owner: aooohan
@@ -185,4 +185,4 @@ docker_signs:
 release:
   name_template: "v{{ .Version }}"
   footer: |
-    **Full Changelog**: https://github.com/aooohan/version-fox/compare/{{ .PreviousTag }}...{{ if .IsNightly }}nightly{{ else }}{{ .Tag }}{{ end }}
+    **Full Changelog**: https://github.com/version-fox/vfox/compare/{{ .PreviousTag }}...{{ if .IsNightly }}nightly{{ else }}{{ .Tag }}{{ end }}
