@@ -14,7 +14,7 @@ VersionSourceUrl = "https://nodejs.org/dist/index.json"
 
 PLUGIN = {
     name = "node",
-    author = "Lihan",
+    author = "Han Li",
     version = "0.0.1",
     updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
 }

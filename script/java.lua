@@ -5,49 +5,28 @@
 OS_TYPE = ""
 ARCH_TYPE = ""
 
-nodeDownloadUrl = "https://nodejs.org/dist/v%s/node-v%s-%s-%s%s"
 SearchUrl = "https://api.adoptium.net/v3/assets/latest/%s/hotspot?os=%s&architecture=%s"
 AvailableVersionsUrl = "https://api.adoptium.net/v3/info/available_releases"
 
 
 
---- https://nodejs.org/dist/index.json
-
 PLUGIN = {
-    name = "java",
-    author = "Lihan",
+    name = "adoptium-jdk",
+    author = "Han Li",
     version = "0.0.1",
-    updateUrl = "https://raw.githubusercontent.com/aooohan/ktorm-generator/main/build.gradle.lua",
+    updateUrl = "",
 }
 
---- Return to target version download link
---- @param ctx table
---- @field ctx.version string version
---- @return string download url
-function PLUGIN:DownloadUrl(ctx)
-    version = ctx.version
-
-    arch_type = ARCH_TYPE
-    ext = ".tar.gz"
-    if arch_type == "amd64" then
-        arch_type = "x64"
-    end
-    if OS_TYPE == "windows" then
-        ext = ".zip"
-    end
-    return string.format(nodeDownloadUrl, version, version, OS_TYPE, arch_type, ext)
+function PLUGIN:PreInstall(ctx)
 end
 
---- Returns the available download versions for the target context
---- @param ctx table
---- @field ctx.version string version
+function PLUGIN:PostInstall(ctx)
+end
+
 function PLUGIN:Available(ctx)
     return {}
 end
 
---- Return the need to set environment variables when use this version
---- @param ctx table {version, version_path}
---- @return {key = "JAVA_HOME", value = "xxxxxx"}
 function PLUGIN:EnvKeys(ctx)
     version_path = ctx.version_path
     return {
