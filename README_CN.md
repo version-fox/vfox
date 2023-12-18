@@ -3,9 +3,9 @@
 </p>
 <h1 style="margin-top: -40px">VersionFox</h1>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/aooohan/version-fox)](https://goreportcard.com/report/github.com/aooohan/version-fox)
-[![Go Reference](https://pkg.go.dev/badge/github.com/aooohan/version-fox.svg)](https://pkg.go.dev/github.com/aooohan/version-fox)
-[![GitHub](https://img.shields.io/github/license/aooohan/version-fox)]()
+[![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
+[![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
+[![GitHub](https://img.shields.io/github/license/version-fox/vfox)]()
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
@@ -21,14 +21,14 @@ VersionFox 是一个跨平台的用于管理SDK版本的工具，它允许你通
 在macOS上,你可以使用Homebrew来快速安装`vf`:
 
 ```bash
-$ brew tap aooohan/version-fox
+$ brew tap version-fox/tap
 $ brew install vfox
 ```
 
 或者如果没有安装Homebrew, 你可以直接下载二进制文件:
 
 ```bash
-$ curl -sSL https://raw.githubusercontent.com/aooohan/version-fox/main/install.sh | bash
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
 ### Linux
@@ -36,18 +36,17 @@ $ curl -sSL https://raw.githubusercontent.com/aooohan/version-fox/main/install.s
 在Linux上, 你可以直接下载二进制文件:
 
 ```bash
-$ curl -sSL https://raw.githubusercontent.com/aooohan/version-fox/main/install.sh | bash
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
 ### Windows
 
-[//]: # (TODO: winget)
 在Windows上，你需要以管理员身份运行PowerShell来下载和运行`install.ps1`脚本。首先，右键点击开始菜单，
 选择"Windows PowerShell (管理员)"来打开一个以管理员身份运行的PowerShell窗口。 然后，在PowerShell
 窗口中输入以下命令：
 
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/aooohan/version-fox/main/install.ps1'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/version-fox/vfox/main/install.ps1'))
 ```
 
 ## 使用
@@ -58,8 +57,8 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object
 例如:
 
 ```bash
-$ vfox add node https://raw.githubusercontent.com/aooohan/version-fox-plugins/main/node/node.lua
-Adding plugin from https://raw.githubusercontent.com/aooohan/version-fox-plugins/main/node/node.lua...
+$ vfox add node https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
 Checking plugin...
 Plugin info:
 Name    -> node
@@ -401,7 +400,7 @@ print(div:text() == "456")
 ### 插件仓库
 
 VersionFox对于插件的来源是没有任何限制的,你可以使用任何你想要的插件,只要它符合VersionFox的插件规范即可.
-为了方便共享和使用,我们还是提供了一个插件仓库[version-fox-plugin](https://github.com/aooohan/version-fox-plugins)
+为了方便共享和使用,我们还是提供了一个插件仓库[version-fox-plugin](https://github.com/version-fox/version-fox-plugins)
 ,你可以在这里找到一些常用的插件,当然了,你也可以将你的插件分享到这个仓库中来.
 
 #### 已支持的SDK
@@ -444,7 +443,7 @@ vfox help                      Show this help message
 4. 推送你的开发分支 (`git push origin feature/AmazingFeature`)
 5. 创建一个新的Pull Request
 
-插件贡献, 请移步[version-fox-plugins](https://github.com/aooohan/version-fox-plugins).
+插件贡献, 请移步[version-fox-plugins](https://github.com/version-fox/version-fox-plugins).
 
 ## 许可证
 

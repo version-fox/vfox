@@ -2,10 +2,9 @@
   <img src="./logo.png" alt="Logo" width="250" height="250">
 </p>
 <h1 style="margin-top: -40px">VersionFox</h1>
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/aooohan/version-fox)](https://goreportcard.com/report/github.com/aooohan/version-fox)
-[![Go Reference](https://pkg.go.dev/badge/github.com/aooohan/version-fox.svg)](https://pkg.go.dev/github.com/aooohan/version-fox)
-[![GitHub](https://img.shields.io/github/license/aooohan/version-fox)]()
+[![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
+[![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
+[![GitHub](https://img.shields.io/github/license/version-fox/vfox)]()
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
@@ -23,22 +22,51 @@ plugins shared by others to install SDKs. It all depends on your imagination. ;)
 On macOS, you can use Homebrew to quickly install `vfox`:
 
 ```bash
-$ brew tap aooohan/homebrew-vfox-tap
+$ brew tap version-fox/tap
 $ brew install vfox
 ```
 
 If Homebrew is not installed, you can download the binary directly:
 
 ```bash
-$ curl -sSL https://raw.githubusercontent.com/aooohan/version-fox/main/install.sh | bash
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
 ### Linux
 
 On Linux, you can download the binary directly:
 
+- Install with APT
+
+  <details><summary><code>sudo apt install vfox</code></summary>
+
+  ```sh
+   echo "deb [trusted=yes] https://apt.fury.io/versionfox/ /" | sudo tee /etc/apt/sources.list.d/versionfox.list
+   sudo apt-get update
+   sudo apt-get install vfox
+  ```
+
+  </details>
+  
+- Install with YUM
+
+  <details><summary><code>sudo apt install vfox</code></summary>
+
+   ```sh
+    echo '[vfox]
+   name=VersionFox Repo
+   baseurl=https://yum.fury.io/versionfox/
+   enabled=1
+   gpgcheck=0' | sudo tee /etc/yum.repos.d/trzsz.repo
+
+    sudo yum install vfox
+    ```
+
+  </details>
+
+others, you can download the binary directly:
 ```bash
-$ curl -sSL https://raw.githubusercontent.com/aooohan/version-fox/main/install.sh | bash
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
 ### Windows
@@ -48,7 +76,7 @@ Windows PowerShell (Administrator)" to open a PowerShell window with administrat
 following command in the PowerShell window:
 
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/aooohan/version-fox/main/install.ps1'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/version-fox/vfox/main/install.ps1'))
 ```
 
 ## Usage
@@ -59,8 +87,8 @@ In VersionFox, plugins are SDKs, and SDKs are plugins. So, before using them, yo
 plugin. You can use the `vfox add <sdk-name> <url/path>` command to install a plugin. For example:
 
 ```bash
-$ vfox add node https://raw.githubusercontent.com/aooohan/version-fox-plugins/main/node/node.lua
-Adding plugin from https://raw.githubusercontent.com/aooohan/version-fox-plugins/main/node/node.lua...
+$ vfox add node https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
 Checking plugin...
 Plugin info:
 Name    -> node
@@ -266,12 +294,14 @@ OS_TYPE = ""
 ARCH_TYPE = ""
 
 PLUGIN = {
-    --- Plugin name
+    --- Plugin name, eg java, adoptium_jdk, etc.
+    --- NOTE: Use only underscores as hyphens.
     name = "java",
     --- Plugin author
     author = "Lihan",
     --- Plugin version
     version = "0.0.1",
+    description = "xxxxxx",
     -- Update URL
     updateUrl = "{URL}/sdk.lua",
 }
@@ -402,12 +432,12 @@ print(div:text() == "456")
 
 VersionFox has no restrictions on the source of plugins; you can use any plugin as long as it complies with VersionFox
 plugin specifications. To facilitate sharing and use, we also provide a plugin
-repository [version-fox-plugin](https://github.com/aooohan/version-fox-plugins), where you
+repository [version-fox-plugin](https://github.com/version-fox/version-fox-plugins), where you
 can find some commonly used plugins. Of course, you can also share your plugins in this repository.
 
 #### Supported SDKs
 
-- [x] [Node.js](https://github.com/aooohan/version-fox-plugins/blob/main/node/node.lua)
+- [x] [Node.js](https://github.com/version-fox/version-fox-plugins/blob/main/node/node.lua)
 - [ ] Python
 - [ ] Go
 - [ ] Java
@@ -440,7 +470,7 @@ vfox help                      Show this help message
 
 - [ ] Supports bash, zsh, powershell auto-completion.
 - [ ] Supports plugin update
-- [ ] Verify archive file checksum before unpacking
+- [X] Verify archive file checksum before unpacking
 - [ ] Supports unpacking of tar.xz files.
 - [ ] Support proxy configuration
 
@@ -455,7 +485,7 @@ contributions you make are greatly appreciated.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a pull request
 
-Plugin Contributions, please go to[version-fox-plugins](https://github.com/aooohan/version-fox-plugins).
+Plugin Contributions, please go to[version-fox-plugins](https://github.com/version-fox/version-fox-plugins).
 
 ## License
 
