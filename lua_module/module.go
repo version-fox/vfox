@@ -17,6 +17,7 @@
 package lua_module
 
 import (
+	"github.com/aooohan/version-fox/lua_module/html"
 	"github.com/aooohan/version-fox/lua_module/http"
 	"github.com/aooohan/version-fox/lua_module/json"
 	lua "github.com/yuin/gopher-lua"
@@ -25,5 +26,5 @@ import (
 func Preload(L *lua.LState) {
 	http.Preload(L)
 	json.Preload(L)
-	http.Preload(L)
+	html.Preload(L)
 }

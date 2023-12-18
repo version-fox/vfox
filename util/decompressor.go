@@ -177,7 +177,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
 
 func NewDecompressor(src string) Decompressor {
 	filename := filepath.Base(src)
-	if strings.HasSuffix(filename, ".tar.gz") {
+	if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
 		return &GzipTarDecompressor{
 			src:      src,
 			filename: strings.TrimSuffix(filename, ".tar.gz"),
