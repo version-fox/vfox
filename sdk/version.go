@@ -22,11 +22,11 @@ type Package struct {
 }
 
 type Info struct {
-	Name    string
-	Version Version
-	Path    string
-	Note    string
-	SHA256  string
+	Name     string
+	Version  Version
+	Path     string
+	Note     string
+	Checksum string
 }
 
 func (i *Info) label() string {

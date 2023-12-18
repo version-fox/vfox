@@ -32,12 +32,13 @@ const (
 )
 
 type LuaPlugin struct {
-	state     *lua.LState
-	pluginObj *lua.LTable
-	Name      string
-	Author    string
-	Version   string
-	UpdateUrl string
+	state       *lua.LState
+	pluginObj   *lua.LTable
+	Name        string
+	Author      string
+	Version     string
+	Description string
+	UpdateUrl   string
 }
 
 func (l *LuaPlugin) checkValid() error {
@@ -144,10 +145,12 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	}
 	v := table.RawGetString("version").String()
 	muStr := table.RawGetString("url").String()
+	checkSum := table.RawGetString("checksum").String()
 	mainSdk := &Info{
-		Name:    l.Name,
-		Version: Version(v),
-		Path:    muStr,
+		Name:     l.Name,
+		Version:  Version(v),
+		Path:     muStr,
+		Checksum: checkSum,
 	}
 	var additionalArr []*Info
 	additional := table.RawGetString("additional")
@@ -161,9 +164,10 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 			}
 			s := kvTable.RawGetString("url").String()
 			item := Info{
-				Name:    kvTable.RawGetString("name").String(),
-				Version: Version(kvTable.RawGetString("version").String()),
-				Path:    s,
+				Name:     kvTable.RawGetString("name").String(),
+				Version:  Version(kvTable.RawGetString("version").String()),
+				Path:     s,
+				Checksum: kvTable.RawGetString("checksum").String(),
 			}
 			additionalArr = append(additionalArr, &item)
 		})
@@ -310,6 +314,9 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 	}
 	if version := PLUGIN.RawGetString("version"); version.Type() != lua.LTNil {
 		source.Version = version.String()
+	}
+	if description := PLUGIN.RawGetString("description"); description.Type() != lua.LTNil {
+		source.Description = description.String()
 	}
 	if updateUrl := PLUGIN.RawGetString("updateUrl"); updateUrl.Type() != lua.LTNil {
 		source.UpdateUrl = updateUrl.String()

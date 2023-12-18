@@ -332,6 +332,7 @@ func (m *Manager) Add(pluginName, url string) error {
 	pterm.Println("Name   ", "->", pterm.LightBlue(source.Name))
 	pterm.Println("Author ", "->", pterm.LightBlue(source.Author))
 	pterm.Println("Version", "->", pterm.LightBlue(source.Version))
+	pterm.Println("Desc   ", "->", pterm.LightBlue(source.Description))
 	pterm.Println("Path   ", "->", pterm.LightBlue(destPath))
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pluginName)))

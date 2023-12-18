@@ -286,6 +286,8 @@ function PLUGIN:PreInstall(ctx)
         version = "xxx",
         --- Download URL
         url = "xxx",
+        --- SHA256 checksum
+        sha256 = "xxx",
     }
 end
 
@@ -410,6 +412,7 @@ can find some commonly used plugins. Of course, you can also share your plugins 
 - [ ] Go
 - [ ] Java
 - [ ] Rust
+- [ ] Flutter
 - [ ] Ruby
   // etc...
 
@@ -436,7 +439,10 @@ vfox help                      Show this help message
 ## TODO
 
 - [ ] Supports bash, zsh, powershell auto-completion.
-- 
+- [ ] Supports plugin update
+- [ ] Verify archive file checksum before unpacking
+- [ ] Supports unpacking of tar.xz files.
+- [ ] Support proxy configuration
 
 ## Contributing
 

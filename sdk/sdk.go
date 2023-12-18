@@ -17,6 +17,8 @@
 package sdk
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -97,6 +99,15 @@ func (b *Sdk) Install(version Version) error {
 	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
+func (b *Sdk) checksum(path string) (string, error) {
+	fileData, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256(fileData)
+	checksum := hex.EncodeToString(hash[:])
+	return checksum, nil
+}
 func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 	pterm.Printf("Installing %s...\n", info.label())
 	u, err := url.Parse(info.Path)
@@ -113,7 +124,17 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 		// del cache file
 		_ = os.Remove(filePath)
 	}()
-	// TODO  Check SHA256
+	pterm.Printf("Verifying checksum %s...\n", info.Checksum)
+	checksum, err := b.checksum(filePath)
+	if err != nil {
+		fmt.Printf("Failed to calculate %s file checksum, err:%s\n", label, err.Error())
+		return "", err
+	}
+	if checksum != info.Checksum {
+		fmt.Printf("Checksum error, file: %s\n", filePath)
+		return "", errors.New("checksum error")
+	}
+
 	decompressor := util.NewDecompressor(filePath)
 	if decompressor == nil {
 		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
