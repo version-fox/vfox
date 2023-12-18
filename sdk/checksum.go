@@ -16,19 +16,34 @@
 
 package sdk
 
-type Package struct {
-	Main       *Info
-	Additional []*Info
+import (
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+)
+
+type Checksum struct {
+	Value string
+	Type  string
 }
 
-type Info struct {
-	Name     string
-	Version  Version
-	Path     string
-	Note     string
-	Checksum *Checksum
-}
-
-func (i *Info) label() string {
-	return i.Name + "@" + string(i.Version)
+func (c *Checksum) verify(path string) bool {
+	fileData, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var hash []byte
+	if c.Type == "md5" {
+		hashValue := md5.Sum(fileData)
+		hash = hashValue[:]
+	} else {
+		hashValue := sha256.Sum256(fileData)
+		hash = hashValue[:]
+	}
+	checksum := hex.EncodeToString(hash)
+	if checksum == c.Value {
+		return false
+	}
+	return true
 }

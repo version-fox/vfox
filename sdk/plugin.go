@@ -125,6 +125,22 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	return result, nil
 }
 
+func (l *LuaPlugin) Checksum(table *lua.LTable) (*Checksum, error) {
+	checksum := &Checksum{}
+	sha256 := table.RawGetString("sha256")
+	md5 := table.RawGetString("md5")
+	if sha256.Type() != lua.LTNil {
+		checksum.Value = sha256.String()
+		checksum.Type = "sha256"
+	} else if md5.Type() != lua.LTNil {
+		checksum.Value = md5.String()
+		checksum.Type = "md5"
+	} else {
+		return nil, fmt.Errorf("checksum not found")
+	}
+	return checksum, nil
+}
+
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
@@ -145,12 +161,16 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	}
 	v := table.RawGetString("version").String()
 	muStr := table.RawGetString("url").String()
-	checkSum := table.RawGetString("checksum").String()
+
+	checksum, err := l.Checksum(table)
+	if err != nil {
+		return nil, err
+	}
 	mainSdk := &Info{
 		Name:     l.Name,
 		Version:  Version(v),
 		Path:     muStr,
-		Checksum: checkSum,
+		Checksum: checksum,
 	}
 	var additionalArr []*Info
 	additional := table.RawGetString("additional")
@@ -163,11 +183,15 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 				return
 			}
 			s := kvTable.RawGetString("url").String()
+			checksum, err = l.Checksum(kvTable)
+			if err != nil {
+				return
+			}
 			item := Info{
 				Name:     kvTable.RawGetString("name").String(),
 				Version:  Version(kvTable.RawGetString("version").String()),
 				Path:     s,
-				Checksum: kvTable.RawGetString("checksum").String(),
+				Checksum: checksum,
 			}
 			additionalArr = append(additionalArr, &item)
 		})
