@@ -51,6 +51,30 @@ var selectionMethods = map[string]lua.LGFunction{
 	"find":  selectionFind,
 	"first": selectionFirst,
 	"each":  selectionEach,
+	"attr":  selectionAttr,
+	"eq":    selectionEq,
+}
+
+func selectionEq(L *lua.LState) int {
+	s := checkSelection(L)
+	idx := L.CheckInt(2)
+	ud := L.NewUserData()
+	ud.Value = s.Eq(idx)
+	L.SetMetatable(ud, L.GetTypeMetatable(luaSelectionTypeName))
+	L.Push(ud)
+	return 1
+}
+
+func selectionAttr(L *lua.LState) int {
+	s := checkSelection(L)
+	attr := L.CheckString(2)
+	ret, ok := s.Attr(attr)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LString(ret))
+	return 1
 }
 
 func selectionEach(L *lua.LState) int {

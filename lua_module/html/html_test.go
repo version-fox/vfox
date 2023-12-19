@@ -55,7 +55,7 @@ func TestContinuousFind(t *testing.T) {
 	local html = require("html")
 	local doc = html.parse("<html><body><div id='test'>test</div><div id='t2'>456</div></body></html>")
 	local div = doc:find("body"):find("#t2")
-	print(div:text() == "456")
+	assert(div:text() == "456")
 	`
 	evalLua(str, t)
 }
@@ -71,6 +71,31 @@ func TestEach(t *testing.T) {
 			assert(selection:text() == "aabbb")
 		end
 	end)
+	`
+	evalLua(str, t)
+}
+
+func TestAttr(t *testing.T) {
+	const str = `
+	local html = require("html")
+	local doc = html.parse("<html><body><div id='t2' name='123'>456</div></body></html>")
+	local div = doc:find("#t2")
+	assert(div:attr("name") == "123")	
+	assert(div:attr("test") == nil)
+	`
+	evalLua(str, t)
+}
+
+func TestEq(t *testing.T) {
+	const str = `
+	local html = require("html")
+	local doc = html.parse("<html><body><div id='t2' name='123'>456</div><div>222</div></body></html>")
+	local s = doc:find("div"):eq(1)
+	local f = doc:find("div"):eq(0)
+	local ss = doc:find("div"):eq(2)
+	print(ss:text() == "")
+	assert(s:text() == "222")	
+	assert(f:text() == "456")	
 	`
 	evalLua(str, t)
 }
