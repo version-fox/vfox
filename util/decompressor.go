@@ -27,13 +27,11 @@ import (
 )
 
 type Decompressor interface {
-	Filename() string
 	Decompress(dest string) error
 }
 
 type GzipTarDecompressor struct {
-	src      string
-	filename string
+	src string
 }
 
 func (g *GzipTarDecompressor) Decompress(dest string) error {
@@ -49,8 +47,6 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
-	first := true
-	var prefix string
 	for {
 		header, err := tr.Next()
 		switch {
@@ -61,12 +57,16 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 		case header == nil:
 			continue
 		}
-		if first && strings.Contains(header.Name, "/") {
-			first = false
-			prefix = header.Name
-			g.filename = strings.Split(header.Name, "/")[0]
+		// Split the file name into a slice
+		parts := strings.Split(header.Name, "/")
+		if len(parts) > 1 {
+			// Remove the first element
+			parts = parts[1:]
 		}
-		target := filepath.Join(dest, strings.TrimPrefix(header.Name, prefix))
+		// Join the remaining elements to get the new file name
+		fname := strings.Join(parts, "/")
+
+		target := filepath.Join(dest, fname)
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
@@ -75,6 +75,7 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 				}
 			}
 		case tar.TypeReg:
+			_ = os.MkdirAll(filepath.Dir(target), 0755)
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -95,17 +96,8 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	}
 }
 
-func (g *GzipTarDecompressor) Filename() string {
-	return g.filename
-}
-
 type ZipDecompressor struct {
-	src      string
-	filename string
-}
-
-func (z *ZipDecompressor) Filename() string {
-	return z.filename
+	src string
 }
 
 func (z *ZipDecompressor) Decompress(dest string) error {
@@ -114,15 +106,10 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 		return err
 	}
 	defer r.Close()
-	first := true
 	for _, f := range r.File {
 		err := z.processZipFile(f, dest)
 		if err != nil {
 			return err
-		}
-		if first {
-			first = false
-			z.filename = strings.Split(f.Name, "/")[0]
 		}
 	}
 	return nil
@@ -179,14 +166,12 @@ func NewDecompressor(src string) Decompressor {
 	filename := filepath.Base(src)
 	if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
 		return &GzipTarDecompressor{
-			src:      src,
-			filename: strings.TrimSuffix(filename, ".tar.gz"),
+			src: src,
 		}
 	}
 	if strings.HasSuffix(filename, ".zip") {
 		return &ZipDecompressor{
-			src:      src,
-			filename: strings.TrimSuffix(filename, ".zip"),
+			src: src,
 		}
 	}
 	return nil
