@@ -28,10 +28,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/env"
+	"github.com/version-fox/vfox/util"
 )
 
 type Version string

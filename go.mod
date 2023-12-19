@@ -1,4 +1,4 @@
-module github.com/aooohan/version-fox
+module github.com/version-fox/vfox
 
 go 1.21.5
 

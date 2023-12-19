@@ -22,8 +22,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/aooohan/version-fox/sdk"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/sdk"
 )
 
 const Version = "0.0.1"

@@ -21,7 +21,7 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/aooohan/version-fox/util"
+	"github.com/version-fox/vfox/util"
 	"os"
 	"os/exec"
 	"os/user"

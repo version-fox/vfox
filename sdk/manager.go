@@ -24,11 +24,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aooohan/version-fox/env"
-	"github.com/aooohan/version-fox/printer"
-	"github.com/aooohan/version-fox/util"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
+	"github.com/version-fox/vfox/env"
+	"github.com/version-fox/vfox/printer"
+	"github.com/version-fox/vfox/util"
 )
 
 type Arg struct {
