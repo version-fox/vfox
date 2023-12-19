@@ -52,8 +52,5 @@ func (c *Checksum) verify(path string) bool {
 		return false
 	}
 	checksum := hex.EncodeToString(hash)
-	if checksum == c.Value {
-		return false
-	}
-	return true
+	return checksum == c.Value
 }

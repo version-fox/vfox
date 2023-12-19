@@ -115,7 +115,7 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 	}()
 	pterm.Printf("Verifying checksum %s...\n", info.Checksum.Value)
 	checksum := info.Checksum.verify(filePath)
-	if checksum {
+	if !checksum {
 		fmt.Printf("Checksum error, file: %s\n", filePath)
 		return "", errors.New("checksum error")
 	}
@@ -129,6 +129,7 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 	path := filepath.Join(sdkDestPath, info.Name+"-"+string(info.Version))
 	err = decompressor.Decompress(path)
 	if err != nil {
+		fmt.Printf("Unpack failed, err:%s", err.Error())
 		return "", err
 	}
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
