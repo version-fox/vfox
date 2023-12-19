@@ -325,7 +325,7 @@ end
 ---   {
 ---     version = "20.10.0",
 ---     note = "LTS",
----     additional = {
+---     addition = {
 ---       {
 ---         name = "npm",
 ---         version = "8.8.8",
@@ -338,7 +338,7 @@ function PLUGIN:Available(ctx)
         {
             version = "xxxx",
             note = "LTS",
-            additional = {
+            addition = {
                 {
                     name = "npm",
                     version = "xxx",

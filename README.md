@@ -349,7 +349,7 @@ function PLUGIN:Available(ctx)
         {
             version = "xxxx",
             note = "LTS",
-            additional = {
+            addition = {
                 {
                     name = "npm",
                     version = "8.8.8",
@@ -443,16 +443,6 @@ plugin specifications. To facilitate sharing and use, we also provide a plugin
 repository [version-fox-plugin](https://github.com/version-fox/version-fox-plugins), where you
 can find some commonly used plugins. Of course, you can also share your plugins in this repository.
 
-#### Supported SDKs
-
-- [x] [Node.js](https://github.com/version-fox/version-fox-plugins/blob/main/node/node.lua)
-- [ ] Python
-- [ ] Go
-- [ ] Java
-- [ ] Rust
-- [ ] Flutter
-- [ ] Ruby
-  // etc...
 
 ## Command Overview
 

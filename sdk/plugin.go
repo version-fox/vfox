@@ -96,7 +96,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 			Note:    note,
 		}
 		var additionalArr []*Info
-		additional := kvTable.RawGetString("additional")
+		additional := kvTable.RawGetString("addition")
 		if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
 			additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
 				itemTable, ok := value.(*lua.LTable)
@@ -181,7 +181,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		Checksum: checksum,
 	}
 	var additionalArr []*Info
-	additional := table.RawGetString("additional")
+	additional := table.RawGetString("addition")
 	if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
 		var err error
 		additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
