@@ -3,7 +3,7 @@
 #define MyAppName "vfox"
 #define MyAppVersion GetEnv("VFOX_VERSION")
 #define MyAppPublisher "Han Li"
-#define MyAppURL "https://github.com/aooohan/version-fox"
+#define MyAppURL "https://github.com/version-fox/vfox"
 
 [Setup]
 AppId={#MyAppName}-fc742fc3-7013-49b7-adcb-96f2d6ddbda0

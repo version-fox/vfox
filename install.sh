@@ -29,7 +29,7 @@ else
 fi
 
 # Get the latest version
-VERSION=$(curl --silent "https://api.github.com/repos/aooohan/version-fox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$VERSION" ]; then
   echo "Failed to get the latest version. Please check your network connection and try again."
@@ -51,7 +51,7 @@ fi
 
 FILENAME="version-fox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}.tar.gz"
 
-$DOWNLOAD_CMD https://github.com/aooohan/version-fox/releases/download/$VERSION/$FILENAME
+$DOWNLOAD_CMD https://github.com/version-fox/vfox/releases/download/$VERSION/$FILENAME
 
 tar -zxvf $FILENAME
 if [ $? -ne 0 ]; then

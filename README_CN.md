@@ -432,7 +432,7 @@ VersionFox对于插件的来源是没有任何限制的,你可以使用任何你
 
 #### 已支持的SDK
 
-- [x] [Node.js](https://github.com/aooohan/version-fox-plugins/blob/main/node/node.lua)
+- [x] [Node.js](https://github.com/version-fox/version-fox-plugins/blob/main/node/node.lua)
 - [ ] Python
 - [ ] Go
 - [ ] Java
