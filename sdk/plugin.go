@@ -129,12 +129,20 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) (*Checksum, error) {
 	checksum := &Checksum{}
 	sha256 := table.RawGetString("sha256")
 	md5 := table.RawGetString("md5")
+	sha512 := table.RawGetString("sha512")
+	sha1 := table.RawGetString("sha1")
 	if sha256.Type() != lua.LTNil {
 		checksum.Value = sha256.String()
 		checksum.Type = "sha256"
 	} else if md5.Type() != lua.LTNil {
 		checksum.Value = md5.String()
 		checksum.Type = "md5"
+	} else if sha1.Type() != lua.LTNil {
+		checksum.Value = sha1.String()
+		checksum.Type = "sha1"
+	} else if sha512.Type() != lua.LTNil {
+		checksum.Value = sha512.String()
+		checksum.Type = "sha512"
 	} else {
 		return nil, fmt.Errorf("checksum not found")
 	}

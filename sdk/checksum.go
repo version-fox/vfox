@@ -18,7 +18,9 @@ package sdk
 
 import (
 	"crypto/md5"
+	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"os"
 )
@@ -34,12 +36,20 @@ func (c *Checksum) verify(path string) bool {
 		return false
 	}
 	var hash []byte
-	if c.Type == "md5" {
+	if c.Type == "sha256" {
+		hashValue := sha256.Sum256(fileData)
+		hash = hashValue[:]
+	} else if c.Type == "sha512" {
+		hashValue := sha512.Sum512(fileData)
+		hash = hashValue[:]
+	} else if c.Type == "sha1" {
+		hashValue := sha1.Sum(fileData)
+		hash = hashValue[:]
+	} else if c.Type == "md5" {
 		hashValue := md5.Sum(fileData)
 		hash = hashValue[:]
 	} else {
-		hashValue := sha256.Sum256(fileData)
-		hash = hashValue[:]
+		return false
 	}
 	checksum := hex.EncodeToString(hash)
 	if checksum == c.Value {
