@@ -173,16 +173,10 @@ signs:
       - "--output-signature=${signature}"
       - "${artifact}"
       - --yes
-docker_signs:
-  - cmd: cosign
-    artifacts: manifests
-    output: true
-    args:
-      - "sign"
-      - "${artifact}@${digest}"
-      - --yes
 
 release:
+  draft: false
+  prerelease: true
   name_template: "v{{ .Version }}"
   footer: |
     **Full Changelog**: https://github.com/version-fox/vfox/compare/{{ .PreviousTag }}...{{ if .IsNightly }}nightly{{ else }}{{ .Tag }}{{ end }}

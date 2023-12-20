@@ -413,6 +413,8 @@ assert(resp.body == '{"ip": "xxx.xxx.xxx.xxx"}')
 
 ##### 2. JSON Library
 
+Based on [gopher-json](https://github.com/layeh/gopher-json/)
+
 ```lua
 local json = require("json")
 

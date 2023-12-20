@@ -29,41 +29,41 @@ else
 fi
 
 # Get the latest version
-VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
 
 if [ -z "$VERSION" ]; then
   echo "Failed to get the latest version. Please check your network connection and try again."
   exit 1
 fi
-echo "Installing vfox $VERSION ..."
+echo "Installing vfox v$VERSION ..."
 
 # Check if the OS is supported
 OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH_TYPE=$(uname -m)
-if [ "$ARCH_TYPE" = "x86_64" ]; then
-  ARCH_TYPE="amd64"
-elif [ "$ARCH_TYPE" = "aarch64" ]; then
-  ARCH_TYPE="arm64"
-else
-  echo "Unsupported architecture type: $ARCH_TYPE"
-  exit 1
+if [ "$OS_TYPE" = "darwin" ]; then
+  OS_TYPE="macos"
 fi
 
-FILENAME="version-fox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}.tar.gz"
+ARCH_TYPE=$(uname -m)
 
-$DOWNLOAD_CMD https://github.com/version-fox/vfox/releases/download/$VERSION/$FILENAME
+FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
+TAR_FILE="${FILENAME}.tar.gz"
 
-tar -zxvf $FILENAME
+echo https://github.com/version-fox/vfox/releases/download/v$VERSION/$TAR_FILE
+$DOWNLOAD_CMD https://github.com/version-fox/vfox/releases/download/v$VERSION/$TAR_FILE
+
+
+tar -zxvf $TAR_FILE
 if [ $? -ne 0 ]; then
   echo "Failed to extract vfox binary. Please check if the downloaded file is a valid tar.gz file."
   exit 1
 fi
 
-sudo mv vf /usr/local/bin
+sudo mv "${FILENAME}/vfox" /usr/local/bin
 
 if [ $? -ne 0 ]; then
   echo "Failed to move vfox to /usr/local/bin. Please check your sudo permissions and try again."
   exit 1
 fi
-rm $FILENAME
+rm $TAR_FILE
+rm -rf $FILENAME
 echo "vfox installed successfully!"
