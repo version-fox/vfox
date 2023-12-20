@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"github.com/ulikunitz/xz"
 	"io"
 	"os"
 	"path/filepath"
@@ -45,6 +46,71 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 		return err
 	}
 	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		switch {
+		case err == io.EOF:
+			return nil
+		case err != nil:
+			return err
+		case header == nil:
+			continue
+		}
+		// Split the file name into a slice
+		parts := strings.Split(header.Name, "/")
+		if len(parts) > 1 {
+			// Remove the first element
+			parts = parts[1:]
+		}
+		// Join the remaining elements to get the new file name
+		fname := strings.Join(parts, "/")
+
+		target := filepath.Join(dest, fname)
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+		case tar.TypeReg:
+			_ = os.MkdirAll(filepath.Dir(target), 0755)
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+
+			f.Close()
+		case tar.TypeSymlink:
+			err := os.Symlink(header.Linkname, target)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+}
+
+type XZTarDecompressor struct {
+	src string
+}
+
+func (g *XZTarDecompressor) Decompress(dest string) error {
+	file, err := os.Open(g.src)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	gzr, err := xz.NewReader(file)
+	if err != nil {
+		return err
+	}
 
 	tr := tar.NewReader(gzr)
 	for {
@@ -166,6 +232,11 @@ func NewDecompressor(src string) Decompressor {
 	filename := filepath.Base(src)
 	if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
 		return &GzipTarDecompressor{
+			src: src,
+		}
+	}
+	if strings.HasSuffix(filename, ".tar.xz") {
+		return &XZTarDecompressor{
 			src: src,
 		}
 	}

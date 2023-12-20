@@ -469,7 +469,7 @@ vfox help                      Show this help message
 - [ ] Supports bash, zsh, powershell auto-completion.
 - [ ] Supports plugin update
 - [X] Verify archive file checksum before unpacking
-- [ ] Supports unpacking of tar.xz files.
+- [X] Supports unpacking of tar.xz files.
 - [ ] Support proxy configuration
 
 ## Contributing
