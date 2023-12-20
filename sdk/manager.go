@@ -310,6 +310,23 @@ func (m *Manager) Update(pluginName string) error {
 	return nil
 }
 
+func (m *Manager) Info(pluginName string) error {
+	sdk := m.sdkMap[pluginName]
+	if sdk == nil {
+		pterm.Println("This plugin has not been added.")
+		return fmt.Errorf("%s not installed", pluginName)
+	}
+	source := sdk.Plugin
+
+	pterm.Println("Plugin info:")
+	pterm.Println("Name     ", "->", pterm.LightBlue(source.Name))
+	pterm.Println("Author   ", "->", pterm.LightBlue(source.Author))
+	pterm.Println("Version  ", "->", pterm.LightBlue(source.Version))
+	pterm.Println("Desc     ", "->", pterm.LightBlue(source.Description))
+	pterm.Println("UpdateUrl", "->", pterm.LightBlue(source.UpdateUrl))
+	return nil
+}
+
 func (m *Manager) Add(pluginName, url string) error {
 	pterm.Printf("Adding plugin from %s...\n", url)
 	content, err := m.loadLuaFromFileOrUrl(url)

@@ -66,12 +66,11 @@ func main() {
 			Name:  "info",
 			Usage: "show info of plugin",
 			Action: func(ctx *cli.Context) error {
-				args := ctx.Args()
-				l := args.Len()
-				if l < 2 {
+				args := ctx.Args().First()
+				if args == "" {
 					return cli.Exit("invalid arguments", 1)
 				}
-				return manager.Add(args.Get(0), args.Get(1))
+				return manager.Info(args)
 			},
 		},
 		{

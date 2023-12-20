@@ -315,7 +315,7 @@ function PLUGIN:PreInstall(ctx)
     return {
         --- Version number
         version = "xxx",
-        --- Download URL
+        --- Download URL, support tar.gz tar.xz zip three formats
         url = "xxx",
         --- You just choose one of the checksum algorithms.
         --- SHA256 checksum, first choice!
