@@ -44,20 +44,6 @@ type Sdk struct {
 }
 
 func (b *Sdk) Install(version Version) error {
-	success := false
-	newDirPath := b.VersionPath(version)
-
-	// Delete directory after failed installation
-	defer func() {
-		if !success {
-			_ = os.RemoveAll(newDirPath)
-		}
-	}()
-	label := b.label(version)
-	if b.checkExists(version) {
-		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
-		return fmt.Errorf("%s has been installed\n", label)
-	}
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
 		pterm.Printf("Plugin [PreInstall] error: %s\n", err.Error())
@@ -68,6 +54,20 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("no version")
 	}
 	mainSdk := installInfo.Main
+	success := false
+	newDirPath := b.VersionPath(mainSdk.Version)
+
+	// Delete directory after failed installation
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(newDirPath)
+		}
+	}()
+	label := b.label(mainSdk.Version)
+	if b.checkExists(mainSdk.Version) {
+		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
+		return fmt.Errorf("%s has been installed\n", label)
+	}
 	var installedSdkInfos []*Info
 	path, err := b.installSdk(mainSdk, newDirPath)
 	if err != nil {
