@@ -72,13 +72,14 @@ $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh |
 
 ### Windows
 
-On Windows, you need to run the PowerShell script install.ps1 as an administrator. Right-click the Start menu, choose "
-Windows PowerShell (Administrator)" to open a PowerShell window with administrative privileges. Then, enter the
-following command in the PowerShell window:
+For Windows users, please follow the steps below to install:
 
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/version-fox/vfox/main/install.ps1'))
-```
+1. Navigate to the [Releases](https://github.com/version-fox/vfox/releases) page of this repository.
+2. Download the latest `setup.exe` file.
+3. Once the download is complete, double-click the `setup.exe` file to start the installation process.
+4. Follow the prompts in the installation wizard to complete the installation.
+
+Please ensure that you have the necessary permissions to install software on your machine.
 
 ## Usage
 

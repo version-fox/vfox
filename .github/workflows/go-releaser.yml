@@ -38,6 +38,6 @@ jobs:
         env:
           FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
         run: |
-          for filename in dist/vfox*.rpm; do
+          for filename in dist/vfox*.{rpm,deb,apk}; do
             curl -F package=@"$filename" https://{$FURY_TOKEN}@push.fury.io/versionfox/
           done

@@ -194,7 +194,9 @@ func (b *Sdk) Use(version Version) error {
 		outputLabel = label
 	}
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(outputLabel))
-	return b.sdkManager.EnvManager.ReShell()
+	return b.sdkManager.EnvManager.ReShell(func() {
+		b.sdkManager.Close()
+	})
 }
 
 func (b *Sdk) List() []Version {

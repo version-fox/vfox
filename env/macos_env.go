@@ -23,10 +23,10 @@ import (
 	"fmt"
 	"github.com/version-fox/vfox/util"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -45,17 +45,11 @@ type macosEnvManager struct {
 	pathMap map[string]string
 }
 
-func (m *macosEnvManager) ReShell() error {
-	// flush env to file
-	m.Flush()
-	command := exec.Command(m.shellInfo.ShellPath)
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Start(); err != nil {
-		return err
-	}
-	if err := command.Wait(); err != nil {
+func (m *macosEnvManager) ReShell(callback func()) error {
+	callback()
+	err := syscall.Exec(m.shellInfo.ShellPath, []string{m.shellInfo.ShellPath}, syscall.Environ())
+	if err != nil {
+		fmt.Printf("Failed to exec shell, err:%s\n", err.Error())
 		return err
 	}
 	return nil

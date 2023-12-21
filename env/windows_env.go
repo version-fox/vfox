@@ -142,7 +142,7 @@ func (w *windowsEnvManager) Remove(key string) error {
 	return nil
 }
 
-func (w *windowsEnvManager) ReShell() error {
+func (w *windowsEnvManager) ReShell(callback func()) error {
 	// flush env to file
 	w.Flush()
 	command := exec.Command(w.shellInfo.ShellPath)

@@ -139,6 +139,8 @@ nfpms:
           mode: 0644
     formats:
       - rpm
+      - apk
+      - deb
     rpm:
       group: Development/Tools
 

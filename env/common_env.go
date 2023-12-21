@@ -23,7 +23,7 @@ type Manager interface {
 	Load([]*KV) error
 	Get(key string) (string, error)
 	Remove(key string) error
-	ReShell() error
+	ReShell(callback func()) error
 }
 
 type KV struct {
