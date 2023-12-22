@@ -19,10 +19,6 @@ PLUGIN = {
     version = "0.0.1",
     -- Update URL
     updateUrl = "{URL}/sdk.lua",
-    checkFilenames = {
-        "package.json",
-        "pom.xml",
-    }
 }
 
 --- Return information about the specified version based on ctx.version, including version, download URL, etc.
@@ -40,16 +36,6 @@ function PLUGIN:PreInstall(ctx)
         --- md5 checksum [optional]
         md5= "xxx",
     }
-end
-
-function PLUGIN:CheckVersion(checkFileContent)
-    local version = ""
-    local versionPattern = "version%s*=%s*\"([^\"]+)\""
-    local versionMatch = string.match(fileContent, versionPattern)
-    if versionMatch ~= nil then
-        version = versionMatch
-    end
-    return version
 end
 
 --- Extension point, called after PreInstall, can perform additional operations,
@@ -88,7 +74,7 @@ end
 --- @param ctx table Context information
 --- @field ctx.version_path string SDK installation directory
 function PLUGIN:EnvKeys(ctx)
-    local mainPath = ctx.version_path
+    local mainPath = ctx.path
     return {
         {
             key = "JAVA_HOME",

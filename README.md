@@ -364,9 +364,9 @@ end
 --- This allows plugins to define custom environment variables (including PATH settings)
 --- Note: Be sure to distinguish between environment variable settings for different platforms!
 --- @param ctx table Context information
---- @field ctx.version_path string SDK installation directory
+--- @field ctx.path string SDK installation directory
 function PLUGIN:EnvKeys(ctx)
-    local mainPath = ctx.version_path
+    local mainPath = ctx.path
     return {
         {
             key = "JAVA_HOME",
@@ -466,14 +466,6 @@ vfox current <sdk-name>           Show the current version of SDK
 vfox current                   Show the current version of all SDKs
 vfox help                      Show this help message
 ```
-
-## TODO
-
-- [ ] Supports bash, zsh, powershell auto-completion.
-- [ ] Supports plugin update
-- [X] Verify archive file checksum before unpacking
-- [X] Supports unpacking of tar.xz files.
-- [ ] Support proxy configuration
 
 ## Contributing
 
