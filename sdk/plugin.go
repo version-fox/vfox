@@ -315,17 +315,18 @@ func (l *LuaPlugin) Label(version string) string {
 }
 
 func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
-	L := lua.NewState()
-	lua_module.Preload(L)
-	if err := L.DoString(content); err != nil {
+	//rename local-variable 'L' to 'luaVMInstance'.make it more intelligible
+	luaVMInstance := lua.NewState()
+	lua_module.Preload(luaVMInstance)
+	if err := luaVMInstance.DoString(content); err != nil {
 		return nil, err
 	}
 
 	// set OS_TYPE and ARCH_TYPE
-	L.SetGlobal(OsType, lua.LString(osType))
-	L.SetGlobal(ArchType, lua.LString(archType))
+	luaVMInstance.SetGlobal(OsType, lua.LString(osType))
+	luaVMInstance.SetGlobal(ArchType, lua.LString(archType))
 
-	pluginOjb := L.GetGlobal(LuaPluginObjKey)
+	pluginOjb := luaVMInstance.GetGlobal(LuaPluginObjKey)
 	if pluginOjb.Type() == lua.LTNil {
 		return nil, fmt.Errorf("plugin object not found")
 	}
@@ -333,7 +334,7 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 	PLUGIN := pluginOjb.(*lua.LTable)
 
 	source := &LuaPlugin{
-		state:     L,
+		state:     luaVMInstance,
 		pluginObj: PLUGIN,
 	}
 
