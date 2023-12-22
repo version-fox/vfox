@@ -181,4 +181,4 @@ release:
   prerelease: true
   name_template: "v{{ .Version }}"
   footer: |
-    **Full Changelog**: https://github.com/version-fox/vfox/compare/{{ .PreviousTag }}...{{ if .IsNightly }}nightly{{ else }}{{ .Tag }}{{ end }}
+    **Full Changelog**: https://github.com/version-fox/vfox/compare/{{ .PreviousTag }}...{{ .Tag }}

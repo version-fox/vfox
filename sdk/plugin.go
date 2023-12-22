@@ -77,7 +77,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
 
-	if table.Type() == lua.LTNil {
+	if table == nil || table.Type() == lua.LTNil {
 		return []*Package{}, nil
 	}
 	var err error
@@ -164,7 +164,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-	if table.Type() == lua.LTNil {
+	if table == nil || table.Type() == lua.LTNil {
 		return nil, nil
 	}
 	v := table.RawGetString("version").String()
@@ -264,7 +264,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-	if table.Type() == lua.LTNil || table.Len() == 0 {
+	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
 	var err error
