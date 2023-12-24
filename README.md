@@ -4,12 +4,14 @@
 <h1 style="margin-top: -40px">VersionFox</h1>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
-[![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
 [![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
+[![GitHub release](https://img.shields.io/github/v/release/version-fox/vfox)](https://github.com/version-fox/vfox/releases/latest)
+
 
 
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
+
 
 ## Introduction
 
@@ -83,10 +85,12 @@ Please ensure that you have the necessary permissions to install software on you
 
 ## Usage
 
+[![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
+
 ### 1. Install Plugin (SDK)
 
 In VersionFox, plugins are SDKs, and SDKs are plugins. So, before using them, you need to install the corresponding
-plugin. You can use the `vfox add <sdk-name> <url/path>` command to install a plugin. For example:
+plugin. You can use the `vfox add <sdk-name> <plugin-url/path>` command to install a plugin. For example:
 
 ```bash
 $ vfox add node https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua
@@ -101,9 +105,8 @@ Add node plugin successfully!
 Please use `vfox install node@<version>` to install the version you need.
 ```
 
-If the plugin is validated and installed successfully, you will see the output information, including the basic
-information of the plugin such as the plugin name, author, version, and installation path. If everything is fine at this
-step, you can proceed to the next operations.
+VersionFox has no restrictions on the installation sources of plug-ins. You can go 
+to [version-fox-plugins](https://github.com/version-fox/version-fox-plugins) to retrieve the plugin you want.
 
 ### 2. Get Available Versions of SDK
 

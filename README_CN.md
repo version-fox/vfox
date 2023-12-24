@@ -4,8 +4,8 @@
 <h1 style="margin-top: -40px">VersionFox</h1>
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
-[![Go Reference](https://pkg.go.dev/badge/github.com/version-fox/vfox.svg)](https://pkg.go.dev/github.com/version-fox/vfox)
 [![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
+[![GitHub release](https://img.shields.io/github/v/release/version-fox/vfox)](https://github.com/version-fox/vfox/releases/latest)
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
@@ -78,6 +78,8 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object
 
 ## 使用
 
+[![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
+
 ### 1. 安装插件
 
 在VersionFox中,插件即SDK,SDK即插件,所以在使用之前需要安装对应的插件,你可以通过`vfox add <sdk-name> <url/path>`命令来安装插件,
@@ -96,8 +98,9 @@ Add node plugin successfully!
 Please use `vfox install node@<version>` to install the version you need.
 ```
 
-如果该插件验证且安装成功,你将会看到上面的输出信息(包括该插件的基本信息如插件名称、作者、版本以及安装路径),
-在这一步没有问题,就可以继续后续的操作了.
+VersionFox对于插件的来源没有进行限制,你可以使用任何你想要的插件,只要它符合VersionFox的插件规范即可. 你可以到
+[version-fox-plugins](https://github.com/version-fox/version-fox-plugins)检索你想要的插件哦.
+
 
 ### 2. 获取SDK的可用版本
 
