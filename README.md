@@ -87,13 +87,34 @@ Please ensure that you have the necessary permissions to install software on you
 
 [![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
 
+### 0. List Available Plugins
+**Command** : `vfox available [<category>]`
+```bash
+$ vfox available
+flutter/flutter          0.0.1           Han Li          flutter plugin, support for getting stable, dev, beta version
+java/adoptium-jdk        0.0.1           aooohan         Adoptium JDK
+...
+
+Please use vfox add <plugin name> to install plugin
+```
+VersionFox maintains a centralized official plugin repository, which houses all the supported plugins. 
+You can use a specific command to check the currently supported plugins.
+
+> NOTE: The naming convention for these plugins is divided into two parts: the category and the plugin name, separated by a slash (/).
+
 ### 1. Install Plugin (SDK)
 
 In VersionFox, plugins are SDKs, and SDKs are plugins. So, before using them, you need to install the corresponding
-plugin. You can use the `vfox add <sdk-name> <plugin-url/path>` command to install a plugin. For example:
+plugin. 
+
+VersionFox supports the installation of both official and custom plugins.
+
+ - `vfox add [--alias <sdk-name>] <plugin-name>`: This command installs a plugin from the official repository. An alias for the plugin can also be set.
+
+ - `vfox add [--source <url/path>] <sdk-name>`: This command installs a plugin from a specified path or URL and assigns it a name.
 
 ```bash
-$ vfox add node https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua
+$ vfox add --alias node node/node
 Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
 Checking plugin...
 Plugin info:
@@ -454,7 +475,8 @@ can find some commonly used plugins. Of course, you can also share your plugins 
 
 ```bash
 vfox - VersionFox, a tool for sdk version management
-vfox add <sdk-name> <url/path>  Add a plugin from url or path
+vfox available [<category>]     List all available plugins
+vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin from offical repository or custom source
 vfox remove <sdk-name>          Remove a plugin
 vfox update <sdk-name>          Update a plugin
 vfox info <sdk-name>            Show plugin info
