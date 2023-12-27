@@ -60,9 +60,11 @@ func (w *windowsEnvManager) loadPathValue() error {
 func (w *windowsEnvManager) Flush() {
 	defer w.key.Close()
 	customPaths := make([]string, 0, len(w.pathMap))
+	customPathSet := make(map[string]struct{})
 	if len(w.pathMap) > 0 {
 		for path := range w.pathMap {
 			customPaths = append(customPaths, path)
+			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
 		w.Load([]*KV{
@@ -86,6 +88,9 @@ func (w *windowsEnvManager) Flush() {
 		if _, ok := w.deletedPathMap[v]; ok {
 			continue
 		}
+		if _, ok := customPathSet[v]; ok {
+			continue
+		}
 		userNewPaths = append(userNewPaths, v)
 	}
 	w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";"))
@@ -95,6 +100,9 @@ func (w *windowsEnvManager) Flush() {
 	sysNewPaths := append([]string{}, customPaths...)
 	for _, v := range s2 {
 		if _, ok := w.deletedPathMap[v]; ok {
+			continue
+		}
+		if _, ok := customPathSet[v]; ok {
 			continue
 		}
 		sysNewPaths = append(sysNewPaths, v)
