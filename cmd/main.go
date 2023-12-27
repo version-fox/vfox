@@ -17,17 +17,18 @@
 package main
 
 import (
-	"github.com/pterm/pterm"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
+	"github.com/pterm/pterm"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 )
 
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 func main() {
 	cli.VersionFlag = &cli.BoolFlag{
