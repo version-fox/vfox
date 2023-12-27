@@ -27,7 +27,7 @@ import (
 	"github.com/version-fox/vfox/sdk"
 )
 
-const Version = "0.0.1"
+const Version = "0.1.0"
 
 func main() {
 	cli.VersionFlag = &cli.BoolFlag{
