@@ -263,7 +263,7 @@ func (m *Manager) loadSdk() {
 			// filename first as sdk name
 			path := filepath.Join(m.pluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
-			source, err := NewLuaPlugin(content, m.osType, m.archType)
+			source, err := NewLuaPlugin(content, path, m.osType, m.archType)
 			if err != nil {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				continue
@@ -313,6 +313,53 @@ func (m *Manager) Remove(pluginName string) error {
 }
 
 func (m *Manager) Update(pluginName string) error {
+	sdk := m.sdkMap[pluginName]
+	if sdk == nil {
+		pterm.Println("This plugin has not been added.")
+		return fmt.Errorf("%s not installed", pluginName)
+	}
+	updateUrl := sdk.Plugin.UpdateUrl
+	if updateUrl == "" {
+		pterm.Printf("This plugin does not support updates.\n")
+		return fmt.Errorf("not support update")
+	}
+	pterm.Printf("Checking %s plugin...\n", updateUrl)
+	content, err := m.loadLuaFromFileOrUrl(updateUrl)
+	if err != nil {
+		pterm.Printf("Failed to load %s plugin, err: %s\n", updateUrl, err)
+		return fmt.Errorf("update failed")
+	}
+	source, err := NewLuaPlugin(content, updateUrl, m.osType, m.archType)
+	if err != nil {
+		pterm.Printf("Check %s plugin failed, err: %s\n", updateUrl, err)
+		return err
+	}
+	success := false
+	backupPath := sdk.Plugin.Source + ".bak"
+	err = util.CopyFile(sdk.Plugin.Source, backupPath)
+	if err != nil {
+		pterm.Printf("Backup %s plugin failed, err: %s\n", updateUrl, err)
+		return fmt.Errorf("backup failed")
+	}
+	defer func() {
+		if success {
+			_ = os.Remove(backupPath)
+		} else {
+			_ = os.Rename(backupPath, sdk.Plugin.Source)
+		}
+	}()
+	pterm.Println("Checking plugin version...")
+	if util.CompareVersion(source.Version, sdk.Plugin.Version) <= 0 {
+		pterm.Println("The plugin is already the latest version.")
+		return fmt.Errorf("already the latest version")
+	}
+	err = os.WriteFile(sdk.Plugin.Source, []byte(content), 0644)
+	if err != nil {
+		pterm.Printf("Update %s plugin failed, err: %s\n", updateUrl, err)
+		return fmt.Errorf("write file error")
+	}
+	success = true
+	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(source.Version))
 	return nil
 }
 
@@ -378,7 +425,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		return fmt.Errorf("install failed")
 	}
 	pterm.Println("Checking plugin...")
-	source, err := NewLuaPlugin(content, m.osType, m.archType)
+	source, err := NewLuaPlugin(content, url, m.osType, m.archType)
 	if err != nil {
 		pterm.Printf("Check %s plugin failed, err: %s\n", url, err)
 		return err

@@ -32,8 +32,10 @@ const (
 )
 
 type LuaPlugin struct {
-	state       *lua.LState
-	pluginObj   *lua.LTable
+	state     *lua.LState
+	pluginObj *lua.LTable
+	// plugin source path
+	Source      string
 	Name        string
 	Author      string
 	Version     string
@@ -314,7 +316,7 @@ func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
-func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
+func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
 	luaVMInstance := lua.NewState()
 	lua_module.Preload(luaVMInstance)
 	if err := luaVMInstance.DoString(content); err != nil {
@@ -335,6 +337,7 @@ func NewLuaPlugin(content string, osType util.OSType, archType util.ArchType) (*
 	source := &LuaPlugin{
 		state:     luaVMInstance,
 		pluginObj: PLUGIN,
+		Source:    path,
 	}
 
 	if err := source.checkValid(); err != nil {

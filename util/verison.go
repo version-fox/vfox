@@ -17,38 +17,45 @@
 package util
 
 import (
-	"io"
-	"os"
+	"strconv"
+	"strings"
 )
 
-func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return err == nil
-}
+func CompareVersion(v1, v2 string) int {
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
 
-func CopyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
+	len1 := len(parts1)
+	len2 := len(parts2)
 
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return err
-	}
-	err = dstFile.Sync()
-	if err != nil {
-		return err
+	// Get the maximum length between two versions
+	maxLen := len1
+	if len2 > maxLen {
+		maxLen = len2
 	}
 
-	return nil
+	for i := 0; i < maxLen; i++ {
+		// Because the length of v1 or v2 may be less than maxLen
+		// We assume the missing part as 0
+		part1 := 0
+		if i < len1 {
+			part1, _ = strconv.Atoi(parts1[i])
+		}
+
+		part2 := 0
+		if i < len2 {
+			part2, _ = strconv.Atoi(parts2[i])
+		}
+
+		if part1 != part2 {
+			if part1 > part2 {
+				return 1
+			} else {
+				return -1
+			}
+		}
+	}
+
+	// If all parts are equal
+	return 0
 }

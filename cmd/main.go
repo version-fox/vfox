@@ -146,14 +146,14 @@ func main() {
 		},
 		{
 			Name:  "update",
-			Usage: "update a plugin of sdk",
+			Usage: "update specified plug-ins",
 			Action: func(ctx *cli.Context) error {
 				args := ctx.Args()
 				l := args.Len()
 				if l < 1 {
 					return cli.Exit("invalid arguments", 1)
 				}
-				return manager.Remove(args.First())
+				return manager.Update(args.First())
 			},
 		},
 
