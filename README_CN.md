@@ -78,7 +78,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object
 
 ## 使用
 
-[![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
+[![asciicast](https://asciinema.org/a/629106.svg)](https://asciinema.org/a/629106)
 
 ### 0. 获取官方可用插件列表
 **Command** : `vfox available [<category>]`

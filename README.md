@@ -85,7 +85,7 @@ Please ensure that you have the necessary permissions to install software on you
 
 ## Usage
 
-[![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
+[![asciicast](https://asciinema.org/a/629106.svg)](https://asciinema.org/a/629106)
 
 ### 0. List Available Plugins
 **Command** : `vfox available [<category>]`
