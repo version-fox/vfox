@@ -80,13 +80,32 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object
 
 [![Node](https://asciinema.org/a/628061.svg)](https://asciinema.org/a/628061)
 
+### 0. 获取官方可用插件列表
+**Command** : `vfox available [<category>]`
+```bash
+$ vfox available
+Name                      Version         Author          Description
+flutter/flutter          0.0.1           Han Li          flutter plugin, support for getting stable, dev, beta version
+java/adoptium-jdk        0.0.1           aooohan         Adoptium JDK
+...
+
+Please use vfox add <plugin name> to install plugin
+```
+VersionFox 维护一个集中的官方插件库，其中包含所有各种插件。
+
+> 注意: 插件名由两部分组成: 分类/插件名
+
 ### 1. 安装插件
 
-在VersionFox中,插件即SDK,SDK即插件,所以在使用之前需要安装对应的插件,你可以通过`vfox add <sdk-name> <url/path>`命令来安装插件,
-例如:
+在VersionFox的理念里, 插件就是SDK, SDK就是插件. 所以, 在使用之前, 你需要安装对应的插件.
+
+VersionFox支持安装官方插件和自定义插件, 安装插件的命令如下:
+
+- `vfox add [--alias <sdk-name>] <plugin-name>`: 此命令从官方软件仓库安装插件。还可以为插件设置别名。
+- `vfox add [--source <url/path>] <sdk-name>`: 此命令从指定路径或 URL 安装插件并为其命名。
 
 ```bash
-$ vfox add node https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua
+$ vfox add --alias node node/node
 Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
 Checking plugin...
 Plugin info:
@@ -98,8 +117,20 @@ Add node plugin successfully!
 Please use `vfox install node@<version>` to install the version you need.
 ```
 
-VersionFox对于插件的来源没有进行限制,你可以使用任何你想要的插件,只要它符合VersionFox的插件规范即可. 你可以到
-[version-fox-plugins](https://github.com/version-fox/version-fox-plugins)检索你想要的插件哦.
+VersionFox 对插件的安装来源没有限制，这意味着您可以添加自定义插件或使用他人共享的插件。
+
+```bash
+$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua custom-node
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
+Checking plugin...
+Plugin info:
+Name    -> node
+Author  -> Lihan
+Version -> 0.0.1
+Path    -> /${HOME}/.version-fox/plugins/custom-node.lua
+Add custom-node plugin successfully! 
+Please use `vfox install custom-node@<version>` to install the version you need.
+```
 
 
 ### 2. 获取SDK的可用版本

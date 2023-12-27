@@ -91,6 +91,7 @@ Please ensure that you have the necessary permissions to install software on you
 **Command** : `vfox available [<category>]`
 ```bash
 $ vfox available
+Name                     Version         Author          Description
 flutter/flutter          0.0.1           Han Li          flutter plugin, support for getting stable, dev, beta version
 java/adoptium-jdk        0.0.1           aooohan         Adoptium JDK
 ...
@@ -126,8 +127,21 @@ Add node plugin successfully!
 Please use `vfox install node@<version>` to install the version you need.
 ```
 
-VersionFox has no restrictions on the installation sources of plug-ins. You can go 
-to [version-fox-plugins](https://github.com/version-fox/version-fox-plugins) to retrieve the plugin you want.
+VersionFox has no restrictions on the installation sources of plug-ins that means you can add your custom plugins
+or use plugins shared by others. 
+
+```bash
+$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua custom-node
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
+Checking plugin...
+Plugin info:
+Name    -> node
+Author  -> Lihan
+Version -> 0.0.1
+Path    -> /${HOME}/.version-fox/plugins/custom-node.lua
+Add custom-node plugin successfully! 
+Please use `vfox install custom-node@<version>` to install the version you need.
+```
 
 ### 2. Get Available Versions of SDK
 
