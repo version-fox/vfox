@@ -22,6 +22,8 @@ import (
 	"github.com/version-fox/vfox/lua_module"
 	"github.com/version-fox/vfox/util"
 	lua "github.com/yuin/gopher-lua"
+	"path/filepath"
+	"strings"
 )
 
 const (
@@ -35,7 +37,8 @@ type LuaPlugin struct {
 	state     *lua.LState
 	pluginObj *lua.LTable
 	// plugin source path
-	Source      string
+	SourcePath  string
+	SourceName  string
 	Name        string
 	Author      string
 	Version     string
@@ -335,9 +338,10 @@ func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchTy
 	PLUGIN := pluginObj.(*lua.LTable)
 
 	source := &LuaPlugin{
-		state:     luaVMInstance,
-		pluginObj: PLUGIN,
-		Source:    path,
+		state:      luaVMInstance,
+		pluginObj:  PLUGIN,
+		SourcePath: path,
+		SourceName: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
 	}
 
 	if err := source.checkValid(); err != nil {

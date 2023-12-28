@@ -335,8 +335,8 @@ func (m *Manager) Update(pluginName string) error {
 		return err
 	}
 	success := false
-	backupPath := sdk.Plugin.Source + ".bak"
-	err = util.CopyFile(sdk.Plugin.Source, backupPath)
+	backupPath := sdk.Plugin.SourcePath + ".bak"
+	err = util.CopyFile(sdk.Plugin.SourcePath, backupPath)
 	if err != nil {
 		pterm.Printf("Backup %s plugin failed, err: %s\n", updateUrl, err)
 		return fmt.Errorf("backup failed")
@@ -345,7 +345,7 @@ func (m *Manager) Update(pluginName string) error {
 		if success {
 			_ = os.Remove(backupPath)
 		} else {
-			_ = os.Rename(backupPath, sdk.Plugin.Source)
+			_ = os.Rename(backupPath, sdk.Plugin.SourcePath)
 		}
 	}()
 	pterm.Println("Checking plugin version...")
@@ -353,7 +353,7 @@ func (m *Manager) Update(pluginName string) error {
 		pterm.Println("The plugin is already the latest version.")
 		return fmt.Errorf("already the latest version")
 	}
-	err = os.WriteFile(sdk.Plugin.Source, []byte(content), 0644)
+	err = os.WriteFile(sdk.Plugin.SourcePath, []byte(content), 0644)
 	if err != nil {
 		pterm.Printf("Update %s plugin failed, err: %s\n", updateUrl, err)
 		return fmt.Errorf("write file error")

@@ -376,10 +376,9 @@ func (b *Sdk) envVersionKey() string {
 }
 
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
-	name := source.Name
 	return &Sdk{
 		sdkManager:  manager,
-		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
+		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }
