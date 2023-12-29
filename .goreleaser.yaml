@@ -99,6 +99,9 @@ brews:
     #      - name: git
     test: |
       system "#{bin}/vfox version"
+    extra_install: |-
+      bash_completion.install "completions/bash_autocomplete" => "vfox"
+      zsh_completion.install "completions/zsh_autocomplete" => "_vfox"
 
 nfpms:
   - file_name_template: >-
@@ -129,7 +132,7 @@ nfpms:
         file_info:
           mode: 0644
       - src: ./completions/zsh_autocomplete
-        dst: /usr/share/zsh/vendor-completions/vfox
+        dst: /usr/share/zsh/vendor-completions/_vfox
         file_info:
           mode: 0644
       - src: ./LICENSE
