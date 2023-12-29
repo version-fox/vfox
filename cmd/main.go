@@ -36,6 +36,7 @@ func main() {
 		Aliases: []string{"v", "V"},
 		Usage:   "print version",
 		Action: func(ctx *cli.Context, b bool) error {
+
 			println(Version)
 			return nil
 		},
