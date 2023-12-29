@@ -14,41 +14,20 @@
  *    limitations under the License.
  */
 
-package util
+package plugin
 
-import (
-	"io"
-	"os"
-)
-
-func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return err == nil
+type RemotePluginInfo struct {
+	Filename string `json:"name"`
+	Author   string `json:"plugin_author"`
+	Desc     string `json:"plugin_desc"`
+	Name     string `json:"plugin_name"`
+	Version  string `json:"plugin_version"`
+	Sha256   string `json:"sha256"`
+	Url      string `json:"url"`
 }
 
-func CopyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return err
-	}
-	err = dstFile.Sync()
-	if err != nil {
-		return err
-	}
-
-	return nil
+type Category struct {
+	Name    string              `json:"category"`
+	Count   string              `json:"count"`
+	Plugins []*RemotePluginInfo `json:"files"`
 }

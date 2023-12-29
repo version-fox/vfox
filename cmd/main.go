@@ -22,11 +22,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pterm/pterm"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 )
 
-const Version = "0.0.1"
+const Version = "0.1.1"
 
 func main() {
 	cli.VersionFlag = &cli.BoolFlag{
@@ -76,13 +78,59 @@ func main() {
 		{
 			Name:  "add",
 			Usage: "add a plugin of sdk",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "source",
+					Aliases: []string{"s"},
+					Usage:   "plugin source",
+				},
+				&cli.StringFlag{
+					Name:  "alias",
+					Usage: "plugin alias",
+				},
+			},
 			Action: func(ctx *cli.Context) error {
-				args := ctx.Args()
-				l := args.Len()
-				if l < 2 {
-					return cli.Exit("invalid arguments", 1)
+				sdkName := ctx.Args().First()
+				source := ctx.String("source")
+				alias := ctx.String("alias")
+				return manager.Add(sdkName, source, alias)
+			},
+		},
+		{
+			Name:  "available",
+			Usage: "show available plugins",
+			Action: func(ctx *cli.Context) error {
+				categoryName := ctx.Args().First()
+				categories, err := manager.Available()
+				if err != nil {
+					return err
 				}
-				return manager.Add(args.Get(0), args.Get(1))
+				data := pterm.TableData{
+					{"NAME", "VERSION", "AUTHOR", "DESCRIPTION"},
+				}
+				for _, category := range categories {
+					if len(categoryName) > 0 {
+						if categoryName != category.Name {
+							continue
+						}
+					}
+					for _, p := range category.Plugins {
+						desc := p.Desc
+						if len(desc) == 0 {
+							desc = "-"
+						} else if len(desc) > 100 {
+							desc = desc[:100] + "..."
+						}
+						data = append(data, []string{category.Name + "/" + p.Filename, p.Version, p.Author, desc})
+					}
+				}
+
+				_ = pterm.DefaultTable.
+					WithHasHeader().
+					WithSeparator("\t ").
+					WithData(data).Render()
+				pterm.Printf("Please use %s to install plugin\n", pterm.LightBlue("vfox add <plugin name>"))
+				return nil
 			},
 		},
 		{
@@ -99,14 +147,14 @@ func main() {
 		},
 		{
 			Name:  "update",
-			Usage: "update a plugin of sdk",
+			Usage: "update specified plug-ins",
 			Action: func(ctx *cli.Context) error {
 				args := ctx.Args()
 				l := args.Len()
 				if l < 1 {
 					return cli.Exit("invalid arguments", 1)
 				}
-				return manager.Remove(args.First())
+				return manager.Update(args.First())
 			},
 		},
 
@@ -127,7 +175,7 @@ func main() {
 			Usage: "search a version of sdk",
 			Action: func(ctx *cli.Context) error {
 				sdkName := ctx.Args().First()
-				return manager.Available(sdkName)
+				return manager.Search(sdkName)
 			},
 		},
 		{

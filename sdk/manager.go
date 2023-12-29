@@ -17,7 +17,9 @@
 package sdk
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/version-fox/vfox/plugin"
 	"io"
 	"net/http"
 	"os"
@@ -29,6 +31,10 @@ import (
 	"github.com/version-fox/vfox/env"
 	"github.com/version-fox/vfox/printer"
 	"github.com/version-fox/vfox/util"
+)
+
+const (
+	pluginIndexUrl = "https://version-fox.github.io/version-fox-plugins/"
 )
 
 type Arg struct {
@@ -82,7 +88,7 @@ func (m *Manager) Uninstall(config Arg) error {
 	return nil
 }
 
-func (m *Manager) Available(sdkName string) error {
+func (m *Manager) Search(sdkName string) error {
 	source := m.sdkMap[sdkName]
 	if source == nil {
 		pterm.Printf("%s not supported\n", sdkName)
@@ -257,7 +263,7 @@ func (m *Manager) loadSdk() {
 			// filename first as sdk name
 			path := filepath.Join(m.pluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
-			source, err := NewLuaPlugin(content, m.osType, m.archType)
+			source, err := NewLuaPlugin(content, path, m.osType, m.archType)
 			if err != nil {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				continue
@@ -307,6 +313,53 @@ func (m *Manager) Remove(pluginName string) error {
 }
 
 func (m *Manager) Update(pluginName string) error {
+	sdk := m.sdkMap[pluginName]
+	if sdk == nil {
+		pterm.Println("This plugin has not been added.")
+		return fmt.Errorf("%s not installed", pluginName)
+	}
+	updateUrl := sdk.Plugin.UpdateUrl
+	if updateUrl == "" {
+		pterm.Printf("This plugin does not support updates.\n")
+		return fmt.Errorf("not support update")
+	}
+	pterm.Printf("Checking %s plugin...\n", updateUrl)
+	content, err := m.loadLuaFromFileOrUrl(updateUrl)
+	if err != nil {
+		pterm.Printf("Failed to load %s plugin, err: %s\n", updateUrl, err)
+		return fmt.Errorf("update failed")
+	}
+	source, err := NewLuaPlugin(content, updateUrl, m.osType, m.archType)
+	if err != nil {
+		pterm.Printf("Check %s plugin failed, err: %s\n", updateUrl, err)
+		return err
+	}
+	success := false
+	backupPath := sdk.Plugin.SourcePath + ".bak"
+	err = util.CopyFile(sdk.Plugin.SourcePath, backupPath)
+	if err != nil {
+		pterm.Printf("Backup %s plugin failed, err: %s\n", updateUrl, err)
+		return fmt.Errorf("backup failed")
+	}
+	defer func() {
+		if success {
+			_ = os.Remove(backupPath)
+		} else {
+			_ = os.Rename(backupPath, sdk.Plugin.SourcePath)
+		}
+	}()
+	pterm.Println("Checking plugin version...")
+	if util.CompareVersion(source.Version, sdk.Plugin.Version) <= 0 {
+		pterm.Println("The plugin is already the latest version.")
+		return fmt.Errorf("already the latest version")
+	}
+	err = os.WriteFile(sdk.Plugin.SourcePath, []byte(content), 0644)
+	if err != nil {
+		pterm.Printf("Update %s plugin failed, err: %s\n", updateUrl, err)
+		return fmt.Errorf("write file error")
+	}
+	success = true
+	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(source.Version))
 	return nil
 }
 
@@ -327,7 +380,44 @@ func (m *Manager) Info(pluginName string) error {
 	return nil
 }
 
-func (m *Manager) Add(pluginName, url string) error {
+func (m *Manager) Add(pluginName, url, alias string) error {
+	pname := pluginName
+	// official plugin
+	if len(url) == 0 {
+		args := strings.Split(pluginName, "/")
+		if len(args) < 2 {
+			pterm.Println("Invalid plugin name. Format: <category>/<plugin-name>")
+			return fmt.Errorf("invalid plugin name")
+		}
+		category := args[0]
+		name := args[1]
+		pname = name
+		availablePlugins, err := m.Available()
+		if err != nil {
+			return err
+		}
+		for _, available := range availablePlugins {
+			if category == available.Name {
+				for _, p := range available.Plugins {
+					if name == p.Filename {
+						url = p.Url
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if len(alias) > 0 {
+		pname = alias
+	}
+
+	destPath := filepath.Join(m.pluginPath, pname+".lua")
+	if util.FileExists(destPath) {
+		pterm.Printf("Plugin %s already exists, please use %s to remove it first.\n", pterm.LightGreen(pname), pterm.LightBlue("vfox remove "+pname))
+		return fmt.Errorf("plugin already exists")
+	}
+
 	pterm.Printf("Adding plugin from %s...\n", url)
 	content, err := m.loadLuaFromFileOrUrl(url)
 	if err != nil {
@@ -335,12 +425,11 @@ func (m *Manager) Add(pluginName, url string) error {
 		return fmt.Errorf("install failed")
 	}
 	pterm.Println("Checking plugin...")
-	source, err := NewLuaPlugin(content, m.osType, m.archType)
+	source, err := NewLuaPlugin(content, url, m.osType, m.archType)
 	if err != nil {
 		pterm.Printf("Check %s plugin failed, err: %s\n", url, err)
 		return err
 	}
-	destPath := filepath.Join(m.pluginPath, pluginName+".lua")
 	err = os.WriteFile(destPath, []byte(content), 0644)
 	if err != nil {
 		pterm.Printf("Add %s plugin failed, err: %s\n", url, err)
@@ -352,8 +441,8 @@ func (m *Manager) Add(pluginName, url string) error {
 	pterm.Println("Version", "->", pterm.LightBlue(source.Version))
 	pterm.Println("Desc   ", "->", pterm.LightBlue(source.Description))
 	pterm.Println("Path   ", "->", pterm.LightBlue(destPath))
-	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pluginName))
-	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pluginName)))
+	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
+	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
 }
 
@@ -396,6 +485,31 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 	}
 	return string(str), nil
 
+}
+
+func (m *Manager) Available() ([]*plugin.Category, error) {
+	// TODO proxy
+	resp, err := http.Get(pluginIndexUrl)
+	if err != nil {
+		pterm.Printf("Get plugin index error, err: %s\n", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		pterm.Printf("Get plugin index error, status code: %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("get plugin index error")
+	}
+	if str, err := io.ReadAll(resp.Body); err != nil {
+		pterm.Printf("Read plugin index error, err: %s\n", err)
+		return nil, fmt.Errorf("read plugin index error")
+	} else {
+		var categories []*plugin.Category
+		err = json.Unmarshal(str, &categories)
+		if err != nil {
+			pterm.Printf("Parse plugin index error, err: %s\n", err)
+			return nil, fmt.Errorf("parse plugin index error")
+		}
+		return categories, nil
+	}
 }
 
 func NewSdkManager() *Manager {

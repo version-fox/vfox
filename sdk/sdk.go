@@ -265,7 +265,7 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 	}
 	for _, d := range dir {
 		if d.IsDir() {
-			split := strings.Split(d.Name(), "-")
+			split := strings.SplitN(d.Name(), "-", 2)
 			if len(split) != 2 {
 				continue
 			}
@@ -284,6 +284,11 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if mainSdk.Path == "" {
+		return nil, errors.New("main sdk not found")
+
 	}
 	return &Package{
 		Main:       mainSdk,
@@ -371,10 +376,9 @@ func (b *Sdk) envVersionKey() string {
 }
 
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
-	name := source.Name
 	return &Sdk{
 		sdkManager:  manager,
-		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(name)),
+		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }
