@@ -36,6 +36,10 @@ type windowsEnvManager struct {
 	store     *Store
 }
 
+func (w *windowsEnvManager) Close() error {
+	return w.key.Close()
+}
+
 func (w *windowsEnvManager) loadPathValue() error {
 	val, _, err := w.key.GetStringValue("VERSION_FOX_PATH")
 	if err != nil {
@@ -55,9 +59,6 @@ func (w *windowsEnvManager) loadPathValue() error {
 }
 
 func (w *windowsEnvManager) Flush(scope Scope) (err error) {
-	// TODO maybe need to move this to other place
-	// TODO  reimplement to flush env map to registry
-	defer w.key.Close()
 	customPaths := make([]string, 0, len(w.store.pathMap))
 	customPathSet := make(map[string]struct{})
 	if len(w.store.pathMap) > 0 {
@@ -66,7 +67,7 @@ func (w *windowsEnvManager) Flush(scope Scope) (err error) {
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
-		_ = w.Load([]*KV{
+		w.Load([]*KV{
 			{
 				Key:   "VERSION_FOX_PATH",
 				Value: pathValue,
@@ -76,8 +77,8 @@ func (w *windowsEnvManager) Flush(scope Scope) (err error) {
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
-	// user env
-	oldPath, _ := w.Get("PATH")
+
+	oldPath := os.Getenv("PATH")
 	s := strings.Split(oldPath, ";")
 	userNewPaths := append([]string{}, customPaths...)
 	for _, v := range s {
@@ -89,39 +90,52 @@ func (w *windowsEnvManager) Flush(scope Scope) (err error) {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
+	if scope == Global {
+		if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
+			return err
+		}
+	}
+	if err = os.Setenv("PATH", strings.Join(userNewPaths, ";")); err != nil {
 		return err
 	}
-	// sys env
-	sysPath := os.Getenv("PATH")
-	s2 := strings.Split(sysPath, ";")
-	sysNewPaths := append([]string{}, customPaths...)
-	for _, v := range s2 {
-		if _, ok := w.store.deletedPathMap[v]; ok {
-			continue
+	for k, _ := range w.store.deletedEnvMap {
+		if scope == Global {
+			if err = w.key.DeleteValue(k); err != nil {
+				return err
+			}
+		} else {
+			if err = os.Unsetenv(k); err != nil {
+				return err
+			}
 		}
-		if _, ok := customPathSet[v]; ok {
-			continue
-		}
-		sysNewPaths = append(sysNewPaths, v)
 	}
-	_ = os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
+	for k, v := range w.store.envMap {
+		if scope == Global {
+			if err = w.key.SetStringValue(k, v); err != nil {
+				return err
+			}
+		} else {
+			if err = os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+	}
 	_ = w.broadcastEnvironment()
 	return nil
 }
 
-func (w *windowsEnvManager) Load(kvs []*KV) error {
+func (w *windowsEnvManager) Load(kvs []*KV) {
 	for _, kv := range kvs {
 		w.store.Add(kv)
 	}
-	return nil
 }
 
-func (w *windowsEnvManager) Get(key string) (string, error) {
+func (w *windowsEnvManager) Get(key string) (string, bool) {
 	if key == "PATH" {
-		return w.pathEnvValue(), nil
+		return w.pathEnvValue(), true
 	} else {
-		return w.store.envMap[key], nil
+		s, ok := w.store.envMap[key]
+		return s, ok
 	}
 }
 
