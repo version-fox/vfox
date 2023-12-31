@@ -221,10 +221,13 @@ func newUse(manager *sdk.Manager) *cli.Command {
 						},
 					}
 					result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-					return source.Use(sdk.Version(result), scope)
+					return manager.Use(sdk.Arg{
+						Name:    name,
+						Version: result,
+					}, scope)
 
 				}
-				return source.Use(sdk.Version(version), scope)
+				return manager.Use(arg, scope)
 			})(ctx)
 		},
 	}

@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package versions
+package toolversion
 
 import (
 	"bufio"
@@ -33,7 +33,7 @@ type ToolVersions struct {
 	path  string
 }
 
-func (t *ToolVersions) Save() error {
+func (t *ToolVersions) save() error {
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
@@ -49,13 +49,14 @@ func (t *ToolVersions) Save() error {
 	return nil
 }
 
-func (t *ToolVersions) Version(tool string) (string, bool) {
-	s, ok := t.tools[tool]
+func (t *ToolVersions) Version(sdkName string) (string, bool) {
+	s, ok := t.tools[sdkName]
 	return s, ok
 }
 
-func (t *ToolVersions) Add(tool, version string) {
+func (t *ToolVersions) Add(tool, version string) error {
 	t.tools[tool] = version
+	return t.save()
 }
 
 func NewToolVersions(dirPath string) (*ToolVersions, error) {

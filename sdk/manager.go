@@ -19,6 +19,9 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/toolversion"
 	"github.com/version-fox/vfox/plugin"
 	"io"
 	"net/http"
@@ -28,7 +31,6 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
-	"github.com/version-fox/vfox/env"
 	"github.com/version-fox/vfox/printer"
 	"github.com/version-fox/vfox/util"
 )
@@ -49,6 +51,7 @@ type Manager struct {
 	pluginPath    string
 	sdkMap        map[string]*Sdk
 	EnvManager    env.Manager
+	Shell         *shell.Shell
 	osType        util.OSType
 	archType      util.ArchType
 }
@@ -83,7 +86,7 @@ func (m *Manager) Uninstall(config Arg) error {
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, Global)
+		return source.Use(firstVersion, env.Global)
 	}
 	return nil
 }
@@ -157,6 +160,48 @@ func (m *Manager) Sdk(sdkName string) (*Sdk, error) {
 	return source, nil
 }
 
+func (m *Manager) Use(arg Arg, useScope UseScope) error {
+	source := m.sdkMap[arg.Name]
+	if source == nil {
+		return fmt.Errorf("%s not supported", arg.Name)
+	}
+	version := arg.Version
+	if useScope == Directory {
+		pwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		toolVersions, err := toolversion.NewToolVersions(pwd)
+		if err != nil {
+			return err
+		}
+		if arg.Version == "" {
+			version, _ = toolVersions.Version(arg.Name)
+		}
+		err = source.Use(Version(version), env.Local)
+		if err != nil {
+			return err
+		}
+		err = toolVersions.Add(arg.Name, version)
+		if err != nil {
+			pterm.Printf("Failed to record %s version to .tool-versions\n", version)
+			return err
+		}
+	} else {
+		scope := env.Global
+		if useScope == Session {
+			scope = env.Local
+		} else {
+			scope = env.Global
+		}
+		err := source.Use(Version(version), scope)
+		if err != nil {
+			return err
+		}
+	}
+	return m.Shell.ReOpen()
+}
+
 func (m *Manager) List(arg Arg) error {
 	if arg.Name == "" {
 		if len(m.sdkMap) == 0 {
@@ -172,7 +217,7 @@ func (m *Manager) List(arg Arg) error {
 		}
 		// Generate tree from LeveledList.
 		root := putils.TreeFromLeveledList(tree)
-		root.Text = "All installed sdk versions"
+		root.Text = "All installed sdk toolversion"
 		// Render TreePrinter
 		_ = pterm.DefaultTree.WithRoot(root).Render()
 		return nil
@@ -254,6 +299,7 @@ func (m *Manager) Close() {
 	for _, handler := range m.sdkMap {
 		handler.Close()
 	}
+	_ = m.EnvManager.Close()
 }
 
 func (m *Manager) Remove(pluginName string) error {
@@ -497,7 +543,11 @@ func NewSdkManager() *Manager {
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
-	envManger, err := env.NewEnvManager(configPath)
+	newShell, err := shell.NewShell()
+	if err != nil {
+		panic("Init shell error")
+	}
+	envManger, err := env.NewEnvManager(configPath, newShell)
 	if err != nil {
 		panic("Init env manager error")
 	}
@@ -506,6 +556,7 @@ func NewSdkManager() *Manager {
 		sdkCachePath: sdkCachePath,
 		pluginPath:   pluginPath,
 		EnvManager:   envManger,
+		Shell:        newShell,
 		sdkMap:       make(map[string]*Sdk),
 		osType:       util.GetOSType(),
 		archType:     util.GetArchType(),

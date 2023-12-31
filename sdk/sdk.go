@@ -19,6 +19,8 @@ package sdk
 import (
 	"errors"
 	"fmt"
+	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/env"
 	"io"
 	"net"
 	"net/http"
@@ -29,8 +31,6 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/schollz/progressbar/v3"
-	"github.com/version-fox/vfox/env"
 	"github.com/version-fox/vfox/util"
 )
 
@@ -158,7 +158,7 @@ func (b *Sdk) Available() ([]*Package, error) {
 	return b.Plugin.Available()
 }
 
-func (b *Sdk) Use(version Version, scope Scope) error {
+func (b *Sdk) Use(version Version, scope env.Scope) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
@@ -179,9 +179,10 @@ func (b *Sdk) Use(version Version, scope Scope) error {
 		Key:   b.envVersionKey(),
 		Value: string(version),
 	})
-	err = b.sdkManager.EnvManager.Load(keys)
+	b.sdkManager.EnvManager.Load(keys)
+	err = b.sdkManager.EnvManager.Flush(scope)
 	if err != nil {
-		return fmt.Errorf("Use %s error, err: %s\n", label, err)
+		return err
 	}
 	var outputLabel string
 	if len(sdkPackage.Additional) != 0 {
@@ -194,9 +195,7 @@ func (b *Sdk) Use(version Version, scope Scope) error {
 		outputLabel = label
 	}
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(outputLabel))
-	return b.sdkManager.EnvManager.ReShell(func() {
-		b.sdkManager.Close()
-	})
+	return nil
 }
 
 func (b *Sdk) List() []Version {
@@ -225,7 +224,6 @@ func (b *Sdk) Current() Version {
 }
 
 func (b *Sdk) Close() {
-	b.sdkManager.EnvManager.Flush()
 	b.Plugin.Close()
 }
 func (b *Sdk) clearCurrentEnvConfig() {
