@@ -158,7 +158,7 @@ func (b *Sdk) Available() ([]*Package, error) {
 	return b.Plugin.Available()
 }
 
-func (b *Sdk) Use(version Version) error {
+func (b *Sdk) Use(version Version, scope Scope) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))

@@ -83,7 +83,7 @@ func (m *Manager) Uninstall(config Arg) error {
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion)
+		return source.Use(firstVersion, Global)
 	}
 	return nil
 }
@@ -149,37 +149,12 @@ func (m *Manager) Search(sdkName string) error {
 	return source.Install(Version(version.Key))
 }
 
-func (m *Manager) Use(config Arg) error {
-	source := m.sdkMap[config.Name]
+func (m *Manager) Sdk(sdkName string) (*Sdk, error) {
+	source := m.sdkMap[sdkName]
 	if source == nil {
-		fmt.Printf("%s not supported\n", config.Name)
-		return fmt.Errorf("%s not supported", config.Name)
+		return nil, fmt.Errorf("%s not supported", sdkName)
 	}
-	if config.Version == "" {
-		list := source.List()
-		var arr []string
-		for _, version := range list {
-			arr = append(arr, string(version))
-		}
-		selectPrinter := pterm.InteractiveSelectPrinter{
-			TextStyle:     &pterm.ThemeDefault.DefaultText,
-			OptionStyle:   &pterm.ThemeDefault.DefaultText,
-			Options:       arr,
-			DefaultOption: "",
-			MaxHeight:     5,
-			Selector:      "->",
-			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-			Filter:        true,
-			OnInterruptFunc: func() {
-				os.Exit(0)
-			},
-		}
-		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", config.Name))
-
-		return source.Use(Version(result))
-
-	}
-	return m.sdkMap[config.Name].Use(Version(config.Version))
+	return source, nil
 }
 
 func (m *Manager) List(arg Arg) error {

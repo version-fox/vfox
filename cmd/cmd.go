@@ -18,12 +18,12 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/sdk"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/sdk"
 )
 
 func Execute(version string, args []string) {
