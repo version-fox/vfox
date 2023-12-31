@@ -16,14 +16,11 @@
 
 package env
 
-type ShellType string
-
 type Manager interface {
-	Flush()
-	Load([]*KV) error
-	Get(key string) (string, error)
+	Flush(scope Scope) error
+	Load([]*KV)
+	Get(key string) (string, bool)
 	Remove(key string) error
-	ReShell(callback func()) error
 }
 
 type KV struct {
@@ -31,8 +28,34 @@ type KV struct {
 	Value string
 }
 
-type ShellInfo struct {
-	ShellType
-	ShellPath  string
-	ConfigPath string
+type Store struct {
+	envMap map[string]string
+	// $PATH
+	pathMap        map[string]struct{}
+	deletedPathMap map[string]struct{}
+}
+
+func (s *Store) Add(kv *KV) {
+	if kv.Key == "PATH" {
+		s.pathMap[kv.Value] = struct{}{}
+	} else {
+		s.envMap[kv.Key] = kv.Value
+	}
+}
+
+func (s *Store) Remove(key string) {
+	if _, ok := s.pathMap[key]; ok {
+		delete(s.pathMap, key)
+		s.deletedPathMap[key] = struct{}{}
+	} else {
+		delete(s.envMap, key)
+	}
+}
+
+func NewStore() *Store {
+	return &Store{
+		envMap:         make(map[string]string),
+		pathMap:        make(map[string]struct{}),
+		deletedPathMap: make(map[string]struct{}),
+	}
 }

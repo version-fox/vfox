@@ -21,22 +21,19 @@ package env
 import (
 	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/shell"
 	"os"
-	"os/exec"
 	"strings"
 	"syscall"
 	"unsafe"
 
-	"github.com/pterm/pterm"
 	"golang.org/x/sys/windows/registry"
 )
 
 type windowsEnvManager struct {
-	shellInfo *ShellInfo
+	shellInfo *shell.Shell
 	key       registry.Key
-	// $PATH
-	pathMap        map[string]struct{}
-	deletedPathMap map[string]struct{}
+	store     *Store
 }
 
 func (w *windowsEnvManager) loadPathValue() error {
@@ -52,22 +49,24 @@ func (w *windowsEnvManager) loadPathValue() error {
 	}
 	s := strings.Split(val, ";")
 	for _, path := range s {
-		w.pathMap[path] = struct{}{}
+		w.store.pathMap[path] = struct{}{}
 	}
 	return nil
 }
 
-func (w *windowsEnvManager) Flush() {
+func (w *windowsEnvManager) Flush(scope Scope) (err error) {
+	// TODO maybe need to move this to other place
+	// TODO  reimplement to flush env map to registry
 	defer w.key.Close()
-	customPaths := make([]string, 0, len(w.pathMap))
+	customPaths := make([]string, 0, len(w.store.pathMap))
 	customPathSet := make(map[string]struct{})
-	if len(w.pathMap) > 0 {
-		for path := range w.pathMap {
+	if len(w.store.pathMap) > 0 {
+		for path := range w.store.pathMap {
 			customPaths = append(customPaths, path)
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
-		w.Load([]*KV{
+		_ = w.Load([]*KV{
 			{
 				Key:   "VERSION_FOX_PATH",
 				Value: pathValue,
@@ -78,14 +77,11 @@ func (w *windowsEnvManager) Flush() {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
 	// user env
-	oldPath, err := w.Get("PATH")
-	if err != nil {
-		return
-	}
+	oldPath, _ := w.Get("PATH")
 	s := strings.Split(oldPath, ";")
 	userNewPaths := append([]string{}, customPaths...)
 	for _, v := range s {
-		if _, ok := w.deletedPathMap[v]; ok {
+		if _, ok := w.store.deletedPathMap[v]; ok {
 			continue
 		}
 		if _, ok := customPathSet[v]; ok {
@@ -93,13 +89,15 @@ func (w *windowsEnvManager) Flush() {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";"))
+	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
+		return err
+	}
 	// sys env
 	sysPath := os.Getenv("PATH")
 	s2 := strings.Split(sysPath, ";")
 	sysNewPaths := append([]string{}, customPaths...)
 	for _, v := range s2 {
-		if _, ok := w.deletedPathMap[v]; ok {
+		if _, ok := w.store.deletedPathMap[v]; ok {
 			continue
 		}
 		if _, ok := customPathSet[v]; ok {
@@ -107,60 +105,31 @@ func (w *windowsEnvManager) Flush() {
 		}
 		sysNewPaths = append(sysNewPaths, v)
 	}
-	os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
+	_ = os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
 	_ = w.broadcastEnvironment()
+	return nil
 }
 
 func (w *windowsEnvManager) Load(kvs []*KV) error {
 	for _, kv := range kvs {
-		if kv.Key == "PATH" {
-			w.pathMap[kv.Value] = struct{}{}
-		} else {
-			err := os.Setenv(kv.Key, kv.Value)
-			if err != nil {
-				return err
-			}
-			err = w.key.SetStringValue(kv.Key, kv.Value)
-			if err != nil {
-				return err
-			}
-		}
+		w.store.Add(kv)
 	}
 	return nil
 }
 
 func (w *windowsEnvManager) Get(key string) (string, error) {
-	val, _, err := w.key.GetStringValue(key)
-	if err != nil {
-		return "", err
+	if key == "PATH" {
+		return w.pathEnvValue(), nil
+	} else {
+		return w.store.envMap[key], nil
 	}
-	return val, nil
 }
 
 func (w *windowsEnvManager) Remove(key string) error {
 	if key == "PATH" {
 		return fmt.Errorf("can not remove PATH variable")
 	}
-	if _, ok := w.pathMap[key]; ok {
-		delete(w.pathMap, key)
-		w.deletedPathMap[key] = struct{}{}
-	} else {
-		_ = w.key.DeleteValue(key)
-	}
-	return nil
-}
-
-func (w *windowsEnvManager) ReShell(callback func()) error {
-	// flush env to file
-	w.Flush()
-	command := exec.Command(w.shellInfo.ShellPath)
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
-		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
-		return err
-	}
+	w.store.Remove(key)
 	return nil
 }
 
@@ -180,39 +149,27 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 	return nil
 }
 
-func NewEnvManager(vfConfigPath string) (Manager, error) {
+func (w *windowsEnvManager) pathEnvValue() string {
+	var paths []string
+	for path := range w.store.pathMap {
+		paths = append(paths, path)
+	}
+	return strings.Join(paths, ";")
+}
+
+func NewEnvManager(vfConfigPath string, shellInfo *shell.Shell) (Manager, error) {
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return nil, err
 	}
 	manager := &windowsEnvManager{
-		shellInfo:      NewShellInfo(),
-		key:            k,
-		pathMap:        make(map[string]struct{}),
-		deletedPathMap: make(map[string]struct{}),
+		shellInfo: shellInfo,
+		key:       k,
+		store:     NewStore(),
 	}
 	err = manager.loadPathValue()
 	if err != nil {
 		return nil, err
 	}
 	return manager, nil
-}
-
-func NewShellInfo() *ShellInfo {
-	ppid := os.Getppid()
-
-	// On Windows, os.FindProcess does not actually find the process.
-	// So, we use this workaround to get the parent process name.
-	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", ppid), "/NH", "/FO", "CSV")
-	output, _ := cmd.Output()
-	fields := strings.Split(string(output), ",")
-	parentProcessName := strings.Trim(fields[0], "\" ")
-	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", ppid), "get", "ExecutablePath", "/format:list")
-	output, _ = cmd.Output()
-	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
-	return &ShellInfo{
-		ShellType:  ShellType(parentProcessName),
-		ShellPath:  path,
-		ConfigPath: "",
-	}
 }

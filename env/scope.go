@@ -14,12 +14,11 @@
  *    limitations under the License.
  */
 
-package sdk
+package env
 
 type Scope int
 
 const (
 	Global Scope = iota
-	Directory
-	Session
+	Local
 )

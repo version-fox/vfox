@@ -21,92 +21,76 @@ package env
 import (
 	"bufio"
 	"fmt"
+	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/util"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
-	"syscall"
-)
-
-const (
-	BASH = ShellType("bash")
-	ZSH  = ShellType("zsh")
-	KSH  = ShellType("ksh")
-	// extend shell type
 )
 
 type macosEnvManager struct {
-	shellInfo *ShellInfo
+	shellInfo *shell.Shell
 	// ~/.version_fox/env.sh
 	vfEnvPath string
-	envMap    map[string]string
-	// $PATH
-	pathMap map[string]string
+	store     *Store
 }
 
-func (m *macosEnvManager) ReShell(callback func()) error {
-	callback()
-	err := syscall.Exec(m.shellInfo.ShellPath, []string{m.shellInfo.ShellPath}, syscall.Environ())
-	if err != nil {
-		fmt.Printf("Failed to exec shell, err:%s\n", err.Error())
-		return err
-	}
-	return nil
-}
-
-func (m *macosEnvManager) Load(kvs []*KV) error {
+func (m *macosEnvManager) Load(kvs []*KV) {
 	for _, kv := range kvs {
-		if kv.Key == "PATH" {
-			m.pathMap[kv.Value] = kv.Value
-		} else {
-			m.envMap[kv.Key] = kv.Value
-		}
+		m.store.Add(kv)
 	}
-	return nil
 }
 func (m *macosEnvManager) Remove(key string) error {
 	if key == "PATH" {
 		return fmt.Errorf("can not remove PATH variable")
 	}
-	delete(m.envMap, key)
-	delete(m.pathMap, key)
+	m.store.Remove(key)
 	return nil
 }
 
-func (m *macosEnvManager) Flush() {
+func (m *macosEnvManager) Flush(scope Scope) error {
+	if scope == Local {
+		for k, v := range m.store.envMap {
+			if err := os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+		return os.Setenv("PATH", m.pathEnvValue())
+	}
 	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Printf("Failed to open the file %s, err:%s\n", m.vfEnvPath, err.Error())
-		return
+		return err
 	}
 	defer file.Close()
-	for k, v := range m.envMap {
+	for k, v := range m.store.envMap {
 		str := fmt.Sprintf("export %s=%s\n", k, v)
 		if _, err := file.WriteString(str); err != nil {
 			fmt.Printf("Failed to flush env variable to file,value: err:%s\n", err.Error())
-			return
+			return err
 		}
 	}
 
 	pathValue := fmt.Sprintf("export PATH=%s\n", m.pathEnvValue())
 	if _, err := file.WriteString(pathValue); err != nil {
 		fmt.Printf("Failed to flush PATH variable to file, err:%s\n", err.Error())
-		return
+		return err
 	}
+	return nil
 }
 
-func (m *macosEnvManager) Get(key string) (string, error) {
+func (m *macosEnvManager) Get(key string) (string, bool) {
 	if key == "PATH" {
-		return m.pathEnvValue(), nil
+		return m.pathEnvValue(), true
 	} else {
-		return m.envMap[key], nil
+		s, ok := m.store.envMap[key]
+		return s, ok
 	}
 }
 
 func (m *macosEnvManager) pathEnvValue() string {
 	var pathValues []string
-	for k, _ := range m.pathMap {
+	for k, _ := range m.store.pathMap {
 		pathValues = append(pathValues, k)
 	}
 	pathValues = append(pathValues, "$PATH")
@@ -135,10 +119,16 @@ func (m *macosEnvManager) loadEnvFile() error {
 						if path == "$PATH" {
 							continue
 						}
-						m.pathMap[path] = path
+						m.store.Add(&KV{
+							Key:   "PATH",
+							Value: path,
+						})
 					}
 				} else {
-					m.envMap[key] = value
+					m.store.Add(&KV{
+						Key:   key,
+						Value: value,
+					})
 				}
 			}
 		}
@@ -149,11 +139,7 @@ func (m *macosEnvManager) loadEnvFile() error {
 	return nil
 }
 
-func NewEnvManager(vfConfigPath string) (Manager, error) {
-	shellInfo, err := NewShellInfo()
-	if err != nil {
-		return nil, err
-	}
+func NewEnvManager(vfConfigPath string, shellInfo *shell.Shell) (Manager, error) {
 	envPath := filepath.Join(vfConfigPath, "env.sh")
 	if !util.FileExists(envPath) {
 		_, _ = os.Create(envPath)
@@ -161,10 +147,9 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 	manager := &macosEnvManager{
 		shellInfo: shellInfo,
 		vfEnvPath: envPath,
-		envMap:    make(map[string]string),
-		pathMap:   make(map[string]string),
+		store:     NewStore(),
 	}
-	err = manager.loadEnvFile()
+	err := manager.loadEnvFile()
 	if err != nil {
 		fmt.Printf("Failed to load env file: %s, err:%s\n", manager.vfEnvPath, err.Error())
 	}
@@ -172,40 +157,6 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 		return nil, err
 	}
 	return manager, nil
-}
-
-func NewShellInfo() (*ShellInfo, error) {
-	// 获取当前用户
-	currentUser, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	shellPath := os.Getenv("SHELL")
-	shell := filepath.Base(shellPath)
-	var info *ShellInfo
-	switch ShellType(shell) {
-	case BASH:
-		info = &ShellInfo{
-			ShellType:  BASH,
-			ShellPath:  shellPath,
-			ConfigPath: filepath.Join(currentUser.HomeDir, ".bashrc"),
-		}
-	case ZSH:
-		info = &ShellInfo{
-			ShellType:  ZSH,
-			ShellPath:  shellPath,
-			ConfigPath: filepath.Join(currentUser.HomeDir, ".zshrc"),
-		}
-	//case KSH:
-	//	info = &ShellInfo{
-	//		ShellType:  shellType,
-	//		ConfigPath: filepath.Join(currentUser.HomeDir, ".kshrc"),
-	//	}
-	default:
-		return nil, fmt.Errorf("unsupported shell type")
-	}
-	return info, nil
-
 }
 
 func appendEnvSourceIfNotExist(parentEnvPath, childEnvPath string) error {
