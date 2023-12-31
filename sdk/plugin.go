@@ -18,7 +18,7 @@ package sdk
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/env"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/lua_module"
 	"github.com/version-fox/vfox/util"
 	lua "github.com/yuin/gopher-lua"

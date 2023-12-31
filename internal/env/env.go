@@ -16,11 +16,14 @@
 
 package env
 
+import "io"
+
 type Manager interface {
 	Flush(scope Scope) error
 	Load([]*KV)
 	Get(key string) (string, bool)
 	Remove(key string) error
+	io.Closer
 }
 
 type KV struct {
@@ -29,7 +32,8 @@ type KV struct {
 }
 
 type Store struct {
-	envMap map[string]string
+	envMap        map[string]string
+	deletedEnvMap map[string]struct{}
 	// $PATH
 	pathMap        map[string]struct{}
 	deletedPathMap map[string]struct{}
@@ -49,6 +53,7 @@ func (s *Store) Remove(key string) {
 		s.deletedPathMap[key] = struct{}{}
 	} else {
 		delete(s.envMap, key)
+		s.deletedEnvMap[key] = struct{}{}
 	}
 }
 
@@ -57,5 +62,6 @@ func NewStore() *Store {
 		envMap:         make(map[string]string),
 		pathMap:        make(map[string]struct{}),
 		deletedPathMap: make(map[string]struct{}),
+		deletedEnvMap:  make(map[string]struct{}),
 	}
 }

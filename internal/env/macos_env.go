@@ -35,6 +35,10 @@ type macosEnvManager struct {
 	store     *Store
 }
 
+func (m *macosEnvManager) Close() error {
+	return nil
+}
+
 func (m *macosEnvManager) Load(kvs []*KV) {
 	for _, kv := range kvs {
 		m.store.Add(kv)
