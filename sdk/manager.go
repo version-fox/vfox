@@ -19,15 +19,16 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/shell"
-	"github.com/version-fox/vfox/internal/toolversion"
-	"github.com/version-fox/vfox/plugin"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/toolversion"
+	"github.com/version-fox/vfox/plugin"
 
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
@@ -169,8 +170,8 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 	var sdks []*Arg
 	if arg.Name == "" {
 		for sdkName, version := range tv.Sdks {
-			source := m.sdkMap[sdkName]
-			if source == nil {
+			_, ok := m.sdkMap[sdkName]
+			if !ok {
 				pterm.Printf("%s not supported.\n", sdkName)
 				continue
 			}
@@ -179,43 +180,78 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 				Version: version,
 			})
 		}
+		if len(sdks) == 0 {
+			pterm.Println("Please specify the correct parameter. format: <sdk-name>[@<version>]")
+			return fmt.Errorf("invalid parameter")
+		}
 	} else if arg.Version == "" {
+		source, ok := m.sdkMap[arg.Name]
+		if !ok {
+			pterm.Printf("%s not supported.\n", arg.Name)
+			return fmt.Errorf("%s not supported", arg.Name)
+		}
 		version, ok := tv.Sdks[arg.Name]
 		if ok {
 			sdks = append(sdks, &Arg{
 				Name:    arg.Name,
 				Version: version,
 			})
-		}
-	}
-	source := m.sdkMap[arg.Name]
-	if source == nil {
-		return fmt.Errorf("%s not supported", arg.Name)
-	}
-	version := arg.Version
-	if useScope == Project {
-		if arg.Version == "" {
-			//version, _ = tv.Version(arg.Name)
-		}
-		err = source.Use(Version(version), env.Local)
-		if err != nil {
-			return err
-		}
-		err = tv.Add(arg.Name, version)
-		if err != nil {
-			pterm.Printf("Failed to record %s version to .tool-versions\n", version)
-			return err
+		} else {
+			list := source.List()
+			var arr []string
+			for _, version := range list {
+				arr = append(arr, string(version))
+			}
+			selectPrinter := pterm.InteractiveSelectPrinter{
+				TextStyle:     &pterm.ThemeDefault.DefaultText,
+				OptionStyle:   &pterm.ThemeDefault.DefaultText,
+				Options:       arr,
+				DefaultOption: "",
+				MaxHeight:     5,
+				Selector:      "->",
+				SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+				Filter:        true,
+				OnInterruptFunc: func() {
+					os.Exit(0)
+				},
+			}
+			result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", arg.Name))
+			sdks = append(sdks, &Arg{
+				Name:    arg.Name,
+				Version: result,
+			})
 		}
 	} else {
-		scope := env.Global
-		if useScope == Session {
-			scope = env.Local
-		} else {
-			scope = env.Global
+		_, ok := m.sdkMap[arg.Name]
+		if !ok {
+			pterm.Printf("%s not supported.\n", arg.Name)
+			return fmt.Errorf("%s not supported", arg.Name)
 		}
-		err := source.Use(Version(version), scope)
-		if err != nil {
-			return err
+		sdks = append(sdks, &arg)
+	}
+	for _, sdk := range sdks {
+		source := m.sdkMap[sdk.Name]
+		if useScope == Project {
+			err = source.Use(Version(sdk.Version), env.Local)
+			if err != nil {
+				return err
+			}
+			err = tv.Add(arg.Name, sdk.Version)
+			if err != nil {
+				pterm.Printf("Failed to record %s version to .tool-versions\n", sdk.Version)
+				return err
+			}
+		} else {
+			scope := env.Global
+			if useScope == Session {
+				scope = env.Local
+			} else {
+				scope = env.Global
+			}
+			err := source.Use(Version(sdk.Version), scope)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return m.Shell.ReOpen()

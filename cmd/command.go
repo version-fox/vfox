@@ -17,10 +17,11 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
-	"strings"
 )
 
 func newInfo(manager *sdk.Manager) *cli.Command {
@@ -203,42 +204,6 @@ func newUse(manager *sdk.Manager) *cli.Command {
 				scope = sdk.Global
 			}
 			return manager.Use(arg, scope)
-			//return sdkVersionParser(func(arg sdk.Arg) error {
-			//	name := arg.Name
-			//	source, err := manager.Sdk(name)
-			//	if err != nil {
-			//		fmt.Printf("%s not supported\n", name)
-			//		return err
-			//	}
-			//	version := arg.Version
-			//	if version == "" {
-			//		list := source.List()
-			//		var arr []string
-			//		for _, version := range list {
-			//			arr = append(arr, string(version))
-			//		}
-			//		selectPrinter := pterm.InteractiveSelectPrinter{
-			//			TextStyle:     &pterm.ThemeDefault.DefaultText,
-			//			OptionStyle:   &pterm.ThemeDefault.DefaultText,
-			//			Options:       arr,
-			//			DefaultOption: "",
-			//			MaxHeight:     5,
-			//			Selector:      "->",
-			//			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-			//			Filter:        true,
-			//			OnInterruptFunc: func() {
-			//				os.Exit(0)
-			//			},
-			//		}
-			//		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-			//		return manager.Use(sdk.Arg{
-			//			Name:    name,
-			//			Version: result,
-			//		}, scope)
-			//
-			//	}
-			//	return manager.Use(arg, scope)
-			//})(ctx)
 		},
 	}
 }
