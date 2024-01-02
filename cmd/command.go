@@ -17,11 +17,9 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
-	"os"
 	"strings"
 )
 
@@ -185,6 +183,17 @@ func newUse(manager *sdk.Manager) *cli.Command {
 			},
 		},
 		Action: func(ctx *cli.Context) error {
+			sdkArg := ctx.Args().First()
+			arg := sdk.Arg{}
+			if len(sdkArg) != 0 {
+				argArr := strings.Split(sdkArg, "@")
+				if len(argArr) <= 1 {
+					arg.Name = argArr[0]
+				} else {
+					arg.Name = argArr[0]
+					arg.Version = argArr[1]
+				}
+			}
 			scope := sdk.Global
 			if ctx.IsSet("project") {
 				scope = sdk.Project
@@ -193,42 +202,43 @@ func newUse(manager *sdk.Manager) *cli.Command {
 			} else {
 				scope = sdk.Global
 			}
-			return sdkVersionParser(func(arg sdk.Arg) error {
-				name := arg.Name
-				source, err := manager.Sdk(name)
-				if err != nil {
-					fmt.Printf("%s not supported\n", name)
-					return err
-				}
-				version := arg.Version
-				if version == "" {
-					list := source.List()
-					var arr []string
-					for _, version := range list {
-						arr = append(arr, string(version))
-					}
-					selectPrinter := pterm.InteractiveSelectPrinter{
-						TextStyle:     &pterm.ThemeDefault.DefaultText,
-						OptionStyle:   &pterm.ThemeDefault.DefaultText,
-						Options:       arr,
-						DefaultOption: "",
-						MaxHeight:     5,
-						Selector:      "->",
-						SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-						Filter:        true,
-						OnInterruptFunc: func() {
-							os.Exit(0)
-						},
-					}
-					result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-					return manager.Use(sdk.Arg{
-						Name:    name,
-						Version: result,
-					}, scope)
-
-				}
-				return manager.Use(arg, scope)
-			})(ctx)
+			return manager.Use(arg, scope)
+			//return sdkVersionParser(func(arg sdk.Arg) error {
+			//	name := arg.Name
+			//	source, err := manager.Sdk(name)
+			//	if err != nil {
+			//		fmt.Printf("%s not supported\n", name)
+			//		return err
+			//	}
+			//	version := arg.Version
+			//	if version == "" {
+			//		list := source.List()
+			//		var arr []string
+			//		for _, version := range list {
+			//			arr = append(arr, string(version))
+			//		}
+			//		selectPrinter := pterm.InteractiveSelectPrinter{
+			//			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			//			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			//			Options:       arr,
+			//			DefaultOption: "",
+			//			MaxHeight:     5,
+			//			Selector:      "->",
+			//			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			//			Filter:        true,
+			//			OnInterruptFunc: func() {
+			//				os.Exit(0)
+			//			},
+			//		}
+			//		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+			//		return manager.Use(sdk.Arg{
+			//			Name:    name,
+			//			Version: result,
+			//		}, scope)
+			//
+			//	}
+			//	return manager.Use(arg, scope)
+			//})(ctx)
 		},
 	}
 }

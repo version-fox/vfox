@@ -28,9 +28,9 @@ import (
 const filename = ".tool-versions"
 
 type ToolVersions struct {
-	// tools sdkName -> version
-	tools map[string]string
-	path  string
+	// Sdks sdkName -> version
+	Sdks map[string]string
+	path string
 }
 
 func (t *ToolVersions) save() error {
@@ -40,7 +40,7 @@ func (t *ToolVersions) save() error {
 	}
 	defer file.Close()
 
-	for k, v := range t.tools {
+	for k, v := range t.Sdks {
 		_, err := fmt.Fprintf(file, "%s %s\n", k, v)
 		if err != nil {
 			return err
@@ -49,13 +49,8 @@ func (t *ToolVersions) save() error {
 	return nil
 }
 
-func (t *ToolVersions) Version(sdkName string) (string, bool) {
-	s, ok := t.tools[sdkName]
-	return s, ok
-}
-
 func (t *ToolVersions) Add(tool, version string) error {
-	t.tools[tool] = version
+	t.Sdks[tool] = version
 	return t.save()
 }
 
@@ -83,7 +78,7 @@ func NewToolVersions(dirPath string) (*ToolVersions, error) {
 		}
 	}
 	return &ToolVersions{
-		tools: versionsMap,
-		path:  versionsFile,
+		Sdks: versionsMap,
+		path: versionsFile,
 	}, nil
 }

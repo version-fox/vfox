@@ -152,37 +152,56 @@ func (m *Manager) Search(sdkName string) error {
 	return source.Install(Version(version.Key))
 }
 
-func (m *Manager) Sdk(sdkName string) (*Sdk, error) {
-	source := m.sdkMap[sdkName]
-	if source == nil {
-		return nil, fmt.Errorf("%s not supported", sdkName)
-	}
-	return source, nil
-}
-
+// Use examples:
+// 1. vfox use (--project)
+// 2. vfox use java
+// 3. vfox use java@11
+// 4. vfox use --project java@11
+// 5. vfox use --session java@11
+// 6. vfox use --global java@11
 func (m *Manager) Use(arg Arg, useScope UseScope) error {
+	pwd, err := os.Getwd()
+	if err != nil {
+		pterm.Printf("Get current dir error, err: %s\n", err)
+		return err
+	}
+	tv, _ := toolversion.NewToolVersions(pwd)
+	var sdks []*Arg
+	if arg.Name == "" {
+		for sdkName, version := range tv.Sdks {
+			source := m.sdkMap[sdkName]
+			if source == nil {
+				pterm.Printf("%s not supported.\n", sdkName)
+				continue
+			}
+			sdks = append(sdks, &Arg{
+				Name:    sdkName,
+				Version: version,
+			})
+		}
+	} else if arg.Version == "" {
+		version, ok := tv.Sdks[arg.Name]
+		if ok {
+			sdks = append(sdks, &Arg{
+				Name:    arg.Name,
+				Version: version,
+			})
+		}
+	}
 	source := m.sdkMap[arg.Name]
 	if source == nil {
 		return fmt.Errorf("%s not supported", arg.Name)
 	}
 	version := arg.Version
 	if useScope == Project {
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		toolVersions, err := toolversion.NewToolVersions(pwd)
-		if err != nil {
-			return err
-		}
 		if arg.Version == "" {
-			version, _ = toolVersions.Version(arg.Name)
+			//version, _ = tv.Version(arg.Name)
 		}
 		err = source.Use(Version(version), env.Local)
 		if err != nil {
 			return err
 		}
-		err = toolVersions.Add(arg.Name, version)
+		err = tv.Add(arg.Name, version)
 		if err != nil {
 			pterm.Printf("Failed to record %s version to .tool-versions\n", version)
 			return err
@@ -217,7 +236,7 @@ func (m *Manager) List(arg Arg) error {
 		}
 		// Generate tree from LeveledList.
 		root := putils.TreeFromLeveledList(tree)
-		root.Text = "All installed sdk toolversion"
+		root.Text = "All installed sdk versions"
 		// Render TreePrinter
 		_ = pterm.DefaultTree.WithRoot(root).Render()
 		return nil
