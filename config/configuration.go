@@ -18,72 +18,72 @@ package config
 
 import (
 	"encoding/json"
-	"github.com/version-fox/vfox/go/pkg/mod/github.com/fatih/structs@v1.1.0"
-	lua "github.com/yuin/gopher-lua"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 )
 
+type NetworkProxy struct {
+	proxyUrl    string `json:"proxyUrl"`
+	enableProxy bool   `json:"enableProxy"`
+}
+
 const configFilePath = ".\\vfox-setting.yaml"
 
-// const Verison = "0.1.1";
-type httpProxyConfig struct {
-	httpProxy NewProxyConfig `json:"httpProxy"`
+func NewNetWorkProxy() *NetworkProxy {
+	networkProxy := NetworkProxy{}
+	return networkProxy.getInstance()
 }
-type NewProxyConfig struct {
-	proxyUrl    string
-	proxyEnable bool
+func (proxyInstance *NetworkProxy) getInstance() *NetworkProxy {
+	proxyInstance.getGlobalProxyInfo()
+	return proxyInstance
 }
-
-const HTTP_PROXY_SETTING = "httpProxySetting"
-
-var configInfo httpProxyConfig
-
-func (p *NewProxyConfig) InitConfigInfo() {
-	luaVMInstance := lua.NewState()
-	p.readProxySetting()
-	json, _ := json.Marshal(configInfo.httpProxy)
-	luaVMInstance.SetGlobal(HTTP_PROXY_SETTING, lua.LString((json)))
-}
-func (p *NewProxyConfig) updateProxySettingFile(config httpProxyConfig) {
+func (proxyInstance *NetworkProxy) getGlobalProxyInfo() {
 	_, err := os.Stat(configFilePath)
 	if os.IsNotExist(err) {
-		p.createDefaultProxySettingFile()
-	}
-	data, _ := os.ReadFile(configFilePath)
-	proxyInfo := config.httpProxy
-	mp := make(map[string]any, 2)
-	yaml.Unmarshal(data, mp)
-	mp["httpProxy"] = structs.Map(proxyInfo)
-	data, _ = yaml.Marshal(mp)
-	ioutil.WriteFile(configFilePath, data, 0644)
-	configInfo = config
-	//
-	p.InitConfigInfo()
-}
-func (p *NewProxyConfig) createDefaultProxySettingFile() {
-	proxyInfo := NewProxyConfig{}
-	proxyInfo.proxyEnable = false
-	config := httpProxyConfig{}
-	config.httpProxy = proxyInfo
-	data, _ := yaml.Marshal(&config)
-	ioutil.WriteFile(configFilePath, data, 0644)
-	configInfo = config
-	return
-}
-func (p *NewProxyConfig) readProxySetting() {
-	_, err := os.Stat(configFilePath)
-	if os.IsNotExist(err) {
-		p.createDefaultProxySettingFile()
-		p.InitConfigInfo()
+		proxyInstance.enableProxy = false
 		return
 	}
 	data, _ := os.ReadFile(configFilePath)
-	config := httpProxyConfig{}
 	mp := make(map[string]any, 2)
 	yaml.Unmarshal(data, mp)
 	arr, err := json.Marshal(mp)
-	err = json.Unmarshal(arr, &config)
-	configInfo = config
+	err = json.Unmarshal(arr, &proxyInstance)
+}
+func (proxyInstance *NetworkProxy) updateNetworkProxyInfo() {
+	_, err := os.Stat(configFilePath)
+	if os.IsNotExist(err) {
+		data, _ := yaml.Marshal(proxyInstance)
+		ioutil.WriteFile(configFilePath, data, 0644)
+		return
+	}
+	mp := make(map[string]any, 2)
+	data, _ := os.ReadFile(configFilePath)
+	yaml.Unmarshal(data, mp)
+	//mp["httpProxy"] = structs.Map(proxyInfo)
+	//mp["httpProxy"] = structs.Map(proxyInfo)
+	mpProxyInfo := make(map[string]any, 2)
+	proxyInfoJSON, _ := yaml.Marshal(proxyInstance)
+	mp["httpProxyConfig"] = yaml.Unmarshal(proxyInfoJSON, &mpProxyInfo)
+	data, _ = yaml.Marshal(mp)
+	ioutil.WriteFile(configFilePath, data, 0644)
+	return
+}
+func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Response, err error) {
+	if proxyInstance.enableProxy == false {
+		return http.Get(targetUrl)
+	}
+	proxy, err := url.Parse(proxyInstance.proxyUrl)
+	netTransport := &http.Transport{
+		Proxy: http.ProxyURL(proxy),
+	}
+	httpClient := &http.Client{
+		Transport: netTransport,
+	}
+	req, err := http.NewRequest("GET", targetUrl, nil)
+	resp, err = httpClient.Do(req)
+	defer resp.Body.Close()
+	return resp, err
 }

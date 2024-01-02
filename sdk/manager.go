@@ -19,6 +19,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/version-fox/vfox/config"
 	"github.com/version-fox/vfox/plugin"
 	"io"
 	"net/http"
@@ -51,6 +52,7 @@ type Manager struct {
 	EnvManager    env.Manager
 	osType        util.OSType
 	archType      util.ArchType
+	networkProxy  *config.NetworkProxy
 }
 
 func (m *Manager) Install(config Arg) error {
@@ -451,7 +453,7 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 		return "", fmt.Errorf("not a lua file")
 	}
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		resp, err := http.Get(path)
+		resp, err := m.networkProxy.GetByURL(path)
 		if err != nil {
 			return "", err
 		}
@@ -489,7 +491,7 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 
 func (m *Manager) Available() ([]*plugin.Category, error) {
 	// TODO proxy
-	resp, err := http.Get(pluginIndexUrl)
+	resp, err := m.networkProxy.GetByURL(pluginIndexUrl)
 	if err != nil {
 		pterm.Printf("Get plugin index error, err: %s\n", err)
 	}
@@ -526,6 +528,7 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Init env manager error")
 	}
+	httpProxy := config.NewNetWorkProxy()
 	manager := &Manager{
 		configPath:   configPath,
 		sdkCachePath: sdkCachePath,
@@ -534,6 +537,7 @@ func NewSdkManager() *Manager {
 		sdkMap:       make(map[string]*Sdk),
 		osType:       util.GetOSType(),
 		archType:     util.GetArchType(),
+		networkProxy: httpProxy,
 	}
 
 	manager.loadSdk()
