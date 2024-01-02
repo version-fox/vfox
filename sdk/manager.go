@@ -55,6 +55,10 @@ type Manager struct {
 	networkProxy  *config.NetworkProxy
 }
 
+func (m *Manager) SetProxy(proxyUrl string) error {
+	m.networkProxy.SetProxy(proxyUrl)
+	return nil
+}
 func (m *Manager) Install(config Arg) error {
 	source := m.sdkMap[config.Name]
 	if source == nil {

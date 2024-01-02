@@ -36,7 +36,6 @@ func newInfo(manager *sdk.Manager) *cli.Command {
 		},
 	}
 }
-
 func newAdd(manager *sdk.Manager) *cli.Command {
 	return &cli.Command{
 		Name:  "add",
@@ -180,7 +179,17 @@ func newList(manager *sdk.Manager) *cli.Command {
 		},
 	}
 }
-
+func setProxy(manager *sdk.Manager) *cli.Command {
+	return &cli.Command{
+		Name:    "proxy config",
+		Aliases: []string{"setProxy"},
+		Usage:   "if you are in a regulated network environment,set up a proxy first",
+		Action: func(ctx *cli.Context) error {
+			proxyUrl := ctx.Args().First()
+			return manager.SetProxy(proxyUrl)
+		},
+	}
+}
 func newCurrent(manager *sdk.Manager) *cli.Command {
 	return &cli.Command{
 		Name:      "current",

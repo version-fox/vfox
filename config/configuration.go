@@ -83,7 +83,16 @@ func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Respon
 		Transport: netTransport,
 	}
 	req, err := http.NewRequest("GET", targetUrl, nil)
-	resp, err = httpClient.Do(req)
-	defer resp.Body.Close()
-	return resp, err
+	return httpClient.Do(req)
+}
+
+func (proxyInstance *NetworkProxy) SetProxy(proxyUrl string) error {
+	if len(proxyUrl) == 0 {
+		proxyInstance.enableProxy = false
+		proxyInstance.proxyUrl = ""
+		return nil
+	}
+	proxyInstance.proxyUrl = proxyUrl
+	proxyInstance.enableProxy = true
+	return nil
 }
