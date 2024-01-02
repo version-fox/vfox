@@ -20,6 +20,6 @@ type UseScope int
 
 const (
 	Global UseScope = iota
-	Directory
+	Project
 	Session
 )

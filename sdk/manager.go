@@ -166,7 +166,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 		return fmt.Errorf("%s not supported", arg.Name)
 	}
 	version := arg.Version
-	if useScope == Directory {
+	if useScope == Project {
 		pwd, err := os.Getwd()
 		if err != nil {
 			return err

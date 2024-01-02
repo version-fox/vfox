@@ -174,8 +174,8 @@ func newUse(manager *sdk.Manager) *cli.Command {
 				Usage:   "used with the global environment",
 			},
 			&cli.StringFlag{
-				Name:    "directory",
-				Aliases: []string{"d"},
+				Name:    "project",
+				Aliases: []string{"p"},
 				Usage:   "used with the current directory",
 			},
 			&cli.StringFlag{
@@ -186,8 +186,8 @@ func newUse(manager *sdk.Manager) *cli.Command {
 		},
 		Action: func(ctx *cli.Context) error {
 			scope := sdk.Global
-			if ctx.IsSet("directory") {
-				scope = sdk.Directory
+			if ctx.IsSet("project") {
+				scope = sdk.Project
 			} else if ctx.IsSet("session") {
 				scope = sdk.Session
 			} else {
