@@ -20,10 +20,11 @@ package shell
 
 import (
 	"fmt"
+	"github.com/pterm/pterm"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
-	"syscall"
 )
 
 const (
@@ -34,9 +35,12 @@ const (
 )
 
 func (i *Shell) ReOpen() error {
-	err := syscall.Exec(i.ShellPath, []string{i.ShellPath}, syscall.Environ())
-	if err != nil {
-		fmt.Printf("Failed to exec shell, err:%s\n", err.Error())
+	command := exec.Command(i.ShellPath)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
 		return err
 	}
 	return nil

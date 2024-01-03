@@ -18,12 +18,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/urfave/cli/v2"
 )
 
 func Execute(version string, args []string) {
@@ -33,9 +32,19 @@ func Execute(version string, args []string) {
 type cmd struct {
 	app     *cli.App
 	version string
+	manager *sdk.Manager
 }
 
 func (c *cmd) Execute(args []string) {
+	defer c.manager.Close()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM)
+
+	go func() {
+		<-signals
+		c.manager.Close()
+		os.Exit(0)
+	}()
 	if err := c.app.Run(args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -55,16 +64,6 @@ func newCmd(version string) *cmd {
 	}
 
 	manager := sdk.NewSdkManager()
-	defer manager.Close()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM)
-
-	go func() {
-		<-signals
-		manager.Close()
-		os.Exit(0)
-	}()
 
 	app := &cli.App{}
 	app.EnableBashCompletion = true
@@ -94,5 +93,5 @@ func newCmd(version string) *cmd {
 		newAvailable(manager),
 	}
 
-	return &cmd{app: app, version: version}
+	return &cmd{app: app, version: version, manager: manager}
 }

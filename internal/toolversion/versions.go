@@ -33,6 +33,10 @@ type ToolVersions struct {
 	path string
 }
 
+func (t *ToolVersions) String() string {
+	return filename
+}
+
 func (t *ToolVersions) save() error {
 	file, err := os.Create(t.path)
 	if err != nil {

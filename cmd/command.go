@@ -203,7 +203,9 @@ func newUse(manager *sdk.Manager) *cli.Command {
 			} else {
 				scope = sdk.Global
 			}
-			return manager.Use(arg, scope)
+			// TODO Consider how to handle exceptions appropriately. Print directly or return?
+			_ = manager.Use(arg, scope)
+			return nil
 		},
 	}
 }

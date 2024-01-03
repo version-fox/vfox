@@ -181,7 +181,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			})
 		}
 		if len(sdks) == 0 {
-			pterm.Println("Please specify the correct parameter. format: <sdk-name>[@<version>]")
+			pterm.Println("Invalid parameter. format: <sdk-name>[@<version>]")
 			return fmt.Errorf("invalid parameter")
 		}
 	} else if arg.Version == "" {
@@ -238,7 +238,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			}
 			err = tv.Add(arg.Name, sdk.Version)
 			if err != nil {
-				pterm.Printf("Failed to record %s version to .tool-versions\n", sdk.Version)
+				pterm.Printf("Failed to record %s version to %s\n", sdk.Version, tv)
 				return err
 			}
 		} else {
