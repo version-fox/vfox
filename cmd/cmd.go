@@ -92,6 +92,7 @@ func newCmd(version string) *cmd {
 		newAdd(manager),
 		newRemove(manager),
 		newAvailable(manager),
+		setProxy(manager),
 	}
 
 	return &cmd{app: app, version: version}

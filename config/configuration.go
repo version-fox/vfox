@@ -17,7 +17,7 @@
 package config
 
 import (
-	"encoding/json"
+	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/http"
@@ -26,11 +26,11 @@ import (
 )
 
 type NetworkProxy struct {
-	proxyUrl    string `json:"proxyUrl"`
-	enableProxy bool   `json:"enableProxy"`
+	ProxyUrl    string `yaml:"ProxyUrl"`
+	EnableProxy bool   `yaml:"EnableProxy"`
 }
 
-const configFilePath = ".\\vfox-setting.yaml"
+const configFilePath = ".\\vfox-proxy-setting.yaml"
 
 func NewNetWorkProxy() *NetworkProxy {
 	networkProxy := NetworkProxy{}
@@ -43,39 +43,34 @@ func (proxyInstance *NetworkProxy) getInstance() *NetworkProxy {
 func (proxyInstance *NetworkProxy) getGlobalProxyInfo() {
 	_, err := os.Stat(configFilePath)
 	if os.IsNotExist(err) {
-		proxyInstance.enableProxy = false
+		proxyInstance.EnableProxy = false
 		return
 	}
 	data, _ := os.ReadFile(configFilePath)
-	mp := make(map[string]any, 2)
-	yaml.Unmarshal(data, mp)
-	arr, err := json.Marshal(mp)
-	err = json.Unmarshal(arr, &proxyInstance)
+	nper := yaml.Unmarshal(data, proxyInstance)
+	if nper != nil {
+		fmt.Printf("nper")
+	}
 }
 func (proxyInstance *NetworkProxy) updateNetworkProxyInfo() {
 	_, err := os.Stat(configFilePath)
+	mpProxyInfo := make(map[string]any)
+	mpProxyInfo["ProxyUrl"] = proxyInstance.ProxyUrl
+	mpProxyInfo["EnableProxy"] = proxyInstance.EnableProxy
 	if os.IsNotExist(err) {
-		data, _ := yaml.Marshal(proxyInstance)
+		data, _ := yaml.Marshal(mpProxyInfo)
 		ioutil.WriteFile(configFilePath, data, 0644)
 		return
 	}
-	mp := make(map[string]any, 2)
-	data, _ := os.ReadFile(configFilePath)
-	yaml.Unmarshal(data, mp)
-	//mp["httpProxy"] = structs.Map(proxyInfo)
-	//mp["httpProxy"] = structs.Map(proxyInfo)
-	mpProxyInfo := make(map[string]any, 2)
-	proxyInfoJSON, _ := yaml.Marshal(proxyInstance)
-	mp["httpProxyConfig"] = yaml.Unmarshal(proxyInfoJSON, &mpProxyInfo)
-	data, _ = yaml.Marshal(mp)
-	ioutil.WriteFile(configFilePath, data, 0644)
+	actData, _ := yaml.Marshal(mpProxyInfo)
+	ioutil.WriteFile(configFilePath, actData, 0644)
 	return
 }
 func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Response, err error) {
-	if proxyInstance.enableProxy == false {
+	if proxyInstance.EnableProxy == false {
 		return http.Get(targetUrl)
 	}
-	proxy, err := url.Parse(proxyInstance.proxyUrl)
+	proxy, err := url.Parse(proxyInstance.ProxyUrl)
 	netTransport := &http.Transport{
 		Proxy: http.ProxyURL(proxy),
 	}
@@ -88,11 +83,12 @@ func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Respon
 
 func (proxyInstance *NetworkProxy) SetProxy(proxyUrl string) error {
 	if len(proxyUrl) == 0 {
-		proxyInstance.enableProxy = false
-		proxyInstance.proxyUrl = ""
+		proxyInstance.EnableProxy = false
+		proxyInstance.ProxyUrl = ""
 		return nil
 	}
-	proxyInstance.proxyUrl = proxyUrl
-	proxyInstance.enableProxy = true
+	proxyInstance.ProxyUrl = proxyUrl
+	proxyInstance.EnableProxy = true
+	proxyInstance.updateNetworkProxyInfo()
 	return nil
 }

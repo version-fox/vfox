@@ -181,7 +181,7 @@ func newList(manager *sdk.Manager) *cli.Command {
 }
 func setProxy(manager *sdk.Manager) *cli.Command {
 	return &cli.Command{
-		Name:    "proxy config",
+		Name:    "setProxy",
 		Aliases: []string{"setProxy"},
 		Usage:   "if you are in a regulated network environment,set up a proxy first",
 		Action: func(ctx *cli.Context) error {
