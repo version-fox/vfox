@@ -17,6 +17,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -195,13 +196,13 @@ func newUse(manager *sdk.Manager) *cli.Command {
 					arg.Version = argArr[1]
 				}
 			}
-			scope := sdk.Global
-			if ctx.IsSet("project") {
-				scope = sdk.Project
-			} else if ctx.IsSet("session") {
-				scope = sdk.Session
-			} else {
+			scope := sdk.Session
+			if ctx.IsSet("global") {
 				scope = sdk.Global
+			} else if ctx.IsSet("project") {
+				scope = sdk.Project
+			} else {
+				scope = sdk.Session
 			}
 			// TODO Consider how to handle exceptions appropriately. Print directly or return?
 			_ = manager.Use(arg, scope)
@@ -235,6 +236,35 @@ func newCurrent(manager *sdk.Manager) *cli.Command {
 	}
 }
 
+func newActivate(manager *sdk.Manager) *cli.Command {
+	return &cli.Command{
+		Name: "activate",
+		Action: func(ctx *cli.Context) error {
+			shellName := ctx.Args().First()
+			if shellName == "" {
+				return fmt.Errorf("shell name is required")
+			}
+			return manager.Activate(ctx.App.Writer, shellName)
+		},
+	}
+}
+
+func newEnv(manager *sdk.Manager) *cli.Command {
+	return &cli.Command{
+		Name: "env",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "shell",
+				Aliases: []string{"s"},
+				Usage:   "shell",
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			shellName := ctx.String("shell")
+			return manager.Env(ctx.App.Writer, shellName)
+		},
+	}
+}
 func sdkVersionParser(operation func(arg sdk.Arg) error) func(ctx *cli.Context) error {
 	return func(ctx *cli.Context) error {
 		sdkArg := ctx.Args().First()

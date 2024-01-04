@@ -59,7 +59,18 @@ func (m *macosEnvManager) Flush(scope Scope) error {
 				return err
 			}
 		}
-		return os.Setenv("PATH", m.pathEnvValue())
+		var newPaths []string
+		for path := range m.store.pathMap {
+			newPaths = append(newPaths, path)
+		}
+		oldPaths := strings.Split(os.Getenv("PATH"), ":")
+		for _, path := range oldPaths {
+			if strings.Contains(path, ".version-fox") {
+				continue
+			}
+			newPaths = append(newPaths, path)
+		}
+		return os.Setenv("PATH", strings.Join(newPaths, ":"))
 	}
 	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {

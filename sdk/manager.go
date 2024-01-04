@@ -19,6 +19,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -46,15 +47,16 @@ type Arg struct {
 }
 
 type Manager struct {
-	configPath    string
-	sdkCachePath  string
-	envConfigPath string
-	pluginPath    string
-	sdkMap        map[string]*Sdk
-	EnvManager    env.Manager
-	Shell         *shell.Shell
-	osType        util.OSType
-	archType      util.ArchType
+	configPath     string
+	sdkCachePath   string
+	envConfigPath  string
+	pluginPath     string
+	executablePath string
+	sdkMap         map[string]*Sdk
+	EnvManager     env.Manager
+	Shell          *shell.Shell
+	osType         util.OSType
+	archType       util.ArchType
 }
 
 func (m *Manager) Install(config Arg) error {
@@ -588,6 +590,38 @@ func (m *Manager) Available() ([]*plugin.Category, error) {
 	}
 }
 
+func (m *Manager) Activate(writer io.Writer, name string) error {
+	path := m.executablePath
+	path = strings.Replace(path, "\\", "/", -1)
+	ctx := struct {
+		SelfPath string
+	}{
+		SelfPath: path,
+	}
+	s := shell.NewShell(name)
+	if s == nil {
+		return fmt.Errorf("unknow target shell %s", name)
+	}
+	str, err := s.Activate()
+	if err != nil {
+		return err
+	}
+	hookTemplate, err := template.New("hook").Parse(str)
+	if err != nil {
+		return nil
+	}
+	return hookTemplate.Execute(writer, ctx)
+}
+
+func (m *Manager) Env(writer io.Writer, name string) error {
+	s := shell.NewShell(name)
+	if s == nil {
+		return fmt.Errorf("unknow target shell %s", name)
+	}
+	//s.Export()
+	return nil
+}
+
 func NewSdkManager() *Manager {
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -598,7 +632,10 @@ func NewSdkManager() *Manager {
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
-	newShell, err := shell.NewShell()
+	exePath, err := os.Executable()
+	if err != nil {
+		panic("Get executable path error")
+	}
 	if err != nil {
 		panic("Init shell error")
 	}
@@ -607,14 +644,15 @@ func NewSdkManager() *Manager {
 		panic("Init env manager error")
 	}
 	manager := &Manager{
-		configPath:   configPath,
-		sdkCachePath: sdkCachePath,
-		pluginPath:   pluginPath,
-		EnvManager:   envManger,
-		Shell:        newShell,
-		sdkMap:       make(map[string]*Sdk),
-		osType:       util.GetOSType(),
-		archType:     util.GetArchType(),
+		configPath:     configPath,
+		sdkCachePath:   sdkCachePath,
+		pluginPath:     pluginPath,
+		executablePath: exePath,
+		EnvManager:     envManger,
+		Shell:          newShell,
+		sdkMap:         make(map[string]*Sdk),
+		osType:         util.GetOSType(),
+		archType:       util.GetArchType(),
 	}
 
 	manager.loadSdk()

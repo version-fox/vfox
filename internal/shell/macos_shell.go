@@ -18,15 +18,6 @@
 
 package shell
 
-import (
-	"fmt"
-	"github.com/pterm/pterm"
-	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
-)
-
 const (
 	BASH = Type("bash")
 	ZSH  = Type("zsh")
@@ -34,48 +25,49 @@ const (
 	// extend shell type
 )
 
-func (i *Shell) ReOpen() error {
-	command := exec.Command(i.ShellPath)
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
-		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
-		return err
-	}
-	return nil
-}
+//func (i *Shell) ReOpen() error {
+//	command := exec.Command(i.ShellPath)
+//	command.Env = os.Environ()
+//	command.Stdin = os.Stdin
+//	command.Stdout = os.Stdout
+//	command.Stderr = os.Stderr
+//	if err := command.Run(); err != nil {
+//		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
+//		return err
+//	}
+//	return nil
+//}
 
-func NewShell() (*Shell, error) {
-	// 获取当前用户
-	currentUser, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	shellPath := os.Getenv("SHELL")
-	shell := filepath.Base(shellPath)
-	var info *Shell
-	switch Type(shell) {
-	case BASH:
-		info = &Shell{
-			Type:       BASH,
-			ShellPath:  shellPath,
-			ConfigPath: filepath.Join(currentUser.HomeDir, ".bashrc"),
-		}
-	case ZSH:
-		info = &Shell{
-			Type:       ZSH,
-			ShellPath:  shellPath,
-			ConfigPath: filepath.Join(currentUser.HomeDir, ".zshrc"),
-		}
-	//case KSH:
-	//	info = &ShellInfo{
-	//		ShellType:  shellType,
-	//		ConfigPath: filepath.Join(currentUser.HomeDir, ".kshrc"),
-	//	}
-	default:
-		return nil, fmt.Errorf("unsupported shell type")
-	}
-	return info, nil
-
-}
+//func NewShell() (*Shell, error) {
+//	// 获取当前用户
+//	currentUser, err := user.Current()
+//	if err != nil {
+//		return nil, err
+//	}
+//	shellPath := os.Getenv("SHELL")
+//	shell := filepath.Base(shellPath)
+//	var info *Shell
+//	switch Type(shell) {
+//	case BASH:
+//		info = &Shell{
+//			Type:       BASH,
+//			ShellPath:  shellPath,
+//			ConfigPath: filepath.Join(currentUser.HomeDir, ".bashrc"),
+//		}
+//	case ZSH:
+//		info = &Shell{
+//			Type:       ZSH,
+//			ShellPath:  shellPath,
+//			ConfigPath: filepath.Join(currentUser.HomeDir, ".zshrc"),
+//		}
+//	//case KSH:
+//	//	info = &ShellInfo{
+//	//		ShellType:  shellType,
+//	//		ConfigPath: filepath.Join(currentUser.HomeDir, ".kshrc"),
+//	//	}
+//	default:
+//		return nil, fmt.Errorf("unsupported shell type")
+//	}
+//	return info, nil
+//
+//}

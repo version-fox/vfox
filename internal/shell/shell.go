@@ -16,10 +16,28 @@
 
 package shell
 
+import "strings"
+
 type Type string
 
-type Shell struct {
-	Type
-	ShellPath  string
-	ConfigPath string
+//type Shell struct {
+//	Type
+//	ShellPath  string
+//	ConfigPath string
+//}
+
+type Envs map[string]*string
+
+type Shell interface {
+	Activate() (string, error)
+	Export(envs Envs) string
+}
+
+func NewShell(name string) Shell {
+	switch strings.ToLower(name) {
+	case "bash":
+		return Bash
+	}
+	return nil
+
 }
