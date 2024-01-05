@@ -26,6 +26,10 @@ type Type string
 //	ConfigPath string
 //}
 
+type Process interface {
+	Open() error
+}
+
 type Envs map[string]*string
 
 type Shell interface {

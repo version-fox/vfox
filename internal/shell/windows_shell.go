@@ -40,6 +40,8 @@ func (i *Shell) ReOpen() error {
 
 func NewShell() (*Shell, error) {
 	ppid := os.Getppid()
+	process, err2 := os.FindProcess(ppid)
+	process.Kill()
 
 	// On Windows, os.FindProcess does not actually find the process.
 	// So, we use this workaround to get the parent process name.
