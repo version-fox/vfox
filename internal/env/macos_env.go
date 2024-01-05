@@ -35,6 +35,27 @@ type macosEnvManager struct {
 	store     *Store
 }
 
+func (m *macosEnvManager) ToShellEnv() (shell.Envs, error) {
+	envs := make(shell.Envs)
+	for k, v := range m.store.envMap {
+		envs[k] = &v
+	}
+	var newPaths []string
+	for path := range m.store.pathMap {
+		newPaths = append(newPaths, path)
+	}
+	oldPaths := strings.Split(os.Getenv("PATH"), ":")
+	for _, path := range oldPaths {
+		if strings.Contains(path, ".version-fox") {
+			continue
+		}
+		newPaths = append(newPaths, path)
+	}
+	join := strings.Join(newPaths, ":")
+	envs["PATH"] = &join
+	return envs, nil
+}
+
 func (m *macosEnvManager) Close() error {
 	return nil
 }
@@ -168,9 +189,9 @@ func NewEnvManager(vfConfigPath string, shellInfo *shell.Shell) (Manager, error)
 	if err != nil {
 		fmt.Printf("Failed to load env file: %s, err:%s\n", manager.vfEnvPath, err.Error())
 	}
-	if err := appendEnvSourceIfNotExist(manager.shellInfo.ConfigPath, manager.vfEnvPath); err != nil {
-		return nil, err
-	}
+	//if err := appendEnvSourceIfNotExist(manager.shellInfo.ConfigPath, manager.vfEnvPath); err != nil {
+	//	return nil, err
+	//}
 	return manager, nil
 }
 

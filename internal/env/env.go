@@ -16,13 +16,17 @@
 
 package env
 
-import "io"
+import (
+	"github.com/version-fox/vfox/internal/shell"
+	"io"
+)
 
 type Manager interface {
 	Flush(scope Scope) error
 	Load([]*KV)
 	Get(key string) (string, bool)
 	Remove(key string) error
+	ToShellEnv() (shell.Envs, error)
 	io.Closer
 }
 

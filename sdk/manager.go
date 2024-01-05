@@ -256,7 +256,9 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			}
 		}
 	}
-	return m.Shell.ReOpen()
+	// TODO
+	//return m.Shell.ReOpen()
+	return err
 }
 
 func (m *Manager) List(arg Arg) error {
@@ -602,11 +604,14 @@ func (m *Manager) Activate(writer io.Writer, name string) error {
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", name)
 	}
+	shellEnv, _ := m.EnvManager.ToShellEnv()
+	exportStr := s.Export(shellEnv)
 	str, err := s.Activate()
 	if err != nil {
 		return err
 	}
-	hookTemplate, err := template.New("hook").Parse(str)
+	script := exportStr + "\n" + str
+	hookTemplate, err := template.New("hook").Parse(script)
 	if err != nil {
 		return nil
 	}
@@ -639,7 +644,7 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Init shell error")
 	}
-	envManger, err := env.NewEnvManager(configPath, newShell)
+	envManger, err := env.NewEnvManager(configPath, nil)
 	if err != nil {
 		panic("Init env manager error")
 	}
@@ -649,10 +654,10 @@ func NewSdkManager() *Manager {
 		pluginPath:     pluginPath,
 		executablePath: exePath,
 		EnvManager:     envManger,
-		Shell:          newShell,
-		sdkMap:         make(map[string]*Sdk),
-		osType:         util.GetOSType(),
-		archType:       util.GetArchType(),
+		//Shell:          newShell,
+		sdkMap:   make(map[string]*Sdk),
+		osType:   util.GetOSType(),
+		archType: util.GetArchType(),
 	}
 
 	manager.loadSdk()
