@@ -23,6 +23,7 @@ import (
 	"github.com/version-fox/vfox/plugin"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,6 +44,10 @@ type Arg struct {
 	Version string
 }
 
+type Config struct {
+	networkProxy *config.NetworkProxy
+}
+
 type Manager struct {
 	configPath    string
 	sdkCachePath  string
@@ -52,11 +57,11 @@ type Manager struct {
 	EnvManager    env.Manager
 	osType        util.OSType
 	archType      util.ArchType
-	networkProxy  *config.NetworkProxy
+	config        Config
 }
 
 func (m *Manager) SetProxy(proxyUrl string) error {
-	m.networkProxy.SetProxy(proxyUrl)
+	m.config.networkProxy.SetProxy(proxyUrl, m.configPath)
 	return nil
 }
 func (m *Manager) Install(config Arg) error {
@@ -457,7 +462,17 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 		return "", fmt.Errorf("not a lua file")
 	}
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		resp, err := m.networkProxy.GetByURL(path)
+		client := &http.Client{}
+		if m.config.networkProxy.Enable == true {
+			proxy := func(_ *http.Request) (*url.URL, error) {
+				return url.Parse(m.config.networkProxy.Url)
+			}
+			transport := &http.Transport{
+				Proxy: proxy,
+			}
+			client.Transport = transport
+		}
+		resp, err := client.Get(path)
 		if err != nil {
 			return "", err
 		}
@@ -495,7 +510,18 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 
 func (m *Manager) Available() ([]*plugin.Category, error) {
 	// TODO proxy
-	resp, err := m.networkProxy.GetByURL(pluginIndexUrl)
+	client := &http.Client{}
+	if m.config.networkProxy.Enable == true {
+		proxy := func(_ *http.Request) (*url.URL, error) {
+			return url.Parse(m.config.networkProxy.Url)
+		}
+		transport := &http.Transport{
+			Proxy: proxy,
+		}
+		client.Transport = transport
+	}
+	resp, err := client.Get(pluginIndexUrl)
+	//resp, err := m.config.networkProxy.GetByURL(pluginIndexUrl)
 	if err != nil {
 		pterm.Printf("Get plugin index error, err: %s\n", err)
 	}
@@ -532,7 +558,10 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Init env manager error")
 	}
-	httpProxy := config.NewNetWorkProxy()
+	httpProxy := config.NewNetWorkProxy(configPath)
+	configuration := Config{
+		networkProxy: httpProxy,
+	}
 	manager := &Manager{
 		configPath:   configPath,
 		sdkCachePath: sdkCachePath,
@@ -541,7 +570,7 @@ func NewSdkManager() *Manager {
 		sdkMap:       make(map[string]*Sdk),
 		osType:       util.GetOSType(),
 		archType:     util.GetArchType(),
-		networkProxy: httpProxy,
+		config:       configuration,
 	}
 
 	manager.loadSdk()

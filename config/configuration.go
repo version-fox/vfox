@@ -17,60 +17,71 @@
 package config
 
 import (
-	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 )
 
 type NetworkProxy struct {
-	ProxyUrl    string `yaml:"ProxyUrl"`
-	EnableProxy bool   `yaml:"EnableProxy"`
+	Url    string `yaml:"url"`
+	Enable bool   `yaml:"enable"`
 }
 
-const configFilePath = ".\\vfox-proxy-setting.yaml"
+const configFilePath = "config.yaml"
 
-func NewNetWorkProxy() *NetworkProxy {
+func NewNetWorkProxy(configPath string) *NetworkProxy {
 	networkProxy := NetworkProxy{}
-	return networkProxy.getInstance()
+	return networkProxy.getSingleton(configPath)
 }
-func (proxyInstance *NetworkProxy) getInstance() *NetworkProxy {
-	proxyInstance.getGlobalProxyInfo()
+func (proxyInstance *NetworkProxy) getSingleton(configPath string) *NetworkProxy {
+	proxyInstance.getGlobalProxyInfo(configPath)
 	return proxyInstance
 }
-func (proxyInstance *NetworkProxy) getGlobalProxyInfo() {
-	_, err := os.Stat(configFilePath)
+func (proxyInstance *NetworkProxy) getGlobalProxyInfo(configPath string) {
+	filePath := filepath.Join(configPath, configFilePath)
+	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		proxyInstance.EnableProxy = false
+		proxyInstance.Enable = false
 		return
 	}
-	data, _ := os.ReadFile(configFilePath)
-	nper := yaml.Unmarshal(data, proxyInstance)
+	data, _ := os.ReadFile(filePath)
+	mpAll := make(map[string]map[string]any)
+	nper := yaml.Unmarshal(data, &mpAll)
 	if nper != nil {
-		fmt.Printf("nper")
-	}
-}
-func (proxyInstance *NetworkProxy) updateNetworkProxyInfo() {
-	_, err := os.Stat(configFilePath)
-	mpProxyInfo := make(map[string]any)
-	mpProxyInfo["ProxyUrl"] = proxyInstance.ProxyUrl
-	mpProxyInfo["EnableProxy"] = proxyInstance.EnableProxy
-	if os.IsNotExist(err) {
-		data, _ := yaml.Marshal(mpProxyInfo)
-		ioutil.WriteFile(configFilePath, data, 0644)
+		proxyInstance.Enable = false
 		return
 	}
-	actData, _ := yaml.Marshal(mpProxyInfo)
-	ioutil.WriteFile(configFilePath, actData, 0644)
+	mpProxyInfo := make(map[string]any)
+	mpProxyInfo = mpAll["httpProxy"]
+	yamlProxyInfo, _ := yaml.Marshal(mpProxyInfo)
+	yaml.Unmarshal(yamlProxyInfo, proxyInstance)
+
+}
+func (proxyInstance *NetworkProxy) updateNetworkProxyInfo(configPath string) {
+	filePath := filepath.Join(configPath, configFilePath)
+	_, err := os.Stat(filePath)
+	mpProxyInfo := make(map[string]any)
+	mpProxyInfo["url"] = proxyInstance.Url
+	mpProxyInfo["enable"] = proxyInstance.Enable
+	mpAll := make(map[string]any)
+	mpAll["httpProxy"] = mpProxyInfo
+	if os.IsNotExist(err) {
+		data, _ := yaml.Marshal(mpAll)
+		ioutil.WriteFile(filePath, data, 0644)
+		return
+	}
+	actData, _ := yaml.Marshal(mpAll)
+	ioutil.WriteFile(filePath, actData, 0644)
 	return
 }
 func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Response, err error) {
-	if proxyInstance.EnableProxy == false {
+	if proxyInstance.Enable == false {
 		return http.Get(targetUrl)
 	}
-	proxy, err := url.Parse(proxyInstance.ProxyUrl)
+	proxy, err := url.Parse(proxyInstance.Url)
 	netTransport := &http.Transport{
 		Proxy: http.ProxyURL(proxy),
 	}
@@ -81,14 +92,14 @@ func (proxyInstance *NetworkProxy) GetByURL(targetUrl string) (resp *http.Respon
 	return httpClient.Do(req)
 }
 
-func (proxyInstance *NetworkProxy) SetProxy(proxyUrl string) error {
+func (proxyInstance *NetworkProxy) SetProxy(proxyUrl string, configPath string) error {
 	if len(proxyUrl) == 0 {
-		proxyInstance.EnableProxy = false
-		proxyInstance.ProxyUrl = ""
+		proxyInstance.Enable = false
+		proxyInstance.Url = ""
 		return nil
 	}
-	proxyInstance.ProxyUrl = proxyUrl
-	proxyInstance.EnableProxy = true
-	proxyInstance.updateNetworkProxyInfo()
+	proxyInstance.Url = proxyUrl
+	proxyInstance.Enable = true
+	proxyInstance.updateNetworkProxyInfo(configPath)
 	return nil
 }

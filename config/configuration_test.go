@@ -23,6 +23,6 @@ import (
 
 func TestNewSdkManagerProxy(t *testing.T) {
 	manager := sdk.NewSdkManager()
-	//manager.SetProxy("http://127.0.0.1")
+	manager.SetProxy("http://127.0.0.1")
 	manager.Update("noPlugin")
 }
