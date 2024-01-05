@@ -1,3 +1,5 @@
+//go:build darwin || linux
+
 /*
  *    Copyright 2024 [lihan aooohan@gmail.com]
  *
@@ -16,21 +18,29 @@
 
 package shell
 
-import "strings"
+import (
+	"github.com/pterm/pterm"
+	"os"
+	"os/exec"
+)
 
-type Envs map[string]*string
+type unixProcess struct{}
 
-type Shell interface {
-	Name() string
-	Activate() (string, error)
-	Export(envs Envs) string
+var process = unixProcess{}
+
+func GetProcess() Process {
+	return process
 }
 
-func NewShell(name string) Shell {
-	switch strings.ToLower(name) {
-	case "bash":
-		return Bash
+func (u unixProcess) Open(shell Shell) error {
+	//shellPath := os.Getenv("SHELL")
+	command := exec.Command(shell.Name())
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
+		return err
 	}
 	return nil
-
 }

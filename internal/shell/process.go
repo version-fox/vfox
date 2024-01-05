@@ -16,21 +16,6 @@
 
 package shell
 
-import "strings"
-
-type Envs map[string]*string
-
-type Shell interface {
-	Name() string
-	Activate() (string, error)
-	Export(envs Envs) string
-}
-
-func NewShell(name string) Shell {
-	switch strings.ToLower(name) {
-	case "bash":
-		return Bash
-	}
-	return nil
-
+type Process interface {
+	Open(shell Shell) error
 }

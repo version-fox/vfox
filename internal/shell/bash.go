@@ -22,6 +22,10 @@ type bash struct{}
 
 var Bash = bash{}
 
+func (b bash) Name() string {
+	return "bash"
+}
+
 func (b bash) Activate() (string, error) {
 	var script = `
 			export MISE_SHELL=bash
