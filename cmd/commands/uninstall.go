@@ -17,8 +17,12 @@
 package commands
 
 import (
+	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/sdk"
+	"os"
 	"strings"
 )
 
@@ -37,17 +41,30 @@ func uninstallCmd(ctx *cli.Context) error {
 	}
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
-	if argsLen > 2 {
+	if argsLen != 2 {
 		return cli.Exit("sdk version is invalid", 1)
-	} else if argsLen == 2 {
-		return manager.Uninstall(sdk.Arg{
-			Name:    strings.ToLower(argArr[0]),
-			Version: argArr[1],
-		})
-	} else {
-		return manager.Uninstall(sdk.Arg{
-			Name:    strings.ToLower(argArr[0]),
-			Version: "",
-		})
 	}
+
+	name := strings.ToLower(argArr[0])
+	version := sdk.Version(argArr[1])
+
+	source, err := manager.LookupSdk(name)
+	if err != nil {
+		return fmt.Errorf("%s not supported, error: %w", name, err)
+	}
+	cv := source.Current()
+	if err = source.Uninstall(version); err != nil {
+		return err
+	}
+	remainVersion := source.List()
+	if len(remainVersion) == 0 {
+		_ = os.RemoveAll(source.InstallPath)
+		return nil
+	}
+	if cv == version {
+		pterm.Println("Auto switch to the other version.")
+		firstVersion := remainVersion[0]
+		return source.Use(firstVersion, env.Global)
+	}
+	return nil
 }

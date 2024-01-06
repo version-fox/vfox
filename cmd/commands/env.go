@@ -21,19 +21,20 @@ import (
 	"github.com/version-fox/vfox/sdk"
 )
 
-var Update = &cli.Command{
-	Name:   "update",
-	Usage:  "update specified plug-ins",
-	Action: updateCmd,
+var Env = &cli.Command{
+	Name: "env",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "shell",
+			Aliases: []string{"s"},
+			Usage:   "shell",
+		},
+	},
+	Action: envCmd,
 }
 
-func updateCmd(ctx *cli.Context) error {
+func envCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
-	args := ctx.Args()
-	l := args.Len()
-	if l < 1 {
-		return cli.Exit("invalid arguments", 1)
-	}
-	_ = manager.Update(args.First())
-	return nil
+	shellName := ctx.String("shell")
+	return manager.Env(ctx.App.Writer, shellName)
 }

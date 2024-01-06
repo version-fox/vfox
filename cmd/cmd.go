@@ -77,6 +77,8 @@ func newCmd(version string) *cmd {
 		commands.Update,
 		commands.Remove,
 		commands.Add,
+		commands.Activate,
+		commands.Env,
 	}
 
 	return &cmd{app: app, version: version}

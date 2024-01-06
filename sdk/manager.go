@@ -32,8 +32,6 @@ import (
 	"github.com/version-fox/vfox/plugin"
 
 	"github.com/pterm/pterm"
-	"github.com/pterm/pterm/putils"
-	"github.com/version-fox/vfox/printer"
 	"github.com/version-fox/vfox/util"
 )
 
@@ -57,102 +55,6 @@ type Manager struct {
 	Shell          *shell.Shell
 	osType         util.OSType
 	archType       util.ArchType
-}
-
-func (m *Manager) Install(config Arg) error {
-	source := m.sdkMap[config.Name]
-	if source == nil {
-		pterm.PrintOnErrorf("%s not supported\n", config.Name)
-		return fmt.Errorf("%s not supported", config.Name)
-	}
-	if err := source.Install(Version(config.Version)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *Manager) Uninstall(config Arg) error {
-	source := m.sdkMap[config.Name]
-	if source == nil {
-		return fmt.Errorf("%s not supported", config.Name)
-	}
-	version := Version(config.Version)
-	cv := source.Current()
-	if err := source.Uninstall(version); err != nil {
-		return err
-	}
-	remainVersion := source.List()
-	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(source.sdkRootPath)
-		return nil
-	}
-	if cv == version {
-		pterm.Println("Auto switch to the other version.")
-		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, env.Global)
-	}
-	return nil
-}
-
-func (m *Manager) Search(sdkName string) error {
-	source := m.sdkMap[sdkName]
-	if source == nil {
-		pterm.Printf("%s not supported\n", sdkName)
-		return fmt.Errorf("%s not supported", sdkName)
-	}
-	result, err := source.Available()
-	if err != nil {
-		pterm.Printf("Plugin [Available] error: %s\n", err)
-		return err
-	}
-	if len(result) == 0 {
-		pterm.Println("No Available version.")
-		return nil
-	}
-	kvSelect := printer.PageKVSelect{
-		TopText: "Please select a version of " + sdkName,
-		Filter:  true,
-		Size:    20,
-		SourceFunc: func(page, size int) ([]*printer.KV, error) {
-			start := page * size
-			end := start + size
-
-			if start > len(result) {
-				return nil, fmt.Errorf("page is out of range")
-			}
-			if end > len(result) {
-				end = len(result)
-			}
-			versions := result[start:end]
-			var arr []*printer.KV
-			for _, p := range versions {
-				var value string
-				if p.Main.Note != "" {
-					value = fmt.Sprintf("v%s (%s)", p.Main.Version, p.Main.Note)
-				} else {
-					value = fmt.Sprintf("v%s", p.Main.Version)
-				}
-				if len(p.Additional) != 0 {
-					var additional []string
-					for _, a := range p.Additional {
-						additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
-					}
-					value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
-				}
-				arr = append(arr, &printer.KV{
-					Key:   string(p.Main.Version),
-					Value: value,
-				})
-			}
-			return arr, nil
-		},
-	}
-	version, err := kvSelect.Show()
-	if err != nil {
-		pterm.Printf("Select version error, err: %s\n", err)
-		return err
-	}
-	return source.Install(Version(version.Key))
 }
 
 // Use examples:
@@ -261,52 +163,11 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 	return err
 }
 
-func (m *Manager) List(arg Arg) error {
-	if arg.Name == "" {
-		if len(m.sdkMap) == 0 {
-			pterm.Println("You don't have any sdk installed yet.")
-			return nil
-		}
-		tree := pterm.LeveledList{}
-		for name, sdk := range m.sdkMap {
-			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
-			for _, version := range sdk.List() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})
-			}
-		}
-		// Generate tree from LeveledList.
-		root := putils.TreeFromLeveledList(tree)
-		root.Text = "All installed sdk versions"
-		// Render TreePrinter
-		_ = pterm.DefaultTree.WithRoot(root).Render()
-		return nil
-	}
-	source := m.sdkMap[arg.Name]
-	if source == nil {
-		return fmt.Errorf("%s not supported", arg.Name)
-	}
-	curVersion := source.Current()
-	list := source.List()
-	if len(list) == 0 {
-		pterm.Println("No available version.")
-		return nil
-	}
-	for _, version := range list {
-		if version == curVersion {
-			pterm.Println("->", fmt.Sprintf("v%s", version), pterm.LightGreen("<— current"))
-		} else {
-			pterm.Println("->", fmt.Sprintf("v%s", version))
-		}
-	}
-
-	return nil
-}
-
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	pluginPath := filepath.Join(m.pluginPath, strings.ToLower(name)+".lua")
 	if !util.FileExists(pluginPath) {
-		return nil, fmt.Errorf("plugin not exists")
+		return nil, fmt.Errorf("%s not installed", name)
 	}
 	content, err := m.loadLuaFromFileOrUrl(pluginPath)
 	if err != nil {
@@ -323,7 +184,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 	dir, err := os.ReadDir(m.pluginPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load sdks error: %w", err)
 	}
 	sdkMap := make(map[string]*Sdk)
 	for _, d := range dir {
@@ -355,52 +216,37 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) Remove(pluginName string) error {
-	source := m.sdkMap[pluginName]
-	if source == nil {
-		pterm.Println("This plugin has not been added.")
-		return fmt.Errorf("%s not installed", pluginName)
+	source, err := m.LookupSdk(pluginName)
+	if err != nil {
+		return err
 	}
-	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
-	result, _ := pterm.DefaultInteractiveConfirm.
-		WithTextStyle(&pterm.ThemeDefault.DefaultText).
-		WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-		WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-		WithDefaultText("Please confirm").
-		Show()
-	if result {
-		source.clearCurrentEnvConfig()
-		pPath := filepath.Join(m.pluginPath, pluginName+".lua")
-		pterm.Printf("Removing %s plugin...\n", pPath)
-		err := os.RemoveAll(pPath)
-		if err != nil {
-			pterm.Printf("Remove %s plugin failed, err: %s\n", pluginName, err)
-			return fmt.Errorf("remove failed")
-		}
-		pterm.Printf("Removing %s sdk...\n", source.sdkRootPath)
-		err = os.RemoveAll(source.sdkRootPath)
-		pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
-	} else {
-		pterm.Println("Remove canceled.")
+	source.clearCurrentEnvConfig()
+	pPath := filepath.Join(m.pluginPath, pluginName+".lua")
+	pterm.Printf("Removing %s plugin...\n", pPath)
+	err = os.RemoveAll(pPath)
+	if err != nil {
+		return fmt.Errorf("remove failed, err: %w", err)
 	}
+	pterm.Printf("Removing %s sdk...\n", source.InstallPath)
+	err = os.RemoveAll(source.InstallPath)
+	pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	return nil
 }
 
 func (m *Manager) Update(pluginName string) error {
-	sdk := m.sdkMap[pluginName]
-	if sdk == nil {
-		pterm.Println("This plugin has not been added.")
-		return fmt.Errorf("%s not installed", pluginName)
+	sdk, err := m.LookupSdk(pluginName)
+	if err != nil {
+		return fmt.Errorf("%s plugin not installed", pluginName)
 	}
 	updateUrl := sdk.Plugin.UpdateUrl
 	if updateUrl == "" {
-		pterm.Printf("This plugin does not support updates.\n")
-		return fmt.Errorf("not support update")
+		return fmt.Errorf("%s plugin not support update", pluginName)
 	}
 	pterm.Printf("Checking %s plugin...\n", updateUrl)
 	content, err := m.loadLuaFromFileOrUrl(updateUrl)
 	if err != nil {
 		pterm.Printf("Failed to load %s plugin, err: %s\n", updateUrl, err)
-		return fmt.Errorf("update failed")
+		return fmt.Errorf("fetch plugin failed")
 	}
 	source, err := NewLuaPlugin(content, updateUrl, m.osType, m.archType)
 	if err != nil {
@@ -433,23 +279,6 @@ func (m *Manager) Update(pluginName string) error {
 	}
 	success = true
 	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(source.Version))
-	return nil
-}
-
-func (m *Manager) Info(pluginName string) error {
-	sdk := m.sdkMap[pluginName]
-	if sdk == nil {
-		pterm.Println("This plugin has not been added.")
-		return fmt.Errorf("%s not installed", pluginName)
-	}
-	source := sdk.Plugin
-
-	pterm.Println("Plugin info:")
-	pterm.Println("Name     ", "->", pterm.LightBlue(source.Name))
-	pterm.Println("Author   ", "->", pterm.LightBlue(source.Author))
-	pterm.Println("Version  ", "->", pterm.LightBlue(source.Version))
-	pterm.Println("Desc     ", "->", pterm.LightBlue(source.Description))
-	pterm.Println("UpdateUrl", "->", pterm.LightBlue(source.UpdateUrl))
 	return nil
 }
 
@@ -522,7 +351,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 
 func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 	if !strings.HasSuffix(path, ".lua") {
-		return "", fmt.Errorf("not a lua file")
+		return "", fmt.Errorf("%s not a lua file", path)
 	}
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
 		resp, err := http.Get(path)

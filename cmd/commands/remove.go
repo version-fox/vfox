@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 )
@@ -34,6 +35,16 @@ func removeCmd(ctx *cli.Context) error {
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
-	// TODO 移除选择到外层
-	return manager.Remove(args.First())
+	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
+	result, _ := pterm.DefaultInteractiveConfirm.
+		WithTextStyle(&pterm.ThemeDefault.DefaultText).
+		WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+		WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+		WithDefaultText("Please confirm").
+		Show()
+	if result {
+		return manager.Remove(args.First())
+	} else {
+		return cli.Exit("remove canceled", 1)
+	}
 }

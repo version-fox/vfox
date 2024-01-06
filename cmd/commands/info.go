@@ -17,6 +17,8 @@
 package commands
 
 import (
+	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 )
@@ -33,5 +35,17 @@ func infoCmd(ctx *cli.Context) error {
 	if args == "" {
 		return cli.Exit("invalid arguments", 1)
 	}
-	return manager.Info(args)
+	s, err := manager.LookupSdk(args)
+	if err != nil {
+		return fmt.Errorf("%s not supported, error: %w", args, err)
+	}
+	source := s.Plugin
+
+	pterm.Println("Plugin info:")
+	pterm.Println("Name     ", "->", pterm.LightBlue(source.Name))
+	pterm.Println("Author   ", "->", pterm.LightBlue(source.Author))
+	pterm.Println("Version  ", "->", pterm.LightBlue(source.Version))
+	pterm.Println("Desc     ", "->", pterm.LightBlue(source.Description))
+	pterm.Println("UpdateUrl", "->", pterm.LightBlue(source.UpdateUrl))
+	return nil
 }

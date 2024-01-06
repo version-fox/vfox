@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 	"strings"
@@ -30,24 +31,29 @@ var Install = &cli.Command{
 }
 
 func installCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
 	sdkArg := ctx.Args().First()
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
+	manager := sdk.NewSdkManager()
 	if argsLen > 2 {
 		return cli.Exit("sdk version is invalid", 1)
-	} else if argsLen == 2 {
-		return manager.Install(sdk.Arg{
-			Name:    strings.ToLower(argArr[0]),
-			Version: argArr[1],
-		})
 	} else {
-		return manager.Install(sdk.Arg{
-			Name:    strings.ToLower(argArr[0]),
-			Version: "",
-		})
+		var name string
+		var version sdk.Version
+		if argsLen == 2 {
+			name = strings.ToLower(argArr[0])
+			version = sdk.Version(argArr[1])
+		} else {
+			name = strings.ToLower(argArr[0])
+			version = ""
+		}
+		source, err := manager.LookupSdk(name)
+		if err != nil {
+			return fmt.Errorf("%s not supported, error: %w", name, err)
+		}
+		return source.Install(version)
 	}
 }

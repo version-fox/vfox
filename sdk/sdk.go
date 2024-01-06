@@ -40,7 +40,7 @@ type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
-	sdkRootPath string
+	InstallPath string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -199,11 +199,11 @@ func (b *Sdk) Use(version Version, scope env.Scope) error {
 }
 
 func (b *Sdk) List() []Version {
-	if !util.FileExists(b.sdkRootPath) {
+	if !util.FileExists(b.InstallPath) {
 		return make([]Version, 0)
 	}
 	var versions []Version
-	dir, err := os.ReadDir(b.sdkRootPath)
+	dir, err := os.ReadDir(b.InstallPath)
 	if err != nil {
 		return nil
 	}
@@ -299,7 +299,7 @@ func (b *Sdk) checkExists(version Version) bool {
 }
 
 func (b *Sdk) VersionPath(version Version) string {
-	return filepath.Join(b.sdkRootPath, fmt.Sprintf("v-%s", version))
+	return filepath.Join(b.InstallPath, fmt.Sprintf("v-%s", version))
 }
 
 func (b *Sdk) Download(u *url.URL) (string, error) {
@@ -325,12 +325,12 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 		return "", errors.New("source file not found")
 	}
 
-	err = os.MkdirAll(b.sdkRootPath, 0755)
+	err = os.MkdirAll(b.InstallPath, 0755)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(b.sdkRootPath, filepath.Base(u.Path))
+	path := filepath.Join(b.InstallPath, filepath.Base(u.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -376,7 +376,7 @@ func (b *Sdk) envVersionKey() string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		sdkRootPath: filepath.Join(manager.sdkCachePath, strings.ToLower(source.SourceName)),
+		InstallPath: filepath.Join(manager.sdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }

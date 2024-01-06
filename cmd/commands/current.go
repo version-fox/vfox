@@ -37,7 +37,7 @@ func currentCmd(ctx *cli.Context) error {
 	if sdkName == "" {
 		allSdk, err := manager.LoadAllSdk()
 		if err != nil {
-			return fmt.Errorf("load sdks error: %w", err)
+			return err
 		}
 		for name, s := range allSdk {
 			current := s.Current()

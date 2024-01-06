@@ -17,23 +17,21 @@
 package commands
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/sdk"
 )
 
-var Update = &cli.Command{
-	Name:   "update",
-	Usage:  "update specified plug-ins",
-	Action: updateCmd,
+var Activate = &cli.Command{
+	Name:   "activate",
+	Action: activateCmd,
 }
 
-func updateCmd(ctx *cli.Context) error {
+func activateCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
-	args := ctx.Args()
-	l := args.Len()
-	if l < 1 {
-		return cli.Exit("invalid arguments", 1)
+	shellName := ctx.Args().First()
+	if shellName == "" {
+		return fmt.Errorf("shell name is required")
 	}
-	_ = manager.Update(args.First())
-	return nil
+	return manager.Activate(ctx.App.Writer, shellName)
 }
