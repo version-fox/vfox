@@ -328,6 +328,25 @@ func (m *Manager) Current(sdkName string) error {
 	return nil
 }
 
+// lookupSdk lookup sdk by name
+func (m *Manager) lookupSdk(name string) (*Sdk, error) {
+	pluginPath := filepath.Join(m.pluginPath, strings.ToLower(name)+".lua")
+	if !util.FileExists(pluginPath) {
+		return nil, fmt.Errorf("plugin not exists")
+	}
+	content, err := m.loadLuaFromFileOrUrl(pluginPath)
+	if err != nil {
+		return nil, err
+	}
+	luaPlugin, err := NewLuaPlugin(content, pluginPath, m.osType, m.archType)
+	if err != nil {
+		return nil, err
+	}
+	sdk, _ := NewSdk(m, luaPlugin)
+	m.sdkMap[strings.ToLower(name)] = sdk
+	return sdk, nil
+}
+
 func (m *Manager) loadSdk() {
 	dir, err := os.ReadDir(m.pluginPath)
 	if err != nil {
