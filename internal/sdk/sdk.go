@@ -376,7 +376,7 @@ func (b *Sdk) envVersionKey() string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.sdkCachePath, strings.ToLower(source.SourceName)),
+		InstallPath: filepath.Join(manager.SdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }

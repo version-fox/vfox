@@ -28,7 +28,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
-	"github.com/version-fox/vfox/internal/toolversion"
+	"github.com/version-fox/vfox/internal/toolversions"
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/util"
@@ -44,14 +44,14 @@ type Arg struct {
 }
 
 type Manager struct {
-	configPath     string
-	sdkCachePath   string
-	envConfigPath  string
-	pluginPath     string
-	executablePath string
+	TmpPath        string
+	ConfigPath     string
+	SdkCachePath   string
+	EnvConfigPath  string
+	PluginPath     string
+	ExecutablePath string
 	openSdks       map[string]*Sdk
 	EnvManager     env.Manager
-	Shell          *shell.Shell
 	osType         util.OSType
 	archType       util.ArchType
 }
@@ -69,10 +69,10 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 		pterm.Printf("Get current dir error, err: %s\n", err)
 		return err
 	}
-	tv, _ := toolversion.NewToolVersions(pwd)
+	tv, _ := toolversions.NewRecord(pwd)
 	var sdks []*Arg
 	if arg.Name == "" {
-		for sdkName, version := range tv.Sdks {
+		for sdkName, version := range tv.Export() {
 			_, ok := m.openSdks[sdkName]
 			if !ok {
 				pterm.Printf("%s not supported.\n", sdkName)
@@ -93,7 +93,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			pterm.Printf("%s not supported.\n", arg.Name)
 			return fmt.Errorf("%s not supported", arg.Name)
 		}
-		version, ok := tv.Sdks[arg.Name]
+		version, ok := tv.Export()[arg.Name]
 		if ok {
 			sdks = append(sdks, &Arg{
 				Name:    arg.Name,
@@ -164,7 +164,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
-	pluginPath := filepath.Join(m.pluginPath, strings.ToLower(name)+".lua")
+	pluginPath := filepath.Join(m.PluginPath, strings.ToLower(name)+".lua")
 	if !util.FileExists(pluginPath) {
 		return nil, fmt.Errorf("%s not installed", name)
 	}
@@ -182,7 +182,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 }
 
 func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
-	dir, err := os.ReadDir(m.pluginPath)
+	dir, err := os.ReadDir(m.PluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("load sdks error: %w", err)
 	}
@@ -193,7 +193,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		}
 		if strings.HasSuffix(d.Name(), ".lua") {
 			// filename first as sdk name
-			path := filepath.Join(m.pluginPath, d.Name())
+			path := filepath.Join(m.PluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
 			source, err := NewLuaPlugin(content, path, m.osType, m.archType)
 			if err != nil {
@@ -222,7 +222,7 @@ func (m *Manager) Remove(pluginName string) error {
 		return err
 	}
 	source.clearCurrentEnvConfig()
-	pPath := filepath.Join(m.pluginPath, pluginName+".lua")
+	pPath := filepath.Join(m.PluginPath, pluginName+".lua")
 	pterm.Printf("Removing %s plugin...\n", pPath)
 	err = os.RemoveAll(pPath)
 	if err != nil {
@@ -315,7 +315,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		pname = alias
 	}
 
-	destPath := filepath.Join(m.pluginPath, pname+".lua")
+	destPath := filepath.Join(m.PluginPath, pname+".lua")
 	if util.FileExists(destPath) {
 		pterm.Printf("Plugin %s already exists, please use %s to remove it first.\n", pterm.LightGreen(pname), pterm.LightBlue("vfox remove "+pname))
 		return fmt.Errorf("plugin already exists")
@@ -417,7 +417,7 @@ func (m *Manager) Available() ([]*Category, error) {
 }
 
 func (m *Manager) Activate(writer io.Writer, name string) error {
-	path := m.executablePath
+	path := m.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	ctx := struct {
 		SelfPath string
@@ -459,8 +459,10 @@ func NewSdkManager() *Manager {
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
 	configPath := filepath.Join(userHomeDir, ".version-fox")
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
+	tmpPath := filepath.Join(userHomeDir, ".version-fox", "tmp")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
+	_ = os.MkdirAll(tmpPath, 0755)
 	exePath, err := os.Executable()
 	if err != nil {
 		panic("Get executable path error")
@@ -473,10 +475,11 @@ func NewSdkManager() *Manager {
 		panic("Init env manager error")
 	}
 	manager := &Manager{
-		configPath:     configPath,
-		sdkCachePath:   sdkCachePath,
-		pluginPath:     pluginPath,
-		executablePath: exePath,
+		TmpPath:        tmpPath,
+		ConfigPath:     configPath,
+		SdkCachePath:   sdkCachePath,
+		PluginPath:     pluginPath,
+		ExecutablePath: exePath,
 		EnvManager:     envManger,
 		openSdks:       make(map[string]*Sdk),
 		osType:         util.GetOSType(),

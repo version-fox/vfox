@@ -14,12 +14,13 @@
  *    limitations under the License.
  */
 
-package toolversion
+package toolversions
 
 import (
 	"bufio"
 	"fmt"
 	"github.com/version-fox/vfox/internal/util"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,17 +28,23 @@ import (
 
 const filename = ".tool-versions"
 
-type ToolVersions struct {
+type Record interface {
+	Add(name, version string) error
+	Export() map[string]string
+	io.Closer
+}
+
+type single struct {
 	// Sdks sdkName -> version
 	Sdks map[string]string
 	path string
 }
 
-func (t *ToolVersions) String() string {
-	return filename
+func (t *single) Export() map[string]string {
+	return t.Sdks
 }
 
-func (t *ToolVersions) Save() error {
+func (t *single) Close() error {
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
@@ -53,16 +60,21 @@ func (t *ToolVersions) Save() error {
 	return nil
 }
 
-func (t *ToolVersions) Add(tool, version string) error {
-	t.Sdks[tool] = version
-	return t.Save()
+func (t *single) String() string {
+	return filename
 }
 
-func NewToolVersions(dirPath string) (*ToolVersions, error) {
-	versionsFile := filepath.Join(dirPath, filename)
+func (t *single) Add(tool, version string) error {
+	t.Sdks[tool] = version
+	return nil
+}
+
+func newSingle(dirPath string) (Record, error) {
+
+	file := filepath.Join(dirPath, filename)
 	versionsMap := make(map[string]string)
-	if util.FileExists(versionsFile) {
-		file, err := os.Open(versionsFile)
+	if util.FileExists(file) {
+		file, err := os.Open(file)
 		if err != nil {
 			return nil, err
 		}
@@ -81,8 +93,32 @@ func NewToolVersions(dirPath string) (*ToolVersions, error) {
 			return nil, err
 		}
 	}
-	return &ToolVersions{
+	return &single{
 		Sdks: versionsMap,
-		path: versionsFile,
+		path: file,
+	}, nil
+}
+
+func NewRecord(mainPath string, salve ...string) (Record, error) {
+	main, err := newSingle(mainPath)
+	if err != nil {
+		return nil, fmt.Errorf("create version record failed, error: %w", err)
+	}
+
+	if len(salve) == 0 {
+		return main, nil
+	}
+
+	var salveRecords []Record
+	for _, path := range salve {
+		salveRecord, err := newSingle(path)
+		if err != nil {
+			return nil, fmt.Errorf("create version record failed, error: %w", err)
+		}
+		salveRecords = append(salveRecords, salveRecord)
+	}
+	return &multi{
+		main:  main,
+		slave: salveRecords,
 	}, nil
 }
