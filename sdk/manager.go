@@ -302,34 +302,8 @@ func (m *Manager) List(arg Arg) error {
 	return nil
 }
 
-func (m *Manager) Current(sdkName string) error {
-	if sdkName == "" {
-		for name, sdk := range m.sdkMap {
-			current := sdk.Current()
-			if current == "" {
-				pterm.Printf("%s -> N/A \n", name)
-			} else {
-				pterm.Printf("%s -> %s\n", name, pterm.LightGreen("v"+string(current)))
-			}
-		}
-		return nil
-	}
-	source := m.sdkMap[sdkName]
-	if source == nil {
-		pterm.Printf("%s not supported\n", sdkName)
-		return fmt.Errorf("%s not supported", sdkName)
-	}
-	current := source.Current()
-	if current == "" {
-		pterm.Printf("No current version of %s\n", sdkName)
-		return nil
-	}
-	pterm.Println("->", pterm.LightGreen("v"+string(current)))
-	return nil
-}
-
-// lookupSdk lookup sdk by name
-func (m *Manager) lookupSdk(name string) (*Sdk, error) {
+// LookupSdk lookup sdk by name
+func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	pluginPath := filepath.Join(m.pluginPath, strings.ToLower(name)+".lua")
 	if !util.FileExists(pluginPath) {
 		return nil, fmt.Errorf("plugin not exists")
@@ -343,16 +317,15 @@ func (m *Manager) lookupSdk(name string) (*Sdk, error) {
 		return nil, err
 	}
 	sdk, _ := NewSdk(m, luaPlugin)
-	m.sdkMap[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
 
-func (m *Manager) loadSdk() {
+func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 	dir, err := os.ReadDir(m.pluginPath)
 	if err != nil {
-		pterm.Printf("Read plugin dir error, err: %s\n", err)
-		return
+		return nil, err
 	}
+	sdkMap := make(map[string]*Sdk)
 	for _, d := range dir {
 		if d.IsDir() {
 			continue
@@ -368,9 +341,10 @@ func (m *Manager) loadSdk() {
 			}
 			sdk, _ := NewSdk(m, source)
 			name := strings.TrimSuffix(filepath.Base(path), ".lua")
-			m.sdkMap[strings.ToLower(name)] = sdk
+			sdkMap[strings.ToLower(name)] = sdk
 		}
 	}
+	return sdkMap, nil
 }
 
 func (m *Manager) Close() {
@@ -529,6 +503,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		pterm.Printf("Check %s plugin failed, err: %s\n", url, err)
 		return err
 	}
+	defer source.Close()
 	err = os.WriteFile(destPath, []byte(content), 0644)
 	if err != nil {
 		pterm.Printf("Add %s plugin failed, err: %s\n", url, err)
@@ -673,13 +648,9 @@ func NewSdkManager() *Manager {
 		pluginPath:     pluginPath,
 		executablePath: exePath,
 		EnvManager:     envManger,
-		//Shell:          newShell,
-		sdkMap:   make(map[string]*Sdk),
-		osType:   util.GetOSType(),
-		archType: util.GetArchType(),
+		sdkMap:         make(map[string]*Sdk),
+		osType:         util.GetOSType(),
+		archType:       util.GetArchType(),
 	}
-
-	manager.loadSdk()
-
 	return manager
 }
