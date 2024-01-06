@@ -19,7 +19,7 @@ package commands
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/sdk"
+	"github.com/version-fox/vfox/internal/sdk"
 	"strings"
 )
 

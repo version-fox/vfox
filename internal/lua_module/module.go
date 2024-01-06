@@ -17,9 +17,9 @@
 package lua_module
 
 import (
-	"github.com/version-fox/vfox/lua_module/html"
-	"github.com/version-fox/vfox/lua_module/http"
-	"github.com/version-fox/vfox/lua_module/json"
+	"github.com/version-fox/vfox/internal/lua_module/html"
+	"github.com/version-fox/vfox/internal/lua_module/http"
+	"github.com/version-fox/vfox/internal/lua_module/json"
 	lua "github.com/yuin/gopher-lua"
 )
 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/sdk"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Info = &cli.Command{

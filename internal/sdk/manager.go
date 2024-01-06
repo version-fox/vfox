@@ -27,12 +27,12 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolversion"
-	"github.com/version-fox/vfox/plugin"
 
 	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/util"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const (

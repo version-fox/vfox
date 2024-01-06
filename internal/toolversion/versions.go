@@ -19,7 +19,7 @@ package toolversion
 import (
 	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/util"
+	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 	"strings"

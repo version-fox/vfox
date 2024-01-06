@@ -31,7 +31,7 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/util"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 type Version string
