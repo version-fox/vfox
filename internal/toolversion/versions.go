@@ -37,7 +37,7 @@ func (t *ToolVersions) String() string {
 	return filename
 }
 
-func (t *ToolVersions) save() error {
+func (t *ToolVersions) Save() error {
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (t *ToolVersions) save() error {
 
 func (t *ToolVersions) Add(tool, version string) error {
 	t.Sdks[tool] = version
-	return t.save()
+	return t.Save()
 }
 
 func NewToolVersions(dirPath string) (*ToolVersions, error) {
