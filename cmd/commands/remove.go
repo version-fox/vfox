@@ -29,12 +29,13 @@ var Remove = &cli.Command{
 }
 
 func removeCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
 	args := ctx.Args()
 	l := args.Len()
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
 	result, _ := pterm.DefaultInteractiveConfirm.
 		WithTextStyle(&pterm.ThemeDefault.DefaultText).

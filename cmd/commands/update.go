@@ -28,12 +28,13 @@ var Update = &cli.Command{
 }
 
 func updateCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
 	args := ctx.Args()
 	l := args.Len()
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	_ = manager.Update(args.First())
 	return nil
 }

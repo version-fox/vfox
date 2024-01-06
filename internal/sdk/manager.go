@@ -49,7 +49,7 @@ type Manager struct {
 	envConfigPath  string
 	pluginPath     string
 	executablePath string
-	sdkMap         map[string]*Sdk
+	openSdks       map[string]*Sdk
 	EnvManager     env.Manager
 	Shell          *shell.Shell
 	osType         util.OSType
@@ -73,7 +73,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 	var sdks []*Arg
 	if arg.Name == "" {
 		for sdkName, version := range tv.Sdks {
-			_, ok := m.sdkMap[sdkName]
+			_, ok := m.openSdks[sdkName]
 			if !ok {
 				pterm.Printf("%s not supported.\n", sdkName)
 				continue
@@ -88,7 +88,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			return fmt.Errorf("invalid parameter")
 		}
 	} else if arg.Version == "" {
-		source, ok := m.sdkMap[arg.Name]
+		source, ok := m.openSdks[arg.Name]
 		if !ok {
 			pterm.Printf("%s not supported.\n", arg.Name)
 			return fmt.Errorf("%s not supported", arg.Name)
@@ -125,7 +125,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 			})
 		}
 	} else {
-		_, ok := m.sdkMap[arg.Name]
+		_, ok := m.openSdks[arg.Name]
 		if !ok {
 			pterm.Printf("%s not supported.\n", arg.Name)
 			return fmt.Errorf("%s not supported", arg.Name)
@@ -133,7 +133,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 		sdks = append(sdks, &arg)
 	}
 	for _, sdk := range sdks {
-		source := m.sdkMap[sdk.Name]
+		source := m.openSdks[sdk.Name]
 		if useScope == Project {
 			err = source.Use(Version(sdk.Version), env.Local)
 			if err != nil {
@@ -177,6 +177,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 		return nil, err
 	}
 	sdk, _ := NewSdk(m, luaPlugin)
+	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
 
@@ -202,13 +203,14 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 			sdk, _ := NewSdk(m, source)
 			name := strings.TrimSuffix(filepath.Base(path), ".lua")
 			sdkMap[strings.ToLower(name)] = sdk
+			m.openSdks[strings.ToLower(name)] = sdk
 		}
 	}
 	return sdkMap, nil
 }
 
 func (m *Manager) Close() {
-	for _, handler := range m.sdkMap {
+	for _, handler := range m.openSdks {
 		handler.Close()
 	}
 	_ = m.EnvManager.Close()
@@ -476,7 +478,7 @@ func NewSdkManager() *Manager {
 		pluginPath:     pluginPath,
 		executablePath: exePath,
 		EnvManager:     envManger,
-		sdkMap:         make(map[string]*Sdk),
+		openSdks:       make(map[string]*Sdk),
 		osType:         util.GetOSType(),
 		archType:       util.GetArchType(),
 	}

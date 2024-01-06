@@ -24,6 +24,7 @@ import (
 
 var Activate = &cli.Command{
 	Name:   "activate",
+	Hidden: true,
 	Action: activateCmd,
 }
 

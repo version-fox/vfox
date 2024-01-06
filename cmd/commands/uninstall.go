@@ -34,11 +34,12 @@ var Uninstall = &cli.Command{
 }
 
 func uninstallCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
 	sdkArg := ctx.Args().First()
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
 	if argsLen != 2 {

@@ -31,6 +31,7 @@ var Info = &cli.Command{
 
 func infoCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	args := ctx.Args().First()
 	if args == "" {
 		return cli.Exit("invalid arguments", 1)

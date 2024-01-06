@@ -48,6 +48,7 @@ var Use = &cli.Command{
 
 func useCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	sdkArg := ctx.Args().First()
 	arg := sdk.Arg{}
 	if len(sdkArg) != 0 {

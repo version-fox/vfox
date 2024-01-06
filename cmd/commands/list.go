@@ -33,6 +33,7 @@ var List = &cli.Command{
 
 func listCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	sdkName := ctx.Args().First()
 	if sdkName == "" {
 		allSdk, err := manager.LoadAllSdk()

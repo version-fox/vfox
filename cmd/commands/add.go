@@ -40,6 +40,7 @@ var Add = &cli.Command{
 
 func addCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	sdkName := ctx.Args().First()
 	source := ctx.String("source")
 	alias := ctx.String("alias")

@@ -38,6 +38,7 @@ func installCmd(ctx *cli.Context) error {
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	if argsLen > 2 {
 		return cli.Exit("sdk version is invalid", 1)
 	} else {

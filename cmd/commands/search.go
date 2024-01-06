@@ -37,6 +37,7 @@ func searchCmd(ctx *cli.Context) error {
 		return cli.Exit("sdk name is required", 1)
 	}
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	source, err := manager.LookupSdk(sdkName)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)

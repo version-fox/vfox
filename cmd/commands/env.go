@@ -22,7 +22,8 @@ import (
 )
 
 var Env = &cli.Command{
-	Name: "env",
+	Name:   "env",
+	Hidden: true,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "shell",
@@ -35,6 +36,7 @@ var Env = &cli.Command{
 
 func envCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	shellName := ctx.String("shell")
 	return manager.Env(ctx.App.Writer, shellName)
 }
