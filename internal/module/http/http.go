@@ -30,7 +30,7 @@ func Preload(L *lua.LState) {
 	L.PreloadModule("http", loader)
 }
 
-// loader is the lua_module loader function.
+// loader is the module loader function.
 func loader(L *lua.LState) int {
 	t := L.NewTable()
 	L.SetFuncs(t, api)

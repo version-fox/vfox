@@ -19,7 +19,7 @@ package sdk
 import (
 	"fmt"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/lua_module"
+	"github.com/version-fox/vfox/internal/module"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 	"path/filepath"
@@ -321,7 +321,7 @@ func (l *LuaPlugin) Label(version string) string {
 
 func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
 	luaVMInstance := lua.NewState()
-	lua_module.Preload(luaVMInstance)
+	module.Preload(luaVMInstance)
 	if err := luaVMInstance.DoString(content); err != nil {
 		return nil, err
 	}

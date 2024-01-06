@@ -14,12 +14,12 @@
  *    limitations under the License.
  */
 
-package lua_module
+package module
 
 import (
-	"github.com/version-fox/vfox/internal/lua_module/html"
-	"github.com/version-fox/vfox/internal/lua_module/http"
-	"github.com/version-fox/vfox/internal/lua_module/json"
+	"github.com/version-fox/vfox/internal/module/html"
+	"github.com/version-fox/vfox/internal/module/http"
+	"github.com/version-fox/vfox/internal/module/json"
 	lua "github.com/yuin/gopher-lua"
 )
 

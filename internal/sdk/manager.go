@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolversion"
 
@@ -390,7 +389,7 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 
 }
 
-func (m *Manager) Available() ([]*plugin.Category, error) {
+func (m *Manager) Available() ([]*Category, error) {
 	// TODO proxy
 	resp, err := http.Get(pluginIndexUrl)
 	if err != nil {
@@ -405,7 +404,7 @@ func (m *Manager) Available() ([]*plugin.Category, error) {
 		pterm.Printf("Read plugin index error, err: %s\n", err)
 		return nil, fmt.Errorf("read plugin index error")
 	} else {
-		var categories []*plugin.Category
+		var categories []*Category
 		err = json.Unmarshal(str, &categories)
 		if err != nil {
 			pterm.Printf("Parse plugin index error, err: %s\n", err)

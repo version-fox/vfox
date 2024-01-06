@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package plugin
+package sdk
 
 type RemotePluginInfo struct {
 	Filename string `json:"name"`
