@@ -30,7 +30,7 @@ type Temp struct {
 	CurProcessPath string
 }
 
-func (t *Temp) removeOldFile() {
+func (t *Temp) RemoveOldFile() {
 	dir, err := os.ReadDir(t.dirPath)
 	if err == nil {
 		for _, file := range dir {
@@ -54,7 +54,7 @@ func (t *Temp) removeOldFile() {
 }
 
 func NewTemp(dirPath string, pid int) (*Temp, error) {
-	timestamp := util.GetTimestamp()
+	timestamp := util.GetBeginOfToday()
 	name := fmt.Sprintf("%d-%d", timestamp, pid)
 	path := filepath.Join(dirPath, name)
 	if !util.FileExists(path) {
@@ -67,7 +67,5 @@ func NewTemp(dirPath string, pid int) (*Temp, error) {
 		dirPath:        dirPath,
 		CurProcessPath: path,
 	}
-	// Clean up the old temp files, before today.
-	go t.removeOldFile()
 	return t, nil
 }

@@ -19,7 +19,6 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -414,32 +413,6 @@ func (m *Manager) Available() ([]*Category, error) {
 		}
 		return categories, nil
 	}
-}
-
-func (m *Manager) Activate(writer io.Writer, name string) error {
-	path := m.ExecutablePath
-	path = strings.Replace(path, "\\", "/", -1)
-	ctx := struct {
-		SelfPath string
-	}{
-		SelfPath: path,
-	}
-	s := shell.NewShell(name)
-	if s == nil {
-		return fmt.Errorf("unknow target shell %s", name)
-	}
-	shellEnv, _ := m.EnvManager.ToShellEnv()
-	exportStr := s.Export(shellEnv)
-	str, err := s.Activate()
-	if err != nil {
-		return err
-	}
-	script := exportStr + "\n" + str
-	hookTemplate, err := template.New("hook").Parse(script)
-	if err != nil {
-		return nil
-	}
-	return hookTemplate.Execute(writer, ctx)
 }
 
 func (m *Manager) Env(writer io.Writer, name string) error {

@@ -20,6 +20,10 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shell"
+	"html/template"
+	"os"
+	"strings"
 )
 
 var Activate = &cli.Command{
@@ -29,10 +33,40 @@ var Activate = &cli.Command{
 }
 
 func activateCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
-	shellName := ctx.Args().First()
-	if shellName == "" {
-		return fmt.Errorf("shell name is required")
+	name := ctx.Args().First()
+	if name == "" {
+		return cli.Exit("shell name is required", 1)
 	}
-	return manager.Activate(ctx.App.Writer, shellName)
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
+	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
+	if err != nil {
+		return fmt.Errorf("create temp file failed: %w", err)
+	}
+	// Clean up the old temp files, before today.
+	go temp.RemoveOldFile()
+
+	path := manager.ExecutablePath
+	path = strings.Replace(path, "\\", "/", -1)
+	tmpCtx := struct {
+		SelfPath string
+	}{
+		SelfPath: path,
+	}
+	s := shell.NewShell(name)
+	if s == nil {
+		return fmt.Errorf("unknow target shell %s", name)
+	}
+	shellEnv, _ := manager.EnvManager.ToShellEnv()
+	exportStr := s.Export(shellEnv)
+	str, err := s.Activate()
+	if err != nil {
+		return err
+	}
+	script := exportStr + "\n" + str
+	hookTemplate, err := template.New("hook").Parse(script)
+	if err != nil {
+		return nil
+	}
+	return hookTemplate.Execute(ctx.App.Writer, tmpCtx)
 }

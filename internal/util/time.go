@@ -24,6 +24,11 @@ func GetTimestamp() int64 {
 	return time.Now().Unix()
 }
 
+func GetBeginOfToday() int64 {
+	now := time.Now()
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+}
+
 func IsBeforeToday(timestamp int64) bool {
 	t := time.Unix(timestamp, 0)
 	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
