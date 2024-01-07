@@ -17,8 +17,12 @@
 package commands
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shell"
+	"os"
 )
 
 var Env = &cli.Command{
@@ -38,5 +42,23 @@ func envCmd(ctx *cli.Context) error {
 	manager := sdk.NewSdkManager()
 	defer manager.Close()
 	shellName := ctx.String("shell")
-	return manager.Env(ctx.App.Writer, shellName)
+	if shellName == "" {
+		return cli.Exit("shell name is required", 1)
+	}
+	s := shell.NewShell(shellName)
+	if s == nil {
+		return fmt.Errorf("unknow target shell %s", shellName)
+	}
+	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
+	if err != nil {
+		return err
+	}
+	record, err := env.NewRecord(temp.CurProcessPath)
+	if err != nil {
+		return err
+	}
+	envKeys := manager.EnvKeys(record)
+	exportStr := s.Export(envKeys)
+	fmt.Println(exportStr)
+	return nil
 }

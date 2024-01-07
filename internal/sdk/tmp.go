@@ -60,7 +60,7 @@ func NewTemp(dirPath string, pid int) (*Temp, error) {
 	if !util.FileExists(path) {
 		err := os.Mkdir(path, 0755)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("create temp dir failed: %w", err)
 		}
 	}
 	t := &Temp{

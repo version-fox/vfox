@@ -27,7 +27,6 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -160,7 +159,7 @@ func (m *Manager) Use(arg Arg, useScope UseScope) error {
 	//return err
 }
 
-func (m *Manager) EnvKeys(record env.Record) (env.Envs, error) {
+func (m *Manager) EnvKeys(record env.Record) env.Envs {
 	shellEnvs := make(env.Envs)
 	var paths []string
 	for k, v := range record.Export() {
@@ -177,11 +176,11 @@ func (m *Manager) EnvKeys(record env.Record) (env.Envs, error) {
 		}
 	}
 	if len(shellEnvs) == 0 {
-		return shellEnvs, nil
+		return shellEnvs
 	}
 	pathStr := m.EnvManager.Paths(paths[:])
 	shellEnvs["PATH"] = &pathStr
-	return shellEnvs, nil
+	return shellEnvs
 }
 
 // LookupSdk lookup sdk by name
@@ -436,15 +435,6 @@ func (m *Manager) Available() ([]*Category, error) {
 		}
 		return categories, nil
 	}
-}
-
-func (m *Manager) Env(writer io.Writer, name string) error {
-	s := shell.NewShell(name)
-	if s == nil {
-		return fmt.Errorf("unknow target shell %s", name)
-	}
-	//s.Export()
-	return nil
 }
 
 func NewSdkManager() *Manager {

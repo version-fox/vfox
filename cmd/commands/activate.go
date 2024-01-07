@@ -42,7 +42,7 @@ func activateCmd(ctx *cli.Context) error {
 	defer manager.Close()
 	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
 	if err != nil {
-		return fmt.Errorf("create temp file failed: %w", err)
+		return err
 	}
 	// Clean up the old temp files, before today.
 	go temp.RemoveOldFile()
@@ -50,7 +50,7 @@ func activateCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	envKeys, err := manager.EnvKeys(record)
+	envKeys := manager.EnvKeys(record)
 	path := manager.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	tmpCtx := struct {
