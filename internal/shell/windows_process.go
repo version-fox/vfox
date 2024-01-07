@@ -18,6 +18,13 @@
 
 package shell
 
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+)
+
 type windowsProcess struct{}
 
 var process = windowsProcess{}
@@ -26,20 +33,18 @@ func GetProcess() Process {
 	return process
 }
 
-func (w windowsProcess) Open(shell Shell) error {
+func (w windowsProcess) Open(pid int) error {
 	// On Windows, os.FindProcess does not actually find the process.
 	// So, we use this workaround to get the parent process name.
-	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", ppid), "/NH", "/FO", "CSV")
+	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/NH", "/FO", "CSV")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fields := strings.Split(string(output), ",")
-	parentProcessName := strings.Trim(fields[0], "\" ")
-	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", ppid), "get", "ExecutablePath", "/format:list")
+	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "ExecutablePath", "/format:list")
 	output, err = cmd.Output()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
 	command := exec.Command(path)
@@ -47,8 +52,7 @@ func (w windowsProcess) Open(shell Shell) error {
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {
-		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
-		return err
+		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 	return nil
 }

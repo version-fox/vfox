@@ -1,4 +1,4 @@
-//go:build darwin || linux
+//go:build darwin
 
 /*
  *    Copyright 2024 [lihan aooohan@gmail.com]
@@ -19,9 +19,11 @@
 package shell
 
 import (
-	"github.com/pterm/pterm"
+	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 )
 
 type unixProcess struct{}
@@ -32,15 +34,23 @@ func GetProcess() Process {
 	return process
 }
 
-func (u unixProcess) Open(shell Shell) error {
+func (u unixProcess) Open(pid int) error {
 	//shellPath := os.Getenv("SHELL")
-	command := exec.Command(shell.Name())
+	out, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "command=").Output()
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	outCommand := strings.Fields(string(out))
+	if len(outCommand) == 0 {
+		return fmt.Errorf("not found shell")
+	}
+	command := exec.Command(outCommand[0])
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {
-		pterm.Printf("Failed to start shell, err:%s\n", err.Error())
-		return err
+		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 	return nil
 }
