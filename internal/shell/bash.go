@@ -21,6 +21,23 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 )
 
+const bashHook = `
+_vfox_hook() {
+  local previous_exit_status=$?;
+  trap -- '' SIGINT;
+  eval "$("{{.SelfPath}}" env -s bash)";
+  trap - SIGINT;
+  return $previous_exit_status;
+};
+if ! [[ "${PROMPT_COMMAND[*]:-}" =~ _vfox_hook ]]; then
+  if [[ "$(declare -p PROMPT_COMMAND 2>&1)" == "declare -a"* ]]; then
+    PROMPT_COMMAND=(_vfox_hook "${PROMPT_COMMAND[@]}")
+  else
+    PROMPT_COMMAND="_vfox_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+  fi
+fi
+`
+
 type bash struct{}
 
 var Bash = bash{}
@@ -30,24 +47,7 @@ func (b bash) Name() string {
 }
 
 func (b bash) Activate() (string, error) {
-	var script = `
-			export MISE_SHELL=bash
-            export __MISE_ORIG_PATH="$PATH"
-
-            vfox() {{
-            }}
-
-            _vfox_hook() {{
-              local previous_exit_status=$?;
-              eval "$(mise hook-env{flags} -s bash)";
-              return $previous_exit_status;
-            }};
-            if [[ ";${{PROMPT_COMMAND:-}};" != *";_vfox_hook;"* ]]; then
-              PROMPT_COMMAND="_vfox_hook${{PROMPT_COMMAND:+;$PROMPT_COMMAND}}"
-            fi
-`
-
-	return script, nil
+	return bashHook, nil
 }
 
 //https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go

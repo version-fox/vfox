@@ -176,6 +176,9 @@ func (m *Manager) EnvKeys(record env.Record) (env.Envs, error) {
 			}
 		}
 	}
+	if len(shellEnvs) == 0 {
+		return shellEnvs, nil
+	}
 	pathStr := m.EnvManager.Paths(paths[:])
 	shellEnvs["PATH"] = &pathStr
 	return shellEnvs, nil

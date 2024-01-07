@@ -22,9 +22,9 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
-	"html/template"
 	"os"
 	"strings"
+	"text/template"
 )
 
 var Activate = &cli.Command{
