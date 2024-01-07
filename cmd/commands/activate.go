@@ -46,6 +46,7 @@ func activateCmd(ctx *cli.Context) error {
 	}
 	// Clean up the old temp files, before today.
 	go temp.RemoveOldFile()
+	// TODO read tool version from current directory
 	record, err := env.NewRecord(manager.ConfigPath)
 	if err != nil {
 		return err

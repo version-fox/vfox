@@ -43,10 +43,6 @@ type bash struct{}
 
 var Bash = bash{}
 
-func (b bash) Name() string {
-	return "bash"
-}
-
 func (b bash) Activate() (string, error) {
 	return bashHook, nil
 }

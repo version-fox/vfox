@@ -22,7 +22,6 @@ import (
 )
 
 type Shell interface {
-	Name() string
 	Activate() (string, error)
 	Export(envs env.Envs) string
 }
@@ -31,6 +30,8 @@ func NewShell(name string) Shell {
 	switch strings.ToLower(name) {
 	case "bash":
 		return Bash
+	case "zsh":
+		return Zsh
 	}
 	return nil
 
