@@ -44,7 +44,7 @@ type Arg struct {
 }
 
 type Manager struct {
-	TmpPath        string
+	TempPath       string
 	ConfigPath     string
 	SdkCachePath   string
 	EnvConfigPath  string
@@ -459,7 +459,7 @@ func NewSdkManager() *Manager {
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
 	configPath := filepath.Join(userHomeDir, ".version-fox")
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	tmpPath := filepath.Join(userHomeDir, ".version-fox", "tmp")
+	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
 	_ = os.MkdirAll(tmpPath, 0755)
@@ -467,15 +467,12 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Get executable path error")
 	}
-	if err != nil {
-		panic("Init shell error")
-	}
 	envManger, err := env.NewEnvManager(configPath, nil)
 	if err != nil {
 		panic("Init env manager error")
 	}
 	manager := &Manager{
-		TmpPath:        tmpPath,
+		TempPath:       tmpPath,
 		ConfigPath:     configPath,
 		SdkCachePath:   sdkCachePath,
 		PluginPath:     pluginPath,
