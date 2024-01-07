@@ -17,8 +17,13 @@
 package commands
 
 import (
+	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shell"
+	"os"
 	"strings"
 )
 
@@ -47,18 +52,21 @@ var Use = &cli.Command{
 }
 
 func useCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
-	defer manager.Close()
 	sdkArg := ctx.Args().First()
-	arg := sdk.Arg{}
-	if len(sdkArg) != 0 {
-		argArr := strings.Split(sdkArg, "@")
-		if len(argArr) <= 1 {
-			arg.Name = argArr[0]
-		} else {
-			arg.Name = argArr[0]
-			arg.Version = argArr[1]
-		}
+	if len(sdkArg) == 0 {
+		return fmt.Errorf("invalid parameter. format: <sdk-name>[@<version>]")
+	}
+	var (
+		name    string
+		version sdk.Version
+	)
+	argArr := strings.Split(sdkArg, "@")
+	if len(argArr) <= 1 {
+		name = argArr[0]
+		version = ""
+	} else {
+		name = argArr[0]
+		version = sdk.Version(argArr[1])
 	}
 	scope := sdk.Session
 	if ctx.IsSet("global") {
@@ -68,7 +76,40 @@ func useCmd(ctx *cli.Context) error {
 	} else {
 		scope = sdk.Session
 	}
-	// TODO Consider how to handle exceptions appropriately. Print directly or return?
-	_ = manager.Use(arg, scope)
-	return nil
+
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
+
+	source, err := manager.LookupSdk(name)
+	if err != nil {
+		return fmt.Errorf("%s not supported, error: %w", name, err)
+	}
+	if version == "" {
+		list := source.List()
+		var arr []string
+		for _, version := range list {
+			arr = append(arr, string(version))
+		}
+		selectPrinter := pterm.InteractiveSelectPrinter{
+			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			Options:       arr,
+			DefaultOption: "",
+			MaxHeight:     5,
+			Selector:      "->",
+			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			Filter:        true,
+			OnInterruptFunc: func() {
+				os.Exit(0)
+			},
+		}
+		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+		version = sdk.Version(result)
+	}
+	err = source.Use(version, scope)
+	if !env.IsHookEnv() {
+		return shell.GetProcess().Open(os.Getppid())
+	} else {
+		return err
+	}
 }

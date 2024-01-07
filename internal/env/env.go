@@ -21,8 +21,8 @@ import (
 )
 
 type Manager interface {
-	Flush(scope Scope) error
-	Load([]*KV)
+	Flush() error
+	Load(key, value string)
 	Get(key string) (string, bool)
 	Remove(key string) error
 	Paths(paths []string) string

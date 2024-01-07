@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"os"
 	"strings"
@@ -65,7 +64,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, env.Global)
+		return source.Use(firstVersion, sdk.Global)
 	}
 	return nil
 }

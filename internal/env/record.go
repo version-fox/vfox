@@ -29,7 +29,7 @@ const filename = ".tool-versions"
 
 // Record is an interface to record tool version
 type Record interface {
-	Add(name, version string) error
+	Add(name, version string)
 	Export() map[string]string
 	Save() error
 }
@@ -64,9 +64,9 @@ func (t *single) String() string {
 	return filename
 }
 
-func (t *single) Add(tool, version string) error {
-	t.Sdks[tool] = version
-	return nil
+func (t *single) Add(name, version string) {
+	t.Sdks[name] = version
+	return
 }
 
 func newSingle(dirPath string) (Record, error) {
@@ -108,18 +108,11 @@ func (m *multi) Export() map[string]string {
 	return m.main.Export()
 }
 
-func (m *multi) Add(name, version string) error {
-	err := m.main.Add(name, version)
-	if err != nil {
-		return err
-	}
+func (m *multi) Add(name, version string) {
+	m.main.Add(name, version)
 	for _, record := range m.slave {
-		err = record.Add(name, version)
-		if err != nil {
-			return err
-		}
+		record.Add(name, version)
 	}
-	return nil
 }
 
 func (m *multi) Save() error {

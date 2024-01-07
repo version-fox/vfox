@@ -22,6 +22,7 @@ import (
 )
 
 const bashHook = `
+export VFOX_SHELL=bash;
 _vfox_hook() {
   local previous_exit_status=$?;
   trap -- '' SIGINT;

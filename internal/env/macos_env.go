@@ -42,10 +42,11 @@ func (m *macosEnvManager) Close() error {
 	return nil
 }
 
-func (m *macosEnvManager) Load(kvs []*KV) {
-	for _, kv := range kvs {
-		m.store.Add(kv)
-	}
+func (m *macosEnvManager) Load(key, value string) {
+	m.store.Add(&KV{
+		Key:   key,
+		Value: value,
+	})
 }
 func (m *macosEnvManager) Remove(key string) error {
 	if key == "PATH" {
@@ -55,26 +56,7 @@ func (m *macosEnvManager) Remove(key string) error {
 	return nil
 }
 
-func (m *macosEnvManager) Flush(scope Scope) error {
-	if scope == Local {
-		for k, v := range m.store.envMap {
-			if err := os.Setenv(k, v); err != nil {
-				return err
-			}
-		}
-		var newPaths []string
-		for path := range m.store.pathMap {
-			newPaths = append(newPaths, path)
-		}
-		oldPaths := strings.Split(os.Getenv("PATH"), ":")
-		for _, path := range oldPaths {
-			if strings.Contains(path, ".version-fox") {
-				continue
-			}
-			newPaths = append(newPaths, path)
-		}
-		return os.Setenv("PATH", strings.Join(newPaths, ":"))
-	}
+func (m *macosEnvManager) Flush() error {
 	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Printf("Failed to open the file %s, err:%s\n", m.vfEnvPath, err.Error())

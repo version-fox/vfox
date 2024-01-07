@@ -174,7 +174,10 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 	return keys, nil
 }
 
-func (b *Sdk) Use(version Version, scope env.Scope) error {
+func (b *Sdk) Use(version Version, scope UseScope) error {
+	if !env.IsHookEnv() && scope != Global {
+		return errors.New("only global scope is supported in current shell")
+	}
 	label := b.label(version)
 	if !b.checkExists(version) {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
@@ -190,12 +193,35 @@ func (b *Sdk) Use(version Version, scope env.Scope) error {
 		pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
 		return err
 	}
+	var slavePath string
+	if scope == Global {
+		slavePath = b.sdkManager.ConfigPath
+	} else if scope == Project {
+		dir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get current dir error, err: %w", err)
+		}
+		slavePath = dir
+	}
+	temp, err := NewTemp(b.sdkManager.TempPath, os.Getppid())
+	if err != nil {
+		return err
+	}
+	record, err := env.NewRecord(temp.CurProcessPath, slavePath)
+	if err != nil {
+		return err
+	}
+	defer record.Save()
+	record.Add(b.Plugin.SourceName, string(version))
+
 	b.clearCurrentEnvConfig()
+
 	s := string(version)
 	keys[b.envVersionKey()] = &s
-	// TODO change to add(key,value)
-	//b.sdkManager.EnvManager.Load(keys)
-	err = b.sdkManager.EnvManager.Flush(scope)
+	for key, value := range keys {
+		b.sdkManager.EnvManager.Load(key, *value)
+	}
+	err = b.sdkManager.EnvManager.Flush()
 	if err != nil {
 		return err
 	}
