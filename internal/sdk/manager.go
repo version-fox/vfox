@@ -25,11 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
-	"github.com/version-fox/vfox/internal/toolversions"
-
-	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -63,102 +61,124 @@ type Manager struct {
 // 5. vfox use --session java@11
 // 6. vfox use --global java@11
 func (m *Manager) Use(arg Arg, useScope UseScope) error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		pterm.Printf("Get current dir error, err: %s\n", err)
-		return err
+	return nil
+	//pwd, err := os.Getwd()
+	//if err != nil {
+	//	pterm.Printf("Get current dir error, err: %s\n", err)
+	//	return err
+	//}
+	//tv, _ := env.NewRecord(pwd)
+	//var sdks []*Arg
+	//if arg.Name == "" {
+	//	for sdkName, version := range tv.Export() {
+	//		_, ok := m.openSdks[sdkName]
+	//		if !ok {
+	//			pterm.Printf("%s not supported.\n", sdkName)
+	//			continue
+	//		}
+	//		sdks = append(sdks, &Arg{
+	//			Name:    sdkName,
+	//			Version: version,
+	//		})
+	//	}
+	//	if len(sdks) == 0 {
+	//		pterm.Println("Invalid parameter. format: <sdk-name>[@<version>]")
+	//		return fmt.Errorf("invalid parameter")
+	//	}
+	//} else if arg.Version == "" {
+	//	source, ok := m.openSdks[arg.Name]
+	//	if !ok {
+	//		pterm.Printf("%s not supported.\n", arg.Name)
+	//		return fmt.Errorf("%s not supported", arg.Name)
+	//	}
+	//	version, ok := tv.Export()[arg.Name]
+	//	if ok {
+	//		sdks = append(sdks, &Arg{
+	//			Name:    arg.Name,
+	//			Version: version,
+	//		})
+	//	} else {
+	//		list := source.List()
+	//		var arr []string
+	//		for _, version := range list {
+	//			arr = append(arr, string(version))
+	//		}
+	//		selectPrinter := pterm.InteractiveSelectPrinter{
+	//			TextStyle:     &pterm.ThemeDefault.DefaultText,
+	//			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+	//			Options:       arr,
+	//			DefaultOption: "",
+	//			MaxHeight:     5,
+	//			Selector:      "->",
+	//			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+	//			Filter:        true,
+	//			OnInterruptFunc: func() {
+	//				os.Exit(0)
+	//			},
+	//		}
+	//		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", arg.Name))
+	//		sdks = append(sdks, &Arg{
+	//			Name:    arg.Name,
+	//			Version: result,
+	//		})
+	//	}
+	//} else {
+	//	_, ok := m.openSdks[arg.Name]
+	//	if !ok {
+	//		pterm.Printf("%s not supported.\n", arg.Name)
+	//		return fmt.Errorf("%s not supported", arg.Name)
+	//	}
+	//	sdks = append(sdks, &arg)
+	//}
+	//for _, sdk := range sdks {
+	//	source := m.openSdks[sdk.Name]
+	//	if useScope == Project {
+	//		err = source.Use(Version(sdk.Version), env.Local)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		err = tv.Add(arg.Name, sdk.Version)
+	//		if err != nil {
+	//			pterm.Printf("Failed to record %s version to %s\n", sdk.Version, tv)
+	//			return err
+	//		}
+	//	} else {
+	//		scope := env.Global
+	//		if useScope == Session {
+	//			scope = env.Local
+	//		} else {
+	//			scope = env.Global
+	//		}
+	//		err := source.Use(Version(sdk.Version), scope)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	//}
+	//// TODO
+	////return m.Shell.ReOpen()
+	//return err
+}
+
+func (m *Manager) EnvKeys(record env.Record) (env.Envs, error) {
+	shellEnvs := make(env.Envs)
+	var paths []string
+	for k, v := range record.Export() {
+		if lookupSdk, err := m.LookupSdk(k); err == nil {
+			if keys, err := lookupSdk.EnvKeys(Version(v)); err == nil {
+				for key, value := range keys {
+					if key == "PATH" {
+						paths = append(paths, *value)
+					} else {
+						shellEnvs[key] = value
+					}
+				}
+			}
+		}
 	}
-	tv, _ := toolversions.NewRecord(pwd)
-	var sdks []*Arg
-	if arg.Name == "" {
-		for sdkName, version := range tv.Export() {
-			_, ok := m.openSdks[sdkName]
-			if !ok {
-				pterm.Printf("%s not supported.\n", sdkName)
-				continue
-			}
-			sdks = append(sdks, &Arg{
-				Name:    sdkName,
-				Version: version,
-			})
-		}
-		if len(sdks) == 0 {
-			pterm.Println("Invalid parameter. format: <sdk-name>[@<version>]")
-			return fmt.Errorf("invalid parameter")
-		}
-	} else if arg.Version == "" {
-		source, ok := m.openSdks[arg.Name]
-		if !ok {
-			pterm.Printf("%s not supported.\n", arg.Name)
-			return fmt.Errorf("%s not supported", arg.Name)
-		}
-		version, ok := tv.Export()[arg.Name]
-		if ok {
-			sdks = append(sdks, &Arg{
-				Name:    arg.Name,
-				Version: version,
-			})
-		} else {
-			list := source.List()
-			var arr []string
-			for _, version := range list {
-				arr = append(arr, string(version))
-			}
-			selectPrinter := pterm.InteractiveSelectPrinter{
-				TextStyle:     &pterm.ThemeDefault.DefaultText,
-				OptionStyle:   &pterm.ThemeDefault.DefaultText,
-				Options:       arr,
-				DefaultOption: "",
-				MaxHeight:     5,
-				Selector:      "->",
-				SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-				Filter:        true,
-				OnInterruptFunc: func() {
-					os.Exit(0)
-				},
-			}
-			result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", arg.Name))
-			sdks = append(sdks, &Arg{
-				Name:    arg.Name,
-				Version: result,
-			})
-		}
-	} else {
-		_, ok := m.openSdks[arg.Name]
-		if !ok {
-			pterm.Printf("%s not supported.\n", arg.Name)
-			return fmt.Errorf("%s not supported", arg.Name)
-		}
-		sdks = append(sdks, &arg)
-	}
-	for _, sdk := range sdks {
-		source := m.openSdks[sdk.Name]
-		if useScope == Project {
-			err = source.Use(Version(sdk.Version), env.Local)
-			if err != nil {
-				return err
-			}
-			err = tv.Add(arg.Name, sdk.Version)
-			if err != nil {
-				pterm.Printf("Failed to record %s version to %s\n", sdk.Version, tv)
-				return err
-			}
-		} else {
-			scope := env.Global
-			if useScope == Session {
-				scope = env.Local
-			} else {
-				scope = env.Global
-			}
-			err := source.Use(Version(sdk.Version), scope)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// TODO
-	//return m.Shell.ReOpen()
-	return err
+	pathStr := m.EnvManager.Paths(paths[:])
+	shellEnvs["PATH"] = &pathStr
+	return shellEnvs, nil
 }
 
 // LookupSdk lookup sdk by name
@@ -440,7 +460,7 @@ func NewSdkManager() *Manager {
 	if err != nil {
 		panic("Get executable path error")
 	}
-	envManger, err := env.NewEnvManager(configPath, nil)
+	envManger, err := env.NewEnvManager(configPath)
 	if err != nil {
 		panic("Init env manager error")
 	}

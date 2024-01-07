@@ -21,7 +21,6 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
@@ -29,31 +28,14 @@ import (
 )
 
 type macosEnvManager struct {
-	shellInfo *shell.Shell
 	// ~/.version_fox/env.sh
 	vfEnvPath string
 	store     *Store
 }
 
-func (m *macosEnvManager) ToShellEnv() (shell.Envs, error) {
-	envs := make(shell.Envs)
-	for k, v := range m.store.envMap {
-		envs[k] = &v
-	}
-	var newPaths []string
-	for path := range m.store.pathMap {
-		newPaths = append(newPaths, path)
-	}
-	oldPaths := strings.Split(os.Getenv("PATH"), ":")
-	for _, path := range oldPaths {
-		if strings.Contains(path, ".version-fox") {
-			continue
-		}
-		newPaths = append(newPaths, path)
-	}
-	join := strings.Join(newPaths, ":")
-	envs["PATH"] = &join
-	return envs, nil
+func (m *macosEnvManager) Paths(paths []string) string {
+	paths = append(paths, "$PATH")
+	return strings.Join(paths, ":")
 }
 
 func (m *macosEnvManager) Close() error {
@@ -175,13 +157,12 @@ func (m *macosEnvManager) loadEnvFile() error {
 	return nil
 }
 
-func NewEnvManager(vfConfigPath string, shellInfo *shell.Shell) (Manager, error) {
+func NewEnvManager(vfConfigPath string) (Manager, error) {
 	envPath := filepath.Join(vfConfigPath, "env.sh")
 	if !util.FileExists(envPath) {
 		_, _ = os.Create(envPath)
 	}
 	manager := &macosEnvManager{
-		shellInfo: shellInfo,
 		vfEnvPath: envPath,
 		store:     NewStore(),
 	}

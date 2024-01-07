@@ -14,13 +14,12 @@
  *    limitations under the License.
  */
 
-package toolversions
+package env
 
 import (
 	"bufio"
 	"fmt"
 	"github.com/version-fox/vfox/internal/util"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,10 +27,11 @@ import (
 
 const filename = ".tool-versions"
 
+// Record is an interface to record tool version
 type Record interface {
 	Add(name, version string) error
 	Export() map[string]string
-	io.Closer
+	Save() error
 }
 
 type single struct {
@@ -44,7 +44,7 @@ func (t *single) Export() map[string]string {
 	return t.Sdks
 }
 
-func (t *single) Close() error {
+func (t *single) Save() error {
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
@@ -97,6 +97,43 @@ func newSingle(dirPath string) (Record, error) {
 		Sdks: versionsMap,
 		path: file,
 	}, nil
+}
+
+type multi struct {
+	main  Record
+	slave []Record
+}
+
+func (m *multi) Export() map[string]string {
+	return m.main.Export()
+}
+
+func (m *multi) Add(name, version string) error {
+	err := m.main.Add(name, version)
+	if err != nil {
+		return err
+	}
+	for _, record := range m.slave {
+		err = record.Add(name, version)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *multi) Save() error {
+	err := m.main.Save()
+	if err != nil {
+		return err
+	}
+	for _, record := range m.slave {
+		err = record.Save()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func NewRecord(mainPath string, salve ...string) (Record, error) {

@@ -17,7 +17,6 @@
 package env
 
 import (
-	"github.com/version-fox/vfox/internal/shell"
 	"io"
 )
 
@@ -26,9 +25,11 @@ type Manager interface {
 	Load([]*KV)
 	Get(key string) (string, bool)
 	Remove(key string) error
-	ToShellEnv() (shell.Envs, error)
+	Paths(paths []string) string
 	io.Closer
 }
+
+type Envs map[string]*string
 
 type KV struct {
 	Key   string

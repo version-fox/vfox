@@ -248,7 +248,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	return nil
 }
 
-func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
+func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "path", lua.LString(sdkPackage.Main.Path))
@@ -273,7 +273,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
 	var err error
-	var envKeys []*env.KV
+	envKeys := make(env.Envs)
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
 		if !ok {
@@ -282,7 +282,8 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) ([]*env.KV, error) {
 		}
 		key = kvTable.RawGetString("key")
 		value = kvTable.RawGetString("value")
-		envKeys = append(envKeys, &env.KV{Key: key.String(), Value: value.String()})
+		s := value.String()
+		envKeys[key.String()] = &s
 	})
 	if err != nil {
 		return nil, err

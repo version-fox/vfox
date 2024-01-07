@@ -19,6 +19,7 @@ package commands
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
 	"html/template"
@@ -45,7 +46,11 @@ func activateCmd(ctx *cli.Context) error {
 	}
 	// Clean up the old temp files, before today.
 	go temp.RemoveOldFile()
-
+	record, err := env.NewRecord(manager.ConfigPath)
+	if err != nil {
+		return err
+	}
+	envKeys, err := manager.EnvKeys(record)
 	path := manager.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	tmpCtx := struct {
@@ -57,8 +62,7 @@ func activateCmd(ctx *cli.Context) error {
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", name)
 	}
-	shellEnv, _ := manager.EnvManager.ToShellEnv()
-	exportStr := s.Export(shellEnv)
+	exportStr := s.Export(envKeys)
 	str, err := s.Activate()
 	if err != nil {
 		return err

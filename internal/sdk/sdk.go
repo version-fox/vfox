@@ -158,6 +158,22 @@ func (b *Sdk) Available() ([]*Package, error) {
 	return b.Plugin.Available()
 }
 
+func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
+	label := b.label(version)
+	if !b.checkExists(version) {
+		return nil, fmt.Errorf("%s is not installed", label)
+	}
+	sdkPackage, err := b.getLocalSdkPackage(version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get local sdk info, err:%w", err)
+	}
+	keys, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
+	}
+	return keys, nil
+}
+
 func (b *Sdk) Use(version Version, scope env.Scope) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
@@ -175,11 +191,10 @@ func (b *Sdk) Use(version Version, scope env.Scope) error {
 		return err
 	}
 	b.clearCurrentEnvConfig()
-	keys = append(keys, &env.KV{
-		Key:   b.envVersionKey(),
-		Value: string(version),
-	})
-	b.sdkManager.EnvManager.Load(keys)
+	s := string(version)
+	keys[b.envVersionKey()] = &s
+	// TODO change to add(key,value)
+	//b.sdkManager.EnvManager.Load(keys)
 	err = b.sdkManager.EnvManager.Flush(scope)
 	if err != nil {
 		return err
@@ -240,11 +255,11 @@ func (b *Sdk) clearEnvConfig(version Version) {
 		return
 	}
 	envManager := b.sdkManager.EnvManager
-	for _, kv := range envKV {
-		if kv.Key == "PATH" {
-			_ = envManager.Remove(kv.Value)
+	for k, v := range envKV {
+		if k == "PATH" {
+			_ = envManager.Remove(*v)
 		} else {
-			_ = envManager.Remove(kv.Key)
+			_ = envManager.Remove(k)
 		}
 	}
 	_ = envManager.Remove(b.envVersionKey())

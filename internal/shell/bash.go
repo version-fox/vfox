@@ -16,7 +16,10 @@
 
 package shell
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/version-fox/vfox/internal/env"
+)
 
 type bash struct{}
 
@@ -49,7 +52,7 @@ func (b bash) Activate() (string, error) {
 
 //https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 
-func (b bash) Export(envs Envs) (out string) {
+func (b bash) Export(envs env.Envs) (out string) {
 	for key, value := range envs {
 		if value == nil {
 			out += b.unset(key)

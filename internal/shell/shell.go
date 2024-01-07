@@ -16,14 +16,15 @@
 
 package shell
 
-import "strings"
-
-type Envs map[string]*string
+import (
+	"github.com/version-fox/vfox/internal/env"
+	"strings"
+)
 
 type Shell interface {
 	Name() string
 	Activate() (string, error)
-	Export(envs Envs) string
+	Export(envs env.Envs) string
 }
 
 func NewShell(name string) Shell {
