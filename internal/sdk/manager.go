@@ -68,7 +68,7 @@ func (m *Manager) EnvKeys(record env.Record) env.Envs {
 			}
 		}
 	}
-	if len(shellEnvs) == 0 {
+	if len(paths) == 0 {
 		return shellEnvs
 	}
 	pathStr := m.EnvManager.Paths(paths[:])

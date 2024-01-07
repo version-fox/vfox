@@ -39,8 +39,6 @@ var Env = &cli.Command{
 }
 
 func envCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
-	defer manager.Close()
 	shellName := ctx.String("shell")
 	if shellName == "" {
 		return cli.Exit("shell name is required", 1)
@@ -49,6 +47,8 @@ func envCmd(ctx *cli.Context) error {
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", shellName)
 	}
+	manager := sdk.NewSdkManager()
+	defer manager.Close()
 	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
 	if err != nil {
 		return err

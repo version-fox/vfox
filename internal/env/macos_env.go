@@ -34,7 +34,8 @@ type macosEnvManager struct {
 }
 
 func (m *macosEnvManager) Paths(paths []string) string {
-	paths = append(paths, "$PATH")
+	oldPath := os.Getenv("PATH")
+	paths = append(paths, oldPath)
 	return strings.Join(paths, ":")
 }
 
