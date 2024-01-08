@@ -34,11 +34,19 @@ var Env = &cli.Command{
 			Aliases: []string{"s"},
 			Usage:   "shell",
 		},
+		&cli.BoolFlag{
+			Name:    "cleanup",
+			Aliases: []string{"c"},
+			Usage:   "cleanup temp file",
+		},
 	},
 	Action: envCmd,
 }
 
 func envCmd(ctx *cli.Context) error {
+	if ctx.Bool("cleanup") {
+		// TODO cleanup temp file
+	}
 	shellName := ctx.String("shell")
 	if shellName == "" {
 		return cli.Exit("shell name is required", 1)

@@ -34,20 +34,20 @@ func (t *Temp) RemoveOldFile() {
 	dir, err := os.ReadDir(t.dirPath)
 	if err == nil {
 		for _, file := range dir {
-			if file.IsDir() {
+			if !file.IsDir() {
 				continue
 			}
 			names := strings.SplitN(file.Name(), "-", 2)
 			if len(names) != 2 {
 				continue
 			}
-			t := names[0]
-			i, err := strconv.ParseInt(t, 10, 64)
+			time := names[0]
+			i, err := strconv.ParseInt(time, 10, 64)
 			if err != nil {
 				continue
 			}
 			if util.IsBeforeToday(i) {
-				_ = os.Remove(filepath.Join(t, file.Name()))
+				_ = os.Remove(filepath.Join(t.dirPath, file.Name()))
 			}
 		}
 	}

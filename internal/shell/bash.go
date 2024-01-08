@@ -37,6 +37,8 @@ if ! [[ "${PROMPT_COMMAND[*]:-}" =~ _vfox_hook ]]; then
     PROMPT_COMMAND="_vfox_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
   fi
 fi
+
+trap 'vfox env --cleanup' EXIT
 `
 
 type bash struct{}
