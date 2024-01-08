@@ -19,8 +19,6 @@ package sdk
 import (
 	"errors"
 	"fmt"
-	"github.com/schollz/progressbar/v3"
-	"github.com/version-fox/vfox/internal/env"
 	"io"
 	"net"
 	"net/http"
@@ -29,6 +27,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shell"
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/util"
@@ -175,28 +177,31 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) Use(version Version, scope UseScope) error {
-	if !env.IsHookEnv() && scope != Session {
-		return errors.New("only global scope is supported in current shell")
+	// FIXME The default is Session under unix-like, and the default is Global under windows.
+	if !env.IsHookEnv() {
+		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
+		scope = Global
 	}
 	label := b.label(version)
 	if !b.checkExists(version) {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
-	if err != nil {
-		pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
-		return err
-	}
-	keys, err := b.Plugin.EnvKeys(sdkPackage)
-	if err != nil {
-		pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
-		return err
-	}
 	var slavePath string
 	// TODO Need to optimize envManager
 	if scope == Global {
 		slavePath = b.sdkManager.ConfigPath
+		sdkPackage, err := b.getLocalSdkPackage(version)
+		if err != nil {
+			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
+			return err
+		}
+		keys, err := b.Plugin.EnvKeys(sdkPackage)
+		if err != nil {
+			pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
+			return err
+		}
+
 		b.clearCurrentEnvConfig()
 
 		s := string(version)
@@ -226,17 +231,10 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	defer record.Save()
 	record.Add(b.Plugin.SourceName, string(version))
 
-	var outputLabel string
-	if len(sdkPackage.Additional) != 0 {
-		var additionalLabels []string
-		for _, additional := range sdkPackage.Additional {
-			additionalLabels = append(additionalLabels, fmt.Sprintf("%s v%s", additional.Name, additional.Version))
-		}
-		outputLabel = fmt.Sprintf("%s (%s)", label, strings.Join(additionalLabels, ","))
-	} else {
-		outputLabel = label
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
+	if !env.IsHookEnv() {
+		return shell.GetProcess().Open(os.Getppid())
 	}
-	pterm.Printf("Now using %s.\n", pterm.LightGreen(outputLabel))
 	return nil
 }
 

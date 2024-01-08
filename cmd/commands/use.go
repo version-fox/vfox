@@ -18,13 +18,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/sdk"
-	"github.com/version-fox/vfox/internal/shell"
 	"os"
 	"strings"
+
+	"github.com/pterm/pterm"
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Use = &cli.Command{
@@ -99,21 +98,13 @@ func useCmd(ctx *cli.Context) error {
 		version = sdk.Version(result)
 	}
 
-	if !env.IsHookEnv() {
-		err = source.Use(version, sdk.Session)
-		if err != nil {
-			return err
-		}
-		return shell.GetProcess().Open(os.Getppid())
+	scope := sdk.Session
+	if ctx.IsSet("global") {
+		scope = sdk.Global
+	} else if ctx.IsSet("project") {
+		scope = sdk.Project
 	} else {
-		scope := sdk.Session
-		if ctx.IsSet("global") {
-			scope = sdk.Global
-		} else if ctx.IsSet("project") {
-			scope = sdk.Project
-		} else {
-			scope = sdk.Session
-		}
-		return source.Use(version, scope)
+		scope = sdk.Session
 	}
+	return source.Use(version, scope)
 }

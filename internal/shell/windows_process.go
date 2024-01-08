@@ -48,6 +48,7 @@ func (w windowsProcess) Open(pid int) error {
 	}
 	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
 	command := exec.Command(path)
+	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
