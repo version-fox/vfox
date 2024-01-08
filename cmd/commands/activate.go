@@ -52,6 +52,8 @@ func activateCmd(ctx *cli.Context) error {
 		return err
 	}
 	envKeys := manager.EnvKeys(record)
+	envKeys[env.HookFlag] = &name
+	envKeys[env.PathFlag] = envKeys["PATH"]
 	path := manager.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	tmpCtx := struct {

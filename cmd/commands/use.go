@@ -32,17 +32,17 @@ var Use = &cli.Command{
 	Aliases: []string{"u"},
 	Usage:   "use a version of sdk",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		&cli.BoolFlag{
 			Name:    "global",
 			Aliases: []string{"g"},
 			Usage:   "used with the global environment",
 		},
-		&cli.StringFlag{
+		&cli.BoolFlag{
 			Name:    "project",
 			Aliases: []string{"p"},
 			Usage:   "used with the current directory",
 		},
-		&cli.StringFlag{
+		&cli.BoolFlag{
 			Name:    "session",
 			Aliases: []string{"s"},
 			Usage:   "used with the current shell session",
