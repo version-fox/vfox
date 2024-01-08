@@ -21,9 +21,7 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -58,26 +56,43 @@ func (m *macosEnvManager) Remove(key string) error {
 }
 
 func (m *macosEnvManager) Flush() error {
-	file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Printf("Failed to open the file %s, err:%s\n", m.vfEnvPath, err.Error())
-		return err
-	}
-	defer file.Close()
 	for k, v := range m.store.envMap {
-		str := fmt.Sprintf("export %s=%s\n", k, v)
-		if _, err := file.WriteString(str); err != nil {
-			fmt.Printf("Failed to flush env variable to file,value: err:%s\n", err.Error())
+		if err := os.Setenv(k, v); err != nil {
 			return err
 		}
 	}
-
-	pathValue := fmt.Sprintf("export PATH=%s\n", m.pathEnvValue())
-	if _, err := file.WriteString(pathValue); err != nil {
-		fmt.Printf("Failed to flush PATH variable to file, err:%s\n", err.Error())
-		return err
+	var newPaths []string
+	for path := range m.store.pathMap {
+		newPaths = append(newPaths, path)
 	}
-	return nil
+	oldPaths := strings.Split(os.Getenv("PATH"), ":")
+	for _, path := range oldPaths {
+		if strings.Contains(path, ".version-fox") {
+			continue
+		}
+		newPaths = append(newPaths, path)
+	}
+	return os.Setenv("PATH", strings.Join(newPaths, ":"))
+	//file, err := os.OpenFile(m.vfEnvPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	//if err != nil {
+	//	fmt.Printf("Failed to open the file %s, err:%s\n", m.vfEnvPath, err.Error())
+	//	return err
+	//}
+	//defer file.Close()
+	//for k, v := range m.store.envMap {
+	//	str := fmt.Sprintf("export %s=%s\n", k, v)
+	//	if _, err := file.WriteString(str); err != nil {
+	//		fmt.Printf("Failed to flush env variable to file,value: err:%s\n", err.Error())
+	//		return err
+	//	}
+	//}
+	//
+	//pathValue := fmt.Sprintf("export PATH=%s\n", m.pathEnvValue())
+	//if _, err := file.WriteString(pathValue); err != nil {
+	//	fmt.Printf("Failed to flush PATH variable to file, err:%s\n", err.Error())
+	//	return err
+	//}
+	//return nil
 }
 
 func (m *macosEnvManager) Get(key string) (string, bool) {
@@ -141,18 +156,18 @@ func (m *macosEnvManager) loadEnvFile() error {
 }
 
 func NewEnvManager(vfConfigPath string) (Manager, error) {
-	envPath := filepath.Join(vfConfigPath, "env.sh")
-	if !util.FileExists(envPath) {
-		_, _ = os.Create(envPath)
-	}
+	//envPath := filepath.Join(vfConfigPath, "env.sh")
+	//if !util.FileExists(envPath) {
+	//	_, _ = os.Create(envPath)
+	//}
 	manager := &macosEnvManager{
-		vfEnvPath: envPath,
-		store:     NewStore(),
+		//vfEnvPath: envPath,
+		store: NewStore(),
 	}
-	err := manager.loadEnvFile()
-	if err != nil {
-		fmt.Printf("Failed to load env file: %s, err:%s\n", manager.vfEnvPath, err.Error())
-	}
+	//err := manager.loadEnvFile()
+	//if err != nil {
+	//	fmt.Printf("Failed to load env file: %s, err:%s\n", manager.vfEnvPath, err.Error())
+	//}
 	//if err := appendEnvSourceIfNotExist(manager.shellInfo.ConfigPath, manager.vfEnvPath); err != nil {
 	//	return nil, err
 	//}

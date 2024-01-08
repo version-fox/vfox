@@ -26,26 +26,28 @@ import (
 	"strings"
 )
 
-type unixProcess struct{}
+type macosProcess struct{}
 
-var process = unixProcess{}
+var process = macosProcess{}
 
 func GetProcess() Process {
 	return process
 }
 
-func (u unixProcess) Open(pid int) error {
+func (u macosProcess) Open(pid int) error {
 	//shellPath := os.Getenv("SHELL")
 	out, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "command=").Output()
 	if err != nil {
 		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
-
 	outCommand := strings.Fields(string(out))
 	if len(outCommand) == 0 {
 		return fmt.Errorf("not found shell")
 	}
-	command := exec.Command(outCommand[0])
+	name := outCommand[0]
+	name = strings.TrimPrefix(name, "-")
+	command := exec.Command(name)
+	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr

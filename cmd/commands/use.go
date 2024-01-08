@@ -68,14 +68,6 @@ func useCmd(ctx *cli.Context) error {
 		name = argArr[0]
 		version = sdk.Version(argArr[1])
 	}
-	scope := sdk.Session
-	if ctx.IsSet("global") {
-		scope = sdk.Global
-	} else if ctx.IsSet("project") {
-		scope = sdk.Project
-	} else {
-		scope = sdk.Session
-	}
 
 	manager := sdk.NewSdkManager()
 	defer manager.Close()
@@ -106,10 +98,22 @@ func useCmd(ctx *cli.Context) error {
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
 		version = sdk.Version(result)
 	}
-	err = source.Use(version, scope)
+
 	if !env.IsHookEnv() {
+		err = source.Use(version, sdk.Global)
+		if err != nil {
+			return err
+		}
 		return shell.GetProcess().Open(os.Getppid())
 	} else {
-		return err
+		scope := sdk.Session
+		if ctx.IsSet("global") {
+			scope = sdk.Global
+		} else if ctx.IsSet("project") {
+			scope = sdk.Project
+		} else {
+			scope = sdk.Session
+		}
+		return source.Use(version, scope)
 	}
 }
