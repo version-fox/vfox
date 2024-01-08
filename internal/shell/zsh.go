@@ -25,7 +25,7 @@ type zsh struct{}
 var Zsh = zsh{}
 
 const zshHook = `
-
+{{.EnvContent}}
 _vfox_hook() {
   trap -- '' SIGINT;
   eval "$("{{.SelfPath}}" env -s zsh)";

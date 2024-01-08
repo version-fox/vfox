@@ -18,8 +18,9 @@ package shell
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/env"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/env"
 )
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_fish.go
@@ -29,6 +30,7 @@ type fish struct{}
 var Fish Shell = fish{}
 
 const fishHook = `
+{{.EnvContent}}
     function __vfox_export_eval --on-event fish_prompt;
         "{{.SelfPath}}" env -s fish | source;
 

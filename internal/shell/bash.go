@@ -18,11 +18,13 @@ package shell
 
 import (
 	"fmt"
+
 	"github.com/version-fox/vfox/internal/env"
 )
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
+{{.EnvContent}}
 _vfox_hook() {
   local previous_exit_status=$?;
   trap -- '' SIGINT;

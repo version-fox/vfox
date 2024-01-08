@@ -18,8 +18,9 @@ package shell
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/env"
 	"regexp"
+
+	"github.com/version-fox/vfox/internal/env"
 )
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_pwsh.go
@@ -28,25 +29,15 @@ type pwsh struct{}
 // Pwsh shell instance
 var Pwsh Shell = pwsh{}
 
-const hook = `using namespace System;
-using namespace System.Management.Automation;
-
-$hook = [EventHandler[LocationChangedEventArgs]] {
-  param([object] $source, [LocationChangedEventArgs] $eventArgs)
-  end {
+const hook = `
+{{.EnvContent}}
+function prompt {
     $export = {{.SelfPath}} env -s pwsh;
     if ($export) {
       Invoke-Expression -Command $export;
     }
-  }
-};
-$currentAction = $ExecutionContext.SessionState.InvokeCommand.LocationChangedAction;
-if ($currentAction) {
-  $ExecutionContext.SessionState.InvokeCommand.LocationChangedAction = [Delegate]::Combine($currentAction, $hook);
+	return "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) ";
 }
-else {
-  $ExecutionContext.SessionState.InvokeCommand.LocationChangedAction = $hook;
-};
 `
 
 func (sh pwsh) Activate() (string, error) {

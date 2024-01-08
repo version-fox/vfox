@@ -59,6 +59,7 @@ func (w *windowsEnvManager) loadPathValue() error {
 }
 
 func (w *windowsEnvManager) Flush() (err error) {
+	// TODO move this close method to other place
 	defer w.key.Close()
 	customPaths := make([]string, 0, len(w.pathMap))
 	customPathSet := make(map[string]struct{})
@@ -167,6 +168,8 @@ func (w *windowsEnvManager) pathEnvValue() string {
 }
 
 func (w *windowsEnvManager) Paths(paths []string) string {
+	s := os.Getenv("PATH")
+	paths = append(paths, s)
 	return strings.Join(paths, ";")
 }
 

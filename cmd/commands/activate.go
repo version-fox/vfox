@@ -50,11 +50,6 @@ func activateCmd(ctx *cli.Context) error {
 	envKeys[env.PathFlag] = envKeys["PATH"]
 	path := manager.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
-	tmpCtx := struct {
-		SelfPath string
-	}{
-		SelfPath: path,
-	}
 	s := shell.NewShell(name)
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", name)
@@ -64,10 +59,16 @@ func activateCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	script := exportStr + "\n" + str
-	hookTemplate, err := template.New("hook").Parse(script)
+	hookTemplate, err := template.New("hook").Parse(str)
 	if err != nil {
 		return nil
+	}
+	tmpCtx := struct {
+		SelfPath   string
+		EnvContent string
+	}{
+		SelfPath:   path,
+		EnvContent: exportStr,
 	}
 	return hookTemplate.Execute(ctx.App.Writer, tmpCtx)
 }
