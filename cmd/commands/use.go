@@ -100,7 +100,7 @@ func useCmd(ctx *cli.Context) error {
 	}
 
 	if !env.IsHookEnv() {
-		err = source.Use(version, sdk.Global)
+		err = source.Use(version, sdk.Session)
 		if err != nil {
 			return err
 		}

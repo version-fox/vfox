@@ -56,7 +56,7 @@ func newCmd(version string) *cmd {
 	app.Name = "VersionFox"
 	app.Usage = "VersionFox is a tool for sdk version management"
 	app.UsageText = "vfox [command] [command options]"
-	app.Copyright = "Copyright 2023 Han Li. All rights reserved."
+	app.Copyright = "Copyright 2024 Han Li. All rights reserved."
 	app.Version = version
 	app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
 	app.Suggest = true
