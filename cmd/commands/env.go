@@ -53,7 +53,11 @@ func envCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	record, err := env.NewRecord(temp.CurProcessPath)
+	curPath, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get current path error: %w", err)
+	}
+	record, err := env.NewRecord(temp.CurProcessPath, curPath)
 	if err != nil {
 		return err
 	}

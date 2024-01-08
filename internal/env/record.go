@@ -105,7 +105,13 @@ type multi struct {
 }
 
 func (m *multi) Export() map[string]string {
-	return m.main.Export()
+	export := m.main.Export()
+	for _, s := range m.slave {
+		for k, v := range s.Export() {
+			export[k] = v
+		}
+	}
+	return export
 }
 
 func (m *multi) Add(name, version string) {
@@ -132,7 +138,7 @@ func (m *multi) Save() error {
 func NewRecord(mainPath string, salve ...string) (Record, error) {
 	main, err := newSingle(mainPath)
 	if err != nil {
-		return nil, fmt.Errorf("create version record failed, error: %w", err)
+		return nil, fmt.Errorf("read version record failed, error: %w", err)
 	}
 
 	if len(salve) == 0 {
@@ -143,7 +149,7 @@ func NewRecord(mainPath string, salve ...string) (Record, error) {
 	for _, path := range salve {
 		salveRecord, err := newSingle(path)
 		if err != nil {
-			return nil, fmt.Errorf("create version record failed, error: %w", err)
+			return nil, fmt.Errorf("read version record failed, error: %w", err)
 		}
 		salveRecords = append(salveRecords, salveRecord)
 	}
