@@ -21,7 +21,6 @@ package env
 import (
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/shell"
 	"os"
 	"strings"
 	"syscall"
@@ -31,9 +30,8 @@ import (
 )
 
 type windowsEnvManager struct {
-	shellInfo *shell.Shell
-	key       registry.Key
-	store     *Store
+	key   registry.Key
+	store *Store
 }
 
 func (w *windowsEnvManager) Close() error {
@@ -58,7 +56,7 @@ func (w *windowsEnvManager) loadPathValue() error {
 	return nil
 }
 
-func (w *windowsEnvManager) Flush(scope Scope) (err error) {
+func (w *windowsEnvManager) Flush() (err error) {
 	customPaths := make([]string, 0, len(w.store.pathMap))
 	customPathSet := make(map[string]struct{})
 	if len(w.store.pathMap) > 0 {
@@ -67,12 +65,7 @@ func (w *windowsEnvManager) Flush(scope Scope) (err error) {
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
-		w.Load([]*KV{
-			{
-				Key:   "VERSION_FOX_PATH",
-				Value: pathValue,
-			}},
-		)
+		w.Load("VERSION_FOX_PATH", pathValue)
 
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
@@ -90,44 +83,28 @@ func (w *windowsEnvManager) Flush(scope Scope) (err error) {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	if scope == Global {
-		if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
-			return err
-		}
-	}
-	if err = os.Setenv("PATH", strings.Join(userNewPaths, ";")); err != nil {
+	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
 		return err
 	}
 	for k, _ := range w.store.deletedEnvMap {
-		if scope == Global {
-			if err = w.key.DeleteValue(k); err != nil {
-				return err
-			}
-		} else {
-			if err = os.Unsetenv(k); err != nil {
-				return err
-			}
+		if err = w.key.DeleteValue(k); err != nil {
+			return err
 		}
 	}
 	for k, v := range w.store.envMap {
-		if scope == Global {
-			if err = w.key.SetStringValue(k, v); err != nil {
-				return err
-			}
-		} else {
-			if err = os.Setenv(k, v); err != nil {
-				return err
-			}
+		if err = w.key.SetStringValue(k, v); err != nil {
+			return err
 		}
 	}
 	_ = w.broadcastEnvironment()
 	return nil
 }
 
-func (w *windowsEnvManager) Load(kvs []*KV) {
-	for _, kv := range kvs {
-		w.store.Add(kv)
-	}
+func (w *windowsEnvManager) Load(key, value string) {
+	w.store.Add(&KV{
+		Key:   key,
+		Value: value,
+	})
 }
 
 func (w *windowsEnvManager) Get(key string) (string, bool) {
@@ -168,18 +145,21 @@ func (w *windowsEnvManager) pathEnvValue() string {
 	for path := range w.store.pathMap {
 		paths = append(paths, path)
 	}
+	return w.Paths(paths)
+}
+
+func (w *windowsEnvManager) Paths(paths []string) string {
 	return strings.Join(paths, ";")
 }
 
-func NewEnvManager(vfConfigPath string, shellInfo *shell.Shell) (Manager, error) {
+func NewEnvManager(vfConfigPath string) (Manager, error) {
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return nil, err
 	}
 	manager := &windowsEnvManager{
-		shellInfo: shellInfo,
-		key:       k,
-		store:     NewStore(),
+		key:   k,
+		store: NewStore(),
 	}
 	err = manager.loadPathValue()
 	if err != nil {

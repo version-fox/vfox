@@ -175,7 +175,7 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) Use(version Version, scope UseScope) error {
-	if !env.IsHookEnv() && scope != Global {
+	if !env.IsHookEnv() && scope != Session {
 		return errors.New("only global scope is supported in current shell")
 	}
 	label := b.label(version)
@@ -194,8 +194,20 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		return err
 	}
 	var slavePath string
+	// TODO Need to optimize envManager
 	if scope == Global {
 		slavePath = b.sdkManager.ConfigPath
+		b.clearCurrentEnvConfig()
+
+		s := string(version)
+		keys[b.envVersionKey()] = &s
+		for key, value := range keys {
+			b.sdkManager.EnvManager.Load(key, *value)
+		}
+		err = b.sdkManager.EnvManager.Flush()
+		if err != nil {
+			return err
+		}
 	} else if scope == Project {
 		dir, err := os.Getwd()
 		if err != nil {
@@ -214,17 +226,6 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	defer record.Save()
 	record.Add(b.Plugin.SourceName, string(version))
 
-	b.clearCurrentEnvConfig()
-
-	s := string(version)
-	keys[b.envVersionKey()] = &s
-	for key, value := range keys {
-		b.sdkManager.EnvManager.Load(key, *value)
-	}
-	err = b.sdkManager.EnvManager.Flush()
-	if err != nil {
-		return err
-	}
 	var outputLabel string
 	if len(sdkPackage.Additional) != 0 {
 		var additionalLabels []string
