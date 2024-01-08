@@ -18,13 +18,13 @@ package commands
 
 import (
 	"fmt"
+	"strings"
+	"text/template"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
-	"os"
-	"strings"
-	"text/template"
 )
 
 var Activate = &cli.Command{
@@ -40,12 +40,6 @@ func activateCmd(ctx *cli.Context) error {
 	}
 	manager := sdk.NewSdkManager()
 	defer manager.Close()
-	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
-	if err != nil {
-		return err
-	}
-	// Clean up the old temp files, before today.
-	temp.RemoveOldFile()
 	// TODO read tool version from current directory
 	record, err := env.NewRecord(manager.ConfigPath)
 	if err != nil {

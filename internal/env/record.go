@@ -19,10 +19,11 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const filename = ".tool-versions"
@@ -147,6 +148,9 @@ func NewRecord(mainPath string, salve ...string) (Record, error) {
 
 	var salveRecords []Record
 	for _, path := range salve {
+		if path == "" {
+			continue
+		}
 		salveRecord, err := newSingle(path)
 		if err != nil {
 			return nil, fmt.Errorf("read version record failed, error: %w", err)
