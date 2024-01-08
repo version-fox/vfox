@@ -18,7 +18,7 @@ package shell
 
 import "github.com/version-fox/vfox/internal/env"
 
-// BASE https://github.com/direnv/direnv/blob/master/internal/cmd/shell_zsh.go
+// Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_zsh.go
 
 type zsh struct{}
 

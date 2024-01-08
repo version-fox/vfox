@@ -21,6 +21,7 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 )
 
+// Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
 _vfox_hook() {
   local previous_exit_status=$?;
@@ -45,8 +46,6 @@ var Bash = bash{}
 func (b bash) Activate() (string, error) {
 	return bashHook, nil
 }
-
-//https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 
 func (b bash) Export(envs env.Envs) (out string) {
 	for key, value := range envs {
