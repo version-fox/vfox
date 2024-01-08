@@ -18,12 +18,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/sdk"
+	"github.com/version-fox/vfox/cmd/commands"
+	"os"
 )
 
 func Execute(version string, args []string) {
@@ -54,18 +51,6 @@ func newCmd(version string) *cmd {
 		},
 	}
 
-	manager := sdk.NewSdkManager()
-	defer manager.Close()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM)
-
-	go func() {
-		<-signals
-		manager.Close()
-		os.Exit(0)
-	}()
-
 	app := &cli.App{}
 	app.EnableBashCompletion = true
 	app.Name = "VersionFox"
@@ -81,17 +66,19 @@ func newCmd(version string) *cmd {
 		}
 	}
 	app.Commands = []*cli.Command{
-		newInfo(manager),
-		newList(manager),
-		newUse(manager),
-		newInstall(manager),
-		newUninstall(manager),
-		newSearch(manager),
-		newUpdate(manager),
-		newCurrent(manager),
-		newAdd(manager),
-		newRemove(manager),
-		newAvailable(manager),
+		commands.Info,
+		commands.Install,
+		commands.Current,
+		commands.Use,
+		commands.List,
+		commands.Uninstall,
+		commands.Available,
+		commands.Search,
+		commands.Update,
+		commands.Remove,
+		commands.Add,
+		commands.Activate,
+		commands.Env,
 	}
 
 	return &cmd{app: app, version: version}
