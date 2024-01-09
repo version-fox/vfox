@@ -25,8 +25,9 @@ plugins shared by others to install SDKs. It all depends on your imagination. ;)
 - **cross-platform support** (Windows, Linux, macOS)
 - single CLI for multiple languages
 - **consistent commands** to manage all your languages
+- support **Global**、**Project**、**Session** scopes when switching versions
 - simple **plugin system** to add support for your language of choice
-- automatically switches runtime versions as you traverse your project
+- **automatically switches** runtime versions as you traverse your project
 - shell completion available for common shells (Bash, Zsh, Powershell)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.** see [What-is-the-difference-with-asdf?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
 
