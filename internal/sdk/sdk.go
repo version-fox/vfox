@@ -255,7 +255,10 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, _ := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.getLocalSdkPackage(version)
+	if err != nil {
+		return
+	}
 	envKV, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
 		return

@@ -90,7 +90,6 @@ func (t *single) Add(name, version string) {
 }
 
 func newSingle(dirPath string) (Record, error) {
-
 	file := filepath.Join(dirPath, filename)
 	versionsMap := make(map[string]string)
 	if util.FileExists(file) {
@@ -173,9 +172,6 @@ func NewRecord(mainPath string, salve ...string) (Record, error) {
 		salveRecord, err := newSingle(path)
 		if err != nil {
 			return nil, fmt.Errorf("read version record failed, error: %w", err)
-		}
-		for k, v := range salveRecord.Export() {
-			main.Add(k, v)
 		}
 		salveRecords = append(salveRecords, salveRecord)
 	}

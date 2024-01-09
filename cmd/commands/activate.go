@@ -38,7 +38,7 @@ func activateCmd(ctx *cli.Context) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := sdk.NewSdkManagerWithSource(sdk.GlobalRecordSource, sdk.ProjectRecordSource)
+	manager := sdk.NewSdkManager(sdk.GlobalRecordSource, sdk.ProjectRecordSource)
 	defer manager.Record.Save()
 	defer manager.Close()
 	envKeys := manager.EnvKeys()

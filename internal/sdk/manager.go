@@ -349,9 +349,7 @@ func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 			if err != nil {
 				panic("Get current dir error")
 			}
-			if env.IsRecordExist(curDir) {
-				paths = append(paths, curDir)
-			}
+			paths = append(paths, curDir)
 		case SessionRecordSource:
 			temp, err := NewTemp(meta.TempPath, os.Getppid())
 			if err != nil {
@@ -379,8 +377,11 @@ func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 	return newSdkManager(record, meta)
 }
 
-func NewSdkManager() *Manager {
-	return NewSdkManagerWithSource(SessionRecordSource, ProjectRecordSource)
+func NewSdkManager(sources ...RecordSource) *Manager {
+	if len(sources) == 0 {
+		return NewSdkManagerWithSource(SessionRecordSource, ProjectRecordSource)
+	}
+	return newSdkManagerWithSource(sources...)
 }
 
 func newSdkManager(record env.Record, meta *PathMeta) *Manager {

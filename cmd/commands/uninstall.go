@@ -37,7 +37,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	manager := sdk.NewSdkManager()
+	manager := sdk.NewSdkManagerWithSource(sdk.SessionRecordSource, sdk.GlobalRecordSource, sdk.ProjectRecordSource)
 	defer manager.Close()
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
