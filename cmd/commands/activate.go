@@ -38,17 +38,12 @@ func activateCmd(ctx *cli.Context) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := sdk.NewSdkManager()
+	manager := sdk.NewSdkManagerWithSource(sdk.GlobalRecordSource, sdk.ProjectRecordSource)
 	defer manager.Close()
-	// TODO read tool version from current directory
-	record, err := env.NewRecord(manager.ConfigPath)
-	if err != nil {
-		return err
-	}
-	envKeys := manager.EnvKeys(record)
+	envKeys := manager.EnvKeys()
 	envKeys[env.HookFlag] = &name
 	envKeys[env.PathFlag] = envKeys["PATH"]
-	path := manager.ExecutablePath
+	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	s := shell.NewShell(name)
 	if s == nil {

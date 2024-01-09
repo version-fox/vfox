@@ -190,7 +190,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	var slavePath string
 	// TODO Need to optimize envManager
 	if scope == Global {
-		slavePath = b.sdkManager.ConfigPath
+		slavePath = b.sdkManager.PathMeta.ConfigPath
 		sdkPackage, err := b.getLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
@@ -220,7 +220,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 		slavePath = dir
 	}
-	temp, err := NewTemp(b.sdkManager.TempPath, os.Getppid())
+	temp, err := NewTemp(b.sdkManager.PathMeta.TempPath, os.Getppid())
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (b *Sdk) envVersionKey() string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.SdkCachePath, strings.ToLower(source.SourceName)),
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }

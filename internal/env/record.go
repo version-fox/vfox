@@ -28,12 +28,31 @@ import (
 
 const filename = ".tool-versions"
 
+func IsRecordExist(dirPath string) bool {
+	return util.FileExists(filepath.Join(dirPath, filename))
+}
+
 // Record is an interface to record tool version
 type Record interface {
 	Add(name, version string)
 	Export() map[string]string
 	Save() error
 }
+type empty struct {
+}
+
+func (e empty) Add(name, version string) {
+}
+
+func (e empty) Export() map[string]string {
+	return map[string]string{}
+}
+
+func (e empty) Save() error {
+	return nil
+}
+
+var EmptyRecord = &empty{}
 
 type single struct {
 	// Sdks sdkName -> version
@@ -154,6 +173,9 @@ func NewRecord(mainPath string, salve ...string) (Record, error) {
 		salveRecord, err := newSingle(path)
 		if err != nil {
 			return nil, fmt.Errorf("read version record failed, error: %w", err)
+		}
+		for k, v := range salveRecord.Export() {
+			main.Add(k, v)
 		}
 		salveRecords = append(salveRecords, salveRecord)
 	}
