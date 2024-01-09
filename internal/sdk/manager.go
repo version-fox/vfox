@@ -327,6 +327,14 @@ func (m *Manager) Available() ([]*Category, error) {
 }
 
 func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
+	if env.IsHookEnv() {
+		return newSdkManagerWithSource(sources...)
+	} else {
+		return newSdkManagerWithSource(SessionRecordSource, GlobalRecordSource, ProjectRecordSource)
+	}
+}
+
+func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 	meta, err := newPathMeta()
 	if err != nil {
 		panic("Init path meta error")
@@ -353,7 +361,7 @@ func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
 		}
 	}
 	var record env.Record
-	if !env.IsHookEnv() || len(paths) == 0 {
+	if len(paths) == 0 {
 		record = env.EmptyRecord
 	} else if len(paths) == 1 {
 		r, err := env.NewRecord(paths[0])
@@ -372,7 +380,7 @@ func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
 }
 
 func NewSdkManager() *Manager {
-	return NewSdkManagerWithSource()
+	return NewSdkManagerWithSource(SessionRecordSource, ProjectRecordSource)
 }
 
 func newSdkManager(record env.Record, meta *PathMeta) *Manager {

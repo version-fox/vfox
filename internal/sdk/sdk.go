@@ -187,10 +187,8 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	var slavePath string
 	// TODO Need to optimize envManager
 	if scope == Global {
-		slavePath = b.sdkManager.PathMeta.ConfigPath
 		sdkPackage, err := b.getLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
@@ -204,8 +202,6 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 		b.clearCurrentEnvConfig()
 
-		s := string(version)
-		keys[b.envVersionKey()] = &s
 		for key, value := range keys {
 			b.sdkManager.EnvManager.Load(key, *value)
 		}
@@ -213,24 +209,9 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
-	} else if scope == Project {
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get current dir error, err: %w", err)
-		}
-		slavePath = dir
 	}
-	temp, err := NewTemp(b.sdkManager.PathMeta.TempPath, os.Getppid())
-	if err != nil {
-		return err
-	}
-	record, err := env.NewRecord(temp.CurProcessPath, slavePath)
-	if err != nil {
-		return err
-	}
-	defer record.Save()
-	record.Add(b.Plugin.SourceName, string(version))
-
+	b.sdkManager.Record.Add(b.Plugin.SourceName, string(version))
+	defer b.sdkManager.Record.Save()
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
 	if !env.IsHookEnv() {
 		return shell.GetProcess().Open(os.Getppid())
@@ -259,8 +240,8 @@ func (b *Sdk) List() []Version {
 }
 
 func (b *Sdk) Current() Version {
-	value, _ := b.sdkManager.EnvManager.Get(b.envVersionKey())
-	return Version(value)
+	version := b.sdkManager.Record.Export()[b.Plugin.SourceName]
+	return Version(version)
 }
 
 func (b *Sdk) Close() {
@@ -287,7 +268,6 @@ func (b *Sdk) clearEnvConfig(version Version) {
 			_ = envManager.Remove(k)
 		}
 	}
-	_ = envManager.Remove(b.envVersionKey())
 }
 
 func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
@@ -407,10 +387,6 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 
 func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
-}
-
-func (b *Sdk) envVersionKey() string {
-	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name))
 }
 
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {

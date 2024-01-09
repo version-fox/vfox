@@ -68,7 +68,18 @@ func useCmd(ctx *cli.Context) error {
 		version = sdk.Version(argArr[1])
 	}
 
-	manager := sdk.NewSdkManager()
+	recordSources := []sdk.RecordSource{sdk.SessionRecordSource}
+	scope := sdk.Session
+	if ctx.IsSet("global") {
+		scope = sdk.Global
+		recordSources = append(recordSources, sdk.GlobalRecordSource)
+	} else if ctx.IsSet("project") {
+		scope = sdk.Project
+		recordSources = append(recordSources, sdk.ProjectRecordSource)
+	} else {
+		scope = sdk.Session
+	}
+	manager := sdk.NewSdkManagerWithSource(recordSources...)
 	defer manager.Close()
 
 	source, err := manager.LookupSdk(name)
@@ -96,15 +107,6 @@ func useCmd(ctx *cli.Context) error {
 		}
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
 		version = sdk.Version(result)
-	}
-
-	scope := sdk.Session
-	if ctx.IsSet("global") {
-		scope = sdk.Global
-	} else if ctx.IsSet("project") {
-		scope = sdk.Project
-	} else {
-		scope = sdk.Session
 	}
 	return source.Use(version, scope)
 }
