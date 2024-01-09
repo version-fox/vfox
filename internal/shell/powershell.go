@@ -32,14 +32,16 @@ var Pwsh Shell = pwsh{}
 const hook = `
 {{.EnvContent}}
 function prompt {
-    $export = {{.SelfPath}} env -s pwsh;
+    $export = &"{{.SelfPath}}" env -s pwsh;
     if ($export) {
       Invoke-Expression -Command $export;
     }
 	return "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) ";
 }
 
-Register-EngineEvent PowerShell.Exiting -Action { vfox env --cleanup } -SupportEvent
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
+	&"{{.SelfPath}}" env --cleanup;
+}
 `
 
 func (sh pwsh) Activate() (string, error) {
