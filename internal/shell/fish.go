@@ -54,6 +54,9 @@ const fishHook = `
 
         functions --erase __vfox_cd_hook;
     end;
+	function cleanup_on_exit --on-process-exit %self
+		vfox env --cleanup
+	end;
 `
 
 func (sh fish) Activate() (string, error) {

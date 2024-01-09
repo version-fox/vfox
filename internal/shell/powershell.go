@@ -38,6 +38,8 @@ function prompt {
     }
 	return "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) ";
 }
+
+Register-EngineEvent PowerShell.Exiting -Action { vfox env --cleanup } -SupportEvent
 `
 
 func (sh pwsh) Activate() (string, error) {
