@@ -255,6 +255,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
+	b.sdkManager.Record.Remove(string(version))
 	sdkPackage, err := b.getLocalSdkPackage(version)
 	if err != nil {
 		return

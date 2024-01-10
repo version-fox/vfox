@@ -35,6 +35,7 @@ func IsRecordExist(dirPath string) bool {
 // Record is an interface to record tool version
 type Record interface {
 	Add(name, version string)
+	Remove(name string)
 	Export() map[string]string
 	Save() error
 }
@@ -48,6 +49,9 @@ func (e empty) Export() map[string]string {
 	return map[string]string{}
 }
 
+func (e empty) Remove(name string) {
+}
+
 func (e empty) Save() error {
 	return nil
 }
@@ -58,6 +62,10 @@ type single struct {
 	// Sdks sdkName -> version
 	Sdks map[string]string
 	path string
+}
+
+func (t *single) Remove(name string) {
+	delete(t.Sdks, name)
 }
 
 func (t *single) Export() map[string]string {
@@ -124,6 +132,13 @@ func newSingle(dirPath string) (Record, error) {
 type multi struct {
 	main  Record
 	slave []Record
+}
+
+func (m *multi) Remove(name string) {
+	m.main.Remove(name)
+	for _, record := range m.slave {
+		record.Remove(name)
+	}
 }
 
 func (m *multi) Export() map[string]string {
