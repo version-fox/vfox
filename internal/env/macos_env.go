@@ -32,14 +32,8 @@ type macosEnvManager struct {
 }
 
 func (m *macosEnvManager) Paths(paths []string) string {
-	// TODO env.Flag
-	if IsHookEnv() {
-		oldPath := os.Getenv(PathFlag)
-		paths = append(paths, oldPath)
-	} else {
-		getenv := os.Getenv("PATH")
-		paths = append(paths, getenv)
-	}
+	getenv := os.Getenv("PATH")
+	paths = append(paths, getenv)
 	return strings.Join(paths, ":")
 }
 

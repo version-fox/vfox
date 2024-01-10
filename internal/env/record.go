@@ -65,6 +65,9 @@ func (t *single) Export() map[string]string {
 }
 
 func (t *single) Save() error {
+	if len(t.Sdks) == 0 {
+		return nil
+	}
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
