@@ -31,6 +31,44 @@ plugins shared by others to install SDKs. It all depends on your imagination. ;)
 - shell completion available for common shells (Bash, Zsh, Powershell)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.** see [What-is-the-difference-with-asdf?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
 
+## Demo
+[![asciicast](https://asciinema.org/a/630769.svg)](https://asciinema.org/a/630769)
+
+## Quickstart
+
+Install VersionFox (For detailed installation see [Installation](https://github.com/version-fox/vfox/wiki/Getting-Started#installation))
+
+```bash
+$ brew tap version-fox/tap
+$ brew install vfox
+```
+
+Hook VersionFox into your shell (pick one that works for your shell)
+```bash
+echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
+echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
+echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+
+# For PowerShell, add the following line to your $PROFILE:
+Invoke-Expression "$(vfox activate pwsh)"
+```
+
+Add an SDK plugin (For detailed usage see [Getting Started](https://github.com/version-fox/vfox/wiki/Getting-Started))
+```bash 
+$ vfox add zig/zig
+```
+
+Install an SDK version
+```bash
+$ vfox install zig@0.11.0
+```
+
+Use the installed SDK version
+```bash
+$ vfox use zig@0.11.0
+$ zig version
+0.11.0
+```
 
 
 ## Documentation
