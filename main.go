@@ -21,7 +21,7 @@ import (
 	"os"
 )
 
-const Version = "0.1.2-dev"
+const Version = "0.2.0"
 
 func main() {
 	cmd.Execute(Version, os.Args)
