@@ -127,13 +127,16 @@ type multi struct {
 }
 
 func (m *multi) Export() map[string]string {
-	export := m.main.Export()
+	result := make(map[string]string)
+	for k, v := range m.main.Export() {
+		result[k] = v
+	}
 	for _, s := range m.slave {
 		for k, v := range s.Export() {
-			export[k] = v
+			result[k] = v
 		}
 	}
-	return export
+	return result
 }
 
 func (m *multi) Add(name, version string) {
