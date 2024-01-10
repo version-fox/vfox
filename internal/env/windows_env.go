@@ -30,8 +30,10 @@ import (
 )
 
 type windowsEnvManager struct {
-	key   registry.Key
-	store *Store
+	key registry.Key
+	// $PATH
+	pathMap        map[string]struct{}
+	deletedPathMap map[string]struct{}
 }
 
 func (w *windowsEnvManager) Close() error {
@@ -51,31 +53,35 @@ func (w *windowsEnvManager) loadPathValue() error {
 	}
 	s := strings.Split(val, ";")
 	for _, path := range s {
-		w.store.pathMap[path] = struct{}{}
+		w.pathMap[path] = struct{}{}
 	}
 	return nil
 }
 
 func (w *windowsEnvManager) Flush() (err error) {
-	customPaths := make([]string, 0, len(w.store.pathMap))
+	// TODO move this close method to other place
+	defer w.key.Close()
+	customPaths := make([]string, 0, len(w.pathMap))
 	customPathSet := make(map[string]struct{})
-	if len(w.store.pathMap) > 0 {
-		for path := range w.store.pathMap {
+	if len(w.pathMap) > 0 {
+		for path := range w.pathMap {
 			customPaths = append(customPaths, path)
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
 		w.Load("VERSION_FOX_PATH", pathValue)
-
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
-
-	oldPath := os.Getenv("PATH")
+	// user env
+	oldPath, success := w.Get("PATH")
+	if !success {
+		return
+	}
 	s := strings.Split(oldPath, ";")
 	userNewPaths := append([]string{}, customPaths...)
 	for _, v := range s {
-		if _, ok := w.store.deletedPathMap[v]; ok {
+		if _, ok := w.deletedPathMap[v]; ok {
 			continue
 		}
 		if _, ok := customPathSet[v]; ok {
@@ -83,44 +89,57 @@ func (w *windowsEnvManager) Flush() (err error) {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
-		return err
-	}
-	for k, _ := range w.store.deletedEnvMap {
-		if err = w.key.DeleteValue(k); err != nil {
-			return err
+	w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";"))
+	// sys env
+	sysPath := os.Getenv("PATH")
+	s2 := strings.Split(sysPath, ";")
+	sysNewPaths := append([]string{}, customPaths...)
+	for _, v := range s2 {
+		if _, ok := w.deletedPathMap[v]; ok {
+			continue
 		}
-	}
-	for k, v := range w.store.envMap {
-		if err = w.key.SetStringValue(k, v); err != nil {
-			return err
+		if _, ok := customPathSet[v]; ok {
+			continue
 		}
+		sysNewPaths = append(sysNewPaths, v)
 	}
+	os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
 	_ = w.broadcastEnvironment()
-	return nil
+	return
 }
 
 func (w *windowsEnvManager) Load(key, value string) {
-	w.store.Add(&KV{
-		Key:   key,
-		Value: value,
-	})
+	if key == "PATH" {
+		w.pathMap[value] = struct{}{}
+	} else {
+		// TODO handle error
+		err := os.Setenv(key, value)
+		if err != nil {
+		}
+		err = w.key.SetStringValue(key, value)
+		if err != nil {
+		}
+	}
 }
 
 func (w *windowsEnvManager) Get(key string) (string, bool) {
-	if key == "PATH" {
-		return w.pathEnvValue(), true
-	} else {
-		s, ok := w.store.envMap[key]
-		return s, ok
+	val, _, err := w.key.GetStringValue(key)
+	if err != nil {
+		return "", false
 	}
+	return val, true
 }
 
 func (w *windowsEnvManager) Remove(key string) error {
 	if key == "PATH" {
 		return fmt.Errorf("can not remove PATH variable")
 	}
-	w.store.Remove(key)
+	if _, ok := w.pathMap[key]; ok {
+		delete(w.pathMap, key)
+		w.deletedPathMap[key] = struct{}{}
+	} else {
+		_ = w.key.DeleteValue(key)
+	}
 	return nil
 }
 
@@ -142,13 +161,15 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 
 func (w *windowsEnvManager) pathEnvValue() string {
 	var paths []string
-	for path := range w.store.pathMap {
+	for path := range w.pathMap {
 		paths = append(paths, path)
 	}
 	return w.Paths(paths)
 }
 
 func (w *windowsEnvManager) Paths(paths []string) string {
+	s := os.Getenv("PATH")
+	paths = append(paths, s)
 	return strings.Join(paths, ";")
 }
 
@@ -158,8 +179,9 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 		return nil, err
 	}
 	manager := &windowsEnvManager{
-		key:   k,
-		store: NewStore(),
+		key:            k,
+		pathMap:        make(map[string]struct{}),
+		deletedPathMap: make(map[string]struct{}),
 	}
 	err = manager.loadPathValue()
 	if err != nil {

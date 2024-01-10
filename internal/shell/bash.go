@@ -18,11 +18,13 @@ package shell
 
 import (
 	"fmt"
+
 	"github.com/version-fox/vfox/internal/env"
 )
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
+{{.EnvContent}}
 _vfox_hook() {
   local previous_exit_status=$?;
   trap -- '' SIGINT;
@@ -37,6 +39,8 @@ if ! [[ "${PROMPT_COMMAND[*]:-}" =~ _vfox_hook ]]; then
     PROMPT_COMMAND="_vfox_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
   fi
 fi
+
+trap 'vfox env --cleanup' EXIT
 `
 
 type bash struct{}

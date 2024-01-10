@@ -18,13 +18,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/sdk"
-	"github.com/version-fox/vfox/internal/shell"
 	"os"
 	"strings"
+
+	"github.com/pterm/pterm"
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Use = &cli.Command{
@@ -69,7 +68,19 @@ func useCmd(ctx *cli.Context) error {
 		version = sdk.Version(argArr[1])
 	}
 
-	manager := sdk.NewSdkManager()
+	var recordSources []sdk.RecordSource
+	scope := sdk.Session
+	if ctx.IsSet("global") {
+		scope = sdk.Global
+		recordSources = append(recordSources, sdk.SessionRecordSource, sdk.GlobalRecordSource)
+	} else if ctx.IsSet("project") {
+		scope = sdk.Project
+		recordSources = append(recordSources, sdk.ProjectRecordSource)
+	} else {
+		scope = sdk.Session
+		recordSources = append(recordSources, sdk.SessionRecordSource)
+	}
+	manager := sdk.NewSdkManagerWithSource(recordSources...)
 	defer manager.Close()
 
 	source, err := manager.LookupSdk(name)
@@ -98,22 +109,5 @@ func useCmd(ctx *cli.Context) error {
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
 		version = sdk.Version(result)
 	}
-
-	if !env.IsHookEnv() {
-		err = source.Use(version, sdk.Session)
-		if err != nil {
-			return err
-		}
-		return shell.GetProcess().Open(os.Getppid())
-	} else {
-		scope := sdk.Session
-		if ctx.IsSet("global") {
-			scope = sdk.Global
-		} else if ctx.IsSet("project") {
-			scope = sdk.Project
-		} else {
-			scope = sdk.Session
-		}
-		return source.Use(version, scope)
-	}
+	return source.Use(version, scope)
 }

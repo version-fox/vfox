@@ -40,22 +40,18 @@ type Arg struct {
 }
 
 type Manager struct {
-	TempPath       string
-	ConfigPath     string
-	SdkCachePath   string
-	EnvConfigPath  string
-	PluginPath     string
-	ExecutablePath string
-	openSdks       map[string]*Sdk
-	EnvManager     env.Manager
-	osType         util.OSType
-	archType       util.ArchType
+	PathMeta   *PathMeta
+	openSdks   map[string]*Sdk
+	EnvManager env.Manager
+	Record     env.Record
+	osType     util.OSType
+	archType   util.ArchType
 }
 
-func (m *Manager) EnvKeys(record env.Record) env.Envs {
+func (m *Manager) EnvKeys() env.Envs {
 	shellEnvs := make(env.Envs)
 	var paths []string
-	for k, v := range record.Export() {
+	for k, v := range m.Record.Export() {
 		if lookupSdk, err := m.LookupSdk(k); err == nil {
 			if keys, err := lookupSdk.EnvKeys(Version(v)); err == nil {
 				for key, value := range keys {
@@ -69,16 +65,23 @@ func (m *Manager) EnvKeys(record env.Record) env.Envs {
 		}
 	}
 	if len(paths) == 0 {
-		return shellEnvs
+		var p string
+		if env.IsHookEnv() {
+			p = os.Getenv(env.PathFlag)
+		} else {
+			p = os.Getenv("PATH")
+		}
+		shellEnvs["PATH"] = &p
+	} else {
+		pathStr := m.EnvManager.Paths(paths[:])
+		shellEnvs["PATH"] = &pathStr
 	}
-	pathStr := m.EnvManager.Paths(paths[:])
-	shellEnvs["PATH"] = &pathStr
 	return shellEnvs
 }
 
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
-	pluginPath := filepath.Join(m.PluginPath, strings.ToLower(name)+".lua")
+	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
 	if !util.FileExists(pluginPath) {
 		return nil, fmt.Errorf("%s not installed", name)
 	}
@@ -96,7 +99,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 }
 
 func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
-	dir, err := os.ReadDir(m.PluginPath)
+	dir, err := os.ReadDir(m.PathMeta.PluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("load sdks error: %w", err)
 	}
@@ -107,7 +110,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		}
 		if strings.HasSuffix(d.Name(), ".lua") {
 			// filename first as sdk name
-			path := filepath.Join(m.PluginPath, d.Name())
+			path := filepath.Join(m.PathMeta.PluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
 			source, err := NewLuaPlugin(content, path, m.osType, m.archType)
 			if err != nil {
@@ -136,7 +139,7 @@ func (m *Manager) Remove(pluginName string) error {
 		return err
 	}
 	source.clearCurrentEnvConfig()
-	pPath := filepath.Join(m.PluginPath, pluginName+".lua")
+	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName+".lua")
 	pterm.Printf("Removing %s plugin...\n", pPath)
 	err = os.RemoveAll(pPath)
 	if err != nil {
@@ -229,7 +232,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		pname = alias
 	}
 
-	destPath := filepath.Join(m.PluginPath, pname+".lua")
+	destPath := filepath.Join(m.PathMeta.PluginPath, pname+".lua")
 	if util.FileExists(destPath) {
 		pterm.Printf("Plugin %s already exists, please use %s to remove it first.\n", pterm.LightGreen(pname), pterm.LightBlue("vfox remove "+pname))
 		return fmt.Errorf("plugin already exists")
@@ -330,36 +333,76 @@ func (m *Manager) Available() ([]*Category, error) {
 	}
 }
 
-func NewSdkManager() *Manager {
-	userHomeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic("Get user home dir error")
+func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
+	if env.IsHookEnv() {
+		return newSdkManagerWithSource(sources...)
+	} else {
+		return newSdkManagerWithSource(SessionRecordSource, GlobalRecordSource, ProjectRecordSource)
 	}
-	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
-	configPath := filepath.Join(userHomeDir, ".version-fox")
-	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
-	_ = os.MkdirAll(sdkCachePath, 0755)
-	_ = os.MkdirAll(pluginPath, 0755)
-	_ = os.MkdirAll(tmpPath, 0755)
-	exePath, err := os.Executable()
+}
+
+func newSdkManagerWithSource(sources ...RecordSource) *Manager {
+	meta, err := newPathMeta()
 	if err != nil {
-		panic("Get executable path error")
+		panic("Init path meta error")
 	}
-	envManger, err := env.NewEnvManager(configPath)
+	var paths []string
+	for _, source := range sources {
+		switch source {
+		case GlobalRecordSource:
+			paths = append(paths, meta.ConfigPath)
+		case ProjectRecordSource:
+			curDir, err := os.Getwd()
+			if err != nil {
+				panic("Get current dir error")
+			}
+			paths = append(paths, curDir)
+		case SessionRecordSource:
+			temp, err := NewTemp(meta.TempPath, os.Getppid())
+			if err != nil {
+				panic("Init temp error")
+			}
+			paths = append(paths, temp.CurProcessPath)
+		}
+	}
+	var record env.Record
+	if len(paths) == 0 {
+		record = env.EmptyRecord
+	} else if len(paths) == 1 {
+		r, err := env.NewRecord(paths[0])
+		if err != nil {
+			panic(err)
+		}
+		record = r
+	} else {
+		r, err := env.NewRecord(paths[0], paths[1:]...)
+		if err != nil {
+			panic(err)
+		}
+		record = r
+	}
+	return newSdkManager(record, meta)
+}
+
+func NewSdkManager(sources ...RecordSource) *Manager {
+	if len(sources) == 0 {
+		return NewSdkManagerWithSource(SessionRecordSource, ProjectRecordSource)
+	}
+	return newSdkManagerWithSource(sources...)
+}
+
+func newSdkManager(record env.Record, meta *PathMeta) *Manager {
+	envManger, err := env.NewEnvManager(meta.ConfigPath)
 	if err != nil {
 		panic("Init env manager error")
 	}
 	manager := &Manager{
-		TempPath:       tmpPath,
-		ConfigPath:     configPath,
-		SdkCachePath:   sdkCachePath,
-		PluginPath:     pluginPath,
-		ExecutablePath: exePath,
-		EnvManager:     envManger,
-		openSdks:       make(map[string]*Sdk),
-		osType:         util.GetOSType(),
-		archType:       util.GetArchType(),
+		PathMeta:   meta,
+		EnvManager: envManger,
+		Record:     record,
+		openSdks:   make(map[string]*Sdk),
+		osType:     util.GetOSType(),
+		archType:   util.GetArchType(),
 	}
 	return manager
 }

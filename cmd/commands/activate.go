@@ -18,13 +18,13 @@ package commands
 
 import (
 	"fmt"
+	"strings"
+	"text/template"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
-	"os"
-	"strings"
-	"text/template"
 )
 
 var Activate = &cli.Command{
@@ -38,29 +38,14 @@ func activateCmd(ctx *cli.Context) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := sdk.NewSdkManager()
+	manager := sdk.NewSdkManager(sdk.GlobalRecordSource, sdk.ProjectRecordSource)
+	defer manager.Record.Save()
 	defer manager.Close()
-	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
-	if err != nil {
-		return err
-	}
-	// Clean up the old temp files, before today.
-	go temp.RemoveOldFile()
-	// TODO read tool version from current directory
-	record, err := env.NewRecord(manager.ConfigPath)
-	if err != nil {
-		return err
-	}
-	envKeys := manager.EnvKeys(record)
+	envKeys := manager.EnvKeys()
 	envKeys[env.HookFlag] = &name
 	envKeys[env.PathFlag] = envKeys["PATH"]
-	path := manager.ExecutablePath
+	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
-	tmpCtx := struct {
-		SelfPath string
-	}{
-		SelfPath: path,
-	}
 	s := shell.NewShell(name)
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", name)
@@ -70,10 +55,16 @@ func activateCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	script := exportStr + "\n" + str
-	hookTemplate, err := template.New("hook").Parse(script)
+	hookTemplate, err := template.New("hook").Parse(str)
 	if err != nil {
 		return nil
+	}
+	tmpCtx := struct {
+		SelfPath   string
+		EnvContent string
+	}{
+		SelfPath:   path,
+		EnvContent: exportStr,
 	}
 	return hookTemplate.Execute(ctx.App.Writer, tmpCtx)
 }

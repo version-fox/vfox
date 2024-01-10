@@ -19,8 +19,6 @@ package sdk
 import (
 	"errors"
 	"fmt"
-	"github.com/schollz/progressbar/v3"
-	"github.com/version-fox/vfox/internal/env"
 	"io"
 	"net"
 	"net/http"
@@ -29,6 +27,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shell"
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/util"
@@ -175,32 +177,31 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) Use(version Version, scope UseScope) error {
-	if !env.IsHookEnv() && scope != Session {
-		return errors.New("only global scope is supported in current shell")
+	// FIXME The default is Session under unix-like, and the default is Global under windows.
+	if !env.IsHookEnv() {
+		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
+		scope = Global
 	}
 	label := b.label(version)
 	if !b.checkExists(version) {
 		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
-	if err != nil {
-		pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
-		return err
-	}
-	keys, err := b.Plugin.EnvKeys(sdkPackage)
-	if err != nil {
-		pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
-		return err
-	}
-	var slavePath string
 	// TODO Need to optimize envManager
 	if scope == Global {
-		slavePath = b.sdkManager.ConfigPath
+		sdkPackage, err := b.getLocalSdkPackage(version)
+		if err != nil {
+			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
+			return err
+		}
+		keys, err := b.Plugin.EnvKeys(sdkPackage)
+		if err != nil {
+			pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
+			return err
+		}
+
 		b.clearCurrentEnvConfig()
 
-		s := string(version)
-		keys[b.envVersionKey()] = &s
 		for key, value := range keys {
 			b.sdkManager.EnvManager.Load(key, *value)
 		}
@@ -208,35 +209,13 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
-	} else if scope == Project {
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get current dir error, err: %w", err)
-		}
-		slavePath = dir
 	}
-	temp, err := NewTemp(b.sdkManager.TempPath, os.Getppid())
-	if err != nil {
-		return err
+	b.sdkManager.Record.Add(b.Plugin.SourceName, string(version))
+	defer b.sdkManager.Record.Save()
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
+	if !env.IsHookEnv() {
+		return shell.GetProcess().Open(os.Getppid())
 	}
-	record, err := env.NewRecord(temp.CurProcessPath, slavePath)
-	if err != nil {
-		return err
-	}
-	defer record.Save()
-	record.Add(b.Plugin.SourceName, string(version))
-
-	var outputLabel string
-	if len(sdkPackage.Additional) != 0 {
-		var additionalLabels []string
-		for _, additional := range sdkPackage.Additional {
-			additionalLabels = append(additionalLabels, fmt.Sprintf("%s v%s", additional.Name, additional.Version))
-		}
-		outputLabel = fmt.Sprintf("%s (%s)", label, strings.Join(additionalLabels, ","))
-	} else {
-		outputLabel = label
-	}
-	pterm.Printf("Now using %s.\n", pterm.LightGreen(outputLabel))
 	return nil
 }
 
@@ -261,8 +240,8 @@ func (b *Sdk) List() []Version {
 }
 
 func (b *Sdk) Current() Version {
-	value, _ := b.sdkManager.EnvManager.Get(b.envVersionKey())
-	return Version(value)
+	version := b.sdkManager.Record.Export()[b.Plugin.SourceName]
+	return Version(version)
 }
 
 func (b *Sdk) Close() {
@@ -276,7 +255,10 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, _ := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.getLocalSdkPackage(version)
+	if err != nil {
+		return
+	}
 	envKV, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
 		return
@@ -289,7 +271,6 @@ func (b *Sdk) clearEnvConfig(version Version) {
 			_ = envManager.Remove(k)
 		}
 	}
-	_ = envManager.Remove(b.envVersionKey())
 }
 
 func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
@@ -411,14 +392,10 @@ func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
-func (b *Sdk) envVersionKey() string {
-	return fmt.Sprintf("%s_VERSION", strings.ToUpper(b.Plugin.Name))
-}
-
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.SdkCachePath, strings.ToLower(source.SourceName)),
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SourceName)),
 		Plugin:      source,
 	}, nil
 }

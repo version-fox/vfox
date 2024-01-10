@@ -39,7 +39,7 @@ var Add = &cli.Command{
 }
 
 func addCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
+	manager := sdk.NewSdkManagerWithSource()
 	defer manager.Close()
 	sdkName := ctx.Args().First()
 	source := ctx.String("source")

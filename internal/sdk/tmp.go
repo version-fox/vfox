@@ -18,11 +18,10 @@ package sdk
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
+
+	"github.com/version-fox/vfox/internal/util"
 )
 
 type Temp struct {
@@ -30,27 +29,8 @@ type Temp struct {
 	CurProcessPath string
 }
 
-func (t *Temp) RemoveOldFile() {
-	dir, err := os.ReadDir(t.dirPath)
-	if err == nil {
-		for _, file := range dir {
-			if file.IsDir() {
-				continue
-			}
-			names := strings.SplitN(file.Name(), "-", 2)
-			if len(names) != 2 {
-				continue
-			}
-			t := names[0]
-			i, err := strconv.ParseInt(t, 10, 64)
-			if err != nil {
-				continue
-			}
-			if util.IsBeforeToday(i) {
-				_ = os.Remove(filepath.Join(t, file.Name()))
-			}
-		}
-	}
+func (t *Temp) Remove() {
+	_ = os.RemoveAll(t.CurProcessPath)
 }
 
 func NewTemp(dirPath string, pid int) (*Temp, error) {

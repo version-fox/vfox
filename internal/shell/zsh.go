@@ -25,7 +25,7 @@ type zsh struct{}
 var Zsh = zsh{}
 
 const zshHook = `
-
+{{.EnvContent}}
 _vfox_hook() {
   trap -- '' SIGINT;
   eval "$("{{.SelfPath}}" env -s zsh)";
@@ -39,6 +39,8 @@ typeset -ag chpwd_functions;
 if [[ -z "${chpwd_functions[(r)_vfox_hook]+1}" ]]; then
   chpwd_functions=( _vfox_hook ${chpwd_functions[@]} )
 fi
+
+trap 'vfox env --cleanup' EXIT
 `
 
 func (z zsh) Activate() (string, error) {

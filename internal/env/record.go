@@ -19,13 +19,18 @@ package env
 import (
 	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const filename = ".tool-versions"
+
+func IsRecordExist(dirPath string) bool {
+	return util.FileExists(filepath.Join(dirPath, filename))
+}
 
 // Record is an interface to record tool version
 type Record interface {
@@ -33,6 +38,21 @@ type Record interface {
 	Export() map[string]string
 	Save() error
 }
+type empty struct {
+}
+
+func (e empty) Add(name, version string) {
+}
+
+func (e empty) Export() map[string]string {
+	return map[string]string{}
+}
+
+func (e empty) Save() error {
+	return nil
+}
+
+var EmptyRecord = &empty{}
 
 type single struct {
 	// Sdks sdkName -> version
@@ -45,6 +65,9 @@ func (t *single) Export() map[string]string {
 }
 
 func (t *single) Save() error {
+	if len(t.Sdks) == 0 {
+		return nil
+	}
 	file, err := os.Create(t.path)
 	if err != nil {
 		return err
@@ -70,7 +93,6 @@ func (t *single) Add(name, version string) {
 }
 
 func newSingle(dirPath string) (Record, error) {
-
 	file := filepath.Join(dirPath, filename)
 	versionsMap := make(map[string]string)
 	if util.FileExists(file) {
@@ -105,13 +127,16 @@ type multi struct {
 }
 
 func (m *multi) Export() map[string]string {
-	export := m.main.Export()
+	result := make(map[string]string)
+	for k, v := range m.main.Export() {
+		result[k] = v
+	}
 	for _, s := range m.slave {
 		for k, v := range s.Export() {
-			export[k] = v
+			result[k] = v
 		}
 	}
-	return export
+	return result
 }
 
 func (m *multi) Add(name, version string) {
@@ -147,6 +172,9 @@ func NewRecord(mainPath string, salve ...string) (Record, error) {
 
 	var salveRecords []Record
 	for _, path := range salve {
+		if path == "" {
+			continue
+		}
 		salveRecord, err := newSingle(path)
 		if err != nil {
 			return nil, fmt.Errorf("read version record failed, error: %w", err)

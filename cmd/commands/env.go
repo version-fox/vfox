@@ -18,11 +18,11 @@ package commands
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
-	"os"
 )
 
 var Env = &cli.Command{
@@ -34,35 +34,40 @@ var Env = &cli.Command{
 			Aliases: []string{"s"},
 			Usage:   "shell",
 		},
+		&cli.BoolFlag{
+			Name:    "cleanup",
+			Aliases: []string{"c"},
+			Usage:   "cleanup temp file",
+		},
 	},
 	Action: envCmd,
 }
 
 func envCmd(ctx *cli.Context) error {
-	shellName := ctx.String("shell")
-	if shellName == "" {
-		return cli.Exit("shell name is required", 1)
+	if ctx.IsSet("cleanup") {
+		manager := sdk.NewSdkManager()
+		defer manager.Close()
+		temp, err := sdk.NewTemp(manager.PathMeta.TempPath, os.Getppid())
+		if err != nil {
+			return err
+		}
+		// Clean up the old temp files, before today.
+		temp.Remove()
+		return nil
+	} else {
+		shellName := ctx.String("shell")
+		if shellName == "" {
+			return cli.Exit("shell name is required", 1)
+		}
+		s := shell.NewShell(shellName)
+		if s == nil {
+			return fmt.Errorf("unknow target shell %s", shellName)
+		}
+		manager := sdk.NewSdkManagerWithSource(sdk.SessionRecordSource, sdk.ProjectRecordSource)
+		defer manager.Close()
+		envKeys := manager.EnvKeys()
+		exportStr := s.Export(envKeys)
+		fmt.Println(exportStr)
+		return nil
 	}
-	s := shell.NewShell(shellName)
-	if s == nil {
-		return fmt.Errorf("unknow target shell %s", shellName)
-	}
-	manager := sdk.NewSdkManager()
-	defer manager.Close()
-	temp, err := sdk.NewTemp(manager.TempPath, os.Getppid())
-	if err != nil {
-		return err
-	}
-	curPath, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get current path error: %w", err)
-	}
-	record, err := env.NewRecord(temp.CurProcessPath, curPath)
-	if err != nil {
-		return err
-	}
-	envKeys := manager.EnvKeys(record)
-	exportStr := s.Export(envKeys)
-	fmt.Println(exportStr)
-	return nil
 }
