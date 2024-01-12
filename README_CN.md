@@ -471,16 +471,6 @@ VersionFox对于插件的来源是没有任何限制的,你可以使用任何你
 为了方便共享和使用,我们还是提供了一个插件仓库[version-fox-plugin](https://github.com/version-fox/version-fox-plugins)
 ,你可以在这里找到一些常用的插件,当然了,你也可以将你的插件分享到这个仓库中来.
 
-#### 已支持的SDK
-
-- [x] [Node.js](https://github.com/version-fox/version-fox-plugins/blob/main/node/node.lua)
-- [ ] Python
-- [ ] Go
-- [ ] Java
-- [ ] Rust
-- [ ] Ruby
-  // etc...
-
 ## 命令一览表
 
 ```bash
