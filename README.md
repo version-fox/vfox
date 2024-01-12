@@ -91,18 +91,14 @@ $ zig version
 
 ## Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any
-contributions you make are greatly appreciated.
+Bug reports, contributions and forks are welcome. All bugs or other forms of discussion happen on [issues](http://github.com/version-fox/vfox/issues).
 
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a pull request
+See more at [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 Plugin Contributions, please go to [version-fox-plugins](https://github.com/version-fox/version-fox-plugins).
 
-## License
 
-Distributed under the Apache 2.0 License. See [LICENSE](./LICENSE) for more information.
+## COPYRIGHT
+
+[Apache 2.0 licence](./LICENSE) - Copyright (C) 2024 Han Li and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
 
