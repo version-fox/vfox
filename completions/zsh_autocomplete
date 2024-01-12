@@ -1,4 +1,4 @@
-#compdef $PROG
+#compdef vfox
 
 _cli_zsh_autocomplete() {
   local -a opts
@@ -17,4 +17,4 @@ _cli_zsh_autocomplete() {
   fi
 }
 
-compdef _cli_zsh_autocomplete $PROG
+compdef _cli_zsh_autocomplete vfox
