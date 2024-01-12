@@ -18,7 +18,7 @@ VersionFox 是一个跨平台的用于管理SDK版本的工具，它允许你通
 
 ### macOS
 
-在macOS上,你可以使用Homebrew来快速安装`vf`:
+在macOS上,你可以使用Homebrew来快速安装`vfox`:
 
 ```bash
 $ brew tap version-fox/tap
@@ -67,18 +67,25 @@ $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh |
 ```
 
 ### Windows
+对于Windows用户, 有两种方式进行安装:
+1. 下载setup.ext安装器进行安装
+2. 直接下载二进制文件, 将它**配置到PATH**中
 
-在Windows上，你需要以管理员身份运行PowerShell来下载和运行`install.ps1`脚本。首先，右键点击开始菜单，
-选择"Windows PowerShell (管理员)"来打开一个以管理员身份运行的PowerShell窗口。 然后，在PowerShell
-窗口中输入以下命令：
 
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/version-fox/vfox/main/install.ps1'))
+### 将 vfox 挂到你的 shell 中（从下面条目中,选择适合你 shell 的版本）：
+```bash
+echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
+echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
+echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+
+Add the following line to your $PROFILE:
+Invoke-Expression "$(vfox activate pwsh)"
 ```
 
-## 使用
+### 演示(Nodejs)
+[![asciicast](https://asciinema.org/a/630778.svg)](https://asciinema.org/a/630778)
 
-[![asciicast](https://asciinema.org/a/629106.svg)](https://asciinema.org/a/629106)
+
 
 ### 0. 获取官方可用插件列表
 **Command** : `vfox available [<category>]`
