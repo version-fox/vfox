@@ -97,6 +97,9 @@ See more at [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 Plugin Contributions, please go to [version-fox-plugins](https://github.com/version-fox/version-fox-plugins).
 
+## Star History
+
+![Star History Chart](https://api.star-history.com/svg?repos=version-fox/vfox&type=Date)
 
 ## COPYRIGHT
 
