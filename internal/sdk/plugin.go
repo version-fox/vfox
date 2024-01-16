@@ -149,7 +149,7 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) (*Checksum, error) {
 		checksum.Value = sha512.String()
 		checksum.Type = "sha512"
 	} else {
-		return nil, fmt.Errorf("checksum not found")
+		return NoneChecksum, nil
 	}
 	return checksum, nil
 }

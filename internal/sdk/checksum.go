@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"github.com/pterm/pterm"
 	"os"
 )
 
@@ -48,9 +49,17 @@ func (c *Checksum) verify(path string) bool {
 	} else if c.Type == "md5" {
 		hashValue := md5.Sum(fileData)
 		hash = hashValue[:]
+	} else if c.Type == "none" {
+		pterm.Printf("%s: Checksum is not provided, skip verify...\n", pterm.LightYellow("WARNING"))
+		return true
 	} else {
 		return false
 	}
 	checksum := hex.EncodeToString(hash)
 	return checksum == c.Value
+}
+
+var NoneChecksum = &Checksum{
+	Value: "",
+	Type:  "none",
 }
