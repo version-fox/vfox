@@ -39,7 +39,7 @@ const fishHook = `
                 if test "$vfox_fish_mode" = "eval_after_arrow";
                     set -g __vfox_export_again 0;
                 else;
-                    "{{.SelfPath}}" export fish | source;
+                    "{{.SelfPath}}" env -s fish | source;
                 end;
             end;
         end;
@@ -48,14 +48,15 @@ const fishHook = `
     function __vfox_export_eval_2 --on-event fish_preexec;
         if set -q __vfox_export_again;
             set -e __vfox_export_again;
-            "{{.SelfPath}}" export fish | source;
+            "{{.SelfPath}}" env -s fish | source;
             echo;
         end;
 
         functions --erase __vfox_cd_hook;
     end;
 	function cleanup_on_exit --on-process-exit %self
-		vfox env --cleanup
+
+		"{{.SelfPath}}" env --cleanup
 	end;
 `
 
