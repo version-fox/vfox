@@ -35,6 +35,5 @@ func updateCmd(ctx *cli.Context) error {
 	}
 	manager := sdk.NewSdkManager()
 	defer manager.Close()
-	_ = manager.Update(args.First())
-	return nil
+	return manager.Update(args.First())
 }

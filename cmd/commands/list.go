@@ -41,8 +41,7 @@ func listCmd(ctx *cli.Context) error {
 			return err
 		}
 		if len(allSdk) == 0 {
-			pterm.Println("You don't have any sdk installed yet.")
-			return nil
+			return fmt.Errorf("you don't have any sdk installed yet")
 		}
 		tree := pterm.LeveledList{}
 		for name, s := range allSdk {
@@ -65,8 +64,7 @@ func listCmd(ctx *cli.Context) error {
 	curVersion := source.Current()
 	list := source.List()
 	if len(list) == 0 {
-		pterm.Println("No available version.")
-		return nil
+		return fmt.Errorf("no available version")
 	}
 	for _, version := range list {
 		if version == curVersion {

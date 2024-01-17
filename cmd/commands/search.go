@@ -18,7 +18,6 @@ package commands
 
 import (
 	"fmt"
-	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/sdk"
@@ -44,12 +43,10 @@ func searchCmd(ctx *cli.Context) error {
 	}
 	result, err := source.Available()
 	if err != nil {
-		pterm.Printf("Plugin [Available] error: %s\n", err)
-		return nil
+		return fmt.Errorf("plugin [Available] method error: %w", err)
 	}
 	if len(result) == 0 {
-		pterm.Println("No Available version.")
-		return nil
+		return fmt.Errorf("no available version")
 	}
 	kvSelect := printer.PageKVSelect{
 		TopText: "Please select a version of " + sdkName,
@@ -91,8 +88,7 @@ func searchCmd(ctx *cli.Context) error {
 	}
 	version, err := kvSelect.Show()
 	if err != nil {
-		pterm.Printf("Select version error, err: %s\n", err)
-		return err
+		return fmt.Errorf("select version error: %w", err)
 	}
 	return source.Install(sdk.Version(version.Key))
 }

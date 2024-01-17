@@ -163,20 +163,17 @@ func (m *Manager) Update(pluginName string) error {
 	pterm.Printf("Checking %s plugin...\n", updateUrl)
 	content, err := m.loadLuaFromFileOrUrl(updateUrl)
 	if err != nil {
-		pterm.Printf("Failed to load %s plugin, err: %s\n", updateUrl, err)
-		return fmt.Errorf("fetch plugin failed")
+		return fmt.Errorf("fetch plugin failed, err: %w", err)
 	}
 	source, err := NewLuaPlugin(content, updateUrl, m.osType, m.archType)
 	if err != nil {
-		pterm.Printf("Check %s plugin failed, err: %s\n", updateUrl, err)
-		return err
+		return fmt.Errorf("check %s plugin failed, err: %w", updateUrl, err)
 	}
 	success := false
 	backupPath := sdk.Plugin.SourcePath + ".bak"
 	err = util.CopyFile(sdk.Plugin.SourcePath, backupPath)
 	if err != nil {
-		pterm.Printf("Backup %s plugin failed, err: %s\n", updateUrl, err)
-		return fmt.Errorf("backup failed")
+		return fmt.Errorf("backup %s plugin failed, err: %w", updateUrl, err)
 	}
 	defer func() {
 		if success {
@@ -187,13 +184,11 @@ func (m *Manager) Update(pluginName string) error {
 	}()
 	pterm.Println("Checking plugin version...")
 	if util.CompareVersion(source.Version, sdk.Plugin.Version) <= 0 {
-		pterm.Println("The plugin is already the latest version.")
-		return fmt.Errorf("already the latest version")
+		return fmt.Errorf("the plugin is already the latest version")
 	}
 	err = os.WriteFile(sdk.Plugin.SourcePath, []byte(content), 0644)
 	if err != nil {
-		pterm.Printf("Update %s plugin failed, err: %s\n", updateUrl, err)
-		return fmt.Errorf("write file error")
+		return fmt.Errorf("update %s plugin failed: %w", updateUrl, err)
 	}
 	success = true
 	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(source.Version))
@@ -206,8 +201,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if len(url) == 0 {
 		args := strings.Split(pluginName, "/")
 		if len(args) < 2 {
-			pterm.Println("Invalid plugin name. Format: <category>/<plugin-name>")
-			return fmt.Errorf("invalid plugin name")
+			return fmt.Errorf("invalid plugin name, format: <category>/<plugin-name>")
 		}
 		category := args[0]
 		name := args[1]
@@ -234,27 +228,23 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 
 	destPath := filepath.Join(m.PathMeta.PluginPath, pname+".lua")
 	if util.FileExists(destPath) {
-		pterm.Printf("Plugin %s already exists, please use %s to remove it first.\n", pterm.LightGreen(pname), pterm.LightBlue("vfox remove "+pname))
-		return fmt.Errorf("plugin already exists")
+		return fmt.Errorf("plugin %s already exists", pname)
 	}
 
 	pterm.Printf("Adding plugin from %s...\n", url)
 	content, err := m.loadLuaFromFileOrUrl(url)
 	if err != nil {
-		pterm.Printf("Failed to load %s plugin, err: %s\n", url, err)
-		return fmt.Errorf("install failed")
+		return fmt.Errorf("failed to load plugin: %w", err)
 	}
 	pterm.Println("Checking plugin...")
 	source, err := NewLuaPlugin(content, url, m.osType, m.archType)
 	if err != nil {
-		pterm.Printf("Check %s plugin failed, err: %s\n", url, err)
-		return err
+		return fmt.Errorf("check plugin error: %w", err)
 	}
 	defer source.Close()
 	err = os.WriteFile(destPath, []byte(content), 0644)
 	if err != nil {
-		pterm.Printf("Add %s plugin failed, err: %s\n", url, err)
-		return fmt.Errorf("write file error")
+		return fmt.Errorf("add plugin error: %w", err)
 	}
 	pterm.Println("Plugin info:")
 	pterm.Println("Name   ", "->", pterm.LightBlue(source.Name))
@@ -312,22 +302,19 @@ func (m *Manager) Available() ([]*Category, error) {
 	// TODO proxy
 	resp, err := http.Get(pluginIndexUrl)
 	if err != nil {
-		pterm.Printf("Get plugin index error, err: %s\n", err)
+		return nil, fmt.Errorf("get plugin index error: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		pterm.Printf("Get plugin index error, status code: %d\n", resp.StatusCode)
-		return nil, fmt.Errorf("get plugin index error")
+		return nil, fmt.Errorf("get plugin index error, status code: %d", resp.StatusCode)
 	}
 	if str, err := io.ReadAll(resp.Body); err != nil {
-		pterm.Printf("Read plugin index error, err: %s\n", err)
-		return nil, fmt.Errorf("read plugin index error")
+		return nil, fmt.Errorf("read plugin index error: %w", err)
 	} else {
 		var categories []*Category
 		err = json.Unmarshal(str, &categories)
 		if err != nil {
-			pterm.Printf("Parse plugin index error, err: %s\n", err)
-			return nil, fmt.Errorf("parse plugin index error")
+			return nil, fmt.Errorf("parse plugin index error: %w", err)
 		}
 		return categories, nil
 	}

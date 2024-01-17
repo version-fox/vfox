@@ -48,12 +48,10 @@ type Sdk struct {
 func (b *Sdk) Install(version Version) error {
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
-		pterm.Printf("Plugin [PreInstall] error: %s\n", err.Error())
-		return err
+		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
 	}
 	if installInfo == nil {
-		pterm.Println("No information about the current version")
-		return fmt.Errorf("no version")
+		return fmt.Errorf("no information about the current version")
 	}
 	mainSdk := installInfo.Main
 	success := false
@@ -67,8 +65,7 @@ func (b *Sdk) Install(version Version) error {
 	}()
 	label := b.label(mainSdk.Version)
 	if b.checkExists(mainSdk.Version) {
-		pterm.Printf("%s is already installed.\n", pterm.LightGreen(label))
-		return fmt.Errorf("%s has been installed\n", label)
+		return fmt.Errorf("%s is already installed", label)
 	}
 	var installedSdkInfos []*Info
 	path, err := b.installSdk(mainSdk, newDirPath)
@@ -95,7 +92,10 @@ func (b *Sdk) Install(version Version) error {
 		}
 	}
 	success = true
-	_ = b.Plugin.PostInstall(newDirPath, installedSdkInfos)
+	err = b.Plugin.PostInstall(newDirPath, installedSdkInfos)
+	if err != nil {
+		return fmt.Errorf("plugin [PostInstall] method error: %w", err)
+	}
 	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
@@ -184,7 +184,6 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	}
 	label := b.label(version)
 	if !b.checkExists(version) {
-		pterm.Printf("No %s installed, please install it first.", pterm.Yellow(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
 	// TODO Need to optimize envManager
@@ -196,8 +195,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 		keys, err := b.Plugin.EnvKeys(sdkPackage)
 		if err != nil {
-			pterm.Printf("Plugin [EnvKeys] error: err:%s\n", err.Error())
-			return err
+			return fmt.Errorf("plugin [EnvKeys] method error: %w", err)
 		}
 
 		b.clearCurrentEnvConfig()
