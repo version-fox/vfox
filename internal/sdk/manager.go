@@ -205,7 +205,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		}
 		category := args[0]
 		name := args[1]
-		pname = name
+		pname = category
 		availablePlugins, err := m.Available()
 		if err != nil {
 			return err
