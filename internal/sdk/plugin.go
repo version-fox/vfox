@@ -22,8 +22,7 @@ import (
 	"github.com/version-fox/vfox/internal/module"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
-	"path/filepath"
-	"strings"
+	"regexp"
 )
 
 const (
@@ -38,7 +37,6 @@ type LuaPlugin struct {
 	pluginObj *lua.LTable
 	// plugin source path
 	SourcePath  string
-	SourceName  string
 	Name        string
 	Author      string
 	Version     string
@@ -342,15 +340,19 @@ func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchTy
 		state:      luaVMInstance,
 		pluginObj:  PLUGIN,
 		SourcePath: path,
-		SourceName: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
 	}
 
 	if err := source.checkValid(); err != nil {
 		return nil, err
 	}
 
-	if name := PLUGIN.RawGetString("name"); name.Type() != lua.LTNil {
+	if name := PLUGIN.RawGetString("name"); name.Type() == lua.LTNil {
+		return nil, fmt.Errorf("no plugin name provided")
+	} else {
 		source.Name = name.String()
+		if !isValidName(source.Name) {
+			return nil, fmt.Errorf("invalid plugin name")
+		}
 	}
 	if version := PLUGIN.RawGetString("version"); version.Type() != lua.LTNil {
 		source.Version = version.String()
@@ -365,4 +367,11 @@ func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchTy
 		source.Author = author.String()
 	}
 	return source, nil
+}
+
+func isValidName(name string) bool {
+	// The regular expression means: start with a letter,
+	// followed by any number of letters, digits, or underscores.
+	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+	return re.MatchString(name)
 }

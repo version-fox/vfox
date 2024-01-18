@@ -208,7 +208,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 			return err
 		}
 	}
-	b.sdkManager.Record.Add(b.Plugin.SourceName, string(version))
+	b.sdkManager.Record.Add(b.Plugin.Name, string(version))
 	defer b.sdkManager.Record.Save()
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
 	if !env.IsHookEnv() {
@@ -238,7 +238,7 @@ func (b *Sdk) List() []Version {
 }
 
 func (b *Sdk) Current() Version {
-	version := b.sdkManager.Record.Export()[b.Plugin.SourceName]
+	version := b.sdkManager.Record.Export()[b.Plugin.Name]
 	return Version(version)
 }
 
@@ -394,7 +394,7 @@ func (b *Sdk) label(version Version) string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SourceName)),
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Name)),
 		Plugin:      source,
 	}, nil
 }

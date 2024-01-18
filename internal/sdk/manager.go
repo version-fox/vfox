@@ -196,7 +196,6 @@ func (m *Manager) Update(pluginName string) error {
 }
 
 func (m *Manager) Add(pluginName, url, alias string) error {
-	pname := pluginName
 	// official plugin
 	if len(url) == 0 {
 		args := strings.Split(pluginName, "/")
@@ -205,7 +204,6 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		}
 		category := args[0]
 		name := args[1]
-		pname = category
 		availablePlugins, err := m.Available()
 		if err != nil {
 			return err
@@ -222,16 +220,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		}
 	}
 
-	if len(alias) > 0 {
-		pname = alias
-	}
-
-	destPath := filepath.Join(m.PathMeta.PluginPath, pname+".lua")
-	if util.FileExists(destPath) {
-		return fmt.Errorf("plugin %s already exists", pname)
-	}
-
-	pterm.Printf("Adding plugin from %s...\n", url)
+	pterm.Printf("Loading plugin from %s...\n", url)
 	content, err := m.loadLuaFromFileOrUrl(url)
 	if err != nil {
 		return fmt.Errorf("failed to load plugin: %w", err)
@@ -242,6 +231,15 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		return fmt.Errorf("check plugin error: %w", err)
 	}
 	defer source.Close()
+
+	pname := source.Name
+	if len(alias) > 0 {
+		pname = alias
+	}
+	destPath := filepath.Join(m.PathMeta.PluginPath, pname+".lua")
+	if util.FileExists(destPath) {
+		return fmt.Errorf("plugin %s already exists", pname)
+	}
 	err = os.WriteFile(destPath, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("add plugin error: %w", err)
