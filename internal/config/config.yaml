@@ -1,0 +1,3 @@
+proxy:
+  enable: false
+  url: http://test
