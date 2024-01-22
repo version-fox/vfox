@@ -13,6 +13,7 @@ require (
 	github.com/urfave/cli/v2 v2.26.0
 	github.com/yuin/gopher-lua v1.1.1
 	golang.org/x/sys v0.15.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
