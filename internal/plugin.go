@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/module"
-	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 	"regexp"
 )
@@ -318,16 +317,16 @@ func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
-func NewLuaPlugin(content, path string, osType util.OSType, archType util.ArchType) (*LuaPlugin, error) {
+func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	luaVMInstance := lua.NewState()
-	module.Preload(luaVMInstance)
+	module.Preload(luaVMInstance, manager.Config)
 	if err := luaVMInstance.DoString(content); err != nil {
 		return nil, err
 	}
 
 	// set OS_TYPE and ARCH_TYPE
-	luaVMInstance.SetGlobal(OsType, lua.LString(osType))
-	luaVMInstance.SetGlobal(ArchType, lua.LString(archType))
+	luaVMInstance.SetGlobal(OsType, lua.LString(manager.osType))
+	luaVMInstance.SetGlobal(ArchType, lua.LString(manager.archType))
 
 	pluginObj := luaVMInstance.GetGlobal(LuaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {

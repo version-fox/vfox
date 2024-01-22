@@ -20,3 +20,10 @@ type Proxy struct {
 	Url    string `yaml:"url"`
 	Enable bool   `yaml:"enable"`
 }
+
+var (
+	EmptyProxy = &Proxy{
+		Url:    "",
+		Enable: false,
+	}
+)

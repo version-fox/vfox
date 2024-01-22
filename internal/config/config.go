@@ -17,19 +17,33 @@
 package config
 
 import (
+	"github.com/version-fox/vfox/internal/util"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 )
 
 type Config struct {
-	Proxy Proxy `yaml:"proxy"`
+	Proxy *Proxy `yaml:"proxy"`
 }
 
 const filename = "config.yaml"
 
+var (
+	defaultConfig = &Config{
+		Proxy: EmptyProxy,
+	}
+)
+
 func NewConfig(path string) (*Config, error) {
 	p := filepath.Join(path, filename)
+	if !util.FileExists(p) {
+		content, err := yaml.Marshal(defaultConfig)
+		if err != nil {
+			_ = os.WriteFile(p, content, 0644)
+			return defaultConfig, nil
+		}
+	}
 	content, err := os.ReadFile(p)
 	if err != nil {
 		return nil, err

@@ -48,7 +48,7 @@ type Manager struct {
 	Record     env.Record
 	osType     util.OSType
 	archType   util.ArchType
-	config     *config.Config
+	Config     *config.Config
 }
 
 func (m *Manager) EnvKeys() env.Envs {
@@ -92,7 +92,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	if err != nil {
 		return nil, err
 	}
-	luaPlugin, err := NewLuaPlugin(content, pluginPath, m.osType, m.archType)
+	luaPlugin, err := NewLuaPlugin(content, pluginPath, m)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 			// filename first as sdk name
 			path := filepath.Join(m.PathMeta.PluginPath, d.Name())
 			content, _ := m.loadLuaFromFileOrUrl(path)
-			source, err := NewLuaPlugin(content, path, m.osType, m.archType)
+			source, err := NewLuaPlugin(content, path, m)
 			if err != nil {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				continue
@@ -168,7 +168,7 @@ func (m *Manager) Update(pluginName string) error {
 	if err != nil {
 		return fmt.Errorf("fetch plugin failed, err: %w", err)
 	}
-	source, err := NewLuaPlugin(content, updateUrl, m.osType, m.archType)
+	source, err := NewLuaPlugin(content, updateUrl, m)
 	if err != nil {
 		return fmt.Errorf("check %s plugin failed, err: %w", updateUrl, err)
 	}
@@ -229,7 +229,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		return fmt.Errorf("failed to load plugin: %w", err)
 	}
 	pterm.Println("Checking plugin...")
-	source, err := NewLuaPlugin(content, url, m.osType, m.archType)
+	source, err := NewLuaPlugin(content, url, m)
 	if err != nil {
 		return fmt.Errorf("check plugin error: %w", err)
 	}
@@ -258,23 +258,30 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	return nil
 }
 
+func (m *Manager) httpClient() *http.Client {
+	var client *http.Client
+	if m.Config.Proxy.Enable {
+		if uri, err := url.Parse(m.Config.Proxy.Url); err == nil {
+			transPort := &http.Transport{
+				Proxy: http.ProxyURL(uri),
+			}
+			client = &http.Client{
+				Transport: transPort,
+			}
+		}
+	} else {
+		client = http.DefaultClient
+	}
+
+	return client
+}
+
 func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 	if !strings.HasSuffix(path, ".lua") {
 		return "", fmt.Errorf("%s not a lua file", path)
 	}
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		client := http.Client{}
-		if m.config.Proxy.Enable {
-			uri, err := url.Parse(m.config.Proxy.Url)
-			if err == nil {
-				transPort := &http.Transport{
-					Proxy: http.ProxyURL(uri),
-				}
-				client = http.Client{
-					Transport: transPort,
-				}
-			}
-		}
+		client := m.httpClient()
 		resp, err := client.Get(path)
 		if err != nil {
 			return "", err
@@ -312,19 +319,7 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 }
 
 func (m *Manager) Available() ([]*Category, error) {
-	// FIX proxy
-	client := http.Client{}
-	if m.config.Proxy.Enable {
-		uri, err := url.Parse(m.config.Proxy.Url)
-		if err == nil {
-			transPort := &http.Transport{
-				Proxy: http.ProxyURL(uri),
-			}
-			client = http.Client{
-				Transport: transPort,
-			}
-		}
-	}
+	client := m.httpClient()
 	resp, err := client.Get(pluginIndexUrl)
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", err)
@@ -410,7 +405,7 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 	}
 	c, err := config.NewConfig(meta.ConfigPath)
 	if err != nil {
-		panic(fmt.Errorf("init config error: %w", err))
+		panic(fmt.Errorf("init Config error: %w", err))
 	}
 	manager := &Manager{
 		PathMeta:   meta,
@@ -419,7 +414,7 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 		openSdks:   make(map[string]*Sdk),
 		osType:     util.GetOSType(),
 		archType:   util.GetArchType(),
-		config:     c,
+		Config:     c,
 	}
 	return manager
 }

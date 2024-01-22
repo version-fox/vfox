@@ -17,33 +17,18 @@
 package http
 
 import (
+	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
 	"io"
 	"net/http"
+	"net/url"
 )
 
-// Preload adds json to the given Lua state's package.preload table. After it
-// has been preloaded, it can be loaded using require:
-//
-//	local json = require("http")
-func Preload(L *lua.LState) {
-	L.PreloadModule("http", loader)
+type Module struct {
+	proxy *config.Proxy
 }
 
-// loader is the module loader function.
-func loader(L *lua.LState) int {
-	t := L.NewTable()
-	L.SetFuncs(t, api)
-	L.Push(t)
-	return 1
-}
-
-var api = map[string]lua.LGFunction{
-	"get": getRequest,
-	// TODO wait to extend
-}
-
-// getRequest performs a http get request
+// Get performs a http get request
 // @param url string
 // @param headers table
 // @return resp table
@@ -59,15 +44,27 @@ var api = map[string]lua.LGFunction{
 //	    status_code = 200,
 //	    headers = table
 //	}
-func getRequest(L *lua.LState) int {
+func (m *Module) Get(L *lua.LState) int {
 	param := L.CheckTable(1)
-	url := param.RawGetString("url")
-	if url == lua.LNil {
+	urlStr := param.RawGetString("url")
+	if urlStr == lua.LNil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("url is required"))
 	}
+
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url.String(), nil)
+	if m.proxy.Enable {
+		uri, err := url.Parse(m.proxy.Url)
+		if err == nil {
+			transPort := &http.Transport{
+				Proxy: http.ProxyURL(uri),
+			}
+			client = &http.Client{
+				Transport: transPort,
+			}
+		}
+	}
+	req, err := http.NewRequest("GET", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
@@ -107,4 +104,20 @@ func getRequest(L *lua.LState) int {
 	L.SetField(result, "headers", headers)
 	L.Push(result)
 	return 1
+}
+
+func (m *Module) luaMap() map[string]lua.LGFunction {
+	return map[string]lua.LGFunction{
+		"get": m.Get,
+	}
+}
+
+func NewModule(proxy *config.Proxy) lua.LGFunction {
+	return func(L *lua.LState) int {
+		m := &Module{proxy: proxy}
+		t := L.NewTable()
+		L.SetFuncs(t, m.luaMap())
+		L.Push(t)
+		return 1
+	}
 }
