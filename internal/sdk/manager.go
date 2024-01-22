@@ -19,8 +19,10 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/version-fox/vfox/internal/config"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,6 +48,7 @@ type Manager struct {
 	Record     env.Record
 	osType     util.OSType
 	archType   util.ArchType
+	config     config.VFoxConfig
 }
 
 func (m *Manager) EnvKeys() env.Envs {
@@ -260,7 +263,20 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 		return "", fmt.Errorf("%s not a lua file", path)
 	}
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		resp, err := http.Get(path)
+		client := http.Client{}
+		if m.config.Proxy.Enable {
+			uri, err := url.Parse(m.config.Proxy.Url)
+			if err == nil {
+				transPort := &http.Transport{
+					Proxy: http.ProxyURL(uri),
+				}
+				client = http.Client{
+					Transport: transPort,
+				}
+			}
+		}
+		//resp, err := http.Get(path)
+		resp, err := client.Get(path)
 		if err != nil {
 			return "", err
 		}
@@ -297,8 +313,20 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 }
 
 func (m *Manager) Available() ([]*Category, error) {
-	// TODO proxy
-	resp, err := http.Get(pluginIndexUrl)
+	// FIX proxy
+	client := http.Client{}
+	if m.config.Proxy.Enable {
+		uri, err := url.Parse(m.config.Proxy.Url)
+		if err == nil {
+			transPort := &http.Transport{
+				Proxy: http.ProxyURL(uri),
+			}
+			client = http.Client{
+				Transport: transPort,
+			}
+		}
+	}
+	resp, err := client.Get(pluginIndexUrl)
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", err)
 	}
@@ -381,6 +409,8 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 	if err != nil {
 		panic("Init env manager error")
 	}
+	config := config.VFoxConfig{}
+	config.GetVFoxConfigInfo(meta.ConfigPath)
 	manager := &Manager{
 		PathMeta:   meta,
 		EnvManager: envManger,
@@ -388,6 +418,7 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 		openSdks:   make(map[string]*Sdk),
 		osType:     util.GetOSType(),
 		archType:   util.GetArchType(),
+		config:     config,
 	}
 	return manager
 }
