@@ -312,8 +312,20 @@ func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
 }
 
 func (m *Manager) Available() ([]*Category, error) {
-	// TODO proxy
-	resp, err := http.Get(pluginIndexUrl)
+	// FIX proxy
+	client := http.Client{}
+	if m.config.Proxy.Enable {
+		uri, err := url.Parse(m.config.Proxy.Url)
+		if err == nil {
+			transPort := &http.Transport{
+				Proxy: http.ProxyURL(uri),
+			}
+			client = http.Client{
+				Transport: transPort,
+			}
+		}
+	}
+	resp, err := client.Get(pluginIndexUrl)
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", err)
 	}
