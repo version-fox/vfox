@@ -14,20 +14,21 @@
  *    limitations under the License.
  */
 
-package sdk
+package internal
 
-type RemotePluginInfo struct {
-	Filename string `json:"name"`
-	Author   string `json:"plugin_author"`
-	Desc     string `json:"plugin_desc"`
-	Name     string `json:"plugin_name"`
-	Version  string `json:"plugin_version"`
-	Sha256   string `json:"sha256"`
-	Url      string `json:"url"`
+type Package struct {
+	Main       *Info
+	Additional []*Info
 }
 
-type Category struct {
-	Name    string              `json:"category"`
-	Count   string              `json:"count"`
-	Plugins []*RemotePluginInfo `json:"files"`
+type Info struct {
+	Name     string
+	Version  Version
+	Path     string
+	Note     string
+	Checksum *Checksum
+}
+
+func (i *Info) label() string {
+	return i.Name + "@" + string(i.Version)
 }

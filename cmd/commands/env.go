@@ -18,10 +18,10 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal"
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -45,9 +45,9 @@ var Env = &cli.Command{
 
 func envCmd(ctx *cli.Context) error {
 	if ctx.IsSet("cleanup") {
-		manager := sdk.NewSdkManager()
+		manager := internal.NewSdkManager()
 		defer manager.Close()
-		temp, err := sdk.NewTemp(manager.PathMeta.TempPath, os.Getppid())
+		temp, err := internal.NewTemp(manager.PathMeta.TempPath, os.Getppid())
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func envCmd(ctx *cli.Context) error {
 		if s == nil {
 			return fmt.Errorf("unknow target shell %s", shellName)
 		}
-		manager := sdk.NewSdkManagerWithSource(sdk.SessionRecordSource, sdk.ProjectRecordSource)
+		manager := internal.NewSdkManagerWithSource(internal.SessionRecordSource, internal.ProjectRecordSource)
 		defer manager.Close()
 		envKeys := manager.EnvKeys()
 		exportStr := s.Export(envKeys)

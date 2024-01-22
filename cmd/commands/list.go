@@ -21,7 +21,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 )
 
 var List = &cli.Command{
@@ -32,7 +32,7 @@ var List = &cli.Command{
 }
 
 func listCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	sdkName := ctx.Args().First()
 	if sdkName == "" {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 	"os"
 	"strings"
 )
@@ -37,7 +37,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	manager := sdk.NewSdkManagerWithSource(sdk.SessionRecordSource, sdk.GlobalRecordSource, sdk.ProjectRecordSource)
+	manager := internal.NewSdkManagerWithSource(internal.SessionRecordSource, internal.GlobalRecordSource, internal.ProjectRecordSource)
 	defer manager.Close()
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
@@ -46,7 +46,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	}
 
 	name := strings.ToLower(argArr[0])
-	version := sdk.Version(argArr[1])
+	version := internal.Version(argArr[1])
 
 	source, err := manager.LookupSdk(name)
 	if err != nil {
@@ -64,7 +64,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, sdk.Global)
+		return source.Use(firstVersion, internal.Global)
 	}
 	return nil
 }

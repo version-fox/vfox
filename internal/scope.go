@@ -14,21 +14,12 @@
  *    limitations under the License.
  */
 
-package sdk
+package internal
 
-type Package struct {
-	Main       *Info
-	Additional []*Info
-}
+type UseScope int
 
-type Info struct {
-	Name     string
-	Version  Version
-	Path     string
-	Note     string
-	Checksum *Checksum
-}
-
-func (i *Info) label() string {
-	return i.Name + "@" + string(i.Version)
-}
+const (
+	Global UseScope = iota
+	Project
+	Session
+)

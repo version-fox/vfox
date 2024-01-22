@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 )
 
 var Update = &cli.Command{
@@ -33,7 +33,7 @@ func updateCmd(ctx *cli.Context) error {
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
-	manager := sdk.NewSdkManager()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	return manager.Update(args.First())
 }

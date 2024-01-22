@@ -18,12 +18,12 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal"
 	"strings"
 	"text/template"
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -38,7 +38,7 @@ func activateCmd(ctx *cli.Context) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := sdk.NewSdkManager(sdk.GlobalRecordSource, sdk.ProjectRecordSource)
+	manager := internal.NewSdkManager(internal.GlobalRecordSource, internal.ProjectRecordSource)
 	defer manager.Record.Save()
 	defer manager.Close()
 	envKeys := manager.EnvKeys()

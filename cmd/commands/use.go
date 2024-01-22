@@ -18,12 +18,12 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal"
 	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Use = &cli.Command{
@@ -57,7 +57,7 @@ func useCmd(ctx *cli.Context) error {
 	}
 	var (
 		name    string
-		version sdk.Version
+		version internal.Version
 	)
 	argArr := strings.Split(sdkArg, "@")
 	if len(argArr) <= 1 {
@@ -65,22 +65,22 @@ func useCmd(ctx *cli.Context) error {
 		version = ""
 	} else {
 		name = argArr[0]
-		version = sdk.Version(argArr[1])
+		version = internal.Version(argArr[1])
 	}
 
-	var recordSources []sdk.RecordSource
-	scope := sdk.Session
+	var recordSources []internal.RecordSource
+	scope := internal.Session
 	if ctx.IsSet("global") {
-		scope = sdk.Global
-		recordSources = append(recordSources, sdk.SessionRecordSource, sdk.GlobalRecordSource)
+		scope = internal.Global
+		recordSources = append(recordSources, internal.SessionRecordSource, internal.GlobalRecordSource)
 	} else if ctx.IsSet("project") {
-		scope = sdk.Project
-		recordSources = append(recordSources, sdk.ProjectRecordSource)
+		scope = internal.Project
+		recordSources = append(recordSources, internal.ProjectRecordSource)
 	} else {
-		scope = sdk.Session
-		recordSources = append(recordSources, sdk.SessionRecordSource)
+		scope = internal.Session
+		recordSources = append(recordSources, internal.SessionRecordSource)
 	}
-	manager := sdk.NewSdkManagerWithSource(recordSources...)
+	manager := internal.NewSdkManagerWithSource(recordSources...)
 	defer manager.Close()
 
 	source, err := manager.LookupSdk(name)
@@ -107,7 +107,7 @@ func useCmd(ctx *cli.Context) error {
 			},
 		}
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-		version = sdk.Version(result)
+		version = internal.Version(result)
 	}
 	return source.Use(version, scope)
 }

@@ -19,8 +19,8 @@ package commands
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
-	"github.com/version-fox/vfox/internal/sdk"
 	"strings"
 )
 
@@ -35,7 +35,7 @@ func searchCmd(ctx *cli.Context) error {
 	if sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	manager := sdk.NewSdkManager()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	source, err := manager.LookupSdk(sdkName)
 	if err != nil {
@@ -90,5 +90,5 @@ func searchCmd(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("select version error: %w", err)
 	}
-	return source.Install(sdk.Version(version.Key))
+	return source.Install(internal.Version(version.Key))
 }

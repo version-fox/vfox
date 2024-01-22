@@ -19,7 +19,7 @@ package commands
 import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 )
 
 var Available = &cli.Command{
@@ -29,7 +29,7 @@ var Available = &cli.Command{
 }
 
 func availableCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManagerWithSource()
+	manager := internal.NewSdkManagerWithSource()
 	defer manager.Close()
 	categoryName := ctx.Args().First()
 	categories, err := manager.Available()

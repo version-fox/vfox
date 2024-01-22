@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 )
 
 var Current = &cli.Command{
@@ -32,7 +32,7 @@ var Current = &cli.Command{
 }
 
 func currentCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManager()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	sdkName := ctx.Args().First()
 	if sdkName == "" {

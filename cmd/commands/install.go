@@ -19,7 +19,7 @@ package commands
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 	"strings"
 )
 
@@ -37,16 +37,16 @@ func installCmd(ctx *cli.Context) error {
 	}
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
-	manager := sdk.NewSdkManager()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	if argsLen > 2 {
 		return cli.Exit("sdk version is invalid", 1)
 	} else {
 		var name string
-		var version sdk.Version
+		var version internal.Version
 		if argsLen == 2 {
 			name = strings.ToLower(argArr[0])
-			version = sdk.Version(argArr[1])
+			version = internal.Version(argArr[1])
 		} else {
 			name = strings.ToLower(argArr[0])
 			version = ""

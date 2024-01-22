@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package sdk
+package internal
 
 import (
 	"fmt"

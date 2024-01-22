@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal"
 )
 
 var Add = &cli.Command{
@@ -39,7 +39,7 @@ var Add = &cli.Command{
 }
 
 func addCmd(ctx *cli.Context) error {
-	manager := sdk.NewSdkManagerWithSource()
+	manager := internal.NewSdkManagerWithSource()
 	defer manager.Close()
 	sdkName := ctx.Args().First()
 	source := ctx.String("source")
