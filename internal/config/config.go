@@ -35,8 +35,7 @@ var (
 	}
 )
 
-func NewConfig(path string) (*Config, error) {
-	p := filepath.Join(path, filename)
+func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
 		content, err := yaml.Marshal(defaultConfig)
 		if err != nil {
@@ -53,5 +52,14 @@ func NewConfig(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if config.Proxy == nil {
+		config.Proxy = EmptyProxy
+	}
 	return config, nil
+
+}
+
+func NewConfig(path string) (*Config, error) {
+	p := filepath.Join(path, filename)
+	return NewConfigWithPath(p)
 }

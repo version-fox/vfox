@@ -1,3 +1,6 @@
 proxy:
   enable: false
   url: http://test
+
+storage:
+  path: /tmp

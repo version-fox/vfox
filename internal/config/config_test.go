@@ -40,3 +40,15 @@ func TestConfig_Proxy(t *testing.T) {
 		t.Fatal("proxy enable is invalid")
 	}
 }
+func TestConfigWithEmptyProxy(t *testing.T) {
+	c, err := config.NewConfigWithPath("empty_test.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Proxy.Url != "" {
+		t.Fatal("proxy url must be empty")
+	}
+	if !c.Proxy.Enable == false {
+		t.Fatal("proxy enable must be false")
+	}
+}
