@@ -38,7 +38,7 @@ var (
 func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
 		content, err := yaml.Marshal(defaultConfig)
-		if err != nil {
+		if err == nil {
 			_ = os.WriteFile(p, content, 0644)
 			return defaultConfig, nil
 		}
