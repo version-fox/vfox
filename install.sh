@@ -29,6 +29,10 @@ fi
 
 ARCH_TYPE=$(uname -m)
 
+if [ "$ARCH_TYPE" = "arm64" ]; then
+    ARCH_TYPE="aarch64"
+fi
+
 FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
 TAR_FILE="${FILENAME}.tar.gz"
 
