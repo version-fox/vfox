@@ -94,10 +94,6 @@ brews:
     commit_author:
       name: "Han Li"
       email: aooohan@gmail.com
-    #    dependencies:
-    #      - name: go
-    #        type: optional
-    #      - name: git
     test: |
       system "#{bin}/vfox version"
     extra_install: |-
