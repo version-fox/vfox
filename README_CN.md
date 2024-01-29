@@ -112,11 +112,11 @@ VersionFox支持安装官方插件和自定义插件, 安装插件的命令如�
 - `vfox add [--source <url/path>] <sdk-name>`: 此命令从指定路径或 URL 安装插件并为其命名。
 
 ```bash
-$ vfox add --alias node node/node
-Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
+$ vfox add --alias node nodejs/nodejs
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua...
 Checking plugin...
 Plugin info:
-Name    -> node
+Name    -> nodejs
 Author  -> Lihan
 Version -> 0.0.1
 Path    -> /${HOME}/.version-fox/plugins/node.lua
@@ -127,11 +127,11 @@ Please use `vfox install node@<version>` to install the version you need.
 VersionFox 对插件的安装来源没有限制，这意味着您可以添加自定义插件或使用他人共享的插件。
 
 ```bash
-$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua custom-node
-Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/node/node.lua...
+$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua custom-node
+Adding plugin from https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua...
 Checking plugin...
 Plugin info:
-Name    -> node
+Name    -> nodejs
 Author  -> Lihan
 Version -> 0.0.1
 Path    -> /${HOME}/.version-fox/plugins/custom-node.lua
