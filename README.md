@@ -32,7 +32,7 @@ plugins shared by others to install SDKs. It all depends on your imagination. ;)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.** see [What-is-the-difference-with-asdf?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
 
 ## Demo
-[![asciicast](https://asciinema.org/a/630769.svg)](https://asciinema.org/a/630769)
+[![asciicast](https://asciinema.org/a/630778.svg)](https://asciinema.org/a/630778)
 
 ## Quickstart
 
@@ -54,20 +54,21 @@ Invoke-Expression "$(vfox activate pwsh)"
 ```
 
 Add an SDK plugin (For detailed usage see [Getting Started](https://github.com/version-fox/vfox/wiki/Getting-Started))
+> NOTE: if you don’t know which plugins to add, you can use the `vfox available` command to check all available plugins
 ```bash 
-$ vfox add zig/zig
+$ vfox add nodejs/nodejs
 ```
 
 Install an SDK version
 ```bash
-$ vfox install zig@0.11.0
+$ vfox install nodejs@21.5.0
 ```
 
 Use the installed SDK version
 ```bash
-$ vfox use zig@0.11.0
-$ zig version
-0.11.0
+$ vfox use nodejs@21.5.0
+$ node -v
+21.5.0
 ```
 
 
