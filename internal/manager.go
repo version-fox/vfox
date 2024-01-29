@@ -407,6 +407,15 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 	if err != nil {
 		panic(fmt.Errorf("init Config error: %w", err))
 	}
+
+	// custom sdk path first
+	if len(c.Storage.SdkPath) > 0 {
+		err = c.Storage.Validate()
+		if err != nil {
+			panic(fmt.Errorf("validate storage error: %w", err))
+		}
+		meta.SdkCachePath = c.Storage.SdkPath
+	}
 	manager := &Manager{
 		PathMeta:   meta,
 		EnvManager: envManger,

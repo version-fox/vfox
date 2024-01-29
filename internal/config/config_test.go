@@ -18,6 +18,7 @@ package config_test
 
 import (
 	"github.com/version-fox/vfox/internal/config"
+	"os"
 	"testing"
 )
 
@@ -50,5 +51,37 @@ func TestConfigWithEmptyProxy(t *testing.T) {
 	}
 	if !c.Proxy.Enable == false {
 		t.Fatal("proxy enable must be false")
+	}
+}
+
+func TestConfigWithStorage(t *testing.T) {
+	c, err := config.NewConfig("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Storage.SdkPath != "/tmp" {
+		t.Fatal("storage sdk path is invalid")
+	}
+}
+
+func TestStorageWithWritePermission(t *testing.T) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &config.Storage{
+		SdkPath: dir,
+	}
+	if err = s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestConfigWithEmptyStorage(t *testing.T) {
+	c, err := config.NewConfigWithPath("empty_test.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Storage.SdkPath != "" {
+		t.Fatal("proxy url must be empty")
 	}
 }

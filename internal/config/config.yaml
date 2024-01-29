@@ -3,4 +3,4 @@ proxy:
   url: http://test
 
 storage:
-  path: /tmp
+  sdkPath: /tmp
