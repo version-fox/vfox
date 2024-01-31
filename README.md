@@ -1,11 +1,13 @@
 <p style="" align="center">
   <img src="./logo.png" alt="Logo" width="250" height="250">
 </p>
-<h1 style="margin-top: -40px">VersionFox</h1>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
-[![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
-[![GitHub release](https://img.shields.io/github/v/release/version-fox/vfox)](https://github.com/version-fox/vfox/releases/latest)
+# VersionFox
+
+[![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=for-the-badge)](https://goreportcard.com/report/github.com/version-fox/vfox)
+[![GitHub License](https://img.shields.io/github/license/version-fox/vfox?style=for-the-badge)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/version-fox/vfox?display_name=tag&style=for-the-badge)](https://github.com/version-fox/vfox/releases)
+[![Discord](https://img.shields.io/discord/1191981003204477019?style=for-the-badge&logo=discord)](https://discord.gg/PdEvGXHp)
 
 
 
@@ -104,5 +106,5 @@ Plugin Contributions, please go to [version-fox-plugins](https://github.com/vers
 
 ## COPYRIGHT
 
-[Apache 2.0 licence](./LICENSE) - Copyright (C) 2024 Han Li and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
+[Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
 

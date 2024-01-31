@@ -3,9 +3,12 @@
 </p>
 <h1 style="margin-top: -40px">VersionFox</h1>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/version-fox/vfox)](https://goreportcard.com/report/github.com/version-fox/vfox)
-[![GitHub](https://img.shields.io/github/license/version-fox/vfox)](https://wimg.shields.io/github/license/version-fox/vfox)
-[![GitHub release](https://img.shields.io/github/v/release/version-fox/vfox)](https://github.com/version-fox/vfox/releases/latest)
+[![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=for-the-badge)](https://goreportcard.com/report/github.com/version-fox/vfox)
+[![GitHub License](https://img.shields.io/github/license/version-fox/vfox?style=for-the-badge)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/version-fox/vfox?display_name=tag&style=for-the-badge)](https://github.com/version-fox/vfox/releases)
+[![Discord](https://img.shields.io/discord/1191981003204477019?style=for-the-badge&logo=discord)](https://discord.gg/PdEvGXHp)
+
+
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
