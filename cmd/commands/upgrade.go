@@ -17,23 +17,22 @@
 package commands
 
 import (
-	"path/filepath"
 	"encoding/json"
 	"fmt"
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
-	"github.com/urfave/cli/v2"
-	"archive/tar"
-	"compress/gzip"
 )
 
 var Upgrade = &cli.Command{
-    Name:   "upgrade",
-    Usage:  "Upgrade vfox to the latest version.",
-    Action: upgradeCmd,
+	Name:   "upgrade",
+	Usage:  "Upgrade vfox to the latest version.",
+	Action: upgradeCmd,
 }
 
 type ReleaseInfo struct {
@@ -69,135 +68,93 @@ func constructBinaryName(tagName string) string {
 		archType = "aarch64"
 	}
 
-	fileName := fmt.Sprintf("vfox_%s_%s_%s.tar.gz", tagName[1:], osType, archType) 
+	fileName := fmt.Sprintf("vfox_%s_%s_%s.tar.gz", tagName[1:], osType, archType)
 	return fileName
 }
 
 // constructDiffURL constructs a GitHub diff URL between two version tags
 func constructDiffURL(oldTag, newTag string) string {
-    return fmt.Sprintf("https://github.com/version-fox/vfox/compare/%s...%s", oldTag, newTag)
+	return fmt.Sprintf("https://github.com/version-fox/vfox/compare/%s...%s", oldTag, newTag)
 }
 
-
-func getUrls(apiURL string,currVersion string) (string, string) {
-	version:= currVersion;
-    releaseInfo, err := getLatestReleaseInfo(apiURL)
-    if err != nil {
-        fmt.Println("Error fetching release info:", err)
-        return "", ""
-    }
+func getUrls(apiURL string, currVersion string) (string, string) {
+	version := currVersion
+	releaseInfo, err := getLatestReleaseInfo(apiURL)
+	if err != nil {
+		fmt.Println("Error fetching release info:", err)
+		return "", ""
+	}
 	fileName := constructBinaryName(releaseInfo.TagName)
 	binURL := fmt.Sprintf("https://github.com/version-fox/vfox/releases/download/%s/%s", releaseInfo.TagName, fileName)
-	diffURL := constructDiffURL(version,releaseInfo.TagName)
-    return binURL, diffURL
+	diffURL := constructDiffURL(version, releaseInfo.TagName)
+	return binURL, diffURL
 }
 
 func downloadFile(filepath string, url string) error {
-    out, err := os.Create(filepath)
-    if err != nil {
-        return err
-    }
-    defer out.Close()
-    resp, err := http.Get(url)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
-    _, err = io.Copy(out, resp.Body)
-    return err
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(out, resp.Body)
+	return err
 }
 
 func extractTarGz(gzipFilePath, destDir string) error {
-    gzipFile, err := os.Open(gzipFilePath)
-    if err != nil {
-        return err
-    }
-    defer gzipFile.Close()
-    gzipReader, err := gzip.NewReader(gzipFile)
-    if err != nil {
-        return err
-    }
-    defer gzipReader.Close()
-    tarReader := tar.NewReader(gzipReader)
-    for {
-        header, err := tarReader.Next()
-
-        switch {
-        case err == io.EOF:
-            return nil
-        case err != nil:
-            return err
-        case header == nil:
-            continue
-        }
-        targetPath := filepath.Join(destDir, header.Name)
-        switch header.Typeflag {
-        case tar.TypeDir:
-            if err := os.MkdirAll(targetPath, 0755); err != nil {
-                return err
-            }
-        case tar.TypeReg:
-            if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-                return err
-            }
-            outFile, err := os.Create(targetPath)
-            if err != nil {
-                return err
-            }
-            if _, err := io.Copy(outFile, tarReader); err != nil {
-                outFile.Close()
-                return err
-            }
-            outFile.Close()
-        }
-    }
+	decompressor := util.NewDecompressor(gzipFilePath)
+	if err := decompressor.Decompress(destDir); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 func upgradeCmd(ctx *cli.Context) error {
 	apiURL := "https://api.github.com/repos/version-fox/vfox/releases/latest"
 	releaseInfo, err := getLatestReleaseInfo(apiURL)
-	currVersion := fmt.Sprintf("v%s",ctx.App.Version);
-	latestVersion := releaseInfo.TagName;
-	fmt.Println("Current version: ", currVersion);
-	fmt.Println("Latest available:", latestVersion);
-   
-	if(currVersion==latestVersion){
-		return cli.Exit("vfox is already at latest version.",0)
+	currVersion := fmt.Sprintf("v%s", ctx.App.Version)
+	latestVersion := releaseInfo.TagName
+	fmt.Println("Current version: ", currVersion)
+	fmt.Println("Latest available:", latestVersion)
+
+	if currVersion == latestVersion {
+		return cli.Exit("vfox is already at latest version.", 0)
+	}
+	exePath, err := os.Executable()
+	if err != nil {
+		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
 	}
 
-	fileName := constructBinaryName(latestVersion)
-    exePath, err := os.Executable()
-    if err != nil {
-        return cli.Exit("Failed to get executable path: "+err.Error(), 1)
-    }
-
-    binURL, diffURL := getUrls(apiURL,currVersion)
+	binURL, diffURL := getUrls(apiURL, currVersion)
 	exeDir := filepath.Dir(exePath)
-    tempFile := "latest_vfox.tar.gz"
-    tempDir := filepath.Join(exeDir, "update_vfox")
+	tempFile := "latest_vfox.tar.gz"
+	tempDir := filepath.Join(exeDir, "update_vfox")
 
-    if err := downloadFile(tempFile, binURL); err != nil {
-        return cli.Exit("Failed to download file: "+err.Error(), 1)
-    }
-    if err := extractTarGz(tempFile, tempDir); err != nil {
-        return cli.Exit("Failed to extract file: "+err.Error(), 1)
-    }
-    folderName := strings.TrimSuffix(fileName, ".tar.gz")
-    newExePath := filepath.Join(tempDir,folderName, "vfox")
-    if err := os.Rename(newExePath, exePath); err != nil {
-        return cli.Exit("Failed to replace executable: "+err.Error(), 1)
-    }
+	if err := downloadFile(tempFile, binURL); err != nil {
+		return cli.Exit("Failed to download file: "+err.Error(), 1)
+	}
+	if err := extractTarGz(tempFile, tempDir); err != nil {
+		return cli.Exit("Failed to extract file: "+err.Error(), 1)
+	}
+	newExePath := filepath.Join(tempDir, "vfox")
+	if err := os.Rename(newExePath, exePath); err != nil {
+		return cli.Exit("Failed to replace executable: "+err.Error(), 1)
+	}
 	if err := os.Chmod(exePath, 0755); err != nil {
-        panic("Failed to make executable: " + err.Error())
-    }
-    if err = os.RemoveAll(tempDir); err != nil {
-        fmt.Println("Error removing directory:", err)
-    }
+		panic("Failed to make executable: " + err.Error())
+	}
+	if err = os.RemoveAll(tempDir); err != nil {
+		fmt.Println("Error removing directory:", err)
+	}
 	if err = os.RemoveAll(tempFile); err != nil {
-        fmt.Println("Error removing directory:", err)
-    }
+		fmt.Println("Error removing directory:", err)
+	}
 
-	updateMsg := fmt.Sprintf("Updated to version: %s \nSee the diff at: %s \n",latestVersion,diffURL);
-    return cli.Exit(updateMsg, 0)
+	updateMsg := fmt.Sprintf("Updated to version: %s \nSee the diff at: %s \n", latestVersion, diffURL)
+	return cli.Exit(updateMsg, 0)
 }
- 
