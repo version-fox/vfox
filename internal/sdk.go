@@ -68,7 +68,7 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("%s is already installed", label)
 	}
 	var installedSdkInfos []*Info
-	path, err := b.installSdk(mainSdk, newDirPath)
+	path, err := b.preInstallSdk(mainSdk, newDirPath)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (b *Sdk) Install(version Version) error {
 	if len(installInfo.Additional) > 0 {
 		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
 		for _, oSdk := range installInfo.Additional {
-			path, err = b.installSdk(oSdk, newDirPath)
+			path, err = b.preInstallSdk(oSdk, newDirPath)
 			if err != nil {
 				return err
 			}
@@ -96,11 +96,21 @@ func (b *Sdk) Install(version Version) error {
 	if err != nil {
 		return fmt.Errorf("plugin [PostInstall] method error: %w", err)
 	}
+	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
 	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
-func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
-	pterm.Printf("Installing %s...\n", info.label())
+
+func (b *Sdk) moveLocalFile(info *Info, sdkDestPath string) (string, error) {
+	path := filepath.Join(sdkDestPath, info.Name+"-"+string(info.Version))
+	pterm.Printf("Moving %s to %s...\n", info.Path, path)
+	err := os.Rename(info.Path, path)
+	if err != nil {
+		return "", fmt.Errorf("failed to move file, err:%w", err)
+	}
+	return path, nil
+}
+func (b *Sdk) moveRemoteFile(info *Info, sdkDestPath string) (string, error) {
 	u, err := url.Parse(info.Path)
 	label := info.label()
 	if err != nil {
@@ -134,8 +144,15 @@ func (b *Sdk) installSdk(info *Info, sdkDestPath string) (string, error) {
 		fmt.Printf("Unpack failed, err:%s", err.Error())
 		return "", err
 	}
-	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
 	return path, nil
+}
+func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
+	pterm.Printf("Preinstalling %s...\n", info.label())
+	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
+		return b.moveRemoteFile(info, sdkDestPath)
+	} else {
+		return b.moveLocalFile(info, sdkDestPath)
+	}
 }
 
 func (b *Sdk) Uninstall(version Version) error {
