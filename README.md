@@ -45,7 +45,8 @@ $ brew tap version-fox/tap
 $ brew install vfox
 ```
 
-Hook VersionFox into your shell (pick one that works for your shell)
+⚠️ **_Hook VersionFox into your shell_ (pick one that works for your shell)** ⚠️
+
 ```bash
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc

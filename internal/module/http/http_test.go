@@ -58,6 +58,21 @@ func TestGetRequest(t *testing.T) {
 	eval(str, t)
 }
 
+func TestHeadRequest(t *testing.T) {
+	const str = `	
+	local http = require("http")
+	assert(type(http) == "table")
+	assert(type(http.get) == "function")
+	local resp, err = http.head({
+        url = "http://ip.jsontest.com/"
+    })
+	assert(err == nil)
+	assert(resp.status_code == 200)
+	assert(resp.content_length ~= 0)
+	`
+	eval(str, t)
+}
+
 func eval(str string, t *testing.T) {
 	s := lua.NewState()
 	defer s.Close()
