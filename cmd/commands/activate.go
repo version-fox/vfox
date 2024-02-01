@@ -41,7 +41,10 @@ func activateCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager(internal.GlobalRecordSource, internal.ProjectRecordSource)
 	defer manager.Record.Save()
 	defer manager.Close()
-	envKeys := manager.EnvKeys()
+	envKeys, err := manager.EnvKeys()
+	if err != nil {
+		return err
+	}
 	envKeys[env.HookFlag] = &name
 	envKeys[env.PathFlag] = envKeys["PATH"]
 	path := manager.PathMeta.ExecutablePath

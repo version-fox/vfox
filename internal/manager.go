@@ -52,18 +52,20 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys() env.Envs {
+func (m *Manager) EnvKeys() (env.Envs, error) {
 	shellEnvs := make(env.Envs)
 	var paths []string
 	for k, v := range m.Record.Export() {
 		if lookupSdk, err := m.LookupSdk(k); err == nil {
-			if keys, err := lookupSdk.EnvKeys(Version(v)); err == nil {
-				for key, value := range keys {
-					if key == "PATH" {
-						paths = append(paths, *value)
-					} else {
-						shellEnvs[key] = value
-					}
+			keys, err := lookupSdk.EnvKeys(Version(v))
+			if err != nil {
+				return nil, err
+			}
+			for key, value := range keys {
+				if key == "PATH" {
+					paths = append(paths, *value)
+				} else {
+					shellEnvs[key] = value
 				}
 			}
 		}
@@ -80,7 +82,7 @@ func (m *Manager) EnvKeys() env.Envs {
 		pathStr := m.EnvManager.Paths(paths[:])
 		shellEnvs["PATH"] = &pathStr
 	}
-	return shellEnvs
+	return shellEnvs, nil
 }
 
 // LookupSdk lookup sdk by name

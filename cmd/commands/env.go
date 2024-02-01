@@ -59,7 +59,10 @@ func envCmd(ctx *cli.Context) error {
 		}
 		manager := internal.NewSdkManagerWithSource(internal.SessionRecordSource, internal.ProjectRecordSource)
 		defer manager.Close()
-		envKeys := manager.EnvKeys()
+		envKeys, err := manager.EnvKeys()
+		if err != nil {
+			return err
+		}
 		exportStr := s.Export(envKeys)
 		fmt.Println(exportStr)
 		return nil

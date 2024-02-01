@@ -91,13 +91,11 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 			err = fmt.Errorf("the return value is not a table")
 			return
 		}
-		v := kvTable.RawGetString("version").String()
-		note := kvTable.RawGetString("note").String()
-		mainSdk := &Info{
-			Name:    l.Name,
-			Version: Version(v),
-			Note:    note,
+		mainSdk, err := l.parseInfo(kvTable)
+		if err != nil {
+			return
 		}
+		mainSdk.Name = l.Name
 		var additionalArr []*Info
 		additional := kvTable.RawGetString("addition")
 		if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
@@ -107,11 +105,11 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 					err = fmt.Errorf("the return value is not a table")
 					return
 				}
-				item := Info{
-					Name:    itemTable.RawGetString("name").String(),
-					Version: Version(itemTable.RawGetString("version").String()),
+				item, err := l.parseInfo(itemTable)
+				if err != nil {
+					return
 				}
-				additionalArr = append(additionalArr, &item)
+				additionalArr = append(additionalArr, item)
 			})
 		}
 
@@ -128,7 +126,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	return result, nil
 }
 
-func (l *LuaPlugin) Checksum(table *lua.LTable) (*Checksum, error) {
+func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 	checksum := &Checksum{}
 	sha256 := table.RawGetString("sha256")
 	md5 := table.RawGetString("md5")
@@ -147,9 +145,9 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) (*Checksum, error) {
 		checksum.Value = sha512.String()
 		checksum.Type = "sha512"
 	} else {
-		return NoneChecksum, nil
+		return NoneChecksum
 	}
-	return checksum, nil
+	return checksum
 }
 
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
@@ -170,19 +168,11 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, nil
 	}
-	v := table.RawGetString("version").String()
-	muStr := table.RawGetString("url").String()
-
-	checksum, err := l.Checksum(table)
+	mainSdk, err := l.parseInfo(table)
 	if err != nil {
 		return nil, err
 	}
-	mainSdk := &Info{
-		Name:     l.Name,
-		Version:  Version(v),
-		Path:     muStr,
-		Checksum: checksum,
-	}
+	mainSdk.Name = l.Name
 	var additionalArr []*Info
 	additional := table.RawGetString("addition")
 	if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
@@ -193,18 +183,11 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 				err = fmt.Errorf("the return value is not a table")
 				return
 			}
-			s := kvTable.RawGetString("url").String()
-			checksum, err = l.Checksum(kvTable)
+			info, err := l.parseInfo(kvTable)
 			if err != nil {
 				return
 			}
-			item := Info{
-				Name:     kvTable.RawGetString("name").String(),
-				Version:  Version(kvTable.RawGetString("version").String()),
-				Path:     s,
-				Checksum: checksum,
-			}
-			additionalArr = append(additionalArr, &item)
+			additionalArr = append(additionalArr, info)
 		})
 		if err != nil {
 			return nil, err
@@ -214,6 +197,38 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	return &Package{
 		Main:       mainSdk,
 		Additional: additionalArr,
+	}, nil
+}
+
+func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
+	versionLua := table.RawGetString("version")
+	if versionLua == lua.LNil {
+		return nil, fmt.Errorf("no version number provided")
+	}
+	var (
+		path    string
+		note    string
+		name    string
+		version string
+	)
+	version = versionLua.String()
+
+	if urlLua := table.RawGetString("url"); urlLua != lua.LNil {
+		path = urlLua.String()
+	}
+	if noteLua := table.RawGetString("note"); noteLua != lua.LNil {
+		note = noteLua.String()
+	}
+	if nameLua := table.RawGetString("name"); nameLua != lua.LNil {
+		name = nameLua.String()
+	}
+	checksum := l.Checksum(table)
+	return &Info{
+		Name:     name,
+		Version:  Version(version),
+		Path:     path,
+		Note:     note,
+		Checksum: checksum,
 	}, nil
 }
 
