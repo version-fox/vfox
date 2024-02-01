@@ -21,7 +21,8 @@ PLUGIN = {
     updateUrl = "{URL}/sdk.lua",
 }
 
---- Return information about the specified version based on ctx.version, including version, download URL, etc.
+--- Returns some pre-installed information, such as version number, download address, local files, etc.
+--- If checksum is provided, vfox will automatically check it for you.
 --- @param ctx table
 --- @field ctx.version string User-input version
 --- @return table Version information
@@ -29,17 +30,21 @@ function PLUGIN:PreInstall(ctx)
     return {
         --- Version number
         version = "xxx",
-        --- Download URL
+        --- remote URL or local file path [optional]
         url = "xxx",
-        --- SHA256 checksum
+        --- SHA256 checksum [optional]
         sha256 = "xxx",
         --- md5 checksum [optional]
         md5= "xxx",
+        --- sha1 checksum [optional]
+        sha1 = "xxx",
+        --- sha512 checksum [optional]
+        sha512 = "xx",
     }
 end
 
 --- Extension point, called after PreInstall, can perform additional operations,
---- such as file operations for the SDK installation directory
+--- such as file operations for the SDK installation directory or compile source code
 --- Currently can be left unimplemented!
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK installation directory

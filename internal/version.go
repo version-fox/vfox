@@ -16,6 +16,8 @@
 
 package internal
 
+import "path/filepath"
+
 type Package struct {
 	Main       *Info
 	Additional []*Info
@@ -31,4 +33,8 @@ type Info struct {
 
 func (i *Info) label() string {
 	return i.Name + "@" + string(i.Version)
+}
+
+func (i *Info) storagePath(parentDir string) string {
+	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }
