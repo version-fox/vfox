@@ -16,4 +16,25 @@
 
 package internal
 
-const RuntimeVersion = "0.2.3"
+import "path/filepath"
+
+type Package struct {
+	Main       *Info
+	Additional []*Info
+}
+
+type Info struct {
+	Name     string
+	Version  Version
+	Path     string
+	Note     string
+	Checksum *Checksum
+}
+
+func (i *Info) label() string {
+	return i.Name + "@" + string(i.Version)
+}
+
+func (i *Info) storagePath(parentDir string) string {
+	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
+}

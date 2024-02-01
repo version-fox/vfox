@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/cmd/commands"
+	"github.com/version-fox/vfox/internal"
 	"os"
 )
 
-func Execute(version string, args []string) {
-	newCmd(version).Execute(args)
+func Execute(args []string) {
+	newCmd().Execute(args)
 }
 
 type cmd struct {
@@ -39,8 +40,8 @@ func (c *cmd) Execute(args []string) {
 	}
 }
 
-func newCmd(version string) *cmd {
-
+func newCmd() *cmd {
+	version := internal.RuntimeVersion
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
 		Aliases: []string{"v", "V"},

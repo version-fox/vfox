@@ -235,6 +235,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	}
 	defer source.Close()
 
+	// Check if the plugin is compatible with the current runtime
+	if source.MinRuntimeVersion != "" && util.CompareVersion(source.MinRuntimeVersion, RuntimeVersion) > 0 {
+		return fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", source.MinRuntimeVersion)
+	}
+
 	pname := source.Name
 	if len(alias) > 0 {
 		pname = alias

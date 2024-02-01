@@ -35,12 +35,13 @@ type LuaPlugin struct {
 	state     *lua.LState
 	pluginObj *lua.LTable
 	// plugin source path
-	SourcePath  string
-	Name        string
-	Author      string
-	Version     string
-	Description string
-	UpdateUrl   string
+	SourcePath        string
+	Name              string
+	Author            string
+	Version           string
+	Description       string
+	UpdateUrl         string
+	MinRuntimeVersion string
 }
 
 func (l *LuaPlugin) checkValid() error {
@@ -364,6 +365,9 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	}
 	if author := PLUGIN.RawGetString("author"); author.Type() != lua.LTNil {
 		source.Author = author.String()
+	}
+	if minRuntimeVersion := PLUGIN.RawGetString("minRuntimeVersion"); minRuntimeVersion.Type() != lua.LTNil {
+		source.MinRuntimeVersion = minRuntimeVersion.String()
 	}
 	return source, nil
 }

@@ -17,8 +17,12 @@ PLUGIN = {
     author = "Lihan",
     --- Plugin version
     version = "0.0.1",
+    --- Plugin description
+    description = "xxx",
     -- Update URL
     updateUrl = "{URL}/sdk.lua",
+    -- minimum compatible vfox version
+    minRuntimeVersion = "0.2.2",
 }
 
 --- Returns some pre-installed information, such as version number, download address, local files, etc.
