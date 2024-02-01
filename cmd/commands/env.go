@@ -18,10 +18,8 @@ package commands
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal"
-	"os"
-
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -47,12 +45,8 @@ func envCmd(ctx *cli.Context) error {
 	if ctx.IsSet("cleanup") {
 		manager := internal.NewSdkManager()
 		defer manager.Close()
-		temp, err := internal.NewTemp(manager.PathMeta.TempPath, os.Getppid())
-		if err != nil {
-			return err
-		}
 		// Clean up the old temp files, before today.
-		temp.Remove()
+		manager.CleanTmp()
 		return nil
 	} else {
 		shellName := ctx.String("shell")

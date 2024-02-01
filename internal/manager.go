@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -345,6 +346,30 @@ func (m *Manager) Available() ([]*Category, error) {
 	}
 }
 
+func (m *Manager) CleanTmp() {
+	dir, err := os.ReadDir(m.PathMeta.TempPath)
+	if err == nil {
+		_ = os.RemoveAll(m.PathMeta.CurTmpPath)
+		for _, file := range dir {
+			if !file.IsDir() {
+				continue
+			}
+			names := strings.SplitN(file.Name(), "-", 2)
+			if len(names) != 2 {
+				continue
+			}
+			timestamp := names[0]
+			i, err := strconv.ParseInt(timestamp, 10, 64)
+			if err != nil {
+				continue
+			}
+			if util.IsBeforeToday(i) {
+				_ = os.Remove(filepath.Join(m.PathMeta.TempPath, file.Name()))
+			}
+		}
+	}
+}
+
 func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
 	if env.IsHookEnv() {
 		return newSdkManagerWithSource(sources...)
@@ -370,11 +395,7 @@ func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 			}
 			paths = append(paths, curDir)
 		case SessionRecordSource:
-			temp, err := NewTemp(meta.TempPath, os.Getppid())
-			if err != nil {
-				panic("Init temp error")
-			}
-			paths = append(paths, temp.CurProcessPath)
+			paths = append(paths, meta.CurTmpPath)
 		}
 	}
 	var record env.Record

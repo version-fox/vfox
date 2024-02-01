@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 )
@@ -31,7 +32,9 @@ const (
 )
 
 type PathMeta struct {
-	TempPath       string
+	TempPath string
+	// Temporary directory for the current process
+	CurTmpPath     string
 	ConfigPath     string
 	SdkCachePath   string
 	PluginPath     string
@@ -52,10 +55,21 @@ func newPathMeta() (*PathMeta, error) {
 	_ = os.MkdirAll(tmpPath, 0755)
 	exePath, err := os.Executable()
 	if err != nil {
-		panic("Get executable path error")
+		return nil, err
+	}
+	pid := os.Getppid()
+	timestamp := util.GetBeginOfToday()
+	name := fmt.Sprintf("%d-%d", timestamp, pid)
+	curTmpPath := filepath.Join(tmpPath, name)
+	if !util.FileExists(curTmpPath) {
+		err = os.Mkdir(curTmpPath, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("create temp dir failed: %w", err)
+		}
 	}
 	return &PathMeta{
 		TempPath:       tmpPath,
+		CurTmpPath:     curTmpPath,
 		ConfigPath:     configPath,
 		SdkCachePath:   sdkCachePath,
 		PluginPath:     pluginPath,
