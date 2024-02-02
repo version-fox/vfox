@@ -75,13 +75,13 @@ $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh |
 2. 直接下载二进制文件, 将它**配置到PATH**中
 
 
-### 将 vfox 挂到你的 shell 中（从下面条目中,选择适合你 shell 的版本）：
+### ⚠️⚠️⚠️将 vfox 挂到你的 shell 中（从下面条目中,选择适合你 shell 的版本）：
 ```bash
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
-Add the following line to your $PROFILE:
+# 对于Powershell, 将以下行添加到你的 $PROFILE中:
 Invoke-Expression "$(vfox activate pwsh)"
 ```
 

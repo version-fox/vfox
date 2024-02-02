@@ -79,11 +79,28 @@ $ node -v
 
 - [Getting Started](https://github.com/version-fox/vfox/wiki/Getting-Started)
 - [Commands Overview](https://github.com/version-fox/vfox/wiki/All-Commands)
-- [Plugins Repository](https://github.com/version-fox/version-fox-plugins)
 - [How to write a custom plugin?](https://github.com/version-fox/vfox/wiki/How-to-write-a-custom-plugin%3F)
 - [What is the difference with asdf-vm?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
 
  For more information, read the [Wiki](https://github.com/version-fox/vfox/wiki).
+
+
+## Supported Plugins
+
+If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
+
+Or please see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins) repository.
+
+## FAQ
+
+### 1.**Switch xxx not work or the `vfox use ` command does not work ?**
+
+If your shell prompt `Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically` that
+means you do not hook `vfox` into your shell, please hook it manually first.
+
+See [issue#35](https://github.com/version-fox/vfox/issues/35)
+
+
 
 ## Contributors
 
