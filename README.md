@@ -87,9 +87,11 @@ $ node -v
 
 ## Supported Plugins
 
-If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
+> If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
 
-Or please see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins) repository.
+[![plugins](https://skillicons.dev/icons?i=java,nodejs,flutter,dotnet,dart,golang,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
+
+For more details, see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
 
 ## FAQ
 
