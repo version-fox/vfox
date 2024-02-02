@@ -159,12 +159,12 @@ func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 		return path, nil
 	}
 	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
-		if err := b.moveRemoteFile(info, sdkDestPath); err != nil {
+		if err := b.moveRemoteFile(info, path); err != nil {
 			return "", err
 		}
 		return path, nil
 	} else {
-		if err := b.moveLocalFile(info, sdkDestPath); err != nil {
+		if err := b.moveLocalFile(info, path); err != nil {
 			return "", err
 		}
 		return path, nil
@@ -241,7 +241,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 			return err
 		}
 	}
-	b.sdkManager.Record.Add(b.Plugin.Name, string(version))
+	b.sdkManager.Record.Add(b.Plugin.Filename, string(version))
 	defer b.sdkManager.Record.Save()
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
 	if !env.IsHookEnv() {
@@ -271,7 +271,7 @@ func (b *Sdk) List() []Version {
 }
 
 func (b *Sdk) Current() Version {
-	version := b.sdkManager.Record.Export()[b.Plugin.Name]
+	version := b.sdkManager.Record.Export()[b.Plugin.Filename]
 	return Version(version)
 }
 
@@ -427,7 +427,7 @@ func (b *Sdk) label(version Version) string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Name)),
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Filename)),
 		Plugin:      source,
 	}, nil
 }
