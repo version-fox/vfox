@@ -44,6 +44,23 @@ function PLUGIN:PreInstall(ctx)
         sha1 = "xxx",
         --- sha512 checksum [optional]
         sha512 = "xx",
+        --- additional need files [optional]
+        addition = {
+            {
+                --- additional file name !
+                name = "xxx",
+                --- remote URL or local file path [optional]
+                url = "xxx",
+                --- SHA256 checksum [optional]
+                sha256 = "xxx",
+                --- md5 checksum [optional]
+                md5= "xxx",
+                --- sha1 checksum [optional]
+                sha1 = "xxx",
+                --- sha512 checksum [optional]
+                sha512 = "xx",
+            }
+        }
     }
 end
 
@@ -81,9 +98,14 @@ end
 --- This allows plugins to define custom environment variables (including PATH settings)
 --- Note: Be sure to distinguish between environment variable settings for different platforms!
 --- @param ctx table Context information
---- @field ctx.version_path string SDK installation directory
+--- @field ctx.path string SDK installation directory
 function PLUGIN:EnvKeys(ctx)
+    --- this variable is same as ctx.sdkInfo['plugin-name'].path
     local mainPath = ctx.path
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
     return {
         {
             key = "JAVA_HOME",

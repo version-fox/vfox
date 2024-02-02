@@ -109,13 +109,17 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 				if err != nil {
 					return
 				}
+				if item.Name == "" {
+					err = fmt.Errorf("additional file no name provided")
+					return
+				}
 				additionalArr = append(additionalArr, item)
 			})
 		}
 
 		result = append(result, &Package{
-			Main:       mainSdk,
-			Additional: additionalArr,
+			Main:      mainSdk,
+			Additions: additionalArr,
 		})
 
 	})
@@ -174,10 +178,10 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	}
 	mainSdk.Name = l.Name
 	var additionalArr []*Info
-	additional := table.RawGetString("addition")
-	if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
+	additions := table.RawGetString("addition")
+	if tb, ok := additions.(*lua.LTable); ok && tb.Len() != 0 {
 		var err error
-		additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
+		additions.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
 			kvTable, ok := value.(*lua.LTable)
 			if !ok {
 				err = fmt.Errorf("the return value is not a table")
@@ -185,6 +189,10 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 			}
 			info, err := l.parseInfo(kvTable)
 			if err != nil {
+				return
+			}
+			if info.Name == "" {
+				err = fmt.Errorf("additional file no name provided")
 				return
 			}
 			additionalArr = append(additionalArr, info)
@@ -195,8 +203,8 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	}
 
 	return &Package{
-		Main:       mainSdk,
-		Additional: additionalArr,
+		Main:      mainSdk,
+		Additions: additionalArr,
 	}, nil
 }
 
@@ -240,6 +248,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 		L.SetField(sdkTable, "name", lua.LString(v.Name))
 		L.SetField(sdkTable, "version", lua.LString(v.Version))
 		L.SetField(sdkTable, "path", lua.LString(v.Path))
+		L.SetField(sdkTable, "note", lua.LString(v.Note))
 		L.SetField(sdkArr, v.Name, sdkTable)
 	}
 	ctxTable := L.NewTable()
@@ -263,15 +272,19 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 
 func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	L := l.state
-	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "path", lua.LString(sdkPackage.Main.Path))
-	if len(sdkPackage.Additional) != 0 {
-		additionalTable := L.NewTable()
-		for _, v := range sdkPackage.Additional {
-			L.SetField(additionalTable, v.Name, lua.LString(v.Path))
-		}
-		L.SetField(ctxTable, "additional_path", additionalTable)
+	mainInfo := sdkPackage.Main
+	sdkArr := L.NewTable()
+	for _, v := range sdkPackage.Additions {
+		sdkTable := L.NewTable()
+		L.SetField(sdkTable, "name", lua.LString(v.Name))
+		L.SetField(sdkTable, "version", lua.LString(v.Version))
+		L.SetField(sdkTable, "path", lua.LString(v.Path))
+		L.SetField(sdkArr, v.Name, sdkTable)
 	}
+	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "sdkInfo", sdkArr)
+	// TODO Will be deprecated in future versions
+	L.SetField(ctxTable, "path", lua.LString(mainInfo.Path))
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("EnvKeys"),
 		NRet:    1,

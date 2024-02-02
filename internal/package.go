@@ -19,8 +19,8 @@ package internal
 import "path/filepath"
 
 type Package struct {
-	Main       *Info
-	Additional []*Info
+	Main      *Info
+	Additions []*Info
 }
 
 type Info struct {
@@ -36,5 +36,8 @@ func (i *Info) label() string {
 }
 
 func (i *Info) storagePath(parentDir string) string {
+	if i.Version == "" {
+		return filepath.Join(parentDir, i.Name)
+	}
 	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }

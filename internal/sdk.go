@@ -81,11 +81,12 @@ func (b *Sdk) Install(version Version) error {
 	installedSdkInfos = append(installedSdkInfos, &Info{
 		Name:    mainSdk.Name,
 		Version: mainSdk.Version,
+		Note:    mainSdk.Note,
 		Path:    path,
 	})
-	if len(installInfo.Additional) > 0 {
-		pterm.Printf("There are %d additional items that need to be installed...\n", len(installInfo.Additional))
-		for _, oSdk := range installInfo.Additional {
+	if len(installInfo.Additions) > 0 {
+		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Additions))
+		for _, oSdk := range installInfo.Additions {
 			path, err = b.preInstallSdk(oSdk, newDirPath)
 			if err != nil {
 				return err
@@ -107,26 +108,23 @@ func (b *Sdk) Install(version Version) error {
 	return nil
 }
 
-func (b *Sdk) moveLocalFile(info *Info, sdkDestPath string) (string, error) {
-	path := info.storagePath(sdkDestPath)
-	pterm.Printf("Moving %s to %s...\n", info.Path, path)
-	err := os.Rename(info.Path, path)
-	if err != nil {
-		return "", fmt.Errorf("failed to move file, err:%w", err)
+func (b *Sdk) moveLocalFile(info *Info, targetPath string) error {
+	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
+	if err := os.Rename(info.Path, targetPath); err != nil {
+		return fmt.Errorf("failed to move file, err:%w", err)
 	}
-	return path, nil
+	return nil
 }
 
-func (b *Sdk) moveRemoteFile(info *Info, sdkDestPath string) (string, error) {
+func (b *Sdk) moveRemoteFile(info *Info, targetPath string) error {
 	u, err := url.Parse(info.Path)
 	label := info.label()
 	if err != nil {
-		return "", err
+		return err
 	}
 	filePath, err := b.Download(u)
 	if err != nil {
-		fmt.Printf("Failed to download %s file, err:%s", label, err.Error())
-		return "", err
+		return fmt.Errorf("failed to download %s file, err:%w", label, err)
 	}
 	defer func() {
 		// del cache file
@@ -136,32 +134,40 @@ func (b *Sdk) moveRemoteFile(info *Info, sdkDestPath string) (string, error) {
 	checksum := info.Checksum.verify(filePath)
 	if !checksum {
 		fmt.Printf("Checksum error, file: %s\n", filePath)
-		return "", errors.New("checksum error")
+		return errors.New("checksum error")
 	}
-
 	decompressor := util.NewDecompressor(filePath)
 	if decompressor == nil {
-		fmt.Printf("Unable to process current file type, file: %s\n", filePath)
-		return "", fmt.Errorf("unknown file type")
+		// If it is not a compressed file, move file to the corresponding sdk directory,
+		// and the rest be handled by the PostInstall function.
+		if err = os.Rename(filePath, targetPath); err != nil {
+			return fmt.Errorf("failed to move file, err:%w", err)
+		}
+		return nil
 	}
 	pterm.Printf("Unpacking %s...\n", filePath)
-	path := info.storagePath(sdkDestPath)
-	err = decompressor.Decompress(path)
+	err = decompressor.Decompress(targetPath)
 	if err != nil {
-		fmt.Printf("Unpack failed, err:%s", err.Error())
-		return "", err
+		return fmt.Errorf("unpack failed, err:%w", err)
 	}
-	return path, nil
+	return nil
 }
 func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 	pterm.Printf("Preinstalling %s...\n", info.label())
+	path := info.storagePath(sdkDestPath)
 	if info.Path == "" {
-		return info.storagePath(sdkDestPath), nil
+		return path, nil
 	}
 	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
-		return b.moveRemoteFile(info, sdkDestPath)
+		if err := b.moveRemoteFile(info, sdkDestPath); err != nil {
+			return "", err
+		}
+		return path, nil
 	} else {
-		return b.moveLocalFile(info, sdkDestPath)
+		if err := b.moveLocalFile(info, sdkDestPath); err != nil {
+			return "", err
+		}
+		return path, nil
 	}
 }
 
@@ -305,7 +311,7 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 		Name:    b.Plugin.Name,
 		Version: version,
 	}
-	var additional []*Info
+	var additions []*Info
 	dir, err := os.ReadDir(versionPath)
 	if err != nil {
 		return nil, err
@@ -313,16 +319,16 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 	for _, d := range dir {
 		if d.IsDir() {
 			split := strings.SplitN(d.Name(), "-", 2)
-			if len(split) != 2 {
-				continue
-			}
 			name := split[0]
-			v := split[1]
 			if name == b.Plugin.Name {
 				mainSdk.Path = filepath.Join(versionPath, d.Name())
 				continue
 			}
-			additional = append(additional, &Info{
+			if len(split) != 2 {
+				continue
+			}
+			v := split[1]
+			additions = append(additions, &Info{
 				Name:    name,
 				Version: Version(v),
 				Path:    filepath.Join(versionPath, d.Name()),
@@ -338,8 +344,8 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 
 	}
 	return &Package{
-		Main:       mainSdk,
-		Additional: additional,
+		Main:      mainSdk,
+		Additions: additions,
 	}, nil
 }
 
@@ -356,7 +362,7 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := b.sdkManager.httpClient().Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {

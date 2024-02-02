@@ -71,9 +71,9 @@ func searchCmd(ctx *cli.Context) error {
 				} else {
 					value = fmt.Sprintf("v%s", p.Main.Version)
 				}
-				if len(p.Additional) != 0 {
+				if len(p.Additions) != 0 {
 					var additional []string
-					for _, a := range p.Additional {
+					for _, a := range p.Additions {
 						additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
 					}
 					value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
