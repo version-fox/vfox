@@ -155,6 +155,11 @@ func (b *Sdk) moveRemoteFile(info *Info, targetPath string) error {
 func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 	pterm.Printf("Preinstalling %s...\n", info.label())
 	path := info.storagePath(sdkDestPath)
+	if !util.FileExists(path) {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return "", fmt.Errorf("failed to create directory, err:%w", err)
+		}
+	}
 	if info.Path == "" {
 		return path, nil
 	}
