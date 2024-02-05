@@ -30,7 +30,6 @@ const (
 	LuaPluginObjKey = "PLUGIN"
 	OsType          = "OS_TYPE"
 	ArchType        = "ARCH_TYPE"
-	PluginVersion   = "0.0.1"
 )
 
 type LuaPlugin struct {
@@ -73,7 +72,7 @@ func (l *LuaPlugin) Close() {
 func (l *LuaPlugin) Available() ([]*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "plugin_version", lua.LString(PluginVersion))
+	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("Available").(*lua.LFunction),
 		NRet:    1,
@@ -163,6 +162,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.state
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
+	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 
 	if err := L.CallByParam(lua.P{
 		Fn:      l.pluginObj.RawGetString("PreInstall").(*lua.LFunction),
@@ -258,6 +258,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	}
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "sdkInfo", sdkArr)
+	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	L.SetField(ctxTable, "rootPath", lua.LString(rootPath))
 
 	function := l.pluginObj.RawGetString("PostInstall")
@@ -288,6 +289,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	}
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "sdkInfo", sdkArr)
+	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	// TODO Will be deprecated in future versions
 	L.SetField(ctxTable, "path", lua.LString(mainInfo.Path))
 	if err := L.CallByParam(lua.P{
