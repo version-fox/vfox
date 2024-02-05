@@ -31,6 +31,8 @@ PLUGIN = {
 --- @field ctx.version string User-input version
 --- @return table Version information
 function PLUGIN:PreInstall(ctx)
+    local version = ctx.version
+    local runtimeVersion = ctx.runtimeVersion
     return {
         --- Version number
         version = "xxx",
@@ -70,6 +72,7 @@ end
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK installation directory
     local rootPath = ctx.rootPath
+    local runtimeVersion = ctx.runtimeVersion
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
     local version = sdkInfo.version
@@ -80,6 +83,7 @@ end
 --- @param ctx table Empty table used as context, for future extension
 --- @return table Descriptions of available versions and accompanying tool descriptions
 function PLUGIN:Available(ctx)
+    local runtimeVersion = ctx.runtimeVersion
     return {
         {
             version = "xxxx",
@@ -102,6 +106,7 @@ end
 function PLUGIN:EnvKeys(ctx)
     --- this variable is same as ctx.sdkInfo['plugin-name'].path
     local mainPath = ctx.path
+    local runtimeVersion = ctx.runtimeVersion
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
     local version = sdkInfo.version

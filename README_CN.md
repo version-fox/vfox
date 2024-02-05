@@ -328,14 +328,18 @@ OS_TYPE = ""
 ARCH_TYPE = ""
 
 PLUGIN = {
-    --- 插件名称
+    --- 插件名称, 即sdk名称
     name = "java",
     --- 插件作者
     author = "Lihan",
     --- 插件版本
     version = "0.0.1",
+    --- 插件描述
+    description = "xxx",
     -- 升级地址
     updateUrl = "{URL}/sdk.lua",
+    -- 最先运行时的版本 >=
+    minRuntimeVersion = "0.2.2",
 }
 
 --- 根据ctx.version来返回对应版本的信息,包括版本、下载地址等
@@ -343,10 +347,12 @@ PLUGIN = {
 --- @field ctx.version string 用户输入的版本号
 --- @return table 版本信息
 function PLUGIN:PreInstall(ctx)
+    local runtimeVersion = ctx.runtimeVersion
+    local version = ctx.version
     return {
-        --- 版本号
+        --- 版本号 必填
         version = "xxx",
-        --- 下载地址
+        --- 下载地址 [选填]
         url = "xxx",
     }
 end
@@ -356,6 +362,7 @@ end
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK安装目录
     local rootPath = ctx.rootPath
+    local runtimeVersion = ctx.runtimeVersion
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
     local version = sdkInfo.version
@@ -378,6 +385,7 @@ end
 ---   }
 --- }
 function PLUGIN:Available(ctx)
+    local runtimeVersion = ctx.runtimeVersion
     return {
         {
             version = "xxxx",
@@ -397,7 +405,8 @@ end
 --- @param ctx table 上下文信息
 --- @field ctx.version_path string SDK安装目录
 function PLUGIN:EnvKeys(ctx)
-    local mainPath = ctx.version_path
+    local mainPath = ctx.path
+    local runtimeVersion = ctx.runtimeVersion
     return {
         {
             key = "JAVA_HOME",
