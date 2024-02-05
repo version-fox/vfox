@@ -32,6 +32,7 @@ import (
 type windowsEnvManager struct {
 	key registry.Key
 	// $PATH
+	paths          []string
 	pathMap        map[string]struct{}
 	deletedPathMap map[string]struct{}
 }
@@ -53,23 +54,25 @@ func (w *windowsEnvManager) loadPathValue() error {
 	}
 	s := strings.Split(val, ";")
 	for _, path := range s {
+		w.paths = append(w.paths, path)
 		w.pathMap[path] = struct{}{}
 	}
 	return nil
 }
 
 func (w *windowsEnvManager) Flush() (err error) {
-	// TODO move this close method to other place
-	defer w.key.Close()
 	customPaths := make([]string, 0, len(w.pathMap))
 	customPathSet := make(map[string]struct{})
 	if len(w.pathMap) > 0 {
-		for path := range w.pathMap {
+		for i := len(w.paths) - 1; i >= 0; i-- {
+			path := w.paths[i]
 			customPaths = append(customPaths, path)
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
-		w.Load("VERSION_FOX_PATH", pathValue)
+		if err = w.Load("VERSION_FOX_PATH", pathValue); err != nil {
+			return err
+		}
 	} else {
 		_ = w.Remove("VERSION_FOX_PATH")
 	}
@@ -89,7 +92,9 @@ func (w *windowsEnvManager) Flush() (err error) {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";"))
+	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
+		return err
+	}
 	// sys env
 	sysPath := os.Getenv("PATH")
 	s2 := strings.Split(sysPath, ";")
@@ -103,23 +108,31 @@ func (w *windowsEnvManager) Flush() (err error) {
 		}
 		sysNewPaths = append(sysNewPaths, v)
 	}
-	os.Setenv("PATH", strings.Join(sysNewPaths, ";"))
+	if err = os.Setenv("PATH", strings.Join(sysNewPaths, ";")); err != nil {
+		return err
+	}
 	_ = w.broadcastEnvironment()
 	return
 }
 
-func (w *windowsEnvManager) Load(key, value string) {
+func (w *windowsEnvManager) Load(key, value string) error {
 	if key == "PATH" {
-		w.pathMap[value] = struct{}{}
+		_, ok := w.pathMap[value]
+		if !ok {
+			w.pathMap[value] = struct{}{}
+			w.paths = append(w.paths, value)
+		}
 	} else {
-		// TODO handle error
 		err := os.Setenv(key, value)
 		if err != nil {
+			return err
 		}
 		err = w.key.SetStringValue(key, value)
 		if err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func (w *windowsEnvManager) Get(key string) (string, bool) {
@@ -182,6 +195,7 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 		key:            k,
 		pathMap:        make(map[string]struct{}),
 		deletedPathMap: make(map[string]struct{}),
+		paths:          make([]string, 0),
 	}
 	err = manager.loadPathValue()
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 
 type Manager interface {
 	Flush() error
-	Load(key, value string)
+	Load(key, value string) error
 	Get(key string) (string, bool)
 	Remove(key string) error
 	Paths(paths []string) string

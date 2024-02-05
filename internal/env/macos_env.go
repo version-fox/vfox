@@ -41,11 +41,12 @@ func (m *macosEnvManager) Close() error {
 	return nil
 }
 
-func (m *macosEnvManager) Load(key, value string) {
+func (m *macosEnvManager) Load(key, value string) error {
 	m.store.Add(&KV{
 		Key:   key,
 		Value: value,
 	})
+	return nil
 }
 func (m *macosEnvManager) Remove(key string) error {
 	if key == "PATH" {

@@ -239,7 +239,9 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		b.clearCurrentEnvConfig()
 
 		for key, value := range keys {
-			b.sdkManager.EnvManager.Load(key, *value)
+			if err = b.sdkManager.EnvManager.Load(key, *value); err != nil {
+				return err
+			}
 		}
 		err = b.sdkManager.EnvManager.Flush()
 		if err != nil {
