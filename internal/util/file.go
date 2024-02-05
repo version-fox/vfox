@@ -19,6 +19,7 @@ package util
 import (
 	"io"
 	"os"
+	"path/filepath"
 )
 
 func FileExists(filename string) bool {
@@ -50,5 +51,35 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 
+	return nil
+}
+
+// MoveFiles Move a folder or file to a specified directory
+func MoveFiles(src, targetDir string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		files, err := os.ReadDir(src)
+		if err != nil {
+			return err
+		}
+
+		for _, file := range files {
+			oldPath := filepath.Join(src, file.Name())
+			newPath := filepath.Join(targetDir, file.Name())
+			err = os.Rename(oldPath, newPath)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		newPath := filepath.Join(targetDir, filepath.Base(src))
+		err = os.Rename(src, newPath)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -110,7 +110,7 @@ func (b *Sdk) Install(version Version) error {
 
 func (b *Sdk) moveLocalFile(info *Info, targetPath string) error {
 	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
-	if err := os.Rename(info.Path, targetPath); err != nil {
+	if err := util.MoveFiles(info.Path, targetPath); err != nil {
 		return fmt.Errorf("failed to move file, err:%w", err)
 	}
 	return nil
@@ -140,7 +140,7 @@ func (b *Sdk) moveRemoteFile(info *Info, targetPath string) error {
 	if decompressor == nil {
 		// If it is not a compressed file, move file to the corresponding sdk directory,
 		// and the rest be handled by the PostInstall function.
-		if err = os.Rename(filePath, targetPath); err != nil {
+		if err = util.MoveFiles(filePath, targetPath); err != nil {
 			return fmt.Errorf("failed to move file, err:%w", err)
 		}
 		return nil
