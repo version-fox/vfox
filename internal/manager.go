@@ -57,15 +57,13 @@ func (m *Manager) EnvKeys() (env.Envs, error) {
 	var paths []string
 	for k, v := range m.Record.Export() {
 		if lookupSdk, err := m.LookupSdk(k); err == nil {
-			keys, err := lookupSdk.EnvKeys(Version(v))
-			if err != nil {
-				return nil, err
-			}
-			for key, value := range keys {
-				if key == "PATH" {
-					paths = append(paths, *value)
-				} else {
-					shellEnvs[key] = value
+			if keys, err := lookupSdk.EnvKeys(Version(v)); err == nil {
+				for key, value := range keys {
+					if key == "PATH" {
+						paths = append(paths, *value)
+					} else {
+						shellEnvs[key] = value
+					}
 				}
 			}
 		}
