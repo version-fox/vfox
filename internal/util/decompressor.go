@@ -31,6 +31,10 @@ type Decompressor interface {
 	Decompress(dest string) error
 }
 
+type symlink struct {
+	oldname, newname string
+}
+
 type GzipTarDecompressor struct {
 	src string
 }
@@ -48,11 +52,13 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
+	var symlinks []symlink
+loop:
 	for {
 		header, err := tr.Next()
 		switch {
 		case err == io.EOF:
-			return nil
+			break loop
 		case err != nil:
 			return err
 		case header == nil:
@@ -88,13 +94,15 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 
 			f.Close()
 		case tar.TypeSymlink:
-			err := os.Symlink(header.Linkname, target)
-			if err != nil {
-				return err
-			}
-
+			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
 	}
+	for _, s := range symlinks {
+		if err = os.Symlink(s.oldname, s.newname); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type XZTarDecompressor struct {
@@ -113,11 +121,13 @@ func (g *XZTarDecompressor) Decompress(dest string) error {
 	}
 
 	tr := tar.NewReader(gzr)
+	var symlinks []symlink
+loop:
 	for {
 		header, err := tr.Next()
 		switch {
 		case err == io.EOF:
-			return nil
+			break loop
 		case err != nil:
 			return err
 		case header == nil:
@@ -153,13 +163,15 @@ func (g *XZTarDecompressor) Decompress(dest string) error {
 
 			f.Close()
 		case tar.TypeSymlink:
-			err := os.Symlink(header.Linkname, target)
-			if err != nil {
-				return err
-			}
-
+			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
 	}
+	for _, s := range symlinks {
+		if err = os.Symlink(s.oldname, s.newname); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type ZipDecompressor struct {
