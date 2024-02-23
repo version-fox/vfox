@@ -50,6 +50,7 @@ var selectionMethods = map[string]lua.LGFunction{
 	"html":  selectionHtml,
 	"find":  selectionFind,
 	"first": selectionFirst,
+	"last":  selectionLast,
 	"each":  selectionEach,
 	"attr":  selectionAttr,
 	"eq":    selectionEq,
@@ -115,6 +116,15 @@ func selectionFirst(state *lua.LState) int {
 	s := checkSelection(state)
 	ud := state.NewUserData()
 	ud.Value = s.First()
+	state.SetMetatable(ud, state.GetTypeMetatable(luaSelectionTypeName))
+	state.Push(ud)
+	return 1
+}
+
+func selectionLast(state *lua.LState) int {
+	s := checkSelection(state)
+	ud := state.NewUserData()
+	ud.Value = s.Last()
 	state.SetMetatable(ud, state.GetTypeMetatable(luaSelectionTypeName))
 	state.Push(ud)
 	return 1

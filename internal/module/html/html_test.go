@@ -100,6 +100,16 @@ func TestEq(t *testing.T) {
 	evalLua(str, t)
 }
 
+func TestLast(t *testing.T) {
+	const str = `
+	local html = require("html")
+	local doc = html.parse("<html><body><div id='t2' name='123'>456</div><div>222</div></body></html>")
+	local s = doc:find("div"):last()
+	print(s:text() == "222")
+	`
+	evalLua(str, t)
+}
+
 func evalLua(str string, t *testing.T) {
 	s := lua.NewState()
 	defer s.Close()
