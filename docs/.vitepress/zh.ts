@@ -47,22 +47,36 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '用法',
             items: [
-                {text: 'markdown例子', link: '/markdown-examples'},
-                {text: 'Runtime API Examples', link: '/api-examples'}
+                {text: '核心', link: '/zh-hans/guides/core-commands'},
+                {text: '所有命令', link: '/zh-hans/guides/all-commands'},
             ]
         },
         {
             text: '插件',
             items: [
-                {text: 'markdown例子', link: '/markdown-examples'},
-                {text: 'Runtime API Examples', link: '/api-examples'}
+                {
+                    text: '成为作者',
+                    items:[
+                        {text: '创建插件', link: '/zh-hans/plugins/create/howto'},
+                        {text: '插件模板', link: 'https://github.com/version-fox/vfox/blob/main/template.lua'},
+                    ]
+                }, 
+                {
+                    text: '标准库',
+                    items:[
+                        {text: 'http', link: '/zh-hans/plugins/library/http'},
+                        {text: 'html', link: '/zh-hans/plugins/library/html'},
+                        {text: 'json', link: '/zh-hans/plugins/library/json'},
+                    ]
+                }, 
+
+                {text: '可用插件', link: 'https://github.com/version-fox/version-fox-plugins'},
             ]
         },
         {
             text: '其他',
             items: [
-                {text: 'markdown例子', link: '/markdown-examples'},
-                {text: 'Runtime API Examples', link: '/api-examples'}
+                {text: '待完成', link: '/'},
             ]
         },
     ]
