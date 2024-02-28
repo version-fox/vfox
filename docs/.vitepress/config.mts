@@ -20,8 +20,10 @@ export default defineConfig({
     search: {
       provider: "local",
     },
+    logo: "/logo.png",
     socialLinks: [
-      { icon: "github", link: "https://github.com/version-fox/vfox" },
+      { icon: 'github', link: 'https://github.com/version-fox/vfox' },
+      { icon: 'discord', link: 'https://discord.com/invite/85c8ptYgb7' }
     ],
   },
 })

@@ -14,31 +14,47 @@
  *    limitations under the License.
  */
 
-import { defineConfig } from 'vitepress'
+import {DefaultTheme, defineConfig} from 'vitepress'
 
 export const zh = defineConfig({
     lang: 'zh-Hans',
-    description: '由 Vite 和 Vue 驱动的静态站点生成器',
+    description: '跨平台且可扩展的SDK版本管理器，支持 Java、Node.js、Flutter、.Net 等',
     themeConfig: {
-        // https://vitepress.dev/reference/default-theme-config
-        nav: [
-            { text: '首页', link: '/zh-hans' },
-            { text: '例子', link: '/zh-hans/markdown-examples' }
-        ],
-
-        sidebar: [
-            {
-                text: '测试例子',
-                items: [
-                    { text: 'markdown例子', link: '/markdown-examples' },
-                    { text: 'Runtime API Examples', link: '/api-examples' }
-                ]
-            }
-        ],
-
-        socialLinks: [
-            { icon: 'github', link: 'https://github.com/version-fox/vfox' },
-            { icon: 'discord', link: 'https://discord.com/invite/85c8ptYgb7' }
-        ]
+        nav: nav(),
+        sidebar: sidebar(),
     }
 })
+
+function nav(): DefaultTheme.NavItem[] {
+    return [
+        {text: '首页', link: '/zh-hans'},
+        {text: '文档', link: '/zh-hans/markdown-examples'},
+        {text: '插件仓库', link: 'https://github.com/version-fox/version-fox-plugins'}
+    ]
+}
+
+function sidebar(): DefaultTheme.Sidebar {
+    return [
+        {
+            text: '入门',
+            items: [
+                {text: 'markdown例子', link: '/markdown-examples'},
+                {text: 'Runtime API Examples', link: '/api-examples'}
+            ]
+        },
+        {
+            text: '用法',
+            items: [
+                {text: 'markdown例子', link: '/markdown-examples'},
+                {text: 'Runtime API Examples', link: '/api-examples'}
+            ]
+        },
+        {
+            text: '用法',
+            items: [
+                {text: 'markdown例子', link: '/markdown-examples'},
+                {text: 'Runtime API Examples', link: '/api-examples'}
+            ]
+        },
+    ]
+}

@@ -3,23 +3,55 @@
 layout: home
 
 hero:
-  name: "vfox 文档"
-  text: "VersionFox Documention"
-  tagline: My great project tagline
+  name: vfox
+  text: 跨平台、可拓展的版本管理器
+  tagline: 😉轻松管理你的工具和运行环境~
+  image:
+    src: /logo.png
+    alt: VitePress
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: 👋快速上手
+      link: /zh-hans/guide/getting-started
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: 为什么选择vfox?
+      link: /zh-hans/guide/introduction
+    - theme: alt
+      text: 查看GitHub
+      link: https://github.com/version-fox/vfox
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: 跨平台
+    details: "支持Windows(非WSL)、Linux、macOS!"
+    icon: 💻
+  - title: 插件
+    details: "简单的API, 添加新工具的支持变得轻而易举！"
+    icon: 🔌
+  - title: "Shells"
+    details: "支持 Powershell、Bash、ZSH和Fish，并提供补全功能。"
+    icon: 🐚
+  - title: "一个配置文件"
+    details: "一个可共享的 .tool-versions 配置文件管理所有工具、运行环境及其版本。"
+    icon: 📄
 ---
 
+
+<style>
+:root {
+  --vp-home-hero-name-color: transparent;
+--vp-home-hero-name-background: -webkit-linear-gradient(120deg, #fd9620 26%, #ab7c44);
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+</style>
