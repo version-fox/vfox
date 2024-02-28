@@ -1,30 +1,54 @@
-# 快速开始
+# 快速入门
 
 这里以`Nodejs`为例，介绍如何使用`vfox`。
 
 ## 1. 安装vfox
 
-::: details Windows
+### Windows
 
-对于Windows用户，有两种方式安装`vfox`：
-
-1. 通过`Setup`安装器安装
-   前往 [GitHub Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的`vfox`安装器，然后按照安装向导进行安装。
-2. 手动安装
-    1. 下载最新版本的`vfox`安装包
-    2. 配置`PATH`环境变量，将`vfox`安装目录添加到`PATH`环境变量中。
+::: details Setup安装器
+   前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的`setup`安装器，然后按照安装向导进行安装。
 :::
 
-::: details Linux
-
-对于Windows用户，有两种方式安装`vfox`：
-
-1. 通过`Setup`安装器安装
-   前往 [GitHub Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的`vfox`安装器，然后按照安装向导进行安装。
-2. 手动安装
-   1. 下载最新版本的`vfox`安装包
+::: details 手动安装
+   1. 在[Releases](https://github.com/version-fox/vfox/releases)下载最新版本的`zip`安装包
    2. 配置`PATH`环境变量，将`vfox`安装目录添加到`PATH`环境变量中。
-      :::
+:::
+
+### Unix-like
+
+::: details Homebrew
+```shell
+$ brew tap version-fox/tap
+$ brew install vfox
+```
+:::
+
+::: details APT
+```shell
+ echo "deb [trusted=yes] https://apt.fury.io/versionfox/ /" | sudo tee /etc/apt/sources.list.d/versionfox.list
+ sudo apt-get update
+ sudo apt-get install vfox
+```
+:::
+
+::: details YUM
+```shell
+echo '[vfox]
+name=VersionFox Repo
+baseurl=https://yum.fury.io/versionfox/
+enabled=1
+gpgcheck=0' | sudo tee /etc/yum.repos.d/trzsz.repo
+
+sudo yum install vfox
+```
+:::
+
+::: details 手动安装
+```shell
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
+```
+:::
 
 ## 2. 挂载`vfox`到你的`Shell`
 
@@ -32,14 +56,31 @@
 请从下面选择一条适合你Shell的命令执行!
 :::
 
-```bash
+::: details Bash
+```shell
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
-echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
-echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+```
+:::
 
-# 对于Powershell用户, 请将下面一行添加到你的$PROFILE文件中:
+::: details ZSH
+```shell
+echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
+```
+:::
+
+::: details Fish
+```shell
+echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+```
+:::
+
+::: details Powershell
+
+请将下面一行添加到你的`$PROFILE`文件中:
+```shell
 Invoke-Expression "$(vfox activate pwsh)"
 ```
+:::
 
 ## 3. 添加插件
 

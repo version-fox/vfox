@@ -18,7 +18,7 @@ import {DefaultTheme, defineConfig} from 'vitepress'
 
 export const zh = defineConfig({
     lang: 'zh-Hans',
-    description: '跨平台且可扩展的SDK版本管理器，支持 Java、Node.js、Flutter、.Net 等',
+    description: '跨平台、可扩展的版本管理器',
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
@@ -39,8 +39,9 @@ function sidebar(): DefaultTheme.Sidebar {
             text: '入门',
             items: [
                 {text: '什么是vfox?', link: '/zh-hans/getting-started/intro'},
-                {text: '快速开始', link: '/zh-hans/getting-started/quick-start'},
-                {text: '详细安装', link: '/zh-hans/getting-started/installation'},
+                {text: '快速入门', link: '/zh-hans/getting-started/quick-start'},
+                {text: '配置', link: '/zh-hans/getting-started/configuration'},
+                {text: '常见问题', link: '/zh-hans/getting-started/faq'},
             ]
         },
         {
@@ -51,7 +52,14 @@ function sidebar(): DefaultTheme.Sidebar {
             ]
         },
         {
-            text: '用法',
+            text: '插件',
+            items: [
+                {text: 'markdown例子', link: '/markdown-examples'},
+                {text: 'Runtime API Examples', link: '/api-examples'}
+            ]
+        },
+        {
+            text: '其他',
             items: [
                 {text: 'markdown例子', link: '/markdown-examples'},
                 {text: 'Runtime API Examples', link: '/api-examples'}
