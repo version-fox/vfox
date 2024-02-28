@@ -28,7 +28,7 @@ export const zh = defineConfig({
 function nav(): DefaultTheme.NavItem[] {
     return [
         {text: '首页', link: '/zh-hans'},
-        {text: '文档', link: '/zh-hans/markdown-examples'},
+        {text: '文档', link: '/zh-hans/getting-started/intro'},
         {text: '插件仓库', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]
 }
@@ -38,8 +38,9 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '入门',
             items: [
-                {text: 'markdown例子', link: '/markdown-examples'},
-                {text: 'Runtime API Examples', link: '/api-examples'}
+                {text: '什么是vfox?', link: '/zh-hans/getting-started/intro'},
+                {text: '快速开始', link: '/zh-hans/getting-started/quick-start'},
+                {text: '详细安装', link: '/zh-hans/getting-started/installation'},
             ]
         },
         {
