@@ -76,7 +76,7 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '其他',
             items: [
-                {text: '待完成', link: '/'},
+                {text: '与asdf-vm对比', link: '/zh-hans/misc/vs-asdf'},
             ]
         },
     ]
