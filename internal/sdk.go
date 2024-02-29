@@ -43,6 +43,7 @@ type Sdk struct {
 	Plugin     *LuaPlugin
 	// current sdk install path
 	InstallPath string
+	Name        string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -220,6 +221,39 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		scope = Global
 	}
+
+	pluginVersion, err := b.Plugin.PreUse(version, scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+	if err != nil {
+		return fmt.Errorf("plugin [PreUse] error: err:%w", err)
+	}
+
+	if pluginVersion != "" {
+		version = pluginVersion
+	}
+
+	if version == "" {
+		var arr []string
+		list := b.List()
+		for _, version := range list {
+			arr = append(arr, string(version))
+		}
+		selectPrinter := pterm.InteractiveSelectPrinter{
+			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			Options:       arr,
+			DefaultOption: "",
+			MaxHeight:     5,
+			Selector:      "->",
+			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			Filter:        true,
+			OnInterruptFunc: func() {
+				os.Exit(0)
+			},
+		}
+		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", b.Name))
+		version = Version(result)
+	}
+
 	label := b.label(version)
 	if !b.checkExists(version) {
 		return fmt.Errorf("%s is not installed", label)
@@ -275,6 +309,18 @@ func (b *Sdk) List() []Version {
 		return versions[i] > versions[j]
 	})
 	return versions
+}
+
+func (b *Sdk) getLocalSdkPackages() []*Package {
+	var infos []*Package
+	for _, version := range b.List() {
+		info, err := b.getLocalSdkPackage(version)
+		if err != nil {
+			continue
+		}
+		infos = append(infos, info)
+	}
+	return infos
 }
 
 func (b *Sdk) Current() Version {
@@ -431,10 +477,11 @@ func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
-func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
+func NewSdk(manager *Manager, source *LuaPlugin, sdkName string) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
 		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Filename)),
 		Plugin:      source,
+		Name:        sdkName,
 	}, nil
 }

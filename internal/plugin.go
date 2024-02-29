@@ -18,12 +18,13 @@ package internal
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/module"
-	lua "github.com/yuin/gopher-lua"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/module"
+	lua "github.com/yuin/gopher-lua"
 )
 
 const (
@@ -249,11 +250,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L := l.state
 	sdkArr := L.NewTable()
 	for _, v := range sdks {
-		sdkTable := L.NewTable()
-		L.SetField(sdkTable, "name", lua.LString(v.Name))
-		L.SetField(sdkTable, "version", lua.LString(v.Version))
-		L.SetField(sdkTable, "path", lua.LString(v.Path))
-		L.SetField(sdkTable, "note", lua.LString(v.Note))
+		sdkTable := l.createSdkInfoTable(v)
 		L.SetField(sdkArr, v.Name, sdkTable)
 	}
 	ctxTable := L.NewTable()
@@ -281,10 +278,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	mainInfo := sdkPackage.Main
 	sdkArr := L.NewTable()
 	for _, v := range sdkPackage.Additions {
-		sdkTable := L.NewTable()
-		L.SetField(sdkTable, "name", lua.LString(v.Name))
-		L.SetField(sdkTable, "version", lua.LString(v.Version))
-		L.SetField(sdkTable, "path", lua.LString(v.Path))
+		sdkTable := l.createSdkInfoTable(v)
 		L.SetField(sdkArr, v.Name, sdkTable)
 	}
 	ctxTable := L.NewTable()
@@ -351,6 +345,55 @@ func (l *LuaPlugin) luaPrint() int {
 
 func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
+}
+
+func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
+	L := l.state
+	sdkTable := L.NewTable()
+	L.SetField(sdkTable, "name", lua.LString(info.Name))
+	L.SetField(sdkTable, "version", lua.LString(info.Version))
+	L.SetField(sdkTable, "path", lua.LString(info.Path))
+	L.SetField(sdkTable, "note", lua.LString(info.Note))
+	return sdkTable
+}
+
+func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
+	L := l.state
+	sdkInfo := L.NewTable()
+	for _, v := range installedSdks {
+		sdkTable := l.createSdkInfoTable(v.Main)
+		L.SetField(sdkInfo, v.Main.Name, sdkTable)
+	}
+	ctxTable := L.NewTable()
+
+	L.SetField(ctxTable, "sdkInfo", sdkInfo)
+	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
+	L.SetField(ctxTable, "cwd", lua.LString(cwd))
+	L.SetField(ctxTable, "scope", lua.LString(scope.String()))
+	L.SetField(ctxTable, "version", lua.LString(version))
+
+	function := l.pluginObj.RawGetString("PreUse")
+	if function.Type() == lua.LTNil {
+		return "", nil
+	}
+	if err := L.CallByParam(lua.P{
+		Fn:      function.(*lua.LFunction),
+		NRet:    1,
+		Protect: true,
+	}, l.pluginObj, ctxTable); err != nil {
+		return "", err
+	}
+	table := L.ToTable(-1) // returned value
+	L.Pop(1)               // remove received value
+	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
+		return "", nil
+	}
+	luaVersion := table.RawGetString("version")
+	if luaVersion.Type() == lua.LTNil {
+		return "", nil
+	}
+
+	return Version(luaVersion.String()), nil
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
