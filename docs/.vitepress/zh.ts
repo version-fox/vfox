@@ -19,6 +19,7 @@ import {DefaultTheme, defineConfig} from 'vitepress'
 export const zh = defineConfig({
     lang: 'zh-Hans',
     description: '跨平台、可扩展的版本管理器',
+
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
