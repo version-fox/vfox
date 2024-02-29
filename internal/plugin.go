@@ -359,14 +359,14 @@ func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
 
 func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
 	L := l.state
-	sdkInfo := L.NewTable()
+	lInstalledSdks := L.NewTable()
 	for _, v := range installedSdks {
 		sdkTable := l.createSdkInfoTable(v.Main)
-		L.SetField(sdkInfo, v.Main.Name, sdkTable)
+		L.SetField(lInstalledSdks, string(v.Main.Version), sdkTable)
 	}
 	ctxTable := L.NewTable()
 
-	L.SetField(ctxTable, "sdkInfo", sdkInfo)
+	L.SetField(ctxTable, "installedSdks", lInstalledSdks)
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	L.SetField(ctxTable, "cwd", lua.LString(cwd))
 	L.SetField(ctxTable, "scope", lua.LString(scope.String()))
@@ -385,7 +385,7 @@ func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installe
 	}
 	table := L.ToTable(-1) // returned value
 	L.Pop(1)               // remove received value
-	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
+	if table == nil || table.Type() == lua.LTNil {
 		return "", nil
 	}
 	luaVersion := table.RawGetString("version")

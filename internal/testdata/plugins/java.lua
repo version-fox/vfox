@@ -1,4 +1,3 @@
-
 --- Common libraries provided by VersionFox (optional)
 local http = require("http")
 local json = require("json")
@@ -41,7 +40,7 @@ function PLUGIN:PreInstall(ctx)
         --- SHA256 checksum [optional]
         sha256 = "xxx",
         --- md5 checksum [optional]
-        md5= "xxx",
+        md5 = "xxx",
         --- sha1 checksum [optional]
         sha1 = "xxx",
         --- sha512 checksum [optional]
@@ -56,7 +55,7 @@ function PLUGIN:PreInstall(ctx)
                 --- SHA256 checksum [optional]
                 sha256 = "xxx",
                 --- md5 checksum [optional]
-                md5= "xxx",
+                md5 = "xxx",
                 --- sha1 checksum [optional]
                 sha1 = "xxx",
                 --- sha512 checksum [optional]
@@ -123,28 +122,59 @@ function PLUGIN:EnvKeys(ctx)
     }
 end
 
---- When user invoke `use` command, this function will be called to get the 
+--- When user invoke `use` command, this function will be called to get the
 --- valid version information.
 --- @param ctx table Context information
 function PLUGIN:PreUse(ctx)
     local runtimeVersion = ctx.runtimeVersion
     --- user input version
     local version = ctx.version
-
     --- installed sdks
-    local sdkInfo = ctx.installedSdks['version']
+    local sdkInfo = ctx.installedSdks['xxxx']
     local path = sdkInfo.path
     local name = sdkInfo.name
-    local version = sdkInfo.version
+    local sdkVersion = sdkInfo.version
 
     --- working directory
     local cwd = ctx.cwd
 
+    PrintTable(ctx)
+
     --- user input scope
     local scope = ctx.scope
 
-    --- return the version information
+    if (scope == "global") then
+        print("return 9.9.9")
+        return {
+            version = "9.9.9",
+        }
+    end
+
+    if (scope == "project") then
+        print("return 10.0.0")
+        return {
+            version = "10.0.0",
+        }
+    end
+
+    print("return 1.0.0")
+
     return {
-        version = version,
+        version = "1.0.0"
     }
+end
+
+function PrintTable(t, indent)
+    indent = indent or 0
+    local strIndent = string.rep("  ", indent)
+    for key, value in pairs(t) do
+        local keyStr = tostring(key)
+        local valueStr = tostring(value)
+        if type(value) == "table" then
+            print(strIndent .. "[" .. keyStr .. "] =>")
+            PrintTable(value, indent + 1)
+        else
+            print(strIndent .. "[" .. keyStr .. "] => " .. valueStr)
+        end
+    end
 end

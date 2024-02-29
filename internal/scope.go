@@ -33,6 +33,6 @@ func (s UseScope) String() string {
 	case Session:
 		return "session"
 	default:
-		return "default"
+		return "session"
 	}
 }
