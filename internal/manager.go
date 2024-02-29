@@ -27,9 +27,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/version-fox/vfox/internal/config"
-
 	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/util"
 )

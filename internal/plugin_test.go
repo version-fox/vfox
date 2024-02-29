@@ -8,7 +8,6 @@ import (
 
 //go:embed testdata/plugins/java.lua
 var pluginContent string
-
 var pluginPath = "testdata/plugins/java.lua"
 
 func TestPlugin(t *testing.T) {
