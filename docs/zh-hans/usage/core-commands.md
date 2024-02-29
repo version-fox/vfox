@@ -56,7 +56,7 @@ $ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-pl
 **用法**
 
 ```shell
-vfox add <sdk-name>
+vfox search <sdk-name>
 ```
 
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
