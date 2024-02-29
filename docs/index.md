@@ -12,10 +12,10 @@ hero:
   actions:
     - theme: brand
       text: 👋Get Started
-      link: /zh-hans/guide/getting-started
+      link: /guides/quick-start
     - theme: alt
       text: Why use vfox?
-      link: /zh-hans/guide/introduction
+      link: /guides/intro
     - theme: alt
       text: View on GitHub
       link: https://github.com/version-fox/vfox
