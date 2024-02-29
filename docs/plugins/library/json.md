@@ -1,9 +1,9 @@
-# Json标准库
+# JSON Library
 
-`vfox`提供的`json`库是基于[gopher-json](https://github.com/PuerkitoBio/goquery)实现的。
+Based on [gopher-json](https://github.com/layeh/gopher-json/)
 
 
-**使用**
+**Usage**
 ```shell
 local json = require("json")
 

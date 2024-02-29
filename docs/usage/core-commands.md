@@ -1,75 +1,78 @@
-# 核心命令
+# Core
 
-核心`vfox`命令很少， 下面列举的是最频繁使用的命令。
+`vfox` has a few core commands that are used frequently. The following are the most frequently used commands.
 
 ## Available
 
-列举[插件仓库](https://github.com/version-fox/version-fox-plugins)中所有可用的插件。
+View all available plugins. If you specify a category, it will only show the plugins in that category. If you don't
+specify a category, it will show all available plugins.
 
-**用法**
+**Usage**
+
 ```shell
 vfox available [<category>]
 ```
 
-`category`[可选]: 分类， 如java、nodejs、flutter等， 如果不传则展示所有可用插件。
+`category`[optional]: Category, such as java, nodejs, flutter, etc. If not passed, all available plugins will be
+displayed.
 
-::: warning 
-注意插件名由两部分组成，`分类/插件名`, 例如`nodejs/nodejs`、`java/graalvm`
+::: warning
+Note that the plugin name consists of two parts, `category/plugin-name`, such as `nodejs/nodejs`, `java/graalvm`
 :::
 
 ## Add
 
-在 `vfox` 中，插件就是 SDK，而 SDK 就是插件。因此，在使用它们之前，您需要安装相应的插件。
+Add a plugin from the official repository or a custom source. In `vfox`, a plugin is an SDK, and an SDK is a plugin.
+Therefore, before using them, you need to install the corresponding plugin.
 
-
-**用法**
+**Usage**
 
 ```shell
 vfox add [options] <plugin-name>
 ```
 
-`plugin-name`: 插件名称， 如`nodejs/nodejs`。
+`plugin-name`: Plugin name, such as `nodejs/nodejs`.
 
-**选项**
-- `-a, --alias`: 设置插件别名。
-- `-s, --source`: 安装指定路径下的插件（可以是远程文件也可以是本地文件）
+**Options**
 
+- `-a, --alias`: Set the plugin alias.
+- `-s, --source`: Install the plugin from the specified path (can be a remote file or a local file).
 
-**例子**
+**Examples**
 
-**安装仓库插件**
+**Install plugin from the official repository**
+
 ```shell
 $ vfox add --alias node nodejs/nodejs
 ```
 
-**安装自定义插件**
+**Install custom plugin**
+
 ```shell
 $ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua custom-node
 ```
 
-
 ## Search
 
-获取当前SDK所有可用的运行时版本。
+View for all available versions of the specified SDK.
 
-
-**用法**
+**Usage**
 
 ```shell
 vfox add <sdk-name>
 ```
 
-`sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
+`sdk-name`: SDK name, such as `nodejs`, `custom-node`.
 
-::: tip 快捷安装
-选择目标版本， 回车即可快速安装。
+::: tip Quick install
+Select the target version, and press Enter to install quickly.
 :::
 
 ## Install
 
-将指定的 SDK 版本安装到您​​的计算机并缓存以供将来使用。
+Install the specified SDK version to your computer and cache it for future use.
 
-**用法**
+**Usage**
 
 ```shell
 vfox install <sdk-name>@<version>
@@ -77,18 +80,15 @@ vfox install <sdk-name>@<version>
 vfox i <sdk-name>@<version>
 ```
 
+`sdk-name`: SDK name
 
-`sdk-name`: SDK名称
-
-`version`: 需要安装的版本号
-
+`version`: The version to install
 
 ## Use
 
-设置运行时版本
+Set the runtime version.
 
-
-**用法**
+**Usage**
 
 ```shell
 vfox use [options] <sdk-name>[@<version>]
@@ -96,36 +96,34 @@ vfox use [options] <sdk-name>[@<version>]
 vfox u [options] <sdk-name>[@<version>]
 ```
 
-`sdk-name`: SDK名称
+`sdk-name`: SDK name
 
-`version`[可选]: 使用 指定版本运行时。如不传， 则下拉选择。 
+`version`[optional]: Use the specified version of the runtime. If not passed, you can select it from the list.
 
-**选项**
-- `-g, --global`: 全局生效
-- `-p, --project`: 当前目录下生效
-- `-s, --session`: 当前Shell会话内生效
+**Options**
 
+- `-g, --global`: Effective globally
+- `-p, --project`: Effective in the current directory(`$PWD`)
+- `-s, --session`: Effective within the current Shell session
 
-::: tip 默认作用域
-`Windows`: 默认`Global`作用域
+::: tip Default scope
 
-`Unix-like`: 默认`Session`作用域
+`Windows`: `Global` scope
 
+`Unix-like`: `Session` scope
 :::
-
 
 ## Uninstall
 
-卸载指定版本的SDK。
+Uninstall the specified version of the SDK.
 
-
-**用法**
+**Usage**
 
 ```shell
 vfox uninstall <sdk-name>@<version>
 vfox un <sdk-name>@<version>
 ```
 
-`sdk-name`: SDK名
+`sdk-name`: SDK name
 
-`version`: 具体版本号
+`version`: The specific version number

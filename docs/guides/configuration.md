@@ -1,30 +1,30 @@
-# 配置
+# Configuration
 
-`vfox` 允许你修改一些配置, 所有配置信息都存放在`$HOME/.version-fox/config.yaml`文件中。 
+`vfox` allows you to change some configurations, all configuration is stored in the `$HOME/.version-fox/config.yaml` file.
 
-::: tip 注意
-如果你是首次运行`vfox`, 则会自动创建一个空的config.yaml文件。
+::: tip
+If you use `vfox` for the first time, an empty `config.yaml` file will be created automatically.
 :::
 
-## 代理设置
+## Proxy Settings
 
-::: tip 注意
-当前仅支持http(s)代理协议
+::: tip
+Currently only support http(s) proxy protocol
 :::
 
-**格式**: `http[s]://[username:password@]host:port`
+**Format**: `http[s]://[username:password@]host:port`
 ```yaml
 proxy:
   enable: false
   url: http://localhost:7890
 ```
 
-## 存储路径
+## Storage Settings
 
-`vfox`默认将SDK缓存文件存储在`$HOME/.version-fox/cache`目录下。
+By default, `vfox` stores SDK cache files in the `$HOME/.version-fox/cache` directory.
 
 ::: danger !!!
-在配置之前， 请确保`vfox`有文件夹的写权限。⚠⚠⚠
+Before configuring, please make sure that `vfox` has write permission to the folder.⚠⚠⚠
 :::
 
 ```yaml

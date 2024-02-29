@@ -1,9 +1,9 @@
-# Http标准库
+# HTTP Library
 
-`vfox`提供了一个简单的http能力，当前支持`Get`、`Head`两种请求类型。
+`vfox` provides a simple HTTP library, currently supporting only GET and HEAD requests. In the Lua script, you can
+use `require("http")` to access it. For example:
 
-
-**使用**
+**Usage**
 ```shell
 local http = require("http")
 assert(type(http) == "table")

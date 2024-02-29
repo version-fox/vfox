@@ -22,13 +22,17 @@ export const en= defineConfig({
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
+        footer: {
+            message: 'Released under the Apache 2.0 License.',
+            copyright: 'Copyright © 2023-present Han Li'
+        }
     }
 })
 
 function nav(): DefaultTheme.NavItem[] {
     return [
         {text: 'Home', link: '/'},
-        {text: 'Documentation', link: '/getting-started/intro'},
+        {text: 'Documentation', link: '/guides/intro'},
         {text: 'Plugins', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]
 }

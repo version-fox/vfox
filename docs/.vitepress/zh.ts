@@ -22,12 +22,16 @@ export const zh = defineConfig({
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
+        footer: {
+            message: '基于 Apache 2.0 许可发布',
+            copyright: '版权所有 © 2023-现在 李晗'
+        }
     }
 })
 
 function nav(): DefaultTheme.NavItem[] {
     return [
-        {text: '首页', link: '/zh-hans'},
+        {text: '首页', link: '/zh-hans/'},
         {text: '文档', link: '/zh-hans/guides/intro'},
         {text: '插件仓库', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]

@@ -1,9 +1,10 @@
-# Html标准库
+# HTML Library
 
-`vfox`提供的`html`库是基于[goquery](https://github.com/PuerkitoBio/goquery)实现的。
+The HTML library provided by VersionFox is based on [goquery](https://github.com/PuerkitoBio/goquery), with some
+functionality encapsulated. You can use `require("html")` to access it, for example:
 
 
-**使用**
+**Usage**
 ```shell
 local html = require("html")
 local doc = html.parse("<html><body><div id='t2' name='123'>456</div><div>222</div></body></html>")

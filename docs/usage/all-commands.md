@@ -1,12 +1,10 @@
-# 所有命令
-
-
+# All Commands
 
 ## List
 
-查看当前已安装的所有SDK版本。
+View all installed sdks.
 
-**用法**
+**Usage**
 
 ```shell
 vfox list [<sdk-name>]
@@ -14,14 +12,14 @@ vfox list [<sdk-name>]
 vfox ls[<sdk-name>]
 ```
 
-`sdk-name`: SDK名称， 不传展示所有。
+`sdk-name`: SDK name, if not passed, display all.
 
 ## Current
 
-查看当前SDK的版本。
+View the current version of the SDK.
 
 
-**用法**
+**Usage**
 
 ```shell
 vfox current [<sdk-name>]
@@ -32,9 +30,9 @@ vfox c
 
 ## Info
 
-查看本地安装的SDK信息。
+View the SDK information installed locally.
 
-**用法**
+**Usage**
 
 ```shell
 vfox info <sdk-name>
@@ -42,37 +40,31 @@ vfox info <sdk-name>
 
 ## Remove
 
-删除本地安装的插件。
+Remove the installed plugin.
 
-**用法**
+**Usage**
 
 ```shell
 vfox remove <sdk-name>
 ```
 
-::: danger 注意
-删除插件，`vfox`会同步删除当前插件安装的所有版本运行时。
+::: danger
+`vfox` will remove all versions of the runtime installed by the current plugin.
 :::
 
 
 
 ## Update
 
-更新插件版本。
+Update plugin.
 
-**用法**
+**Usage**
 
 ```shell
 vfox update <sdk-name>
 ```
 
-::: danger 注意
-删除插件，`vfox`会同步删除当前插件安装的所有版本运行时。
-:::
-
-
-
-## 概览
+## Overview
 
 ```shell
 vfox - VersionFox, a tool for sdk version management

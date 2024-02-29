@@ -16,7 +16,7 @@
 - 简单的 **插件系统** 来添加对你选择的语言的支持
 - 在您切换项目时, 帮您**自动切换**运行时版本
 - 支持常用Shell(Powershell、bash、zsh),并提供补全功能
-- **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)。
+- **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](../misc/vs-asdf.md)。
 
 
 ## 贡献者
