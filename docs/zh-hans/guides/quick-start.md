@@ -38,7 +38,7 @@ echo '[vfox]
 name=VersionFox Repo
 baseurl=https://yum.fury.io/versionfox/
 enabled=1
-gpgcheck=0' | sudo tee /etc/yum.repos.d/trzsz.repo
+gpgcheck=0' | sudo tee /etc/yum.repos.d/versionfox.repo
 
 sudo yum install vfox
 ```

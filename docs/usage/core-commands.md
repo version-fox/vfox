@@ -59,7 +59,7 @@ View for all available versions of the specified SDK.
 **Usage**
 
 ```shell
-vfox add <sdk-name>
+vfox search <sdk-name>
 ```
 
 `sdk-name`: SDK name, such as `nodejs`, `custom-node`.
