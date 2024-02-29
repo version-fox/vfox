@@ -2,6 +2,9 @@
 # https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
+title: vfox
+titleTemplate: 跨平台、可拓展的版本管理器
+
 hero:
   name: vfox
   text: 跨平台、可拓展的版本管理器

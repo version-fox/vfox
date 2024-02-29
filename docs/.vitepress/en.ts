@@ -19,6 +19,7 @@ import {DefaultTheme, defineConfig} from 'vitepress'
 export const en= defineConfig({
     lang: 'en',
     description: 'The Multiple SDK Version Manager',
+
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),

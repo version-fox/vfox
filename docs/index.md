@@ -2,6 +2,9 @@
 # https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
+title: vfox
+titleTemplate: The Multiple SDK Version Manager
+
 hero:
   name: vfox
   text: The Multiple SDK Version Manager

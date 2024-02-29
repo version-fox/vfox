@@ -5,6 +5,13 @@ import { zh } from './zh'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "vfox",
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: 'vfox | The Multiple SDK Version Manager' }],
+    ['meta', { property: 'og:site_name', content: 'VitePress' }],
+  ],
   locales: {
     root: {
       label: 'English',
@@ -21,13 +28,6 @@ export default defineConfig({
       provider: "local",
     },
     logo: "/logo.png",
-    head: [
-      ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-      ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
-      ['meta', { property: 'og:type', content: 'website' }],
-      ['meta', { property: 'og:title', content: 'vfox | The Multiple SDK Version Manager' }],
-      ['meta', { property: 'og:site_name', content: 'VitePress' }],
-    ],
     socialLinks: [
       { icon: 'github', link: 'https://github.com/version-fox/vfox' },
       { icon: 'discord', link: 'https://discord.com/invite/85c8ptYgb7' }
