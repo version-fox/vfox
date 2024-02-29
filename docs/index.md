@@ -8,7 +8,7 @@ hero:
   tagline: 😉Easily manage all your SDK versions~
   image:
     src: /logo.png
-    alt: VitePress
+    alt: vfox
   actions:
     - theme: brand
       text: 👋Get Started

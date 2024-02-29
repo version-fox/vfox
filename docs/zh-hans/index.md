@@ -8,7 +8,7 @@ hero:
   tagline: 😉轻松管理你的工具和运行环境~
   image:
     src: /logo.png
-    alt: VitePress
+    alt: vfox
   actions:
     - theme: brand
       text: 👋快速上手
