@@ -65,10 +65,6 @@ vfox remove <sdk-name>
 vfox update <sdk-name>
 ```
 
-::: danger 注意
-删除插件，`vfox`会同步删除当前插件安装的所有版本运行时。
-:::
-
 
 
 ## 概览
