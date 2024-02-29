@@ -9,18 +9,12 @@
 [![GitHub Release](https://img.shields.io/github/v/release/version-fox/vfox?display_name=tag&style=for-the-badge)](https://github.com/version-fox/vfox/releases)
 [![Discord](https://img.shields.io/discord/1191981003204477019?style=for-the-badge&logo=discord)](https://discord.gg/85c8ptYgb7)
 
-
-
-
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
-
 
 ## Introduction
 
-VersionFox is a cross-platform tool for managing SDK versions. It allows you to quickly install
+**`vfox` is a cross-platform tool for managing SDK versions, extendable via plugins**. It allows you to quickly install
 and switch between different versions of SDKs using the command line.
-SDKs are provided as plugins in the form of Lua scripts. This means you can implement your own SDK sources or use
-plugins shared by others to install SDKs. It all depends on your imagination. ;)
 
 ## Why use VersionFox?
 
@@ -31,21 +25,20 @@ plugins shared by others to install SDKs. It all depends on your imagination. ;)
 - simple **plugin system** to add support for your language of choice
 - **automatically switches** runtime versions as you traverse your project
 - shell completion available for common shells (Bash, Zsh, Powershell)
-- **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.** see [What-is-the-difference-with-asdf?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
+- **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
+  see [Comparison with asdf](https://vfox.lhan.me/misc/vs-asdf.html)
 
 ## Demo
+
 [![asciicast](https://asciinema.org/a/630778.svg)](https://asciinema.org/a/630778)
 
 ## Quickstart
 
-Install VersionFox (For detailed installation see [Installation](https://github.com/version-fox/vfox/wiki/Getting-Started#installation))
+> For detailed installation instructions, see [Quick Start](https://vfox.lhan.me/guides/quick-start.html)
 
-```bash
-$ brew tap version-fox/tap
-$ brew install vfox
-```
+#### 1. Choose an [installation](https://vfox.lhan.me/guides/quick-start.html#_1-installation) that works for you.
 
-⚠️ **_Hook VersionFox into your shell_ (pick one that works for your shell)** ⚠️
+#### 2. ⚠️ **_Hook vfox into your shell_ (pick one that works for your shell)** ⚠️
 
 ```bash
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
@@ -56,34 +49,28 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 Invoke-Expression "$(vfox activate pwsh)"
 ```
 
-Add an SDK plugin (For detailed usage see [Getting Started](https://github.com/version-fox/vfox/wiki/Getting-Started))
-> NOTE: if you don’t know which plugins to add, you can use the `vfox available` command to check all available plugins
+#### 3. Add an SDK plugin
 ```bash 
 $ vfox add nodejs/nodejs
 ```
 
-Install an SDK version
+#### 4. Install a runtime
+
 ```bash
 $ vfox install nodejs@21.5.0
 ```
 
-Use the installed SDK version
+#### 5. Switch runtime
+
 ```bash
 $ vfox use nodejs@21.5.0
 $ node -v
 21.5.0
 ```
 
+## Full Documentation
 
-## Documentation
-
-- [Getting Started](https://github.com/version-fox/vfox/wiki/Getting-Started)
-- [Commands Overview](https://github.com/version-fox/vfox/wiki/All-Commands)
-- [How to write a custom plugin?](https://github.com/version-fox/vfox/wiki/How-to-write-a-custom-plugin%3F)
-- [What is the difference with asdf-vm?](https://github.com/version-fox/vfox/wiki/What-is-the-difference-with-asdf%3F)
-
- For more information, read the [Wiki](https://github.com/version-fox/vfox/wiki).
-
+See [vfox.lhan.me](https://vfox.lhan.me) for full documentation.
 
 ## Supported Plugins
 
@@ -92,17 +79,6 @@ $ node -v
 [![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
 
 For more details, see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
-
-## FAQ
-
-### 1.**Switch xxx not work or the `vfox use ` command does not work ?**
-
-If your shell prompt `Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically` that
-means you do not hook `vfox` into your shell, please hook it manually first.
-
-See [issue#35](https://github.com/version-fox/vfox/issues/35)
-
-
 
 ## Contributors
 
@@ -114,7 +90,8 @@ See [issue#35](https://github.com/version-fox/vfox/issues/35)
 
 ## Contributing
 
-Bug reports, contributions and forks are welcome. All bugs or other forms of discussion happen on [issues](http://github.com/version-fox/vfox/issues).
+Bug reports, contributions and forks are welcome. All bugs or other forms of discussion happen
+on [issues](http://github.com/version-fox/vfox/issues).
 
 See more at [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -126,5 +103,6 @@ Plugin Contributions, please go to [version-fox-plugins](https://github.com/vers
 
 ## COPYRIGHT
 
-[Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
+[Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li
+and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
 
