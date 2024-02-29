@@ -14,27 +14,70 @@
  *    limitations under the License.
  */
 
-import { defineConfig } from 'vitepress'
+import {DefaultTheme, defineConfig} from 'vitepress'
 
-export const en =  defineConfig({
+export const en= defineConfig({
     lang: 'en',
-    description: 'vfox documentation',
+    description: 'The Multiple SDK Version Manager',
     themeConfig: {
-        // https://vitepress.dev/reference/default-theme-config
-        nav: [
-            { text: 'Home', link: '/' },
-            { text: 'Example', link: '/markdown-examples' }
-        ],
-
-        sidebar: [
-            {
-                text: 'Test Example',
-                items: [
-                    { text: 'markdown', link: '/markdown-examples' },
-                    { text: 'Runtime API Examples', link: '/api-examples' }
-                ]
-            }
-        ],
-
+        nav: nav(),
+        sidebar: sidebar(),
     }
 })
+
+function nav(): DefaultTheme.NavItem[] {
+    return [
+        {text: 'Home', link: '/'},
+        {text: 'Documentation', link: '/getting-started/intro'},
+        {text: 'Plugins', link: 'https://github.com/version-fox/version-fox-plugins'}
+    ]
+}
+
+function sidebar(): DefaultTheme.Sidebar {
+    return [
+        {
+            text: 'Guide',
+            items: [
+                {text: 'What is vfox?', link: '/guides/intro'},
+                {text: 'Quick Start', link: '/guides/quick-start'},
+                {text: 'Configuration', link: '/guides/configuration'},
+                {text: 'FAQ', link: '/guides/faq'},
+            ]
+        },
+        {
+            text: 'Usage',
+            items: [
+                {text: 'Core', link: '/usage/core-commands'},
+                {text: 'All Commands', link: '/usage/all-commands'},
+            ]
+        },
+        {
+            text: 'Plugins',
+            items: [
+                {
+                    text: 'Authors',
+                    items:[
+                        {text: 'Create a Plugin', link: '/plugins/create/howto'},
+                        {text: 'Plugin Template', link: 'https://github.com/version-fox/vfox/blob/main/template.lua'},
+                    ]
+                },
+                {
+                    text: 'Library',
+                    items:[
+                        {text: 'http', link: '/plugins/library/http'},
+                        {text: 'html', link: '/plugins/library/html'},
+                        {text: 'json', link: '/plugins/library/json'},
+                    ]
+                },
+
+                {text: 'Available Plugins', link: 'https://github.com/version-fox/version-fox-plugins'},
+            ]
+        },
+        {
+            text: 'Misc',
+            items: [
+                {text: 'Comparison to asdf', link: '/misc/vs-asdf'},
+            ]
+        },
+    ]
+}

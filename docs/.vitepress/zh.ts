@@ -28,7 +28,7 @@ export const zh = defineConfig({
 function nav(): DefaultTheme.NavItem[] {
     return [
         {text: '首页', link: '/zh-hans'},
-        {text: '文档', link: '/zh-hans/getting-started/intro'},
+        {text: '文档', link: '/zh-hans/guides/intro'},
         {text: '插件仓库', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]
 }
@@ -38,17 +38,17 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '入门',
             items: [
-                {text: '什么是vfox?', link: '/zh-hans/getting-started/intro'},
-                {text: '快速入门', link: '/zh-hans/getting-started/quick-start'},
-                {text: '配置', link: '/zh-hans/getting-started/configuration'},
-                {text: '常见问题', link: '/zh-hans/getting-started/faq'},
+                {text: '什么是vfox?', link: '/zh-hans/guides/intro'},
+                {text: '快速入门', link: '/zh-hans/guides/quick-start'},
+                {text: '配置', link: '/zh-hans/guides/configuration'},
+                {text: '常见问题', link: '/zh-hans/guides/faq'},
             ]
         },
         {
             text: '用法',
             items: [
-                {text: '核心', link: '/zh-hans/guides/core-commands'},
-                {text: '所有命令', link: '/zh-hans/guides/all-commands'},
+                {text: '核心', link: '/zh-hans/usage/core-commands'},
+                {text: '所有命令', link: '/zh-hans/usage/all-commands'},
             ]
         },
         {

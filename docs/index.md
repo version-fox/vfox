@@ -3,23 +3,55 @@
 layout: home
 
 hero:
-  name: "vfox doc"
-  text: "VersionFox Documention"
-  tagline: My great project tagline
+  name: vfox
+  text: The Multiple SDK Version Manager
+  tagline: 😉Easily manage all your SDK versions~
+  image:
+    src: /logo.png
+    alt: VitePress
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: 👋Get Started
+      link: /zh-hans/guide/getting-started
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Why choose vfox?
+      link: /zh-hans/guide/introduction
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/version-fox/vfox
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Cross-platform
+    details: "Supports Windows (non-WSL), Linux, macOS!"
+    icon: 💻
+  - title: Plugins
+    details: "Simple API, making it easy to add support for new tools!"
+    icon: 🔌
+  - title: "Shells"
+    details: "Supports Powershell, Bash, ZSH and Fish, with autocomplete feature."
+    icon: 🐚
+  - title: "One Config File"
+    details: ".tool-versions manages all tools, runtime environments and their versions."
+    icon: 📄
 ---
 
+
+<style>
+:root {
+  --vp-home-hero-name-color: transparent;
+--vp-home-hero-name-background: -webkit-linear-gradient(120deg, #fd9620 26%, #ab7c44);
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+</style>
