@@ -21,6 +21,7 @@ export default defineConfig({
       provider: "local",
     },
     logo: "/logo.png",
+    head: [['link', { rel: 'icon', href: '/logo.ico' }]],
     socialLinks: [
       { icon: 'github', link: 'https://github.com/version-fox/vfox' },
       { icon: 'discord', link: 'https://discord.com/invite/85c8ptYgb7' }
