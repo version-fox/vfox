@@ -72,7 +72,6 @@ func (b *Sdk) Install(version Version) error {
 		if !success {
 			_ = os.RemoveAll(newDirPath)
 		}
-		print("invoke la")
 		os.Exit(0)
 	}()
 
