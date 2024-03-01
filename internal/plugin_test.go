@@ -12,7 +12,7 @@ var pluginPath = "testdata/plugins/java.lua"
 
 func TestPlugin(t *testing.T) {
 	t.Run("Available", func(t *testing.T) {
-		manager := newSdkManagerWithSource(SessionRecordSource)
+		manager := NewSdkManager()
 		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)
 		if err != nil {
 			t.Fatal(err)
@@ -29,7 +29,7 @@ func TestPlugin(t *testing.T) {
 	})
 
 	t.Run("PreUse", func(t *testing.T) {
-		manager := newSdkManagerWithSource(SessionRecordSource)
+		manager := NewSdkManager()
 
 		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)
 
