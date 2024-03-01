@@ -76,7 +76,7 @@ See [vfox.lhan.me](https://vfox.lhan.me) for full documentation.
 
 > If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
 
-[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
+[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
 
 For more details, see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
 

@@ -73,7 +73,7 @@ $ node -v
 
 > 如果您已经安装了 `vfox`，您可以使用 `vfox available` 命令查看所有可用的插件。
 
-[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
+[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
 
 详细内容,请看 [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
 
