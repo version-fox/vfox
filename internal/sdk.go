@@ -24,9 +24,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
@@ -60,6 +62,19 @@ func (b *Sdk) Install(version Version) error {
 	mainSdk := installInfo.Main
 	success := false
 	newDirPath := b.VersionPath(mainSdk.Version)
+
+	sigs := make(chan os.Signal, 1)
+
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		_ = <-sigs
+		if !success {
+			_ = os.RemoveAll(newDirPath)
+		}
+		print("invoke la")
+		os.Exit(0)
+	}()
 
 	// Delete directory after failed installation
 	defer func() {
