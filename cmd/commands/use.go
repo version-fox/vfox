@@ -18,8 +18,10 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
 
 	"github.com/urfave/cli/v2"
@@ -85,6 +87,34 @@ func useCmd(ctx *cli.Context) error {
 	source, err := manager.LookupSdk(name)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
+	}
+
+	version, err = source.PreUse(version, scope)
+	if err != nil {
+		return err
+	}
+
+	if version == "" {
+		list := source.List()
+		var arr []string
+		for _, version := range list {
+			arr = append(arr, string(version))
+		}
+		selectPrinter := pterm.InteractiveSelectPrinter{
+			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			Options:       arr,
+			DefaultOption: "",
+			MaxHeight:     5,
+			Selector:      "->",
+			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			Filter:        true,
+			OnInterruptFunc: func() {
+				os.Exit(0)
+			},
+		}
+		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+		version = internal.Version(result)
 	}
 
 	return source.Use(version, scope)

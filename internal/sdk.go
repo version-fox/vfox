@@ -215,43 +215,20 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 	return keys, nil
 }
 
+func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
+	pluginVersion, err := b.Plugin.PreUse(version, scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+	if err != nil {
+		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
+	}
+
+	return pluginVersion, nil
+}
+
 func (b *Sdk) Use(version Version, scope UseScope) error {
 	// FIXME The default is Session under unix-like, and the default is Global under windows.
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		scope = Global
-	}
-
-	pluginVersion, err := b.Plugin.PreUse(version, scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
-	if err != nil {
-		return fmt.Errorf("plugin [PreUse] error: err:%w", err)
-	}
-
-	if pluginVersion != "" {
-		version = pluginVersion
-	}
-
-	if version == "" {
-		var arr []string
-		list := b.List()
-		for _, version := range list {
-			arr = append(arr, string(version))
-		}
-		selectPrinter := pterm.InteractiveSelectPrinter{
-			TextStyle:     &pterm.ThemeDefault.DefaultText,
-			OptionStyle:   &pterm.ThemeDefault.DefaultText,
-			Options:       arr,
-			DefaultOption: "",
-			MaxHeight:     5,
-			Selector:      "->",
-			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-			Filter:        true,
-			OnInterruptFunc: func() {
-				os.Exit(0)
-			},
-		}
-		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", b.Name))
-		version = Version(result)
 	}
 
 	label := b.label(version)
