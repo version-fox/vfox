@@ -49,50 +49,50 @@ var Env = &cli.Command{
 }
 
 func envCmd(ctx *cli.Context) error {
-  if ctx.IsSet("json") {
-    type SDKs map[string]map[string]string
-    data := struct {
-      IsHookEnv bool     `json:"is_hook_env"`
-      Paths []string     `json:"paths"`
-      SDKs  SDKs         `json:"sdks"`
-    }{
-      IsHookEnv: env.IsHookEnv(),
-      Paths: []string{},
-      SDKs: make(SDKs),
-    }
+	if ctx.IsSet("json") {
+		type SDKs map[string]map[string]string
+		data := struct {
+			IsHookEnv bool     `json:"is_hook_env"`
+			Paths     []string `json:"paths"`
+			SDKs      SDKs     `json:"sdks"`
+		}{
+			IsHookEnv: env.IsHookEnv(),
+			Paths:     []string{},
+			SDKs:      make(SDKs),
+		}
 		manager := internal.NewSdkManager()
 		defer manager.Close()
 		allSdk, loadErr := manager.LoadAllSdk()
-    if loadErr != nil {
-      return loadErr
-    }
+		if loadErr != nil {
+			return loadErr
+		}
 		for name, s := range allSdk {
 			current := s.Current()
 			if current != "" {
-        envs, envErr := s.EnvKeys(current)
-        if envErr != nil {
-          return envErr
-        }
-        newEnv := make(map[string]string)
-        for k, v := range envs {
-          if k == "PATH" {
-            data.Paths = append(data.Paths, *v)
-          } else {
-            newEnv[k] = *v
-          }
-        }
-        if len(newEnv) > 0 {
-          data.SDKs[name] = newEnv
-        }
+				envs, envErr := s.EnvKeys(current)
+				if envErr != nil {
+					return envErr
+				}
+				newEnv := make(map[string]string)
+				for k, v := range envs {
+					if k == "PATH" {
+						data.Paths = append(data.Paths, *v)
+					} else {
+						newEnv[k] = *v
+					}
+				}
+				if len(newEnv) > 0 {
+					data.SDKs[name] = newEnv
+				}
 			}
 		}
-    jsonData, err := json.Marshal(data)
-    if err != nil {
-      return err
-    }
-    fmt.Println(string(jsonData))
-    return nil
-  } else if ctx.IsSet("cleanup") {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(jsonData))
+		return nil
+	} else if ctx.IsSet("cleanup") {
 		manager := internal.NewSdkManager()
 		defer manager.Close()
 		// Clean up the old temp files, before today.
