@@ -216,7 +216,8 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
-	pluginVersion, err := b.Plugin.PreUse(version, scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+
+	pluginVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
 	if err != nil {
 		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
 	}

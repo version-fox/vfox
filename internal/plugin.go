@@ -348,7 +348,7 @@ func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
 	return sdkTable
 }
 
-func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
+func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
 	L := l.state
 	lInstalledSdks := L.NewTable()
 	for _, v := range installedSdks {
@@ -362,6 +362,7 @@ func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installe
 	L.SetField(ctxTable, "cwd", lua.LString(cwd))
 	L.SetField(ctxTable, "scope", lua.LString(scope.String()))
 	L.SetField(ctxTable, "version", lua.LString(version))
+	L.SetField(ctxTable, "previousVersion", lua.LString(previousVersion))
 
 	function := l.pluginObj.RawGetString("PreUse")
 	if function.Type() == lua.LTNil {

@@ -129,6 +129,8 @@ function PLUGIN:PreUse(ctx)
     local runtimeVersion = ctx.runtimeVersion
     --- user input version
     local version = ctx.version
+    --- user current used version
+    local previousVersion = ctx.previousVersion
 
     --- installed sdks
     local sdkInfo = ctx.installedSdks['version']

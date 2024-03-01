@@ -30,7 +30,13 @@ func TestPlugin(t *testing.T) {
 
 	t.Run("PreUse", func(t *testing.T) {
 		manager := newSdkManagerWithSource(SessionRecordSource)
+
 		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)
+
+		inputVersion := Version("20.0")
+		previousVersion := Version("21.0")
+		cwd := "/home/user"
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,7 +44,7 @@ func TestPlugin(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		version, err := plugin.PreUse(Version("20.0"), Global, "/home/user", pkgs)
+		version, err := plugin.PreUse(inputVersion, previousVersion, Global, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +53,7 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("expected version '9.9.9', got '%s'", version)
 		}
 
-		version, err = plugin.PreUse(Version("20.0"), Project, "/home/user", pkgs)
+		version, err = plugin.PreUse(inputVersion, previousVersion, Project, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +62,7 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("expected version '10.0.0', got '%s'", version)
 		}
 
-		version, err = plugin.PreUse(Version("20.0"), Session, "/home/user", pkgs)
+		version, err = plugin.PreUse(inputVersion, previousVersion, Session, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
