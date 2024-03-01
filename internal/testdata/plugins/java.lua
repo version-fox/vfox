@@ -138,7 +138,7 @@ function PLUGIN:PreUse(ctx)
     --- working directory
     local cwd = ctx.cwd
 
-    PrintTable(ctx)
+    printTable(ctx)
 
     --- user input scope
     local scope = ctx.scope
@@ -162,19 +162,4 @@ function PLUGIN:PreUse(ctx)
     return {
         version = "1.0.0"
     }
-end
-
-function PrintTable(t, indent)
-    indent = indent or 0
-    local strIndent = string.rep("  ", indent)
-    for key, value in pairs(t) do
-        local keyStr = tostring(key)
-        local valueStr = tostring(value)
-        if type(value) == "table" then
-            print(strIndent .. "[" .. keyStr .. "] =>")
-            PrintTable(value, indent + 1)
-        else
-            print(strIndent .. "[" .. keyStr .. "] => " .. valueStr)
-        end
-    end
 end

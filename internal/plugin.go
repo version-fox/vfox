@@ -17,6 +17,7 @@
 package internal
 
 import (
+	_ "embed"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -26,6 +27,9 @@ import (
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
 )
+
+//go:embed fixtures/preload.lua
+var preloadScript string
 
 const (
 	LuaPluginObjKey = "PLUGIN"
@@ -82,8 +86,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return nil, err
 	}
 
-	table := L.ToTable(-1) // returned value
-	L.Pop(1)               // remove received value
+	table := l.returnedValue()
 
 	if table == nil || table.Type() == lua.LTNil {
 		return []*Package{}, nil
@@ -173,8 +176,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
-	table := L.ToTable(-1) // returned value
-	L.Pop(1)               // remove received value
+	table := l.returnedValue()
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, nil
 	}
@@ -294,8 +296,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, err
 	}
 
-	table := L.ToTable(-1) // returned value
-	L.Pop(1)               // remove received value
+	table := l.returnedValue()
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
@@ -327,20 +328,10 @@ func (l *LuaPlugin) getTableField(table *lua.LTable, fieldName string) (lua.LVal
 	return value, nil
 }
 
-func (l *LuaPlugin) luaPrint() int {
-	L := l.state
-	L.SetGlobal("print", L.NewFunction(func(L *lua.LState) int {
-		top := L.GetTop()
-		for i := 1; i <= top; i++ {
-			fmt.Print(L.ToStringMeta(L.Get(i)))
-			if i != top {
-				fmt.Print("\t")
-			}
-		}
-		fmt.Println()
-		return 0
-	}))
-	return 0
+func (l *LuaPlugin) returnedValue() *lua.LTable {
+	table := l.state.ToTable(-1) // returned value
+	l.state.Pop(1)               // remove received value
+	return table
 }
 
 func (l *LuaPlugin) Label(version string) string {
@@ -383,22 +374,29 @@ func (l *LuaPlugin) PreUse(version Version, scope UseScope, cwd string, installe
 	}, l.pluginObj, ctxTable); err != nil {
 		return "", err
 	}
-	table := L.ToTable(-1) // returned value
-	L.Pop(1)               // remove received value
+
+	table := l.returnedValue()
 	if table == nil || table.Type() == lua.LTNil {
 		return "", nil
 	}
-	luaVersion := table.RawGetString("version")
-	if luaVersion.Type() == lua.LTNil {
+
+	luaVer, err := l.getTableField(table, "version")
+	if err != nil {
+		// ignore version field not found
 		return "", nil
 	}
 
-	return Version(luaVersion.String()), nil
+	return Version(luaVer.String()), nil
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	luaVMInstance := lua.NewState()
 	module.Preload(luaVMInstance, manager.Config)
+
+	if err := luaVMInstance.DoString(preloadScript); err != nil {
+		return nil, err
+	}
+
 	if err := luaVMInstance.DoString(content); err != nil {
 		return nil, err
 	}

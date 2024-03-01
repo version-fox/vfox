@@ -1,4 +1,3 @@
-
 --- Common libraries provided by VersionFox (optional)
 local http = require("http")
 local json = require("json")
@@ -41,7 +40,7 @@ function PLUGIN:PreInstall(ctx)
         --- SHA256 checksum [optional]
         sha256 = "xxx",
         --- md5 checksum [optional]
-        md5= "xxx",
+        md5 = "xxx",
         --- sha1 checksum [optional]
         sha1 = "xxx",
         --- sha512 checksum [optional]
@@ -56,7 +55,7 @@ function PLUGIN:PreInstall(ctx)
                 --- SHA256 checksum [optional]
                 sha256 = "xxx",
                 --- md5 checksum [optional]
-                md5= "xxx",
+                md5 = "xxx",
                 --- sha1 checksum [optional]
                 sha1 = "xxx",
                 --- sha512 checksum [optional]
@@ -123,7 +122,7 @@ function PLUGIN:EnvKeys(ctx)
     }
 end
 
---- When user invoke `use` command, this function will be called to get the 
+--- When user invoke `use` command, this function will be called to get the
 --- valid version information.
 --- @param ctx table Context information
 function PLUGIN:PreUse(ctx)
@@ -141,6 +140,7 @@ function PLUGIN:PreUse(ctx)
     local cwd = ctx.cwd
 
     --- user input scope
+    --- could be one of global/project/session
     local scope = ctx.scope
 
     --- return the version information
