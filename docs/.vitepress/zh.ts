@@ -34,6 +34,7 @@ function nav(): DefaultTheme.NavItem[] {
     return [
         {text: '首页', link: '/zh-hans/'},
         {text: '文档', link: '/zh-hans/guides/intro'},
+        {text: '常见问题', link: '/zh-hans/guides/faq'},
         {text: '插件仓库', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]
 }

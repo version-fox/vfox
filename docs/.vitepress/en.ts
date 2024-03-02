@@ -34,6 +34,7 @@ function nav(): DefaultTheme.NavItem[] {
     return [
         {text: 'Home', link: '/'},
         {text: 'Documentation', link: '/guides/intro'},
+        {text: 'FAQ', link: '/guides/faq'},
         {text: 'Plugins', link: 'https://github.com/version-fox/version-fox-plugins'}
     ]
 }
