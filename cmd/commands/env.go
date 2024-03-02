@@ -60,29 +60,22 @@ func envCmd(ctx *cli.Context) error {
 			Paths:     []string{},
 			SDKs:      make(SDKs),
 		}
-		manager := internal.NewSdkManager()
+		manager := internal.NewSdkManagerWithSource(internal.GlobalRecordSource, internal.SessionRecordSource, internal.ProjectRecordSource)
 		defer manager.Close()
-		allSdk, loadErr := manager.LoadAllSdk()
-		if loadErr != nil {
-			return loadErr
-		}
-		for name, s := range allSdk {
-			current := s.Current()
-			if current != "" {
-				envs, envErr := s.EnvKeys(current)
-				if envErr != nil {
-					return envErr
-				}
-				newEnv := make(map[string]string)
-				for k, v := range envs {
-					if k == "PATH" {
-						data.Paths = append(data.Paths, *v)
-					} else {
-						newEnv[k] = *v
+		for k, v := range manager.Record.Export() {
+			if lookupSdk, err := manager.LookupSdk(k); err == nil {
+				if keys, err := lookupSdk.EnvKeys(internal.Version(v)); err == nil {
+					newEnv := make(map[string]string)
+					for key, value := range keys {
+						if key == "PATH" {
+							data.Paths = append(data.Paths, *value)
+						} else {
+							newEnv[key] = *value
+						}
 					}
-				}
-				if len(newEnv) > 0 {
-					data.SDKs[name] = newEnv
+					if len(newEnv) > 0 {
+						data.SDKs[lookupSdk.Plugin.Name] = newEnv
+					}
 				}
 			}
 		}
