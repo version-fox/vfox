@@ -21,6 +21,9 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
+	"golang.org/x/crypto/ssh/terminal"
+	"math"
+	"os"
 	"strings"
 )
 
@@ -48,10 +51,11 @@ func searchCmd(ctx *cli.Context) error {
 	if len(result) == 0 {
 		return fmt.Errorf("no available version")
 	}
+	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText: "Please select a version of " + sdkName,
 		Filter:  true,
-		Size:    20,
+		Size:    int(math.Min(math.Max(float64(height-3), 1), 20)),
 		SourceFunc: func(page, size int) ([]*printer.KV, error) {
 			start := page * size
 			end := start + size
