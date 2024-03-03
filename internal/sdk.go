@@ -263,7 +263,10 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 	}
 	b.sdkManager.Record.Add(b.Plugin.Filename, string(version))
-	defer b.sdkManager.Record.Save()
+	err := b.sdkManager.Record.Save()
+	if err != nil {
+		return err
+	}
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
 	if !env.IsHookEnv() {
 		return shell.GetProcess().Open(os.Getppid())
