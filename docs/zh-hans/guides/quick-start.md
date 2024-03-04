@@ -76,10 +76,19 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 ::: details Powershell
 
-请将下面一行添加到你的`$PROFILE`文件中:
+打开 PowerShell 配置文件:
+
+```shell
+New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
+Invoke-Item $PROFILE
+```
+
+将下面一行添加到你的 $PROFILE 文件末尾并保存:
+
 ```shell
 Invoke-Expression "$(vfox activate pwsh)"
 ```
+
 :::
 
 ## 3. 添加插件
