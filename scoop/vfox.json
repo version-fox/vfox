@@ -1,0 +1,9 @@
+{
+    "version": "0.23",
+    "url": "https://github.com/version-fox/vfox/releases/download/v0.2.3/vfox_0.2.3_windows_x86_64.zip",
+    "checksum": "f9172908eb88dec2d2fa94ff4652164cbc2e19e0b3e95d809004bc5382f11e7f",
+    "post_install": [
+        "Get-ChildItem -Path $dir\\vfox_0.2.3_windows_x86_64\\* -Recurse | Move-Item -Destination $dir\\",
+        "Remove-Item -Force -Recurse $dir\\vfox_0.2.3_windows_x86_64\\"
+    ]
+}
