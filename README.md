@@ -45,9 +45,15 @@ echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
-# For PowerShell, add the following line to your $PROFILE:
+# For PowerShell:
+# 1. Open PowerShell Profile:
+New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error.
+Invoke-Item $PROFILE
+# 2. Add the following line to the end of your $PROFILE and save:
 Invoke-Expression "$(vfox activate pwsh)"
 ```
+
+> Remember to restart your shell to apply the changes.
 
 #### 3. Add an SDK plugin
 ```bash 
