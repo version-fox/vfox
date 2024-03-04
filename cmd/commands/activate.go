@@ -18,10 +18,11 @@ package commands
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal"
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/version-fox/vfox/internal"
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/env"
@@ -53,6 +54,7 @@ func activateCmd(ctx *cli.Context) error {
 	sdkPaths := envKeys["PATH"]
 	if sdkPaths != nil {
 		paths := manager.EnvManager.Paths([]string{*sdkPaths, originPath})
+
 		envKeys["PATH"] = &paths
 	}
 

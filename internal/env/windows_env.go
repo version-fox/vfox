@@ -189,16 +189,7 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 	return nil
 }
 
-func (w *windowsEnvManager) pathEnvValue() string {
-	var paths []string
-	for path := range w.pathMap {
-		paths = append(paths, path)
-	}
-	return w.Paths(paths)
-}
-
 func (w *windowsEnvManager) Paths(paths []string) string {
-	paths = append(paths, s)
 	return strings.Join(paths, ";")
 }
 
