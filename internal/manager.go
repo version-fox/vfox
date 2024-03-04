@@ -68,17 +68,10 @@ func (m *Manager) EnvKeys() (env.Envs, error) {
 			}
 		}
 	}
-	if len(paths) == 0 {
-		var p string
-		if env.IsHookEnv() {
-			p = os.Getenv(env.PathFlag)
-		} else {
-			p = os.Getenv("PATH")
-		}
-		shellEnvs["PATH"] = &p
-	} else {
+	if len(paths) != 0 {
 		pathStr := m.EnvManager.Paths(paths[:])
 		shellEnvs["PATH"] = &pathStr
+	} else {
 	}
 	return shellEnvs, nil
 }

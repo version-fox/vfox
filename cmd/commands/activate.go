@@ -19,6 +19,7 @@ package commands
 import (
 	"fmt"
 	"github.com/version-fox/vfox/internal"
+	"os"
 	"strings"
 	"text/template"
 
@@ -46,7 +47,15 @@ func activateCmd(ctx *cli.Context) error {
 		return err
 	}
 	envKeys[env.HookFlag] = &name
-	envKeys[env.PathFlag] = envKeys["PATH"]
+	originPath := os.Getenv("PATH")
+	envKeys[env.PathFlag] = &originPath
+
+	sdkPaths := envKeys["PATH"]
+	if sdkPaths != nil {
+		paths := manager.EnvManager.Paths([]string{*sdkPaths, originPath})
+		envKeys["PATH"] = &paths
+	}
+
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
 	s := shell.NewShell(name)

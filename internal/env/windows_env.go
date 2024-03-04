@@ -198,7 +198,6 @@ func (w *windowsEnvManager) pathEnvValue() string {
 }
 
 func (w *windowsEnvManager) Paths(paths []string) string {
-	s := os.Getenv("PATH")
 	paths = append(paths, s)
 	return strings.Join(paths, ";")
 }

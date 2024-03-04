@@ -23,6 +23,7 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
+	"os"
 )
 
 var Env = &cli.Command{
@@ -106,6 +107,14 @@ func envCmd(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
+
+		sdkPaths := envKeys["PATH"]
+		if sdkPaths != nil {
+			originPath := os.Getenv(env.PathFlag)
+			paths := manager.EnvManager.Paths([]string{*sdkPaths, originPath})
+			envKeys["PATH"] = &paths
+		}
+
 		exportStr := s.Export(envKeys)
 		fmt.Println(exportStr)
 		return nil
