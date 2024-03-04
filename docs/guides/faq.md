@@ -32,3 +32,16 @@ $ vfox remove nodejs
 ```
 
 before deleting, you can use `vfox ls` to view the currently installed plugins (i.e. SDK names), and then delete them.
+
+## Why does the PATH environment variable value repeat on Windows?
+
+Only one situation will cause this, that is, you have used the SDK globally (`vfox use -g`), at this time, `vfox` will
+operate the registry and write the SDK's `PATH` into the user environment variable (for the purpose of, **Shell that does not
+support Hook function** can also use SDK, such as `CMD`).
+
+But because of the existence of the `.tool-versions` mechanism, the `PATH` becomes the sum of `.tool-verions` and the user
+environment variable `PATH`.
+
+::: warning
+The same SDK **can be repeated at most twice**, it will not be repeated indefinitely. If >2 times, please feedback to us.
+:::
