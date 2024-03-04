@@ -42,6 +42,7 @@ func (m *macosEnvManager) Close() error {
 }
 
 func (m *macosEnvManager) Load(key, value string) error {
+	// TODO check PATH which include many values
 	m.store.Add(&KV{
 		Key:   key,
 		Value: value,

@@ -54,6 +54,9 @@ func (w *windowsEnvManager) loadPathValue() error {
 	}
 	s := strings.Split(val, ";")
 	for _, path := range s {
+		if _, ok := w.pathMap[path]; ok {
+			continue
+		}
 		w.paths = append(w.paths, path)
 		w.pathMap[path] = struct{}{}
 	}
@@ -117,11 +120,15 @@ func (w *windowsEnvManager) Flush() (err error) {
 
 func (w *windowsEnvManager) Load(key, value string) error {
 	if key == "PATH" {
-		_, ok := w.pathMap[value]
-		if !ok {
-			w.pathMap[value] = struct{}{}
-			w.paths = append(w.paths, value)
+		keys := strings.Split(value, ";")
+		for _, k := range keys {
+			_, ok := w.pathMap[k]
+			if !ok {
+				w.pathMap[k] = struct{}{}
+				w.paths = append(w.paths, k)
+			}
 		}
+
 	} else {
 		err := os.Setenv(key, value)
 		if err != nil {
@@ -147,11 +154,21 @@ func (w *windowsEnvManager) Remove(key string) error {
 	if key == "PATH" {
 		return fmt.Errorf("can not remove PATH variable")
 	}
-	if _, ok := w.pathMap[key]; ok {
-		delete(w.pathMap, key)
-		w.deletedPathMap[key] = struct{}{}
-	} else {
-		_ = w.key.DeleteValue(key)
+	keys := strings.Split(key, ";")
+	for _, k := range keys {
+		if _, ok := w.pathMap[k]; ok {
+			delete(w.pathMap, k)
+			var newPaths []string
+			for _, v := range w.paths {
+				if v != k {
+					newPaths = append(newPaths, v)
+				}
+			}
+			w.paths = newPaths
+			w.deletedPathMap[k] = struct{}{}
+		} else {
+			_ = w.key.DeleteValue(k)
+		}
 	}
 	return nil
 }
