@@ -51,43 +51,46 @@ func searchCmd(ctx *cli.Context) error {
 	if len(result) == 0 {
 		return fmt.Errorf("no available version")
 	}
+
+	var options []*printer.KV
+	for _, p := range result {
+		var value string
+		if p.Main.Note != "" {
+			value = fmt.Sprintf("v%s (%s)", p.Main.Version, p.Main.Note)
+		} else {
+			value = fmt.Sprintf("v%s", p.Main.Version)
+		}
+		if len(p.Additions) != 0 {
+			var additional []string
+			for _, a := range p.Additions {
+				additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
+			}
+			value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
+		}
+		options = append(options, &printer.KV{
+			Key:   string(p.Main.Version),
+			Value: value,
+		})
+	}
+
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText: "Please select a version of " + sdkName,
 		Filter:  true,
 		Size:    int(math.Min(math.Max(float64(height-3), 1), 20)),
-		SourceFunc: func(page, size int) ([]*printer.KV, error) {
+		Options: options,
+		SourceFunc: func(page, size int, options []*printer.KV) ([]*printer.KV, error) {
 			start := page * size
 			end := start + size
 
-			if start > len(result) {
+			if start > len(options) {
 				return nil, fmt.Errorf("page is out of range")
 			}
-			if end > len(result) {
-				end = len(result)
+			if end > len(options) {
+				end = len(options)
 			}
-			versions := result[start:end]
-			var arr []*printer.KV
-			for _, p := range versions {
-				var value string
-				if p.Main.Note != "" {
-					value = fmt.Sprintf("v%s (%s)", p.Main.Version, p.Main.Note)
-				} else {
-					value = fmt.Sprintf("v%s", p.Main.Version)
-				}
-				if len(p.Additions) != 0 {
-					var additional []string
-					for _, a := range p.Additions {
-						additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
-					}
-					value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
-				}
-				arr = append(arr, &printer.KV{
-					Key:   string(p.Main.Version),
-					Value: value,
-				})
-			}
-			return arr, nil
+
+			return options[start:end], nil
 		},
 	}
 	version, err := kvSelect.Show()

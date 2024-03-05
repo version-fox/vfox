@@ -25,19 +25,21 @@ import (
 	"github.com/pterm/pterm"
 	"os"
 	"sort"
+	"strings"
 )
 
 type PageKVSelect struct {
-	index              int
-	options            []*KV
-	Size               int
-	result             *KV
-	isEmpty            bool
-	fuzzySearchString  string
-	fuzzySearchMatches []*KV
-	Filter             bool
-	SourceFunc         func(page, size int) ([]*KV, error)
-	TopText            string
+	index             int
+	Options           []*KV
+	searchOptions     []*KV
+	pageOptions       []*KV
+	Size              int
+	result            *KV
+	isEmpty           bool
+	fuzzySearchString string
+	Filter            bool
+	SourceFunc        func(page, size int, options []*KV) ([]*KV, error)
+	TopText           string
 }
 
 type KV struct {
@@ -45,12 +47,30 @@ type KV struct {
 	Value string
 }
 
+type ranks fuzzy.Ranks
+
+func (r ranks) Len() int {
+	return len(r)
+}
+
+func (r ranks) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r ranks) Less(i, j int) bool {
+	if strings.Contains(r[i].Target, r[i].Source) {
+		return true
+	}
+
+	return r[i].Distance < r[j].Distance
+}
+
 func (s *PageKVSelect) changeIndex(value int) {
 	s.index += value
 	if s.index < 0 {
-		s.index = len(s.options) - 1
+		s.index = len(s.pageOptions) - 1
 	}
-	if s.index > len(s.options)-1 {
+	if s.index > len(s.pageOptions)-1 {
 		s.index = 0
 	}
 }
@@ -62,34 +82,17 @@ func (s *PageKVSelect) renderSelect() string {
 	} else {
 		content += pterm.Sprintf("%s:\n", s.TopText)
 	}
-	if s.options == nil || len(s.options) == 0 {
+	if (s.pageOptions == nil || len(s.pageOptions) == 0) && len(s.searchOptions) > 0 {
 		return pterm.Sprintln("No data")
 	}
 
-	// find options that match fuzzy search string
-	var optionMap = make(map[string]*KV)
-	var valueArr []string
-	for _, kv := range s.options {
-		optionMap[kv.Value] = kv
-		valueArr = append(valueArr, kv.Value)
-	}
-	rankedResults := fuzzy.RankFindFold(s.fuzzySearchString, valueArr)
-	s.fuzzySearchMatches = []*KV{}
-	if len(rankedResults) != len(s.options) {
-		sort.Sort(rankedResults)
+	if len(s.pageOptions) != 0 {
+		s.result = s.pageOptions[s.index]
 	}
 
-	for _, result := range rankedResults {
-		s.fuzzySearchMatches = append(s.fuzzySearchMatches, optionMap[result.Target])
-	}
-
-	if len(s.fuzzySearchMatches) != 0 {
-		s.result = s.fuzzySearchMatches[s.index]
-	}
-
-	indexMapper := make([]*KV, len(s.fuzzySearchMatches))
-	for i := 0; i < len(s.fuzzySearchMatches); i++ {
-		indexMapper[i] = s.fuzzySearchMatches[i]
+	indexMapper := make([]*KV, len(s.pageOptions))
+	for i := 0; i < len(s.pageOptions); i++ {
+		indexMapper[i] = s.pageOptions[i]
 	}
 
 	for i, option := range indexMapper {
@@ -103,12 +106,34 @@ func (s *PageKVSelect) renderSelect() string {
 	return content
 }
 
-func (s *PageKVSelect) loadPageData(page int) (err error) {
-	s.options, err = s.SourceFunc(page, s.Size)
-	s.index = 0
-	if s.options != nil {
-		s.isEmpty = len(s.options) < s.Size
+func (s *PageKVSelect) search() {
+	// find options that match fuzzy search string
+	var optionMap = make(map[string]*KV)
+	var valueArr []string
+	for _, kv := range s.Options {
+		optionMap[kv.Value] = kv
+		valueArr = append(valueArr, kv.Value)
 	}
+	rankedResults := ranks(fuzzy.RankFindFold(s.fuzzySearchString, valueArr))
+	if s.fuzzySearchString != "" {
+		sort.Sort(rankedResults)
+	}
+	s.searchOptions = nil
+	for _, result := range rankedResults {
+		s.searchOptions = append(s.searchOptions, optionMap[result.Target])
+	}
+}
+
+func (s *PageKVSelect) loadPageData(page int) (err error) {
+	options, err := s.SourceFunc(page, s.Size, s.searchOptions)
+	s.index = 0
+	if len(options) > 0 {
+		s.pageOptions = options
+	}
+	if len(s.searchOptions) == 0 {
+		s.pageOptions = nil
+	}
+	s.isEmpty = (page+1)*s.Size >= len(s.searchOptions)
 	return err
 }
 
@@ -120,6 +145,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 	}
 	defer area.Stop()
 
+	s.search()
 	page := 0
 	if err := s.loadPageData(page); err != nil {
 		return nil, err
@@ -133,11 +159,14 @@ func (s *PageKVSelect) Show() (*KV, error) {
 		switch key.Code {
 		case keys.RuneKey:
 			if s.Filter {
-				// Fuzzy search for options
 				// append to fuzzy search string
 				s.fuzzySearchString += key.String()
 				s.index = 0
-				//p.displayedOptions = append([]string{}, p.fuzzySearchMatches[:maxHeight]...)
+				page = 0
+				s.search()
+				if err := s.loadPageData(page); err != nil {
+					return true, err
+				}
 				area.Update(s.renderSelect())
 			}
 		case keys.Backspace:
@@ -146,10 +175,12 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				// Handle UTF-8 characters
 				s.fuzzySearchString = string([]rune(s.fuzzySearchString)[:len([]rune(s.fuzzySearchString))-1])
 			}
-			if s.fuzzySearchString == "" {
-				s.fuzzySearchMatches = append([]*KV{}, s.options...)
-			}
 			s.index = 0
+			page = 0
+			s.search()
+			if err := s.loadPageData(page); err != nil {
+				return true, err
+			}
 			area.Update(s.renderSelect())
 		case keys.CtrlC:
 			s.result = nil
@@ -178,7 +209,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				area.Update(s.renderSelect())
 			}
 		case keys.Enter:
-			s.result = s.fuzzySearchMatches[s.index]
+			s.result = s.pageOptions[s.index]
 			return true, nil
 		default:
 			return false, nil
