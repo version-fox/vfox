@@ -18,9 +18,10 @@ package internal
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/util"
 )
 
 type RecordSource string
@@ -34,11 +35,12 @@ const (
 type PathMeta struct {
 	TempPath string
 	// Temporary directory for the current process
-	CurTmpPath     string
-	ConfigPath     string
-	SdkCachePath   string
-	PluginPath     string
-	ExecutablePath string
+	CurTmpPath       string
+	ConfigPath       string
+	SdkCachePath     string
+	PluginPath       string
+	ExecutablePath   string
+	WorkingDirectory string
 }
 
 func newPathMeta() (*PathMeta, error) {
@@ -67,12 +69,19 @@ func newPathMeta() (*PathMeta, error) {
 			return nil, fmt.Errorf("create temp dir failed: %w", err)
 		}
 	}
+
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("get current working directory failed: %w", err)
+	}
+
 	return &PathMeta{
-		TempPath:       tmpPath,
-		CurTmpPath:     curTmpPath,
-		ConfigPath:     configPath,
-		SdkCachePath:   sdkCachePath,
-		PluginPath:     pluginPath,
-		ExecutablePath: exePath,
+		TempPath:         tmpPath,
+		CurTmpPath:       curTmpPath,
+		ConfigPath:       configPath,
+		SdkCachePath:     sdkCachePath,
+		PluginPath:       pluginPath,
+		ExecutablePath:   exePath,
+		WorkingDirectory: workingDirectory,
 	}, nil
 }

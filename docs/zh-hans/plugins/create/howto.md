@@ -127,9 +127,41 @@ function PLUGIN:EnvKeys(ctx)
 end
 ```
 
+## PreUse
+
+当用户使用 `vfox use` 的时候，会调用插件的 `PreUse` 函数。这个函数的作用是返回用户输入的版本信息。
+如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。
+
+```lua
+function PLUGIN:PreUse(ctx)
+    local runtimeVersion = ctx.runtimeVersion
+    --- 用户输入的版本
+    local version = ctx.version
+    --- 用户之前环境中设置的版本
+    local previousVersion = ctx.previousVersion
+
+    --- 已安装的 SDK 信息
+    local sdkInfo = ctx.installedSdks['version']
+    local path = sdkInfo.path
+    local name = sdkInfo.name
+    local version = sdkInfo.version
+
+    --- 当前工作目录
+    local cwd = ctx.cwd
+
+    --- 用户输入的 scope 信息，值为 global/project/session 其中之一
+    local scope = ctx.scope
+
+    --- 返回版本信息
+    return {
+        version = version,
+    }
+end
+```
+
 ## 测试插件
 
-目前，`vfox` 插件测试方法很简陋。您需要将插件放在 `${HOME}/.version-fox/plugins` 目录中，并使用不同的命令验证您的功能是否正常工作。您可以在c插件中使用`print`函数来打印日志进行调试。
+目前，`vfox` 插件测试方法很简陋。您需要将插件放在 `${HOME}/.version-fox/plugins` 目录中，并使用不同的命令验证您的功能是否正常工作。您可以在c插件中使用 `print`/`printTable` 函数来打印日志进行调试。
 
 - PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`

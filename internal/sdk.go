@@ -228,12 +228,36 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 	return keys, nil
 }
 
+func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
+	if !b.Plugin.HasFunction("PreUse") {
+		return version, nil
+	}
+
+	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+	if err != nil {
+		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
+	}
+
+	// If the plugin does not return a version, it means that the plugin does not want to change the version.
+	if newVersion == "" {
+		return version, nil
+	}
+
+	return newVersion, nil
+}
+
 func (b *Sdk) Use(version Version, scope UseScope) error {
 	// FIXME The default is Session under unix-like, and the default is Global under windows.
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		scope = Global
 	}
+
+	version, err := b.PreUse(version, scope)
+	if err != nil {
+		return err
+	}
+
 	label := b.label(version)
 	if !b.checkExists(version) {
 		return fmt.Errorf("%s is not installed", label)
@@ -292,6 +316,18 @@ func (b *Sdk) List() []Version {
 		return versions[i] > versions[j]
 	})
 	return versions
+}
+
+func (b *Sdk) getLocalSdkPackages() []*Package {
+	var infos []*Package
+	for _, version := range b.List() {
+		info, err := b.getLocalSdkPackage(version)
+		if err != nil {
+			continue
+		}
+		infos = append(infos, info)
+	}
+	return infos
 }
 
 func (b *Sdk) Current() Version {

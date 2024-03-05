@@ -129,24 +129,37 @@ function PLUGIN:PreUse(ctx)
     local runtimeVersion = ctx.runtimeVersion
     --- user input version
     local version = ctx.version
-    --- user current used version
-    local previousVersion = ctx.previousVersion
-
     --- installed sdks
-    local sdkInfo = ctx.installedSdks['version']
+    local sdkInfo = ctx.installedSdks['xxxx']
     local path = sdkInfo.path
     local name = sdkInfo.name
-    local version = sdkInfo.version
+    local sdkVersion = sdkInfo.version
 
     --- working directory
     local cwd = ctx.cwd
 
+    printTable(ctx)
+
     --- user input scope
-    --- could be one of global/project/session
     local scope = ctx.scope
 
-    --- return the version information
+    if (scope == "global") then
+        print("return 9.9.9")
+        return {
+            version = "9.9.9",
+        }
+    end
+
+    if (scope == "project") then
+        print("return 10.0.0")
+        return {
+            version = "10.0.0",
+        }
+    end
+
+    print("return 1.0.0")
+
     return {
-        version = version,
+        version = "1.0.0"
     }
 end

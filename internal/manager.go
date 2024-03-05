@@ -19,7 +19,6 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/version-fox/vfox/internal/config"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -105,9 +105,10 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		if d.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(d.Name(), ".lua") {
+		sdkName := d.Name()
+		if strings.HasSuffix(sdkName, ".lua") {
 			// filename first as sdk name
-			path := filepath.Join(m.PathMeta.PluginPath, d.Name())
+			path := filepath.Join(m.PathMeta.PluginPath, sdkName)
 			content, _ := m.loadLuaFromFileOrUrl(path)
 			source, err := NewLuaPlugin(content, path, m)
 			if err != nil {
@@ -376,17 +377,14 @@ func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 	if err != nil {
 		panic("Init path meta error")
 	}
+
 	var paths []string
 	for _, source := range sources {
 		switch source {
 		case GlobalRecordSource:
 			paths = append(paths, meta.ConfigPath)
 		case ProjectRecordSource:
-			curDir, err := os.Getwd()
-			if err != nil {
-				panic("Get current dir error")
-			}
-			paths = append(paths, curDir)
+			paths = append(paths, meta.WorkingDirectory)
 		case SessionRecordSource:
 			paths = append(paths, meta.CurTmpPath)
 		}

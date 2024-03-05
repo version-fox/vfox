@@ -18,11 +18,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal"
 	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -87,6 +88,7 @@ func useCmd(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
+
 	if version == "" {
 		list := source.List()
 		var arr []string
@@ -109,5 +111,6 @@ func useCmd(ctx *cli.Context) error {
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
 		version = internal.Version(result)
 	}
+
 	return source.Use(version, scope)
 }

@@ -133,11 +133,45 @@ function PLUGIN:EnvKeys(ctx)
 end
 ```
 
+## PreUse
+
+When the user uses `vfox use`, the plugin's `PreUse` function is called. The purpose of this function is to return the
+version information entered by the user. If the `PreUse` function returns version information, `vfox` will use this new
+version.
+
+```lua
+function PLUGIN:PreUse(ctx)
+    local runtimeVersion = ctx.runtimeVersion
+    --- user input version
+    local version = ctx.version
+    --- user current used version
+    local previousVersion = ctx.previousVersion
+
+    --- installed sdks
+    local sdkInfo = ctx.installedSdks['version']
+    local path = sdkInfo.path
+    local name = sdkInfo.name
+    local version = sdkInfo.version
+
+    --- working directory
+    local cwd = ctx.cwd
+
+    --- user input scope
+    --- could be one of global/project/session
+    local scope = ctx.scope
+
+    --- return the version information
+    return {
+        version = version,
+    }
+end
+```
+
 ## Test Plugin
 
 Currently, VersionFox plugin testing is straightforward. You only need to place the plugin file in the
 `${HOME}/.version-fox/plugins` directory and verify that your features are working using different commands. You can use
-`print` statements in Lua scripts for printing log.
+`print`/`printTable` statements in Lua scripts for printing log.
 
 - PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`

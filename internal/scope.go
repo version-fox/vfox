@@ -23,3 +23,16 @@ const (
 	Project
 	Session
 )
+
+func (s UseScope) String() string {
+	switch s {
+	case Global:
+		return "global"
+	case Project:
+		return "project"
+	case Session:
+		return "session"
+	default:
+		return "unknown"
+	}
+}
