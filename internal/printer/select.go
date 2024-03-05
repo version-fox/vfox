@@ -29,7 +29,7 @@ import (
 
 type PageKVSelect struct {
 	index              int
-	options            []*KV
+	pageOptions        []*KV
 	Size               int
 	result             *KV
 	isEmpty            bool
@@ -48,9 +48,9 @@ type KV struct {
 func (s *PageKVSelect) changeIndex(value int) {
 	s.index += value
 	if s.index < 0 {
-		s.index = len(s.options) - 1
+		s.index = len(s.pageOptions) - 1
 	}
-	if s.index > len(s.options)-1 {
+	if s.index > len(s.pageOptions)-1 {
 		s.index = 0
 	}
 }
@@ -62,20 +62,20 @@ func (s *PageKVSelect) renderSelect() string {
 	} else {
 		content += pterm.Sprintf("%s:\n", s.TopText)
 	}
-	if s.options == nil || len(s.options) == 0 {
+	if s.pageOptions == nil || len(s.pageOptions) == 0 {
 		return pterm.Sprintln("No data")
 	}
 
-	// find options that match fuzzy search string
+	// find pageOptions that match fuzzy search string
 	var optionMap = make(map[string]*KV)
 	var valueArr []string
-	for _, kv := range s.options {
+	for _, kv := range s.pageOptions {
 		optionMap[kv.Value] = kv
 		valueArr = append(valueArr, kv.Value)
 	}
 	rankedResults := fuzzy.RankFindFold(s.fuzzySearchString, valueArr)
 	s.fuzzySearchMatches = []*KV{}
-	if len(rankedResults) != len(s.options) {
+	if len(rankedResults) != len(s.pageOptions) {
 		sort.Sort(rankedResults)
 	}
 
@@ -104,10 +104,10 @@ func (s *PageKVSelect) renderSelect() string {
 }
 
 func (s *PageKVSelect) loadPageData(page int) (err error) {
-	s.options, err = s.SourceFunc(page, s.Size)
+	s.pageOptions, err = s.SourceFunc(page, s.Size)
 	s.index = 0
-	if s.options != nil {
-		s.isEmpty = len(s.options) < s.Size
+	if s.pageOptions != nil {
+		s.isEmpty = len(s.pageOptions) < s.Size
 	}
 	return err
 }
@@ -133,7 +133,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 		switch key.Code {
 		case keys.RuneKey:
 			if s.Filter {
-				// Fuzzy search for options
+				// Fuzzy search for pageOptions
 				// append to fuzzy search string
 				s.fuzzySearchString += key.String()
 				s.index = 0
@@ -147,7 +147,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				s.fuzzySearchString = string([]rune(s.fuzzySearchString)[:len([]rune(s.fuzzySearchString))-1])
 			}
 			if s.fuzzySearchString == "" {
-				s.fuzzySearchMatches = append([]*KV{}, s.options...)
+				s.fuzzySearchMatches = append([]*KV{}, s.pageOptions...)
 			}
 			s.index = 0
 			area.Update(s.renderSelect())
