@@ -178,7 +178,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				area.Update(s.renderSelect())
 			}
 		case keys.Enter:
-			s.result = s.options[s.index]
+			s.result = s.fuzzySearchMatches[s.index]
 			return true, nil
 		default:
 			return false, nil
