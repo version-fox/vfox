@@ -24,6 +24,8 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
 	"os"
+	"sort"
+	"strings"
 )
 
 type PageKVSelect struct {
@@ -43,6 +45,24 @@ type PageKVSelect struct {
 type KV struct {
 	Key   string
 	Value string
+}
+
+type ranks fuzzy.Ranks
+
+func (r ranks) Len() int {
+	return len(r)
+}
+
+func (r ranks) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r ranks) Less(i, j int) bool {
+	if strings.Contains(r[i].Target, r[i].Source) {
+		return true
+	}
+
+	return r[i].Distance < r[j].Distance
 }
 
 func (s *PageKVSelect) changeIndex(value int) {
@@ -94,8 +114,10 @@ func (s *PageKVSelect) search() {
 		optionMap[kv.Value] = kv
 		valueArr = append(valueArr, kv.Value)
 	}
-	rankedResults := fuzzy.RankFindFold(s.fuzzySearchString, valueArr)
-
+	rankedResults := ranks(fuzzy.RankFindFold(s.fuzzySearchString, valueArr))
+	if s.fuzzySearchString != "" {
+		sort.Sort(rankedResults)
+	}
 	s.searchOptions = nil
 	for _, result := range rankedResults {
 		s.searchOptions = append(s.searchOptions, optionMap[result.Target])
