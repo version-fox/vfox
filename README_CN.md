@@ -35,16 +35,22 @@
 
 #### 1.选择一个适合你的[安装方式](https://vfox.lhan.me/zh-hans/guides/quick-start.html#_1-%E5%AE%89%E8%A3%85vfox)。
 
-#### 2. ⚠️ **挂载vfox到你的Shell (从下面选择一条适合你shell的命令)** ⚠️
+#### 2. ⚠️ **挂载vfox到你的 Shell (从下面选择一条适合你 shell 的命令)** ⚠️
 
 ```bash
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
-# PowerShell, 请将下面一行添加到你的$PROFILE文件中:
+# PowerShell:
+# 1. 打开 PowerShell 配置文件:
+New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
+Invoke-Item $PROFILE
+# 2. 将下面一行添加到你的 $PROFILE 文件末尾并保存:
 Invoke-Expression "$(vfox activate pwsh)"
 ```
+
+> 请记住重启你的 Shell 以应用更改。
 
 #### 3.添加插件
 ```bash 

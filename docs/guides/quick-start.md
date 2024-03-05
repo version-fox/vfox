@@ -93,7 +93,15 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 :::
 
 ::: details Powershell
-add the following line to your `$PROFILE`:
+
+Open PowerShell Profile:
+
+```shell
+New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error.
+Invoke-Item $PROFILE
+```
+
+Add the following line to the end of your profile and save:
 
 ```shell
 Invoke-Expression "$(vfox activate pwsh)"
