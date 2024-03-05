@@ -87,7 +87,7 @@ func (s *PageKVSelect) renderSelect() string {
 }
 
 func (s *PageKVSelect) search() {
-	// find pageOptions that match fuzzy search string
+	// find options that match fuzzy search string
 	var optionMap = make(map[string]*KV)
 	var valueArr []string
 	for _, kv := range s.Options {
@@ -137,7 +137,6 @@ func (s *PageKVSelect) Show() (*KV, error) {
 		switch key.Code {
 		case keys.RuneKey:
 			if s.Filter {
-				// Fuzzy search for pageOptions
 				// append to fuzzy search string
 				s.fuzzySearchString += key.String()
 				s.index = 0
