@@ -89,11 +89,6 @@ func useCmd(ctx *cli.Context) error {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
 
-	version, err = source.PreUse(version, scope)
-	if err != nil {
-		return err
-	}
-
 	if version == "" {
 		list := source.List()
 		var arr []string

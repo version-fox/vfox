@@ -215,6 +215,10 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
+	if !b.Plugin.HasFunction("PreUse") {
+		return version, nil
+	}
+
 	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
 	if err != nil {
 		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
@@ -233,6 +237,11 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		scope = Global
+	}
+
+	version, err := b.PreUse(version, scope)
+	if err != nil {
+		return err
 	}
 
 	label := b.label(version)

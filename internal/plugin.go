@@ -348,6 +348,10 @@ func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
 	return sdkTable
 }
 
+func (l *LuaPlugin) HasFunction(name string) bool {
+	return l.pluginObj.RawGetString(name) != lua.LNil
+}
+
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
 	L := l.state
 	lInstalledSdks := L.NewTable()
