@@ -43,7 +43,6 @@ type Sdk struct {
 	Plugin     *LuaPlugin
 	// current sdk install path
 	InstallPath string
-	Name        string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -459,11 +458,10 @@ func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
-func NewSdk(manager *Manager, source *LuaPlugin, sdkName string) (*Sdk, error) {
+func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
 		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Filename)),
 		Plugin:      source,
-		Name:        sdkName,
 	}, nil
 }

@@ -97,7 +97,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	if err != nil {
 		return nil, err
 	}
-	sdk, _ := NewSdk(m, luaPlugin, name)
+	sdk, _ := NewSdk(m, luaPlugin)
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
@@ -122,7 +122,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 				continue
 			}
-			sdk, _ := NewSdk(m, source, sdkName)
+			sdk, _ := NewSdk(m, source)
 			name := strings.TrimSuffix(filepath.Base(path), ".lua")
 			sdkMap[strings.ToLower(name)] = sdk
 			m.openSdks[strings.ToLower(name)] = sdk
