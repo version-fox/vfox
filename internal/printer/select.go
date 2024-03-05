@@ -27,18 +27,17 @@ import (
 )
 
 type PageKVSelect struct {
-	index              int
-	Options            []*KV
-	searchOptions      []*KV
-	pageOptions        []*KV
-	Size               int
-	result             *KV
-	isEmpty            bool
-	fuzzySearchString  string
-	fuzzySearchMatches []*KV
-	Filter             bool
-	SourceFunc         func(page, size int, options []*KV) ([]*KV, error)
-	TopText            string
+	index             int
+	Options           []*KV
+	searchOptions     []*KV
+	pageOptions       []*KV
+	Size              int
+	result            *KV
+	isEmpty           bool
+	fuzzySearchString string
+	Filter            bool
+	SourceFunc        func(page, size int, options []*KV) ([]*KV, error)
+	TopText           string
 }
 
 type KV struct {
@@ -189,7 +188,7 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				area.Update(s.renderSelect())
 			}
 		case keys.Enter:
-			s.result = s.fuzzySearchMatches[s.index]
+			s.result = s.pageOptions[s.index]
 			return true, nil
 		default:
 			return false, nil
