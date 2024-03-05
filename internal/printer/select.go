@@ -63,7 +63,7 @@ func (s *PageKVSelect) renderSelect() string {
 	} else {
 		content += pterm.Sprintf("%s:\n", s.TopText)
 	}
-	if s.pageOptions == nil || len(s.pageOptions) == 0 {
+	if (s.pageOptions == nil || len(s.pageOptions) == 0) && len(s.searchOptions) > 0 {
 		return pterm.Sprintln("No data")
 	}
 
@@ -108,6 +108,9 @@ func (s *PageKVSelect) loadPageData(page int) (err error) {
 	s.index = 0
 	if len(options) > 0 {
 		s.pageOptions = options
+	}
+	if len(s.searchOptions) == 0 {
+		s.pageOptions = nil
 	}
 	s.isEmpty = (page+1)*s.Size >= len(s.searchOptions)
 	return err
