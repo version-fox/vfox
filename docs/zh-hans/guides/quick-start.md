@@ -103,7 +103,7 @@ $ vfox add nodejs/npmmirror
 
 以`nodejs/npmmirror`插件为例, `nodejs`是分类, `npmmirror`是插件名, 插件内部`name`字段标注的叫**SDK名**。
 
-所以, 在删除插件时, 需要使用**SDK名**进行删除, 而不是插件名`nodejs/npmirror`或`npmmirror`。
+所以, 在删除插件时, 需要使用**SDK名**（这里是`nodejs`）进行删除, 而不是插件名`nodejs/npmirror`或`npmmirror`。
 
 :::
 
