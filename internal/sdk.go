@@ -287,7 +287,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 	}
 	b.sdkManager.Record.Add(b.Plugin.Filename, string(version))
-	err := b.sdkManager.Record.Save()
+	err = b.sdkManager.Record.Save()
 	if err != nil {
 		return err
 	}
