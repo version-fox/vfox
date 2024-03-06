@@ -54,12 +54,12 @@ func newCmd() *cmd {
 
 	app := &cli.App{}
 	app.EnableBashCompletion = true
-	app.Name = "VersionFox"
-	app.Usage = "VersionFox is a tool for sdk version management"
+	app.Name = "vfox"
+	app.Usage = "vfox is a tool for runtime version management."
 	app.UsageText = "vfox [command] [command options]"
 	app.Copyright = "Copyright 2024 Han Li. All rights reserved."
 	app.Version = version
-	app.Description = "VersionFox is a tool for sdk version management, which allows you to quickly install and use different versions of targeted sdk via the command line."
+	app.Description = "vfox is a cross-platform version manager, extendable via plugins. It allows you to quickly install and switch between different environment you need via the command line."
 	app.Suggest = true
 	app.BashComplete = func(ctx *cli.Context) {
 		for _, command := range ctx.App.Commands {

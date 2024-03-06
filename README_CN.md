@@ -2,7 +2,7 @@
   <img src="./logo.png" alt="Logo" width="250" height="250">
 </p>
 
-# VersionFox
+# vfox
 
 [![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=for-the-badge)](https://goreportcard.com/report/github.com/version-fox/vfox)
 [![GitHub License](https://img.shields.io/github/license/version-fox/vfox?style=for-the-badge)](LICENSE)

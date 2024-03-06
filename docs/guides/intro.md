@@ -14,7 +14,7 @@ implementation (e.g., `$PATH` operations, shims, environment variables, etc.). `
 and configuration file to simplify the development workflow and can be extended to all tools and runtime environments
 through a simple plugin interface.
 
-## Why use VersionFox?
+## Why use vfox?
 
 - **Cross-platform** Supports Windows (non-WSL), Linux, macOS!
 - **Consistent commands** for managing all your languages
