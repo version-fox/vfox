@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
@@ -156,7 +157,7 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 		return NoneChecksum
 	}
 
-	fmt.Printf("luaCheckSum %+v\n", luaCheckSum)
+	logger.Debugf("checksum: %+v", luaCheckSum)
 
 	checksum := &Checksum{}
 
@@ -386,7 +387,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		ctx.InstalledSdks[lSdk.Version] = lSdk
 	}
 
-	fmt.Printf("ctx %+v\n", ctx)
+	logger.Debugf("PreUseHookCtx: %+v", ctx)
 
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
@@ -505,7 +506,8 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 }
 
 func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
-	fmt.Printf("function %+v\n %s", function, function.(*lua.LFunction).String())
+	logger.Debugf("CallFunction: %s", function.String())
+
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,
@@ -513,7 +515,6 @@ func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
 	}, args...); err != nil {
 		return err
 	}
-	fmt.Printf("function done %+v\n", function)
 	return nil
 }
 

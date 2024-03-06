@@ -5,9 +5,9 @@ package luai
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 
+	"github.com/version-fox/vfox/internal/logger"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -16,7 +16,7 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 	if reflected.Kind() == reflect.Ptr {
 		reflected = reflected.Elem()
 	}
-	fmt.Println(v, reflected.Kind())
+	logger.Debug(v, reflected.Kind())
 
 	switch reflected.Kind() {
 	case reflect.Struct:
@@ -37,7 +37,7 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
+			logger.Debugf("field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
 			table.RawSetString(tag, sub)
 		}
 		return table, nil
@@ -95,19 +95,19 @@ func Unmarshal(value lua.LValue, v any) error {
 		for i := 0; i < reflected.NumField(); i++ {
 			fieldTypeField := reflected.Type().Field(i)
 			tag := fieldTypeField.Tag.Get("luai")
-			fmt.Printf("fieldTypeField: %+v, tag: %s\n", fieldTypeField, tag)
+			logger.Debugf("fieldTypeField: %+v, tag: %s\n", fieldTypeField, tag)
 			if tag != "" {
 				tagMap[tag] = i
 			}
 		}
 
-		fmt.Printf("reflected: %+v, kind: %s, tagMap: %+v\n", reflected, reflected.Kind(), tagMap)
+		logger.Debugf("reflected: %+v, kind: %s, tagMap: %+v\n", reflected, reflected.Kind(), tagMap)
 
 		(value.(*lua.LTable)).ForEach(func(key, value lua.LValue) {
 			switch key.Type() {
 			case lua.LTString:
 				fieldName := key.String()
-				fmt.Printf("fieldName: %s\n", fieldName)
+				logger.Debugf("fieldName: %s\n", fieldName)
 				field := reflected.FieldByName(fieldName)
 				luaType := value.Type()
 
@@ -115,14 +115,14 @@ func Unmarshal(value lua.LValue, v any) error {
 				if !field.IsValid() {
 					fieldIndex, ok := tagMap[fieldName]
 					if !ok {
-						fmt.Printf("unmarshal: field %s not found in tagMap\n", fieldName)
+						logger.Debugf("unmarshal: field %s not found in tagMap\n", fieldName)
 						return
 					}
 					field = reflected.Field(fieldIndex)
 				}
 
 				if !field.IsValid() {
-					fmt.Printf("unmarshal: field %s not found in struct\n", fieldName)
+					logger.Debugf("unmarshal: field %s not found in struct\n", fieldName)
 					return
 				}
 
