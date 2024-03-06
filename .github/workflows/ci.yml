@@ -24,5 +24,7 @@ jobs:
         run: |
           go build .
       - name: Test with the Go CLI
+        # we cannot use `go test ./...` currently, because many test cases are failed
         run: |
           go test ./internal
+          go test ./internal/luai
