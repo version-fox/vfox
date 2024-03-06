@@ -44,7 +44,7 @@ type PathMeta struct {
 }
 
 func newPathMeta() (*PathMeta, error) {
-	configPath := os.Getenv("VFOX_CONFIG")
+	configPath := os.Getenv("VFOX_HOME")
 	if len(configPath) == 0 {
 		userHomeDir, err := os.UserHomeDir()
 		if err != nil {
