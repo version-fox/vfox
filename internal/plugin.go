@@ -270,16 +270,21 @@ func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
 
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L := l.vm.Instance
-	sdkArr := L.NewTable()
-	for _, v := range sdks {
-		sdkTable := l.createSdkInfoTable(v)
-		L.SetField(sdkArr, v.Name, sdkTable)
+
+	ctx := &luai.PostInstallHookCtx{
+		RuntimeVersion: RuntimeVersion,
+		RootPath:       rootPath,
+		SdkInfo:        make(map[string]*luai.LuaSDKInfo),
 	}
 
-	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "sdkInfo", sdkArr)
-	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
-	L.SetField(ctxTable, "rootPath", lua.LString(rootPath))
+	for _, v := range sdks {
+		ctx.SdkInfo[v.Name] = NewLuaSDKInfo(v)
+	}
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return err
+	}
 
 	function := l.pluginObj.RawGetString(PostInstallHook)
 	if function.Type() == lua.LTNil {
@@ -296,18 +301,24 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	L := l.vm.Instance
 	mainInfo := sdkPackage.Main
-	sdkArr := L.NewTable()
-	for _, v := range sdkPackage.Additions {
-		sdkTable := l.createSdkInfoTable(v)
-		L.SetField(sdkArr, v.Name, sdkTable)
-	}
-	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "sdkInfo", sdkArr)
-	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
-	// TODO Will be deprecated in future versions
-	L.SetField(ctxTable, "path", lua.LString(mainInfo.Path))
 
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString(EnvKeysHook), l.pluginObj, ctxTable); err != nil {
+	ctx := &luai.EnvKeysHookCtx{
+		// TODO Will be deprecated in future versions
+		Path:           mainInfo.Path,
+		RuntimeVersion: RuntimeVersion,
+		SdkInfo:        make(map[string]*luai.LuaSDKInfo),
+	}
+
+	for _, v := range sdkPackage.Additions {
+		ctx.SdkInfo[v.Name] = NewLuaSDKInfo(v)
+	}
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = l.vm.CallFunction(l.pluginObj.RawGetString(EnvKeysHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -316,7 +327,6 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
-	var err error
 	envKeys := make(env.Envs)
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
@@ -336,26 +346,8 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	return envKeys, nil
 }
 
-func (l *LuaPlugin) getTableField(table *lua.LTable, fieldName string) (lua.LValue, error) {
-	value := table.RawGetString(fieldName)
-	if value.Type() == lua.LTNil {
-		return nil, fmt.Errorf("field '%s' not found", fieldName)
-	}
-	return value, nil
-}
-
 func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
-}
-
-func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
-	L := l.vm.Instance
-	sdkTable := L.NewTable()
-	L.SetField(sdkTable, "name", lua.LString(info.Name))
-	L.SetField(sdkTable, "version", lua.LString(info.Version))
-	L.SetField(sdkTable, "path", lua.LString(info.Path))
-	L.SetField(sdkTable, "note", lua.LString(info.Note))
-	return sdkTable
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
@@ -375,15 +367,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	}
 
 	for _, v := range installedSdks {
-		sdk := v.Main
-
-		lSdk := &luai.LuaSDKInfo{
-			Name:    sdk.Name,
-			Version: string(sdk.Version),
-			Path:    sdk.Path,
-			Note:    sdk.Note,
-		}
-
+		lSdk := NewLuaSDKInfo(v.Main)
 		ctx.InstalledSdks[lSdk.Version] = lSdk
 	}
 

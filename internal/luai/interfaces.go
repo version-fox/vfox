@@ -31,3 +31,16 @@ type PreUseHookCtx struct {
 	PreviousVersion string                 `luai:"previousVersion"`
 	InstalledSdks   map[string]*LuaSDKInfo `luai:"installedSdks"`
 }
+
+type PostInstallHookCtx struct {
+	RuntimeVersion string                 `luai:"runtimeVersion"`
+	RootPath       string                 `luai:"rootPath"`
+	SdkInfo        map[string]*LuaSDKInfo `luai:"sdkInfo"`
+}
+
+type EnvKeysHookCtx struct {
+	RuntimeVersion string `luai:"runtimeVersion"`
+	// TODO Will be deprecated in future versions
+	Path    string                 `luai:"path"`
+	SdkInfo map[string]*LuaSDKInfo `luai:"sdkInfo"`
+}

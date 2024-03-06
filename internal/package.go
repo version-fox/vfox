@@ -16,7 +16,11 @@
 
 package internal
 
-import "path/filepath"
+import (
+	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/luai"
+)
 
 type Package struct {
 	Main      *Info
@@ -40,4 +44,13 @@ func (i *Info) storagePath(parentDir string) string {
 		return filepath.Join(parentDir, i.Name)
 	}
 	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
+}
+
+func NewLuaSDKInfo(info *Info) *luai.LuaSDKInfo {
+	return &luai.LuaSDKInfo{
+		Name:    info.Name,
+		Version: string(info.Version),
+		Path:    info.Path,
+		Note:    info.Note,
+	}
 }
