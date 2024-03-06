@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -144,26 +145,31 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 }
 
 func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
+	luaCheckSum := luai.LuaCheckSum{}
+	err := luai.Unmarshal(table, luaCheckSum)
+	if err != nil {
+		// todo: logger error
+		return NoneChecksum
+	}
+
 	checksum := &Checksum{}
-	sha256 := table.RawGetString("sha256")
-	md5 := table.RawGetString("md5")
-	sha512 := table.RawGetString("sha512")
-	sha1 := table.RawGetString("sha1")
-	if sha256.Type() != lua.LTNil {
-		checksum.Value = sha256.String()
+
+	if luaCheckSum.Sha256 != "" {
+		checksum.Value = luaCheckSum.Sha256
 		checksum.Type = "sha256"
-	} else if md5.Type() != lua.LTNil {
-		checksum.Value = md5.String()
+	} else if luaCheckSum.Md5 != "" {
+		checksum.Value = luaCheckSum.Md5
 		checksum.Type = "md5"
-	} else if sha1.Type() != lua.LTNil {
-		checksum.Value = sha1.String()
+	} else if luaCheckSum.Sha1 != "" {
+		checksum.Value = luaCheckSum.Sha1
 		checksum.Type = "sha1"
-	} else if sha512.Type() != lua.LTNil {
-		checksum.Value = sha512.String()
+	} else if luaCheckSum.Sha512 != "" {
+		checksum.Value = luaCheckSum.Sha512
 		checksum.Type = "sha512"
 	} else {
 		return NoneChecksum
 	}
+
 	return checksum
 }
 
@@ -456,7 +462,6 @@ func NewLuaVM() *LuaVM {
 }
 
 func (vm *LuaVM) Prepare(manager *Manager) error {
-
 	if err := vm.Instance.DoString(preloadScript); err != nil {
 		return err
 	}
