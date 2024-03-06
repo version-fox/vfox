@@ -18,6 +18,7 @@ package internal
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -103,36 +104,36 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	if table == nil || table.Type() == lua.LTNil {
 		return []*Package{}, nil
 	}
+
+	hookResult := []luai.AvailableHookResultItem{}
+	err = luai.Unmarshal(table, &hookResult)
+	if err != nil {
+		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+	}
+
 	var result []*Package
-	table.ForEach(func(key lua.LValue, value lua.LValue) {
-		kvTable, ok := value.(*lua.LTable)
-		if !ok {
-			err = fmt.Errorf("the return value is not a table")
-			return
+
+	for _, item := range hookResult {
+		fmt.Printf("item: %+v\n", item)
+
+		mainSdk := &Info{
+			Name:    l.Name,
+			Version: Version(item.Version),
+			Note:    item.Note,
 		}
-		mainSdk, err := l.parseInfo(kvTable)
-		if err != nil {
-			return
-		}
-		mainSdk.Name = l.Name
+
 		var additionalArr []*Info
-		additional := kvTable.RawGetString("addition")
-		if tb, ok := additional.(*lua.LTable); ok && tb.Len() != 0 {
-			additional.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
-				itemTable, ok := value.(*lua.LTable)
-				if !ok {
-					err = fmt.Errorf("the return value is not a table")
-					return
-				}
-				item, err := l.parseInfo(itemTable)
-				if err != nil {
-					return
-				}
-				if item.Name == "" {
-					err = fmt.Errorf("additional file no name provided")
-					return
-				}
-				additionalArr = append(additionalArr, item)
+
+		for i, addition := range item.Addition {
+			if addition.Name == "" {
+				logger.Errorf("additional file %d no name provided", i+1)
+			}
+
+			additionalArr = append(additionalArr, &Info{
+				Name:    addition.Name,
+				Version: Version(addition.Version),
+				Path:    addition.Path,
+				Note:    addition.Note,
 			})
 		}
 
@@ -140,10 +141,6 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 			Main:      mainSdk,
 			Additions: additionalArr,
 		})
-
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return result, nil
@@ -237,39 +234,33 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 }
 
 func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
-	versionLua := table.RawGetString("version")
-	if versionLua == lua.LNil {
+	info := &luai.LuaSDKInfo{}
+	err := luai.Unmarshal(table, info)
+	if err != nil {
+		return nil, err
+	}
+
+	if info.Version == "" {
 		return nil, fmt.Errorf("no version number provided")
 	}
-	var (
-		path    string
-		note    string
-		name    string
-		version string
-	)
-	version = versionLua.String()
 
-	if urlLua := table.RawGetString("url"); urlLua != lua.LNil {
-		path = urlLua.String()
-	}
-	if noteLua := table.RawGetString("note"); noteLua != lua.LNil {
-		note = noteLua.String()
-	}
-	if nameLua := table.RawGetString("name"); nameLua != lua.LNil {
-		name = nameLua.String()
-	}
 	checksum := l.Checksum(table)
 	return &Info{
-		Name:     name,
-		Version:  Version(version),
-		Path:     path,
-		Note:     note,
+		Name:     info.Name,
+		Version:  Version(info.Version),
+		Path:     info.Path,
+		Note:     info.Name,
 		Checksum: checksum,
 	}, nil
 }
 
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L := l.vm.Instance
+
+	function := l.pluginObj.RawGetString(PostInstallHook)
+	if function.Type() == lua.LTNil {
+		return nil
+	}
 
 	ctx := &luai.PostInstallHookCtx{
 		RuntimeVersion: RuntimeVersion,
@@ -284,11 +275,6 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
 		return err
-	}
-
-	function := l.pluginObj.RawGetString(PostInstallHook)
-	if function.Type() == lua.LTNil {
-		return nil
 	}
 
 	if err := l.vm.CallFunction(function, l.pluginObj, ctxTable); err != nil {
@@ -327,20 +313,17 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
+
 	envKeys := make(env.Envs)
-	table.ForEach(func(key lua.LValue, value lua.LValue) {
-		kvTable, ok := value.(*lua.LTable)
-		if !ok {
-			err = fmt.Errorf("the return value is not a table")
-			return
-		}
-		key = kvTable.RawGetString("key")
-		value = kvTable.RawGetString("value")
-		s := value.String()
-		envKeys[key.String()] = &s
-	})
+
+	items := []*luai.EnvKeysHookResultItem{}
+	err = luai.Unmarshal(table, &items)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, item := range items {
+		envKeys[item.Key] = &item.Value
 	}
 
 	return envKeys, nil
@@ -392,13 +375,13 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", nil
 	}
 
-	luaVer := l.vm.GetTableString(table, "version")
-	if luaVer == "" {
-		// ignore version field not found
-		return "", nil
+	result := &luai.PreUseHookResult{}
+
+	if err := luai.Unmarshal(table, result); err != nil {
+		return "", err
 	}
 
-	return Version(luaVer), nil
+	return Version(result.Version), nil
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {

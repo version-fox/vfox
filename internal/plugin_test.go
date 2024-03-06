@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"strings"
 	"testing"
 
 	_ "embed"
@@ -25,6 +26,48 @@ func TestPlugin(t *testing.T) {
 
 		if len(pkgs) != 1 {
 			t.Errorf("expected 1 package, got %d", len(pkgs))
+		}
+	})
+
+	t.Run("EnvKeys", func(t *testing.T) {
+		manager := NewSdkManager()
+
+		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		keys, err := plugin.EnvKeys(&Package{
+			Main: &Info{
+				Name:    "java",
+				Version: "1.0.0",
+				Path:    "/path/to/java",
+				Note:    "xxxx",
+			},
+			Additions: []*Info{
+				{
+					Name:    "sdk-name",
+					Version: "9.0.0",
+					Path:    "/path/to/sdk",
+					Note:    "xxxx",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		javaHome := keys["JAVA_HOME"]
+		if *javaHome == "" {
+			t.Errorf("expected JAVA_HOME to be set, got '%s'", *javaHome)
+		}
+		path := keys["PATH"]
+		if *path == "" {
+			t.Errorf("expected PATH to be set, got '%s'", *path)
+		}
+
+		if !strings.HasSuffix(*path, "/bin") {
+			t.Errorf("expected PATH to end with '/bin', got '%s'", *path)
 		}
 	})
 
