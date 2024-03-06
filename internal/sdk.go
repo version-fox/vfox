@@ -229,7 +229,7 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 }
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
-	if !b.Plugin.HasFunction("PreUse") {
+	if !b.Plugin.HasFunction(PreUseHook) {
 		return version, nil
 	}
 

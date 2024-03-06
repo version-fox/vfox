@@ -37,8 +37,16 @@ const (
 	ArchType        = "ARCH_TYPE"
 )
 
+const (
+	PreInstallHook  = "PreInstall"
+	PostInstallHook = "PostInstall"
+	AvailableHook   = "Available"
+	EnvKeysHook     = "EnvKeys"
+	PreUseHook      = "PreUse"
+)
+
 type LuaPlugin struct {
-	state     *lua.LState
+	vm        *LuaVM
 	pluginObj *lua.LTable
 	// plugin source path
 	Filepath string
@@ -54,39 +62,36 @@ type LuaPlugin struct {
 }
 
 func (l *LuaPlugin) checkValid() error {
-	if l.state == nil {
+	if l.vm == nil || l.vm.Instance == nil {
 		return fmt.Errorf("lua vm is nil")
 	}
 	obj := l.pluginObj
-	if obj.RawGetString("Available") == lua.LNil {
+	if obj.RawGetString(AvailableHook) == lua.LNil {
 		return fmt.Errorf("[Available] function not found")
 	}
-	if obj.RawGetString("PreInstall") == lua.LNil {
+	if obj.RawGetString(AvailableHook) == lua.LNil {
 		return fmt.Errorf("[PreInstall] function not found")
 	}
-	if obj.RawGetString("EnvKeys") == lua.LNil {
+	if obj.RawGetString(EnvKeysHook) == lua.LNil {
 		return fmt.Errorf("[EnvKeys] function not found")
 	}
 	return nil
 }
 
 func (l *LuaPlugin) Close() {
-	l.state.Close()
+	l.vm.Close()
 }
 
 func (l *LuaPlugin) Available() ([]*Package, error) {
-	L := l.state
+	L := l.vm.Instance
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
-	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("Available").(*lua.LFunction),
-		NRet:    1,
-		Protect: true,
-	}, l.pluginObj, ctxTable); err != nil {
+
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString(AvailableHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
-	table := l.returnedValue()
+	table := l.vm.ReturnedValue()
 
 	if table == nil || table.Type() == lua.LTNil {
 		return []*Package{}, nil
@@ -163,20 +168,16 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 }
 
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
-	L := l.state
+	L := l.vm.Instance
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "version", lua.LString(version))
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 
-	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("PreInstall").(*lua.LFunction),
-		NRet:    1,
-		Protect: true,
-	}, l.pluginObj, ctxTable); err != nil {
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString(PreInstallHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
-	table := l.returnedValue()
+	table := l.vm.ReturnedValue()
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, nil
 	}
@@ -201,6 +202,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 			}
 			if info.Name == "" {
 				err = fmt.Errorf("additional file no name provided")
+				// todo: logger error
 				return
 			}
 			additionalArr = append(additionalArr, info)
@@ -249,26 +251,24 @@ func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
 }
 
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
-	L := l.state
+	L := l.vm.Instance
 	sdkArr := L.NewTable()
 	for _, v := range sdks {
 		sdkTable := l.createSdkInfoTable(v)
 		L.SetField(sdkArr, v.Name, sdkTable)
 	}
+
 	ctxTable := L.NewTable()
 	L.SetField(ctxTable, "sdkInfo", sdkArr)
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	L.SetField(ctxTable, "rootPath", lua.LString(rootPath))
 
-	function := l.pluginObj.RawGetString("PostInstall")
+	function := l.pluginObj.RawGetString(PostInstallHook)
 	if function.Type() == lua.LTNil {
 		return nil
 	}
-	if err := L.CallByParam(lua.P{
-		Fn:      function.(*lua.LFunction),
-		NRet:    1,
-		Protect: true,
-	}, l.pluginObj, ctxTable); err != nil {
+
+	if err := l.vm.CallFunction(function, l.pluginObj, ctxTable); err != nil {
 		return err
 	}
 
@@ -276,7 +276,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 }
 
 func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
-	L := l.state
+	L := l.vm.Instance
 	mainInfo := sdkPackage.Main
 	sdkArr := L.NewTable()
 	for _, v := range sdkPackage.Additions {
@@ -288,15 +288,13 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	// TODO Will be deprecated in future versions
 	L.SetField(ctxTable, "path", lua.LString(mainInfo.Path))
-	if err := L.CallByParam(lua.P{
-		Fn:      l.pluginObj.RawGetString("EnvKeys"),
-		NRet:    1,
-		Protect: true,
-	}, l.pluginObj, ctxTable); err != nil {
+
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString(EnvKeysHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
-	table := l.returnedValue()
+	table := l.vm.ReturnedValue()
+
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
@@ -328,18 +326,12 @@ func (l *LuaPlugin) getTableField(table *lua.LTable, fieldName string) (lua.LVal
 	return value, nil
 }
 
-func (l *LuaPlugin) returnedValue() *lua.LTable {
-	table := l.state.ToTable(-1) // returned value
-	l.state.Pop(1)               // remove received value
-	return table
-}
-
 func (l *LuaPlugin) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
 func (l *LuaPlugin) createSdkInfoTable(info *Info) *lua.LTable {
-	L := l.state
+	L := l.vm.Instance
 	sdkTable := L.NewTable()
 	L.SetField(sdkTable, "name", lua.LString(info.Name))
 	L.SetField(sdkTable, "version", lua.LString(info.Version))
@@ -353,7 +345,7 @@ func (l *LuaPlugin) HasFunction(name string) bool {
 }
 
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
-	L := l.state
+	L := l.vm.Instance
 	lInstalledSdks := L.NewTable()
 	for _, v := range installedSdks {
 		sdkTable := l.createSdkInfoTable(v.Main)
@@ -368,49 +360,39 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	L.SetField(ctxTable, "version", lua.LString(version))
 	L.SetField(ctxTable, "previousVersion", lua.LString(previousVersion))
 
-	function := l.pluginObj.RawGetString("PreUse")
+	function := l.pluginObj.RawGetString(PreUseHook)
 	if function.Type() == lua.LTNil {
 		return "", nil
 	}
-	if err := L.CallByParam(lua.P{
-		Fn:      function.(*lua.LFunction),
-		NRet:    1,
-		Protect: true,
-	}, l.pluginObj, ctxTable); err != nil {
+
+	if err := l.vm.CallFunction(function, l.pluginObj, ctxTable); err != nil {
 		return "", err
 	}
 
-	table := l.returnedValue()
+	table := l.vm.ReturnedValue()
 	if table == nil || table.Type() == lua.LTNil {
 		return "", nil
 	}
 
-	luaVer, err := l.getTableField(table, "version")
-	if err != nil {
+	luaVer := l.vm.GetTableString(table, "version")
+	if luaVer == "" {
 		// ignore version field not found
 		return "", nil
 	}
 
-	return Version(luaVer.String()), nil
+	return Version(luaVer), nil
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
-	luaVMInstance := lua.NewState()
-	module.Preload(luaVMInstance, manager.Config)
+	vm := NewLuaVM()
 
-	if err := luaVMInstance.DoString(preloadScript); err != nil {
+	vm.Prepare(manager)
+
+	if err := vm.Instance.DoString(content); err != nil {
 		return nil, err
 	}
 
-	if err := luaVMInstance.DoString(content); err != nil {
-		return nil, err
-	}
-
-	// set OS_TYPE and ARCH_TYPE
-	luaVMInstance.SetGlobal(OsType, lua.LString(manager.osType))
-	luaVMInstance.SetGlobal(ArchType, lua.LString(manager.archType))
-
-	pluginObj := luaVMInstance.GetGlobal(LuaPluginObjKey)
+	pluginObj := vm.Instance.GetGlobal(LuaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
 		return nil, fmt.Errorf("plugin object not found")
 	}
@@ -418,7 +400,7 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	PLUGIN := pluginObj.(*lua.LTable)
 
 	source := &LuaPlugin{
-		state:     luaVMInstance,
+		vm:        vm,
 		pluginObj: PLUGIN,
 		Filepath:  path,
 		Filename:  strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
@@ -428,28 +410,28 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	if name := PLUGIN.RawGetString("name"); name.Type() == lua.LTNil {
+	if name := vm.GetTableString(PLUGIN, "name"); name != "" {
 		return nil, fmt.Errorf("no plugin name provided")
 	} else {
-		source.Name = name.String()
+		source.Name = name
 		if !isValidName(source.Name) {
 			return nil, fmt.Errorf("invalid plugin name")
 		}
 	}
-	if version := PLUGIN.RawGetString("version"); version.Type() != lua.LTNil {
-		source.Version = version.String()
+	if version := vm.GetTableString(PLUGIN, "version"); version != "" {
+		source.Version = version
 	}
-	if description := PLUGIN.RawGetString("description"); description.Type() != lua.LTNil {
-		source.Description = description.String()
+	if description := vm.GetTableString(PLUGIN, "description"); description != "" {
+		source.Description = description
 	}
-	if updateUrl := PLUGIN.RawGetString("updateUrl"); updateUrl.Type() != lua.LTNil {
-		source.UpdateUrl = updateUrl.String()
+	if updateUrl := vm.GetTableString(PLUGIN, "updateUrl"); updateUrl != "" {
+		source.UpdateUrl = updateUrl
 	}
-	if author := PLUGIN.RawGetString("author"); author.Type() != lua.LTNil {
-		source.Author = author.String()
+	if author := vm.GetTableString(PLUGIN, "author"); author != "" {
+		source.Author = author
 	}
-	if minRuntimeVersion := PLUGIN.RawGetString("minRuntimeVersion"); minRuntimeVersion.Type() != lua.LTNil {
-		source.MinRuntimeVersion = minRuntimeVersion.String()
+	if minRuntimeVersion := vm.GetTableString(PLUGIN, "minRuntimeVersion"); minRuntimeVersion != "" {
+		source.MinRuntimeVersion = minRuntimeVersion
 	}
 	return source, nil
 }
@@ -459,4 +441,58 @@ func isValidName(name string) bool {
 	// followed by any number of letters, digits, or underscores.
 	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 	return re.MatchString(name)
+}
+
+type LuaVM struct {
+	Instance *lua.LState
+}
+
+func NewLuaVM() *LuaVM {
+	instance := lua.NewState()
+
+	return &LuaVM{
+		Instance: instance,
+	}
+}
+
+func (vm *LuaVM) Prepare(manager *Manager) error {
+
+	if err := vm.Instance.DoString(preloadScript); err != nil {
+		return err
+	}
+	module.Preload(vm.Instance, manager.Config)
+
+	// set OS_TYPE and ARCH_TYPE
+	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
+	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
+
+	return nil
+}
+
+func (vm *LuaVM) ReturnedValue() *lua.LTable {
+	table := vm.Instance.ToTable(-1) // returned value
+	vm.Instance.Pop(1)               // remove received value
+	return table
+}
+
+func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
+	if err := vm.Instance.CallByParam(lua.P{
+		Fn:      function.(*lua.LFunction),
+		NRet:    1,
+		Protect: true,
+	}, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {
+	if value := table.RawGetString(key); value != lua.LNil {
+		return value.String()
+	}
+	return ""
+}
+
+func (vm *LuaVM) Close() {
+	vm.Instance.Close()
 }
