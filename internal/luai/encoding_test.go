@@ -57,31 +57,14 @@ func TestRegular(t *testing.T) {
 
 	table := _table.(*lua.LTable)
 
-	field1 := table.RawGetString("Field1")
-	if field1.Type() != lua.LTString {
-		t.Errorf("expected string, got %s", field1.Type())
-	}
+	luaVm.SetGlobal("table", table)
 
-	if field1.String() != "test" {
-		t.Errorf("expected 'test', got '%s'", field1.String())
-	}
-
-	field2 := table.RawGetString("Field2")
-	if field2.Type() != lua.LTNumber {
-		t.Errorf("expected number, got %s", field2.Type())
-	}
-
-	if field2.String() != "1" {
-		t.Errorf("expected '1', got '%s'", field2.String())
-	}
-
-	field3 := table.RawGetString("Field3")
-	if field3.Type() != lua.LTBool {
-		t.Errorf("expected bool, got %s", field3.Type())
-	}
-
-	if field3.String() != "true" {
-		t.Errorf("expected 'true', got '%s'", field3.String())
+	if err := luaVm.DoString(`
+		assert(table.Field1 == "test")
+		assert(table.Field2 == 1)
+		assert(table.Field3 == true)
+	`); err != nil {
+		t.Fatal(err)
 	}
 
 	struct2 := testStruct{}
@@ -118,31 +101,13 @@ func TestTag(t *testing.T) {
 
 	table := _table.(*lua.LTable)
 
-	field1 := table.RawGetString("field1")
-	if field1.Type() != lua.LTString {
-		t.Errorf("expected string, got %s", field1.Type())
-	}
-
-	if field1.String() != "test" {
-		t.Errorf("expected 'test', got '%s'", field1.String())
-	}
-
-	field2 := table.RawGetString("field2")
-	if field2.Type() != lua.LTNumber {
-		t.Errorf("expected number, got %s", field2.Type())
-	}
-
-	if field2.String() != "1" {
-		t.Errorf("expected '1', got '%s'", field2.String())
-	}
-
-	field3 := table.RawGetString("field3")
-	if field3.Type() != lua.LTBool {
-		t.Errorf("expected bool, got %s", field3.Type())
-	}
-
-	if field3.String() != "true" {
-		t.Errorf("expected 'true', got '%s'", field3.String())
+	luaVm.SetGlobal("table", table)
+	if err := luaVm.DoString(`
+		assert(table.field1 == "test")
+		assert(table.field2 == 1)
+		assert(table.field3 == true)
+	`); err != nil {
+		t.Fatal(err)
 	}
 
 	struct2 := testStructTag{}
@@ -211,14 +176,9 @@ func TestMapAndSlice(t *testing.T) {
 	}
 
 	fmt.Printf("m2: %+v\n", m2)
-	if m2["key1"] != "value1" {
-		t.Errorf("expected value1, got %v", m2["key1"])
-	}
-	if m2["key2"] != 2 {
-		t.Errorf("expected 2, got %v", m2["key2"])
-	}
-	if m2["key3"] != true {
-		t.Errorf("expected true, got %v", m2["key3"])
+
+	if !reflect.DeepEqual(m, m2) {
+		t.Errorf("expected %+v, got %+v", m, m2)
 	}
 
 	// Test case for slice
@@ -231,15 +191,20 @@ func TestMapAndSlice(t *testing.T) {
 
 	fmt.Printf("s2: %+v\n", s2)
 
-	if s2[0] != "value1" {
-		t.Errorf("expected value1, got %v", s2[0])
+	if !reflect.DeepEqual(s, s2) {
+		t.Errorf("expected %+v, got %+v", s, s2)
 	}
-	if s2[1] != 2 {
-		t.Errorf("expected 2, got %v", s2[1])
+
+	var s3 any
+	err = Unmarshal(slice, &s3)
+	if err != nil {
+		t.Fatalf("unmarshal slice failed: %v", err)
 	}
-	if s2[2] != true {
-		t.Errorf("expected true, got %v", s2[2])
+
+	if !reflect.DeepEqual(s, s3) {
+		t.Errorf("expected %+v, got %+v", s, s3)
 	}
+
 }
 
 type complexStruct struct {

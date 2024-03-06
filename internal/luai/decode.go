@@ -15,11 +15,8 @@ import (
 
 // indirect walks down v allocating pointers as needed,
 // until it gets to a non-pointer.
-// If it encounters an Unmarshaler, indirect stops and returns that.
-// If decodingNull is true, indirect stops at the first settable pointer so it
-// can be set to nil.
-func indirect(v reflect.Value, decodingNull bool) reflect.Value {
-	// Issue #24153 indicates that it is generally not a guaranteed property
+func indirect(v reflect.Value) reflect.Value {
+	// Issue https://github.com/golang/go/issues/24153 indicates that it is generally not a guaranteed property
 	// that you may round-trip a reflect.Value by calling Value.Addr().Elem()
 	// and expect the value to still be settable for values derived from
 	// unexported embedded struct fields.
@@ -45,7 +42,7 @@ func indirect(v reflect.Value, decodingNull bool) reflect.Value {
 		// usefully addressable.
 		if v.Kind() == reflect.Interface && !v.IsNil() {
 			e := v.Elem()
-			if e.Kind() == reflect.Pointer && !e.IsNil() && (!decodingNull || e.Elem().Kind() == reflect.Pointer) {
+			if e.Kind() == reflect.Pointer && !e.IsNil() && (e.Elem().Kind() == reflect.Pointer) {
 				haveAddr = false
 				v = e
 				continue
@@ -53,10 +50,6 @@ func indirect(v reflect.Value, decodingNull bool) reflect.Value {
 		}
 
 		if v.Kind() != reflect.Pointer {
-			break
-		}
-
-		if decodingNull && v.CanSet() {
 			break
 		}
 
@@ -82,7 +75,7 @@ func indirect(v reflect.Value, decodingNull bool) reflect.Value {
 }
 
 func storeLiteral(value reflect.Value, lvalue lua.LValue) {
-	value = indirect(value, false)
+	value = indirect(value)
 	switch lvalue.Type() {
 	case lua.LTString:
 		value.SetString(lvalue.String())
@@ -104,7 +97,8 @@ func objectInterface(lvalue *lua.LTable) any {
 func valueInterface(lvalue lua.LValue) any {
 	switch lvalue.Type() {
 	case lua.LTTable:
-		isArray := lvalue.(*lua.LTable).RawGetInt(0) != lua.LNil
+		isArray := lvalue.(*lua.LTable).RawGetInt(1) != lua.LNil
+		logger.Infof("isArray: %v\n", isArray)
 		if isArray {
 			return arrayInterface(lvalue.(*lua.LTable))
 		}
@@ -117,7 +111,6 @@ func valueInterface(lvalue lua.LValue) any {
 		return bool(lvalue.(lua.LBool))
 	}
 	return nil
-
 }
 
 func arrayInterface(lvalue *lua.LTable) any {
@@ -134,7 +127,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 
 	switch value.Type() {
 	case lua.LTTable:
-		reflected = indirect(reflected, false)
+		reflected = indirect(reflected)
 		tagMap := make(map[string]int)
 
 		switch reflected.Kind() {
@@ -154,7 +147,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 			default:
-				return errors.New("luai: unsupported map key type " + keyType.String())
+				return errors.New("unmarshal: unsupported map key type " + keyType.String())
 			}
 
 			if reflected.IsNil() {
@@ -202,7 +195,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 					kv = reflect.New(keyType).Elem()
 					kv.SetUint(n)
 				default:
-					panic("luai: Unexpected key type") // should never occur
+					panic("unmarshal: Unexpected key type") // should never occur
 				}
 				if kv.IsValid() {
 					reflected.SetMapIndex(kv, subv)
