@@ -156,6 +156,8 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 		return NoneChecksum
 	}
 
+	fmt.Printf("luaCheckSum %+v\n", luaCheckSum)
+
 	checksum := &Checksum{}
 
 	if luaCheckSum.Sha256 != "" {
@@ -368,7 +370,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		Scope:           scope.String(),
 		Version:         string(version),
 		PreviousVersion: string(previousVersion),
-		InstalledSdks:   make([]*luai.LuaSDKInfo, 0),
+		InstalledSdks:   make(map[string]*luai.LuaSDKInfo),
 	}
 
 	for _, v := range installedSdks {
@@ -380,8 +382,11 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 			Path:    sdk.Path,
 			Note:    sdk.Note,
 		}
-		ctx.InstalledSdks = append(ctx.InstalledSdks, lSdk)
+
+		ctx.InstalledSdks[lSdk.Version] = lSdk
 	}
+
+	fmt.Printf("ctx %+v\n", ctx)
 
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
@@ -439,12 +444,12 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	}
 
 	if name := vm.GetTableString(PLUGIN, "name"); name != "" {
-		return nil, fmt.Errorf("no plugin name provided")
-	} else {
 		source.Name = name
 		if !isValidName(source.Name) {
 			return nil, fmt.Errorf("invalid plugin name")
 		}
+	} else {
+		return nil, fmt.Errorf("no plugin name provided")
 	}
 	if version := vm.GetTableString(PLUGIN, "version"); version != "" {
 		source.Version = version
@@ -484,15 +489,12 @@ func NewLuaVM() *LuaVM {
 }
 
 func (vm *LuaVM) Prepare(manager *Manager) error {
-	if err := vm.Instance.DoString(preloadScript); err != nil {
-		return err
-	}
+	vm.Instance.DoString(preloadScript)
 	module.Preload(vm.Instance, manager.Config)
 
 	// set OS_TYPE and ARCH_TYPE
 	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
 	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
-
 	return nil
 }
 
@@ -503,6 +505,7 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 }
 
 func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
+	fmt.Printf("function %+v\n %s", function, function.(*lua.LFunction).String())
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,
@@ -510,11 +513,12 @@ func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
 	}, args...); err != nil {
 		return err
 	}
+	fmt.Printf("function done %+v\n", function)
 	return nil
 }
 
 func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {
-	if value := table.RawGetString(key); value != lua.LNil {
+	if value := table.RawGetString(key); value.Type() != lua.LTNil {
 		return value.String()
 	}
 	return ""

@@ -21,10 +21,12 @@ func TestRegular(t *testing.T) {
 		Field3: true,
 	}
 
-	table, err := Marshal(luaVm, &test)
+	_table, err := Marshal(luaVm, &test)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	table := _table.(*lua.LTable)
 
 	field1 := table.RawGetString("Field1")
 	if field1.Type() != lua.LTString {
@@ -87,10 +89,12 @@ func TestTag(t *testing.T) {
 		Field3: true,
 	}
 
-	table, err := Marshal(luaVm, &test)
+	_table, err := Marshal(luaVm, &test)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	table := _table.(*lua.LTable)
 
 	field1 := table.RawGetString("field1")
 	if field1.Type() != lua.LTString {

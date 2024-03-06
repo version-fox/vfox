@@ -24,10 +24,10 @@ type PreInstallHookCtx struct {
 }
 
 type PreUseHookCtx struct {
-	RuntimeVersion  string        `luai:"runtimeVersion"`
-	Cwd             string        `luai:"cwd"`
-	Scope           string        `luai:"scope"`
-	Version         string        `luai:"version"`
-	PreviousVersion string        `luai:"previousVersion"`
-	InstalledSdks   []*LuaSDKInfo `luai:"installedSdks"`
+	RuntimeVersion  string                 `luai:"runtimeVersion"`
+	Cwd             string                 `luai:"cwd"`
+	Scope           string                 `luai:"scope"`
+	Version         string                 `luai:"version"`
+	PreviousVersion string                 `luai:"previousVersion"`
+	InstalledSdks   map[string]*LuaSDKInfo `luai:"installedSdks"`
 }
