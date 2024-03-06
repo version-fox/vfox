@@ -6,3 +6,28 @@ type LuaCheckSum struct {
 	Sha1   string `luai:"sha1"`
 	Md5    string `luai:"md5"`
 }
+
+type LuaSDKInfo struct {
+	Name    string `luai:"name"`
+	Version string `luai:"version"`
+	Path    string `luai:"path"`
+	Note    string `luai:"note"`
+}
+
+type AvailableHookCtx struct {
+	RuntimeVersion string `luai:"runtimeVersion"`
+}
+
+type PreInstallHookCtx struct {
+	Version        string `luai:"version"`
+	RuntimeVersion string `luai:"runtimeVersion"`
+}
+
+type PreUseHookCtx struct {
+	RuntimeVersion  string        `luai:"runtimeVersion"`
+	Cwd             string        `luai:"cwd"`
+	Scope           string        `luai:"scope"`
+	Version         string        `luai:"version"`
+	PreviousVersion string        `luai:"previousVersion"`
+	InstalledSdks   []*LuaSDKInfo `luai:"installedSdks"`
+}

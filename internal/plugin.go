@@ -85,8 +85,13 @@ func (l *LuaPlugin) Close() {
 
 func (l *LuaPlugin) Available() ([]*Package, error) {
 	L := l.vm.Instance
-	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
+	ctxTable, err := luai.Marshal(L, luai.AvailableHookCtx{
+		RuntimeVersion: RuntimeVersion,
+	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	if err := l.vm.CallFunction(l.pluginObj.RawGetString(AvailableHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
@@ -97,7 +102,6 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	if table == nil || table.Type() == lua.LTNil {
 		return []*Package{}, nil
 	}
-	var err error
 	var result []*Package
 	table.ForEach(func(key lua.LValue, value lua.LValue) {
 		kvTable, ok := value.(*lua.LTable)
@@ -175,9 +179,14 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.vm.Instance
-	ctxTable := L.NewTable()
-	L.SetField(ctxTable, "version", lua.LString(version))
-	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
+	ctxTable, err := luai.Marshal(L, luai.PreInstallHookCtx{
+		Version:        string(version),
+		RuntimeVersion: RuntimeVersion,
+	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	if err := l.vm.CallFunction(l.pluginObj.RawGetString(PreInstallHook), l.pluginObj, ctxTable); err != nil {
 		return nil, err
@@ -352,19 +361,32 @@ func (l *LuaPlugin) HasFunction(name string) bool {
 
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
 	L := l.vm.Instance
-	lInstalledSdks := L.NewTable()
-	for _, v := range installedSdks {
-		sdkTable := l.createSdkInfoTable(v.Main)
-		L.SetField(lInstalledSdks, string(v.Main.Version), sdkTable)
-	}
-	ctxTable := L.NewTable()
 
-	L.SetField(ctxTable, "installedSdks", lInstalledSdks)
-	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
-	L.SetField(ctxTable, "cwd", lua.LString(cwd))
-	L.SetField(ctxTable, "scope", lua.LString(scope.String()))
-	L.SetField(ctxTable, "version", lua.LString(version))
-	L.SetField(ctxTable, "previousVersion", lua.LString(previousVersion))
+	ctx := luai.PreUseHookCtx{
+		RuntimeVersion:  RuntimeVersion,
+		Cwd:             cwd,
+		Scope:           scope.String(),
+		Version:         string(version),
+		PreviousVersion: string(previousVersion),
+		InstalledSdks:   make([]*luai.LuaSDKInfo, 0),
+	}
+
+	for _, v := range installedSdks {
+		sdk := v.Main
+
+		lSdk := &luai.LuaSDKInfo{
+			Name:    sdk.Name,
+			Version: string(sdk.Version),
+			Path:    sdk.Path,
+			Note:    sdk.Note,
+		}
+		ctx.InstalledSdks = append(ctx.InstalledSdks, lSdk)
+	}
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return "", err
+	}
 
 	function := l.pluginObj.RawGetString(PreUseHook)
 	if function.Type() == lua.LTNil {

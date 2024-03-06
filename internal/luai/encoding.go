@@ -31,33 +31,30 @@ func Marshal(state *lua.LState, v any) (*lua.LTable, error) {
 			field = field.Elem()
 		}
 
+		tag := fieldTypeField.Tag.Get("luai")
+		if tag == "" {
+			tag = fieldTypeField.Name
+		}
+
 		switch field.Kind() {
 		case reflect.Struct:
 			subTable, err := Marshal(state, field.Interface())
 			if err != nil {
 				return nil, err
 			}
-			table.RawSetString(fieldTypeField.Name, subTable)
+			table.RawSetString(tag, subTable)
 		case reflect.String:
-			table.RawSetString(fieldTypeField.Name, lua.LString(field.String()))
+			table.RawSetString(tag, lua.LString(field.String()))
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			table.RawSetString(fieldTypeField.Name, lua.LNumber(field.Int()))
+			table.RawSetString(tag, lua.LNumber(field.Int()))
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			table.RawSetString(fieldTypeField.Name, lua.LNumber(field.Uint()))
+			table.RawSetString(tag, lua.LNumber(field.Uint()))
 		case reflect.Float32, reflect.Float64:
-			table.RawSetString(fieldTypeField.Name, lua.LNumber(field.Float()))
+			table.RawSetString(tag, lua.LNumber(field.Float()))
 		case reflect.Bool:
-			table.RawSetString(fieldTypeField.Name, lua.LBool(field.Bool()))
-		case reflect.Map:
-			switch fieldType.Key().Kind() {
-			case reflect.String,
-				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			default:
-				return nil, errors.New("marshal: unsupported map key type")
-			}
+			table.RawSetString(tag, lua.LBool(field.Bool()))
 		default:
-			return nil, errors.New("marshal: unsupported type")
+			return nil, errors.New("marshal: unsupported type " + field.Kind().String() + " for field " + fieldTypeField.Name + " in " + fieldType.Name() + " struct")
 		}
 	}
 	return table, nil
@@ -81,6 +78,18 @@ func Unmarshal(table *lua.LTable, v any) error {
 			fieldName := key.String()
 			field := reflected.FieldByName(fieldName)
 			luaType := value.Type()
+
+			// if field is not found, try to find it by tag
+			if !field.IsValid() {
+				for i := 0; i < reflected.NumField(); i++ {
+					fieldTypeField := reflected.Type().Field(i)
+					tag := fieldTypeField.Tag.Get("luai")
+					if tag == fieldName {
+						field = reflected.Field(i)
+						break
+					}
+				}
+			}
 
 			switch luaType {
 			case lua.LTString:
