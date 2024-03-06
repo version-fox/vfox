@@ -375,7 +375,7 @@ func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
 func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 	meta, err := newPathMeta()
 	if err != nil {
-		panic("Init path meta error")
+		panic("Init path meta error\n" + err.Error())
 	}
 
 	var paths []string

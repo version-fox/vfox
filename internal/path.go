@@ -55,7 +55,12 @@ func newPathMeta() (*PathMeta, error) {
 	pluginPath := filepath.Join(configPath, "plugin")
 	sdkCachePath := filepath.Join(configPath, "cache")
 	tmpPath := filepath.Join(configPath, "temp")
-	_ = os.MkdirAll(sdkCachePath, 0755)
+	if err := os.MkdirAll(sdkCachePath, 0755); err != nil {
+		if os.IsPermission(err) {
+			return nil, fmt.Errorf("%w\n%v: Directory permission is not set to 0755", err, configPath)
+		}
+		return nil, err
+	}
 	_ = os.MkdirAll(pluginPath, 0755)
 	_ = os.MkdirAll(tmpPath, 0755)
 	exePath, err := os.Executable()
