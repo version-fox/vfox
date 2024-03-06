@@ -11,10 +11,12 @@
 
 [[English]](./README.md)  [[中文文档]](./README_CN.md)
 
+If you switch between development projects which expect different environments, specifically different runtime versions or ambient libraries,
+or you are tired of all kinds of cumbersome environment configurations, `vfox` is the ideal choice for you.
 ## Introduction
 
-**`vfox` is a cross-platform tool for managing SDK versions, extendable via plugins**. It allows you to quickly install
-and switch between different versions of SDKs using the command line.
+**`vfox` is a cross-platform version manager(similar to `nvm`, `fvm`, `sdkman`, `asdf-vm`, etc.), extendable via plugins**. It allows you to quickly install
+and switch between different environment you need via the command line.
 
 ## Why use VersionFox?
 

@@ -1,7 +1,10 @@
 # Introduction
 
+If you switch between development projects which expect different environments, specifically different runtime versions or ambient libraries,
+or you are tired of all kinds of cumbersome environment configurations, `vfox` is the ideal choice for you.
+
 `vfox` is a cross-platform, extensible version manager. It supports **native Windows**, and of course **Unix-like**!
-With it, you can **quickly install and switch** tool versions.
+With it, you can **quickly install and switch** different environment.
 
 It saves all tool version information in a file named `.tool-versions`, so you can share this information in your
 project to ensure that everyone on your team is using the same tool versions.
