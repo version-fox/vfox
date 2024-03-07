@@ -40,14 +40,6 @@ const (
 	ArchType        = "ARCH_TYPE"
 )
 
-const (
-	PreInstallHook  = "PreInstall"
-	PostInstallHook = "PostInstall"
-	AvailableHook   = "Available"
-	EnvKeysHook     = "EnvKeys"
-	PreUseHook      = "PreUse"
-)
-
 type LuaPlugin struct {
 	vm        *LuaVM
 	pluginObj *lua.LTable
@@ -69,13 +61,13 @@ func (l *LuaPlugin) checkValid() error {
 		return fmt.Errorf("lua vm is nil")
 	}
 	obj := l.pluginObj
-	if obj.RawGetString(AvailableHook) == lua.LNil {
+	if obj.RawGetString("Available") == lua.LNil {
 		return fmt.Errorf("[Available] function not found")
 	}
-	if obj.RawGetString(AvailableHook) == lua.LNil {
+	if obj.RawGetString("PreInstall") == lua.LNil {
 		return fmt.Errorf("[PreInstall] function not found")
 	}
-	if obj.RawGetString(EnvKeysHook) == lua.LNil {
+	if obj.RawGetString("EnvKeys") == lua.LNil {
 		return fmt.Errorf("[EnvKeys] function not found")
 	}
 	return nil
@@ -95,7 +87,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return nil, err
 	}
 
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString(AvailableHook), l.pluginObj, ctxTable); err != nil {
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString("Available"), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -188,7 +180,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString(PreInstallHook), l.pluginObj, ctxTable); err != nil {
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString("PreInstall"), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -257,7 +249,7 @@ func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L := l.vm.Instance
 
-	function := l.pluginObj.RawGetString(PostInstallHook)
+	function := l.pluginObj.RawGetString("PostInstall")
 	if function.Type() == lua.LTNil {
 		return nil
 	}
@@ -305,7 +297,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, err
 	}
 
-	if err = l.vm.CallFunction(l.pluginObj.RawGetString(EnvKeysHook), l.pluginObj, ctxTable); err != nil {
+	if err = l.vm.CallFunction(l.pluginObj.RawGetString("EnvKeys"), l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -362,7 +354,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", err
 	}
 
-	function := l.pluginObj.RawGetString(PreUseHook)
+	function := l.pluginObj.RawGetString("PreUse")
 	if function.Type() == lua.LTNil {
 		return "", nil
 	}
