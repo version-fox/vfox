@@ -280,7 +280,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	mainInfo := sdkPackage.Main
 	sdkArr := L.NewTable()
 	sdkTable := l.createSdkInfoTable(mainInfo)
-	L.SetField(sdkArr, mainInfo.Name, sdkTable)
+	L.SetField(sdkArr, "main", sdkTable)
 	for _, v := range sdkPackage.Additions {
 		sdkTable := l.createSdkInfoTable(v)
 		L.SetField(sdkArr, v.Name, sdkTable)
