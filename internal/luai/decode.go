@@ -5,7 +5,6 @@ package luai
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strconv"
 
@@ -98,7 +97,6 @@ func valueInterface(lvalue lua.LValue) any {
 	switch lvalue.Type() {
 	case lua.LTTable:
 		isArray := lvalue.(*lua.LTable).RawGetInt(1) != lua.LNil
-		logger.Infof("isArray: %v\n", isArray)
 		if isArray {
 			return arrayInterface(lvalue.(*lua.LTable))
 		}
@@ -273,8 +271,6 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 			// Decoding into nil interface? Switch to non-reflect code.
 			if reflected.NumMethod() == 0 {
 				result := valueInterface(value)
-				fmt.Printf("value: %v\n", value)
-				fmt.Printf("result: %v\n", result)
 				reflected.Set(reflect.ValueOf(result))
 			}
 		default:

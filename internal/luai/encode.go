@@ -16,7 +16,6 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 	if reflected.Kind() == reflect.Ptr {
 		reflected = reflected.Elem()
 	}
-	logger.Debug(v, reflected.Kind())
 
 	switch reflected.Kind() {
 	case reflect.Struct:
