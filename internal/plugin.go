@@ -280,12 +280,12 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	mainInfo := sdkPackage.Main
 	sdkArr := L.NewTable()
 	sdkTable := l.createSdkInfoTable(mainInfo)
-	L.SetField(sdkArr, "main", sdkTable)
 	for _, v := range sdkPackage.Additions {
 		sdkTable := l.createSdkInfoTable(v)
 		L.SetField(sdkArr, v.Name, sdkTable)
 	}
 	ctxTable := L.NewTable()
+	L.SetField(ctxTable, "main", sdkTable)
 	L.SetField(ctxTable, "sdkInfo", sdkArr)
 	L.SetField(ctxTable, "runtimeVersion", lua.LString(RuntimeVersion))
 	// TODO Will be deprecated in future versions
