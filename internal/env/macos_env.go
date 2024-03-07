@@ -20,6 +20,7 @@ package env
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"strings"
 )
@@ -34,7 +35,8 @@ type macosEnvManager struct {
 }
 
 func (m *macosEnvManager) Paths(paths []string) string {
-	return strings.Join(paths, ":")
+	set := util.NewSortedSetWithSlice[string](paths)
+	return strings.Join(set.Slice(), ":")
 }
 
 func (m *macosEnvManager) Close() error {

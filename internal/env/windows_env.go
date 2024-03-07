@@ -190,7 +190,8 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 }
 
 func (w *windowsEnvManager) Paths(paths []string) string {
-	return strings.Join(paths, ";")
+	set := util.NewSortedSetWithSlice[string](paths)
+	return strings.Join(set.Slice(), ";")
 }
 
 func NewEnvManager(vfConfigPath string) (Manager, error) {
