@@ -135,7 +135,7 @@ func arrayInterface(lvalue *lua.LTable) any {
 }
 
 func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
-	logger.Debugf("reflected: %+v, value type: %s, kind: %s\n", reflected, value.Type(), reflected.Kind())
+	logger.Debugf("unmarshal: reflected: %+v, value type: %s, kind: %s\n", reflected, value.Type(), reflected.Kind())
 
 	switch value.Type() {
 	case lua.LTTable:
@@ -250,33 +250,30 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 					tagMap[tag] = i
 				}
 			}
-			logger.Debugf("reflected: %+v, kind: %s, tagMap: %+v\n", reflected, reflected.Kind(), tagMap)
+			logger.Debugf("unmarshal: reflected: %+v, kind: %s, tagMap: %+v\n", reflected, reflected.Kind(), tagMap)
 
 			(value.(*lua.LTable)).ForEach(func(key, value lua.LValue) {
 				fieldName := key.String()
-				logger.Debugf("fieldName: %s, value type: %s\n", fieldName, value.Type())
+				logger.Debugf("unmarshal: fieldName: %s, value type: %s\n", fieldName, value.Type())
 
-				switch reflected.Kind() {
-				case reflect.Struct:
-					field := reflected.FieldByName(fieldName)
+				field := reflected.FieldByName(fieldName)
 
-					// if field is not found, try to find it by tag
-					if !field.IsValid() {
-						fieldIndex, ok := tagMap[fieldName]
-						if !ok {
-							logger.Debugf("unmarshal: field %s not found in tagMap\n", fieldName)
-							return
-						}
-						field = reflected.Field(fieldIndex)
-					}
-
-					if !field.IsValid() {
-						logger.Debugf("unmarshal: field %s not found in struct\n", fieldName)
+				// if field is not found, try to find it by tag
+				if !field.IsValid() {
+					fieldIndex, ok := tagMap[fieldName]
+					if !ok {
+						logger.Debugf("unmarshal: field %s not found in tagMap\n", fieldName)
 						return
 					}
-
-					unmarshalWorker(value, field)
+					field = reflected.Field(fieldIndex)
 				}
+
+				if !field.IsValid() {
+					logger.Debugf("unmarshal: field %s not found in struct\n", fieldName)
+					return
+				}
+
+				unmarshalWorker(value, field)
 			})
 		}
 	default:

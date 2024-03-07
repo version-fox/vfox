@@ -118,7 +118,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 
 		for i, addition := range item.Addition {
 			if addition.Name == "" {
-				logger.Errorf("additional file %d no name provided", i+1)
+				logger.Errorf("[Available] additional file %d no name provided", i+1)
 			}
 
 			additionalArr = append(additionalArr, &Info{
@@ -145,8 +145,6 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 		// todo: logger error
 		return NoneChecksum
 	}
-
-	logger.Debugf("checksum: %+v", luaCheckSum)
 
 	checksum := &Checksum{}
 

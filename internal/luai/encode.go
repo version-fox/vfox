@@ -35,11 +35,11 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		table := state.NewTable()
 		for i := 0; i < reflected.NumField(); i++ {
 			field := reflected.Field(i)
-			fieldType := reflected.Type().Field(i)
 			if field.Kind() == reflect.Ptr {
 				field = field.Elem()
 			}
 
+			fieldType := reflected.Type().Field(i)
 			tag := fieldType.Tag.Get("luai")
 			if tag == "" {
 				tag = fieldType.Name
@@ -49,7 +49,7 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if err != nil {
 				return nil, err
 			}
-			logger.Debugf("field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
+			logger.Debugf("marshal: field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
 			table.RawSetString(tag, sub)
 		}
 		return table, nil
