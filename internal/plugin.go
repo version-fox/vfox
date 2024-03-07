@@ -292,6 +292,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		// TODO Will be deprecated in future versions
 		Path:           mainInfo.Path,
 		RuntimeVersion: RuntimeVersion,
+		Main:           NewLuaSDKInfo(mainInfo),
 		SdkInfo:        make(map[string]*luai.LuaSDKInfo),
 	}
 

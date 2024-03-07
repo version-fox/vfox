@@ -97,6 +97,11 @@ $ node -v
 
 ![Star History Chart](https://api.star-history.com/svg?repos=version-fox/vfox&type=Date)
 
+## 感谢
+
+<a href="https://hellogithub.com/repository/a32a1f2ad04a4b8aa4dd3e1b76c880b2" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=a32a1f2ad04a4b8aa4dd3e1b76c880b2" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+
+
 ## COPYRIGHT
 
 [Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li
