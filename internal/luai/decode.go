@@ -289,16 +289,3 @@ func Unmarshal(value lua.LValue, v any) error {
 
 	return unmarshalWorker(value, reflected)
 }
-
-func applyValue(value lua.LValue, field reflect.Value) {
-	switch value.Type() {
-	case lua.LTString:
-		field.SetString(value.String())
-	case lua.LTNumber:
-		field.SetInt(int64(value.(lua.LNumber)))
-	case lua.LTBool:
-		field.SetBool(bool(value.(lua.LBool)))
-	case lua.LTTable:
-		Unmarshal(value.(*lua.LTable), field.Interface())
-	}
-}

@@ -33,6 +33,7 @@ type complexStruct struct {
 	Field1 string
 	Field2 int
 	Field3 bool
+	Struct testStructTag
 	Map    map[string]interface{}
 	Slice  []any
 }
@@ -207,8 +208,13 @@ func TestEncoding(t *testing.T) {
 			Field1: "value1",
 			Field2: 123,
 			Field3: true,
-			Map:    m,
-			Slice:  s,
+			Struct: testStructTag{
+				Field1: "value1",
+				Field2: 2,
+				Field3: true,
+			},
+			Map:   m,
+			Slice: s,
 		}
 
 		table, err := Marshal(L, input)
@@ -222,6 +228,9 @@ func TestEncoding(t *testing.T) {
 			assert(m.Field1 == "value1")
 			assert(m.Field2 == 123)
 			assert(m.Field3 == true)
+			assert(m.Struct.field1 == "value1")
+			assert(m.Struct.field2 == 2)
+			assert(m.Struct.field3 == true)
 			assert(m.Map.key1 == "value1")
 			assert(m.Map.key2 == 2)
 			assert(m.Map.key3 == true)
