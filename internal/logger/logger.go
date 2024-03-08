@@ -20,40 +20,41 @@ import "fmt"
 
 type LoggerLevel int
 
+// the smaller the level, the more logs.
 const (
-	ErrorLevel LoggerLevel = iota
+	DebugLevel LoggerLevel = iota
 	InfoLevel
-	DebugLevel
+	ErrorLevel
 )
 
-var globalLevel = InfoLevel
+var currentLevel = InfoLevel
 
 func SetLevel(_level LoggerLevel) {
-	globalLevel = _level
+	currentLevel = _level
 }
 
 func Log(level LoggerLevel, args ...interface{}) {
-	if globalLevel >= level {
+	if currentLevel <= level {
 		fmt.Println(args...)
 	}
 }
 
 func Logf(level LoggerLevel, message string, args ...interface{}) {
-	if globalLevel >= level {
+	if currentLevel <= level {
 		fmt.Printf(message, args...)
 	}
 }
 
-func Error(message string) {
-	Log(ErrorLevel, message)
+func Error(message ...interface{}) {
+	Log(ErrorLevel, message...)
 }
 
 func Errorf(message string, args ...interface{}) {
 	Logf(ErrorLevel, message, args...)
 }
 
-func Info(message string) {
-	Log(InfoLevel, message)
+func Info(message ...interface{}) {
+	Log(InfoLevel, message...)
 }
 
 func Infof(message string, args ...interface{}) {
