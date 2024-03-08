@@ -27,13 +27,9 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
-	"github.com/version-fox/vfox/internal/module"
 	"github.com/version-fox/vfox/internal/plugin"
 	lua "github.com/yuin/gopher-lua"
 )
-
-//go:embed fixtures/preload.lua
-var preloadScript string
 
 const (
 	LuaPluginObjKey = "PLUGIN"
@@ -42,7 +38,7 @@ const (
 )
 
 type LuaPlugin struct {
-	vm        *LuaVM
+	vm        *luai.LuaVM
 	pluginObj *lua.LTable
 	// plugin source path
 	Filepath string
@@ -377,9 +373,15 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
-	vm := NewLuaVM()
+	vm := luai.NewLuaVM()
 
-	vm.Prepare(manager)
+	vm.Prepare(&luai.PrepareOptions{
+		Config: manager.Config,
+	})
+
+	// set OS_TYPE and ARCH_TYPE
+	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
+	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
 
 	if err := vm.Instance.DoString(content); err != nil {
 		return nil, err
@@ -434,56 +436,4 @@ func isValidName(name string) bool {
 	// followed by any number of letters, digits, or underscores.
 	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 	return re.MatchString(name)
-}
-
-type LuaVM struct {
-	Instance *lua.LState
-}
-
-func NewLuaVM() *LuaVM {
-	instance := lua.NewState()
-
-	return &LuaVM{
-		Instance: instance,
-	}
-}
-
-func (vm *LuaVM) Prepare(manager *Manager) error {
-	vm.Instance.DoString(preloadScript)
-	module.Preload(vm.Instance, manager.Config)
-
-	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
-	return nil
-}
-
-func (vm *LuaVM) ReturnedValue() *lua.LTable {
-	table := vm.Instance.ToTable(-1) // returned value
-	vm.Instance.Pop(1)               // remove received value
-	return table
-}
-
-func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
-	logger.Debugf("CallFunction: %s", function.String())
-
-	if err := vm.Instance.CallByParam(lua.P{
-		Fn:      function.(*lua.LFunction),
-		NRet:    1,
-		Protect: true,
-	}, args...); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {
-	if value := table.RawGetString(key); value.Type() != lua.LTNil {
-		return value.String()
-	}
-	return ""
-}
-
-func (vm *LuaVM) Close() {
-	vm.Instance.Close()
 }
