@@ -56,6 +56,10 @@ func TestPlugin(t *testing.T) {
 
 		Main := pkg.Main
 
+		if Main.Version != "version" {
+			t.Errorf("expected version 'version', got '%s'", Main.Version)
+		}
+
 		if Main.Path != "xxx" {
 			t.Errorf("expected path 'xxx', got '%s'", Main.Path)
 		}
@@ -63,6 +67,14 @@ func TestPlugin(t *testing.T) {
 		// checksum should be existed
 		if Main.Checksum == nil {
 			t.Errorf("expected checksum to be set, got nil")
+		}
+
+		if Main.Checksum.Type != "sha256" {
+			t.Errorf("expected checksum type 'sha256', got '%s'", Main.Checksum.Type)
+		}
+
+		if Main.Checksum.Value != "xxx" {
+			t.Errorf("expected checksum value 'xxx', got '%s'", Main.Checksum.Value)
 		}
 
 		if len(pkg.Additions) != 1 {

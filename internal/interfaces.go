@@ -16,7 +16,9 @@
 
 package internal
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type LuaCheckSum struct {
 	Sha256 string `luai:"sha256"`
@@ -66,23 +68,38 @@ type PreInstallHookCtx struct {
 type PreInstallHookResultAdditionItem struct {
 	Name string `luai:"name"`
 	Url  string `luai:"url"`
-	LuaCheckSum
+
+	Sha256 string `luai:"sha256"`
+	Sha512 string `luai:"sha512"`
+	Sha1   string `luai:"sha1"`
+	Md5    string `luai:"md5"`
 }
 
 func (i *PreInstallHookResultAdditionItem) Info() *Info {
+	sum := LuaCheckSum{
+		Sha256: i.Sha256,
+		Sha512: i.Sha512,
+		Sha1:   i.Sha1,
+		Md5:    i.Md5,
+	}
+
 	return &Info{
 		Name:     i.Name,
 		Version:  Version(""),
 		Path:     i.Url,
 		Note:     "",
-		Checksum: i.Checksum(),
+		Checksum: sum.Checksum(),
 	}
 }
 
 type PreInstallHookResult struct {
 	Version string `luai:"version"`
 	Url     string `luai:"url"`
-	LuaCheckSum
+
+	Sha256 string `luai:"sha256"`
+	Sha512 string `luai:"sha512"`
+	Sha1   string `luai:"sha1"`
+	Md5    string `luai:"md5"`
 
 	Addition []*PreInstallHookResultAdditionItem `luai:"addition"`
 }
@@ -92,12 +109,19 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 		return nil, fmt.Errorf("no version number provided")
 	}
 
+	sum := LuaCheckSum{
+		Sha256: i.Sha256,
+		Sha512: i.Sha512,
+		Sha1:   i.Sha1,
+		Md5:    i.Md5,
+	}
+
 	return &Info{
 		Name:     "",
 		Version:  Version(i.Version),
 		Path:     i.Url,
 		Note:     "",
-		Checksum: i.Checksum(),
+		Checksum: sum.Checksum(),
 	}, nil
 }
 

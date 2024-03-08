@@ -134,35 +134,6 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	return result, nil
 }
 
-func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
-	luaCheckSum := LuaCheckSum{}
-	err := luai.Unmarshal(table, luaCheckSum)
-	if err != nil {
-		// todo: logger error
-		return NoneChecksum
-	}
-
-	checksum := &Checksum{}
-
-	if luaCheckSum.Sha256 != "" {
-		checksum.Value = luaCheckSum.Sha256
-		checksum.Type = "sha256"
-	} else if luaCheckSum.Md5 != "" {
-		checksum.Value = luaCheckSum.Md5
-		checksum.Type = "md5"
-	} else if luaCheckSum.Sha1 != "" {
-		checksum.Value = luaCheckSum.Sha1
-		checksum.Type = "sha1"
-	} else if luaCheckSum.Sha512 != "" {
-		checksum.Value = luaCheckSum.Sha512
-		checksum.Type = "sha512"
-	} else {
-		return NoneChecksum
-	}
-
-	return checksum
-}
-
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, PreInstallHookCtx{
@@ -209,27 +180,6 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	return &Package{
 		Main:      mainSdk,
 		Additions: additionalArr,
-	}, nil
-}
-
-func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
-	info := &Info{}
-	err := luai.Unmarshal(table, info)
-	if err != nil {
-		return nil, err
-	}
-
-	if info.Version == "" {
-		return nil, fmt.Errorf("no version number provided")
-	}
-
-	checksum := l.Checksum(table)
-	return &Info{
-		Name:     info.Name,
-		Version:  Version(info.Version),
-		Path:     info.Path,
-		Note:     info.Name,
-		Checksum: checksum,
 	}, nil
 }
 
