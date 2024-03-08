@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📜 Documentation
+    url: https://vfox.lhan.me/
+    about: Before submitting a question, please read the documentation. If you are still not satisfied, ask a question again.
+  - name: 👀 GitHub Discussions
+    url: https://github.com/version-fox/vfox/discussions
+    about: If your issue is not a feature or bug, go to the discussion panel and retrieve if your issue already exists before submitting it.
