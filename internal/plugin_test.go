@@ -42,6 +42,44 @@ func TestPlugin(t *testing.T) {
 		}
 	})
 
+	t.Run("PreInstall", func(t *testing.T) {
+		manager := NewSdkManager()
+		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pkg, err := plugin.PreInstall(Version("9.0.0"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		Main := pkg.Main
+
+		if Main.Path != "xxx" {
+			t.Errorf("expected path 'xxx', got '%s'", Main.Path)
+		}
+
+		// checksum should be existed
+		if Main.Checksum == nil {
+			t.Errorf("expected checksum to be set, got nil")
+		}
+
+		if len(pkg.Additions) != 1 {
+			t.Errorf("expected 1 addition, got %d", len(pkg.Additions))
+		}
+
+		addition := pkg.Additions[0]
+
+		if addition.Path != "xxx" {
+			t.Errorf("expected path 'xxx', got '%s'", addition.Path)
+		}
+
+		if addition.Checksum == nil {
+			t.Errorf("expected checksum to be set, got nil")
+		}
+	})
+
 	t.Run("EnvKeys", func(t *testing.T) {
 		manager := NewSdkManager()
 

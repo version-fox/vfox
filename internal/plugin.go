@@ -182,35 +182,28 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, nil
 	}
-	mainSdk, err := l.parseInfo(table)
+
+	result := PreInstallHookResult{}
+
+	err = luai.Unmarshal(table, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	mainSdk, err := result.Info()
 	if err != nil {
 		return nil, err
 	}
 	mainSdk.Name = l.Name
+
 	var additionalArr []*Info
-	additions := table.RawGetString("addition")
-	if tb, ok := additions.(*lua.LTable); ok && tb.Len() != 0 {
-		var err error
-		additions.(*lua.LTable).ForEach(func(key lua.LValue, value lua.LValue) {
-			kvTable, ok := value.(*lua.LTable)
-			if !ok {
-				err = fmt.Errorf("the return value is not a table")
-				return
-			}
-			info, err := l.parseInfo(kvTable)
-			if err != nil {
-				return
-			}
-			if info.Name == "" {
-				err = fmt.Errorf("additional file no name provided")
-				// todo: logger error
-				return
-			}
-			additionalArr = append(additionalArr, info)
-		})
-		if err != nil {
-			return nil, err
+
+	for i, addition := range result.Addition {
+		if addition.Name == "" {
+			return nil, fmt.Errorf("[PreInstall] additional file %d no name provided", i+1)
 		}
+
+		additionalArr = append(additionalArr, addition.Info())
 	}
 
 	return &Package{
