@@ -60,6 +60,8 @@ type AvailableHookResultItem struct {
 	Addition []*Info `luai:"addition"`
 }
 
+type AvailableHookResult = []*AvailableHookResultItem
+
 type PreInstallHookCtx struct {
 	Version        string `luai:"version"`
 	RuntimeVersion string `luai:"runtimeVersion"`

@@ -93,7 +93,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return []*Package{}, nil
 	}
 
-	hookResult := []AvailableHookResultItem{}
+	hookResult := AvailableHookResult{}
 	err = luai.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
