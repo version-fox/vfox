@@ -5,13 +5,26 @@ import (
 	"testing"
 
 	_ "embed"
+
+	"github.com/version-fox/vfox/internal/logger"
 )
 
 //go:embed testdata/plugins/java.lua
 var pluginContent string
 var pluginPath = "testdata/plugins/java.lua"
 
+func setupSuite(tb testing.TB) func(tb testing.TB) {
+	logger.SetLevel(logger.DebugLevel)
+
+	return func(tb testing.TB) {
+		logger.SetLevel(logger.InfoLevel)
+	}
+}
+
 func TestPlugin(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
 	t.Run("Available", func(t *testing.T) {
 		manager := NewSdkManager()
 		plugin, err := NewLuaPlugin(pluginContent, pluginPath, manager)

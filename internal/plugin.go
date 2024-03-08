@@ -27,7 +27,6 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
-	"github.com/version-fox/vfox/internal/plugin"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -76,7 +75,7 @@ func (l *LuaPlugin) Close() {
 
 func (l *LuaPlugin) Available() ([]*Package, error) {
 	L := l.vm.Instance
-	ctxTable, err := luai.Marshal(L, plugin.AvailableHookCtx{
+	ctxTable, err := luai.Marshal(L, AvailableHookCtx{
 		RuntimeVersion: RuntimeVersion,
 	})
 
@@ -94,7 +93,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return []*Package{}, nil
 	}
 
-	hookResult := []plugin.AvailableHookResultItem{}
+	hookResult := []AvailableHookResultItem{}
 	err = luai.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -136,7 +135,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 }
 
 func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
-	luaCheckSum := plugin.LuaCheckSum{}
+	luaCheckSum := LuaCheckSum{}
 	err := luai.Unmarshal(table, luaCheckSum)
 	if err != nil {
 		// todo: logger error
@@ -166,7 +165,7 @@ func (l *LuaPlugin) Checksum(table *lua.LTable) *Checksum {
 
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.vm.Instance
-	ctxTable, err := luai.Marshal(L, plugin.PreInstallHookCtx{
+	ctxTable, err := luai.Marshal(L, PreInstallHookCtx{
 		Version:        string(version),
 		RuntimeVersion: RuntimeVersion,
 	})
@@ -221,7 +220,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 }
 
 func (l *LuaPlugin) parseInfo(table *lua.LTable) (*Info, error) {
-	info := &plugin.LuaSDKInfo{}
+	info := &Info{}
 	err := luai.Unmarshal(table, info)
 	if err != nil {
 		return nil, err
@@ -249,14 +248,14 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 		return nil
 	}
 
-	ctx := &plugin.PostInstallHookCtx{
+	ctx := &PostInstallHookCtx{
 		RuntimeVersion: RuntimeVersion,
 		RootPath:       rootPath,
-		SdkInfo:        make(map[string]*plugin.LuaSDKInfo),
+		SdkInfo:        make(map[string]*Info),
 	}
 
 	for _, v := range sdks {
-		ctx.SdkInfo[v.Name] = NewLuaSDKInfo(v)
+		ctx.SdkInfo[v.Name] = v
 	}
 
 	ctxTable, err := luai.Marshal(L, ctx)
@@ -275,16 +274,16 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 	L := l.vm.Instance
 	mainInfo := sdkPackage.Main
 
-	ctx := &plugin.EnvKeysHookCtx{
+	ctx := &EnvKeysHookCtx{
 		// TODO Will be deprecated in future versions
 		Path:           mainInfo.Path,
 		RuntimeVersion: RuntimeVersion,
-		Main:           NewLuaSDKInfo(mainInfo),
-		SdkInfo:        make(map[string]*plugin.LuaSDKInfo),
+		Main:           (mainInfo),
+		SdkInfo:        make(map[string]*Info),
 	}
 
 	for _, v := range sdkPackage.Additions {
-		ctx.SdkInfo[v.Name] = NewLuaSDKInfo(v)
+		ctx.SdkInfo[v.Name] = v
 	}
 
 	ctxTable, err := luai.Marshal(L, ctx)
@@ -304,7 +303,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 
 	envKeys := make(env.Envs)
 
-	items := []*plugin.EnvKeysHookResultItem{}
+	items := []*EnvKeysHookResultItem{}
 	err = luai.Unmarshal(table, &items)
 	if err != nil {
 		return nil, err
@@ -328,18 +327,18 @@ func (l *LuaPlugin) HasFunction(name string) bool {
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
 	L := l.vm.Instance
 
-	ctx := plugin.PreUseHookCtx{
+	ctx := PreUseHookCtx{
 		RuntimeVersion:  RuntimeVersion,
 		Cwd:             cwd,
 		Scope:           scope.String(),
 		Version:         string(version),
 		PreviousVersion: string(previousVersion),
-		InstalledSdks:   make(map[string]*plugin.LuaSDKInfo),
+		InstalledSdks:   make(map[string]*Info),
 	}
 
 	for _, v := range installedSdks {
-		lSdk := NewLuaSDKInfo(v.Main)
-		ctx.InstalledSdks[lSdk.Version] = lSdk
+		lSdk := v.Main
+		ctx.InstalledSdks[string(lSdk.Version)] = lSdk
 	}
 
 	logger.Debugf("PreUseHookCtx: %+v", ctx)
@@ -363,7 +362,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", nil
 	}
 
-	result := &plugin.PreUseHookResult{}
+	result := &PreUseHookResult{}
 
 	if err := luai.Unmarshal(table, result); err != nil {
 		return "", err

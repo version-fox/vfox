@@ -30,6 +30,10 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		reflected = reflected.Elem()
 	}
 
+	if !reflected.IsValid() {
+		return lua.LNil, nil
+	}
+
 	switch reflected.Kind() {
 	case reflect.Struct:
 		table := state.NewTable()
@@ -44,12 +48,20 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if tag == "" {
 				tag = fieldType.Name
 			}
+			logger.Debugf("marshal: field: %v, tag: %v, kind: %s\n", field, tag, field.Kind())
+
+			if !field.IsValid() {
+				logger.Debugf("marshal: field %s is invalid\n", tag)
+				continue
+			}
 
 			sub, err := Marshal(state, field.Interface())
 			if err != nil {
 				return nil, err
 			}
+
 			logger.Debugf("marshal: field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
+
 			table.RawSetString(tag, sub)
 		}
 		return table, nil
@@ -66,7 +78,13 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 	case reflect.Array, reflect.Slice:
 		table := state.NewTable()
 		for i := 0; i < reflected.Len(); i++ {
-			value, err := Marshal(state, reflected.Index(i).Interface())
+			field := reflected.Index(i)
+			if !field.IsValid() {
+				logger.Debugf("marshal: field %d is invalid\n", i)
+				continue
+			}
+
+			value, err := Marshal(state, field.Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -76,7 +94,13 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 	case reflect.Map:
 		table := state.NewTable()
 		for _, key := range reflected.MapKeys() {
-			value, err := Marshal(state, reflected.MapIndex(key).Interface())
+			field := reflected.MapIndex(key)
+			if !field.IsValid() {
+				logger.Debugf("marshal: field %s is invalid\n", key.String())
+				continue
+			}
+
+			value, err := Marshal(state, field.Interface())
 			if err != nil {
 				return nil, err
 			}

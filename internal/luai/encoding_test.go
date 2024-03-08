@@ -46,12 +46,13 @@ type testStructTag struct {
 }
 
 type complexStruct struct {
-	Field1 string
-	Field2 int
-	Field3 bool
-	Struct testStructTag
-	Map    map[string]interface{}
-	Slice  []any
+	Field1       string
+	Field2       int
+	Field3       bool
+	SimpleStruct *testStruct
+	Struct       testStructTag
+	Map          map[string]interface{}
+	Slice        []any
 }
 
 func TestEncoding(t *testing.T) {

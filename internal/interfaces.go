@@ -14,20 +14,13 @@
  *    limitations under the License.
  */
 
-package plugin
+package internal
 
 type LuaCheckSum struct {
 	Sha256 string `luai:"sha256"`
 	Sha512 string `luai:"sha512"`
 	Sha1   string `luai:"sha1"`
 	Md5    string `luai:"md5"`
-}
-
-type LuaSDKInfo struct {
-	Name    string `luai:"name"`
-	Version string `luai:"version"`
-	Path    string `luai:"path"`
-	Note    string `luai:"note"`
 }
 
 type AvailableHookCtx struct {
@@ -38,7 +31,7 @@ type AvailableHookResultItem struct {
 	Version string `luai:"version"`
 	Note    string `luai:"note"`
 
-	Addition []*LuaSDKInfo `luai:"addition"`
+	Addition []*Info `luai:"addition"`
 }
 
 type PreInstallHookCtx struct {
@@ -57,16 +50,16 @@ type PreInstallHookResult struct {
 	Url     string `luai:"url"`
 	LuaCheckSum
 
-	Addition []*LuaSDKInfo `luai:"addition"`
+	Addition []*Info `luai:"addition"`
 }
 
 type PreUseHookCtx struct {
-	RuntimeVersion  string                 `luai:"runtimeVersion"`
-	Cwd             string                 `luai:"cwd"`
-	Scope           string                 `luai:"scope"`
-	Version         string                 `luai:"version"`
-	PreviousVersion string                 `luai:"previousVersion"`
-	InstalledSdks   map[string]*LuaSDKInfo `luai:"installedSdks"`
+	RuntimeVersion  string           `luai:"runtimeVersion"`
+	Cwd             string           `luai:"cwd"`
+	Scope           string           `luai:"scope"`
+	Version         string           `luai:"version"`
+	PreviousVersion string           `luai:"previousVersion"`
+	InstalledSdks   map[string]*Info `luai:"installedSdks"`
 }
 
 type PreUseHookResult struct {
@@ -74,17 +67,17 @@ type PreUseHookResult struct {
 }
 
 type PostInstallHookCtx struct {
-	RuntimeVersion string                 `luai:"runtimeVersion"`
-	RootPath       string                 `luai:"rootPath"`
-	SdkInfo        map[string]*LuaSDKInfo `luai:"sdkInfo"`
+	RuntimeVersion string           `luai:"runtimeVersion"`
+	RootPath       string           `luai:"rootPath"`
+	SdkInfo        map[string]*Info `luai:"sdkInfo"`
 }
 
 type EnvKeysHookCtx struct {
-	RuntimeVersion string      `luai:"runtimeVersion"`
-	Main           *LuaSDKInfo `luai:"main"`
+	RuntimeVersion string `luai:"runtimeVersion"`
+	Main           *Info  `luai:"main"`
 	// TODO Will be deprecated in future versions
-	Path    string                 `luai:"path"`
-	SdkInfo map[string]*LuaSDKInfo `luai:"sdkInfo"`
+	Path    string           `luai:"path"`
+	SdkInfo map[string]*Info `luai:"sdkInfo"`
 }
 
 type EnvKeysHookResultItem struct {
