@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package luai
+package plugin
 
 type LuaCheckSum struct {
 	Sha256 string `luai:"sha256"`
