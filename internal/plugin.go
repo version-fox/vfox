@@ -44,12 +44,8 @@ type LuaPlugin struct {
 	// plugin filename, this is also alias name, sdk-name
 	Filename string
 	// The name defined inside the plugin
-	Name              string
-	Author            string
-	Version           string
-	Description       string
-	UpdateUrl         string
-	MinRuntimeVersion string
+
+	LuaPluginInfo
 }
 
 func (l *LuaPlugin) checkValid() error {
@@ -102,8 +98,6 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 	var result []*Package
 
 	for _, item := range hookResult {
-		fmt.Printf("item: %+v\n", item)
-
 		mainSdk := &Info{
 			Name:    l.Name,
 			Version: Version(item.Version),
@@ -347,28 +341,20 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	if name := vm.GetTableString(PLUGIN, "name"); name != "" {
-		source.Name = name
-		if !isValidName(source.Name) {
-			return nil, fmt.Errorf("invalid plugin name")
-		}
-	} else {
+	pluginInfo := LuaPluginInfo{}
+	err := luai.Unmarshal(PLUGIN, &pluginInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	source.LuaPluginInfo = pluginInfo
+
+	if !isValidName(source.Name) {
+		return nil, fmt.Errorf("invalid plugin name")
+	}
+
+	if source.Name == "" {
 		return nil, fmt.Errorf("no plugin name provided")
-	}
-	if version := vm.GetTableString(PLUGIN, "version"); version != "" {
-		source.Version = version
-	}
-	if description := vm.GetTableString(PLUGIN, "description"); description != "" {
-		source.Description = description
-	}
-	if updateUrl := vm.GetTableString(PLUGIN, "updateUrl"); updateUrl != "" {
-		source.UpdateUrl = updateUrl
-	}
-	if author := vm.GetTableString(PLUGIN, "author"); author != "" {
-		source.Author = author
-	}
-	if minRuntimeVersion := vm.GetTableString(PLUGIN, "minRuntimeVersion"); minRuntimeVersion != "" {
-		source.MinRuntimeVersion = minRuntimeVersion
 	}
 	return source, nil
 }

@@ -158,3 +158,12 @@ type EnvKeysHookResultItem struct {
 	Key   string `luai:"key"`
 	Value string `luai:"value"`
 }
+
+type LuaPluginInfo struct {
+	Name              string `luai:"name"`
+	Author            string `luai:"author"`
+	Version           string `luai:"version"`
+	Description       string `luai:"description"`
+	UpdateUrl         string `luai:"updateUrl"`
+	MinRuntimeVersion string `luai:"minRuntimeVersion"`
+}
