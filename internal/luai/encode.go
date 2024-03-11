@@ -20,7 +20,6 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/version-fox/vfox/internal/logger"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -48,10 +47,8 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if tag == "" {
 				tag = fieldType.Name
 			}
-			logger.Debugf("marshal: field: %v, tag: %v, kind: %s\n", field, tag, field.Kind())
 
 			if !field.IsValid() {
-				logger.Debugf("marshal: field %s is invalid\n", tag)
 				continue
 			}
 
@@ -59,8 +56,6 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if err != nil {
 				return nil, err
 			}
-
-			logger.Debugf("marshal: field: %v, tag: %v, sub: %v, kind: %s\n", field, tag, sub, field.Kind())
 
 			table.RawSetString(tag, sub)
 		}
@@ -80,7 +75,6 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		for i := 0; i < reflected.Len(); i++ {
 			field := reflected.Index(i)
 			if !field.IsValid() {
-				logger.Debugf("marshal: field %d is invalid\n", i)
 				continue
 			}
 
@@ -96,7 +90,6 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		for _, key := range reflected.MapKeys() {
 			field := reflected.MapIndex(key)
 			if !field.IsValid() {
-				logger.Debugf("marshal: field %s is invalid\n", key.String())
 				continue
 			}
 

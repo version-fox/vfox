@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/version-fox/vfox/internal/logger"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -135,7 +134,6 @@ func arrayInterface(lvalue *lua.LTable) any {
 }
 
 func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
-	logger.Debugf("unmarshal: reflected: %+v, value type: %s, kind: %s\n", reflected, value.Type(), reflected.Kind())
 
 	switch value.Type() {
 	case lua.LTTable:
@@ -192,7 +190,6 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 					s := key.String()
 					n, err := strconv.ParseInt(s, 10, 64)
 					if err != nil {
-						logger.Errorf("unmarshal: %v\n", err)
 						break
 					}
 					kv = reflect.New(keyType).Elem()
@@ -201,7 +198,6 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 					s := key.String()
 					n, err := strconv.ParseUint(s, 10, 64)
 					if err != nil {
-						logger.Errorf("unmarshal: %v\n", err)
 						break
 					}
 					kv = reflect.New(keyType).Elem()
@@ -250,11 +246,9 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 					tagMap[tag] = i
 				}
 			}
-			logger.Debugf("unmarshal: reflected: %+v, kind: %s, tagMap: %+v\n", reflected, reflected.Kind(), tagMap)
 
 			(value.(*lua.LTable)).ForEach(func(key, value lua.LValue) {
 				fieldName := key.String()
-				logger.Debugf("unmarshal: fieldName: %s, value type: %s\n", fieldName, value.Type())
 
 				field := reflected.FieldByName(fieldName)
 
@@ -262,14 +256,12 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 				if !field.IsValid() {
 					fieldIndex, ok := tagMap[fieldName]
 					if !ok {
-						logger.Debugf("unmarshal: field %s not found in tagMap\n", fieldName)
 						return
 					}
 					field = reflected.Field(fieldIndex)
 				}
 
 				if !field.IsValid() {
-					logger.Debugf("unmarshal: field %s not found in struct\n", fieldName)
 					return
 				}
 
