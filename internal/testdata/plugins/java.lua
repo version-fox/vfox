@@ -34,7 +34,7 @@ function PLUGIN:PreInstall(ctx)
     local runtimeVersion = ctx.runtimeVersion
     return {
         --- Version number
-        version = "xxx",
+        version = "version",
         --- remote URL or local file path [optional]
         url = "xxx",
         --- SHA256 checksum [optional]

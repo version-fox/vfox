@@ -18,10 +18,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/cmd/commands"
 	"github.com/version-fox/vfox/internal"
-	"os"
+	"github.com/version-fox/vfox/internal/logger"
 )
 
 func Execute(args []string) {
@@ -65,6 +67,19 @@ func newCmd() *cmd {
 		for _, command := range ctx.App.Commands {
 			_, _ = fmt.Fprintln(ctx.App.Writer, command.Name)
 		}
+	}
+
+	debugFlags := &cli.BoolFlag{
+		Name:  "debug",
+		Usage: "show debug information",
+		Action: func(ctx *cli.Context, b bool) error {
+			logger.SetLevel(logger.DebugLevel)
+			return nil
+		},
+	}
+
+	app.Flags = []cli.Flag{
+		debugFlags,
 	}
 	app.Commands = []*cli.Command{
 		commands.Info,

@@ -32,6 +32,7 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 
 	"github.com/pterm/pterm"
@@ -230,6 +231,7 @@ func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 	if !b.Plugin.HasFunction("PreUse") {
+		logger.Debug("plugin does not have PreUse function")
 		return version, nil
 	}
 
@@ -252,6 +254,8 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		scope = Global
 	}
+
+	logger.Debugf("use sdk version: %s\n", string(version))
 
 	version, err := b.PreUse(version, scope)
 	if err != nil {

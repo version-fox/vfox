@@ -16,7 +16,9 @@
 
 package internal
 
-import "path/filepath"
+import (
+	"path/filepath"
+)
 
 type Package struct {
 	Main      *Info
@@ -24,10 +26,10 @@ type Package struct {
 }
 
 type Info struct {
-	Name     string
-	Version  Version
-	Path     string
-	Note     string
+	Name     string  `luai:"name"`
+	Version  Version `luai:"version"`
+	Path     string  `luai:"path"`
+	Note     string  `luai:"note"`
 	Checksum *Checksum
 }
 
