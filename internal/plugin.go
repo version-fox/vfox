@@ -79,7 +79,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return nil, err
 	}
 
-	if err = l.CallFunction("Available", l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("Available", ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +139,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
-	if err = l.CallFunction("PreInstall", l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PreInstall", ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -199,7 +199,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 		return err
 	}
 
-	if err = l.CallFunction("PostInstall", l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PostInstall", ctxTable); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, err
 	}
 
-	if err = l.CallFunction("EnvKeys", l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("EnvKeys", ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -288,7 +288,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", nil
 	}
 
-	if err = l.CallFunction("PreUse", l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PreUse", ctxTable); err != nil {
 		return "", err
 	}
 
@@ -308,7 +308,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	logger.Debugf("CallFunction: %s\n", funcName)
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), args...); err != nil {
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), append([]lua.LValue{l.pluginObj}, args...)...); err != nil {
 		return err
 	}
 	return nil
