@@ -47,7 +47,7 @@ func (z zsh) Activate() (string, error) {
 	return zshHook, nil
 }
 
-func (z zsh) Export(envs env.Envs) (out string) {
+func (z zsh) Export(envs env.Vars) (out string) {
 	for key, value := range envs {
 		if value == nil {
 			out += z.unset(key)

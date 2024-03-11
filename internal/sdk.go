@@ -213,7 +213,7 @@ func (b *Sdk) Available() ([]*Package, error) {
 	return b.Plugin.Available()
 }
 
-func (b *Sdk) EnvKeys(version Version) (env.Envs, error) {
+func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 	label := b.label(version)
 	if !b.checkExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
@@ -280,10 +280,8 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 		b.clearCurrentEnvConfig()
 
-		for key, value := range keys {
-			if err = b.sdkManager.EnvManager.Load(key, *value); err != nil {
-				return err
-			}
+		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
+			return err
 		}
 		err = b.sdkManager.EnvManager.Flush()
 		if err != nil {
@@ -360,13 +358,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 		return
 	}
 	envManager := b.sdkManager.EnvManager
-	for k, v := range envKV {
-		if k == "PATH" {
-			_ = envManager.Remove(*v)
-		} else {
-			_ = envManager.Remove(k)
-		}
-	}
+	_ = envManager.Remove(envKV)
 }
 
 func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {

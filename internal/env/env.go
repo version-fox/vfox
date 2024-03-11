@@ -22,11 +22,21 @@ import (
 
 type Manager interface {
 	Flush() error
-	Load(key, value string) error
+	Load(envs *Envs) error
 	Get(key string) (string, bool)
-	Remove(key string) error
+	Remove(envs *Envs) error
 	Paths(paths []string) string
 	io.Closer
 }
 
-type Envs map[string]*string
+// Vars is a map of environment variables
+type Vars map[string]*string
+
+// Paths is a slice of PATH.
+type Paths []string
+
+// Envs is a struct that contains environment variables and PATH.
+type Envs struct {
+	Variables Vars
+	Paths     Paths
+}

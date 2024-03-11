@@ -64,7 +64,7 @@ func (sh fish) Activate() (string, error) {
 	return fishHook, nil
 }
 
-func (sh fish) Export(e env.Envs) (out string) {
+func (sh fish) Export(e env.Vars) (out string) {
 	for key, value := range e {
 		if value == nil {
 			out += sh.unset(key)

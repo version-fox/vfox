@@ -122,8 +122,14 @@ function PLUGIN:EnvKeys(ctx)
         {
             key = "PATH",
             value = mainPath .. "/bin"
-        }
+        },
+        {
+            key = "PATH",
+            value = mainPath .. "/bin2"
+        },
+
     }
+
 end
 
 --- When user invoke `use` command, this function will be called to get the

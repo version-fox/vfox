@@ -23,7 +23,7 @@ import (
 
 type Shell interface {
 	Activate() (string, error)
-	Export(envs env.Envs) string
+	Export(envs env.Vars) string
 }
 
 func NewShell(name string) Shell {
