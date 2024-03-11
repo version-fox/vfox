@@ -43,27 +43,28 @@ func (m *macosEnvManager) Close() error {
 	return nil
 }
 
-func (m *macosEnvManager) Load(key, value string) error {
-	if key == "PATH" {
-		pathArray := strings.Split(value, ":")
-		for _, path := range pathArray {
-			if _, ok := m.pathMap[path]; ok {
-				continue
-			}
-			m.paths = append(m.paths, path)
-			m.pathMap[path] = struct{}{}
+func (m *macosEnvManager) Load(envs *Envs) error {
+	for k, v := range envs.Variables {
+		m.envMap[k] = *v
+	}
+	for _, path := range envs.Paths {
+		if _, ok := m.pathMap[path]; ok {
+			continue
 		}
-	} else {
-		m.envMap[key] = value
+		m.paths = append(m.paths, path)
+		m.pathMap[path] = struct{}{}
 	}
 	return nil
 }
-func (m *macosEnvManager) Remove(key string) error {
-	if key == "PATH" {
-		return fmt.Errorf("can not remove PATH variable")
+func (m *macosEnvManager) Remove(envs *Envs) error {
+	for k, _ := range envs.Variables {
+		if k == "PATH" {
+			return fmt.Errorf("can not remove PATH variable")
+		}
+		delete(m.envMap, k)
+		m.deletedEnvMap[k] = struct{}{}
 	}
-	array := strings.Split(key, ":")
-	for _, k := range array {
+	for _, k := range envs.Paths {
 		if _, ok := m.pathMap[k]; ok {
 			delete(m.pathMap, k)
 			var newPaths []string
@@ -74,9 +75,6 @@ func (m *macosEnvManager) Remove(key string) error {
 			}
 			m.paths = newPaths
 			m.deletedPathMap[k] = struct{}{}
-		} else {
-			delete(m.envMap, key)
-			m.deletedEnvMap[key] = struct{}{}
 		}
 	}
 	return nil

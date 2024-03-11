@@ -164,17 +164,20 @@ func TestPlugin(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		javaHome := keys["JAVA_HOME"]
+		javaHome := keys.Variables["JAVA_HOME"]
 		if *javaHome == "" {
 			t.Errorf("expected JAVA_HOME to be set, got '%s'", *javaHome)
 		}
-		path := keys["PATH"]
-		if *path == "" {
-			t.Errorf("expected PATH to be set, got '%s'", *path)
+		path := keys.Paths
+		if len(path) != 2 {
+			t.Errorf("expected 2 paths, got %d", len(path))
 		}
 
-		if !strings.HasSuffix(*path, "/bin") {
-			t.Errorf("expected PATH to end with '/bin', got '%s'", *path)
+		if !strings.HasSuffix(path[0], "/bin") {
+			t.Errorf("expected PATH to end with '/bin', got '%s'", path[0])
+		}
+		if !strings.HasSuffix(path[1], "/bin2") {
+			t.Errorf("expected PATH to end with '/bin', got '%s'", path[1])
 		}
 	})
 

@@ -51,7 +51,7 @@ var Env = &cli.Command{
 
 func envCmd(ctx *cli.Context) error {
 	if ctx.IsSet("json") {
-		type SDKs map[string]map[string]string
+		type SDKs map[string]map[string]*string
 		data := struct {
 			IsHookEnv bool     `json:"is_hook_env"`
 			Paths     []string `json:"paths"`
@@ -66,17 +66,8 @@ func envCmd(ctx *cli.Context) error {
 		for k, v := range manager.Record.Export() {
 			if lookupSdk, err := manager.LookupSdk(k); err == nil {
 				if keys, err := lookupSdk.EnvKeys(internal.Version(v)); err == nil {
-					newEnv := make(map[string]string)
-					for key, value := range keys {
-						if key == "PATH" {
-							data.Paths = append(data.Paths, *value)
-						} else {
-							newEnv[key] = *value
-						}
-					}
-					if len(newEnv) > 0 {
-						data.SDKs[lookupSdk.Plugin.Name] = newEnv
-					}
+					data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
+					data.Paths = append(data.Paths, keys.Paths...)
 				}
 			}
 		}
@@ -108,14 +99,18 @@ func envCmd(ctx *cli.Context) error {
 			return err
 		}
 
-		sdkPaths := envKeys["PATH"]
-		if sdkPaths != nil {
+		exportEnvs := make(env.Vars)
+		for k, v := range envKeys.Variables {
+			exportEnvs[k] = v
+		}
+		sdkPaths := envKeys.Paths
+		if len(sdkPaths) != 0 {
 			originPath := os.Getenv(env.PathFlag)
-			paths := manager.EnvManager.Paths([]string{*sdkPaths, originPath})
-			envKeys["PATH"] = &paths
+			paths := manager.EnvManager.Paths(append(sdkPaths[:], originPath))
+			exportEnvs["PATH"] = &paths
 		}
 
-		exportStr := s.Export(envKeys)
+		exportStr := s.Export(exportEnvs)
 		fmt.Println(exportStr)
 		return nil
 	}

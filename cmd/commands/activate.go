@@ -47,15 +47,19 @@ func activateCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	envKeys[env.HookFlag] = &name
+	exportEnvs := make(env.Vars)
+	for k, v := range envKeys.Variables {
+		exportEnvs[k] = v
+	}
+
+	exportEnvs[env.HookFlag] = &name
 	originPath := os.Getenv("PATH")
-	envKeys[env.PathFlag] = &originPath
+	exportEnvs[env.PathFlag] = &originPath
 
-	sdkPaths := envKeys["PATH"]
-	if sdkPaths != nil {
-		paths := manager.EnvManager.Paths([]string{*sdkPaths, originPath})
-
-		envKeys["PATH"] = &paths
+	sdkPaths := envKeys.Paths
+	if len(sdkPaths) != 0 {
+		paths := manager.EnvManager.Paths(append(sdkPaths[:], originPath))
+		exportEnvs["PATH"] = &paths
 	}
 
 	path := manager.PathMeta.ExecutablePath
@@ -64,7 +68,7 @@ func activateCmd(ctx *cli.Context) error {
 	if s == nil {
 		return fmt.Errorf("unknow target shell %s", name)
 	}
-	exportStr := s.Export(envKeys)
+	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate()
 	if err != nil {
 		return err

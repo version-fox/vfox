@@ -20,7 +20,6 @@ package env
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"syscall"
@@ -118,18 +117,8 @@ func (w *windowsEnvManager) Flush() (err error) {
 	return
 }
 
-func (w *windowsEnvManager) Load(key, value string) error {
-	if key == "PATH" {
-		keys := strings.Split(value, ";")
-		for _, k := range keys {
-			_, ok := w.pathMap[k]
-			if !ok {
-				w.pathMap[k] = struct{}{}
-				w.paths = append(w.paths, k)
-			}
-		}
-
-	} else {
+func (w *windowsEnvManager) Load(envs *Envs) error {
+	for k, v := range envs.Variables {
 		err := os.Setenv(key, value)
 		if err != nil {
 			return err
@@ -137,6 +126,13 @@ func (w *windowsEnvManager) Load(key, value string) error {
 		err = w.key.SetStringValue(key, value)
 		if err != nil {
 			return err
+		}
+	}
+	for _, path := range envs.Paths {
+		_, ok := w.pathMap[k]
+		if !ok {
+			w.pathMap[k] = struct{}{}
+			w.paths = append(w.paths, k)
 		}
 	}
 	return nil
@@ -150,12 +146,15 @@ func (w *windowsEnvManager) Get(key string) (string, bool) {
 	return val, true
 }
 
-func (w *windowsEnvManager) Remove(key string) error {
-	if key == "PATH" {
-		return fmt.Errorf("can not remove PATH variable")
+func (w *windowsEnvManager) Remove(envs *Envs) error {
+	for k, _ := range envs.Variables {
+		if key == "PATH" {
+			return fmt.Errorf("can not remove PATH variable")
+		}
+		_ = w.key.DeleteValue(k)
 	}
-	keys := strings.Split(key, ";")
-	for _, k := range keys {
+
+	for _, k := range envs.Paths {
 		if _, ok := w.pathMap[k]; ok {
 			delete(w.pathMap, k)
 			var newPaths []string
@@ -166,8 +165,6 @@ func (w *windowsEnvManager) Remove(key string) error {
 			}
 			w.paths = newPaths
 			w.deletedPathMap[k] = struct{}{}
-		} else {
-			_ = w.key.DeleteValue(k)
 		}
 	}
 	return nil

@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/util"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -206,7 +207,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	return nil
 }
 
-func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
+func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 	L := l.vm.Instance
 	mainInfo := sdkPackage.Main
 
@@ -237,7 +238,9 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, fmt.Errorf("no environment variables provided")
 	}
 
-	envKeys := make(env.Envs)
+	envKeys := &env.Envs{
+		Variables: make(env.Vars),
+	}
 
 	var items []*EnvKeysHookResultItem
 	err = luai.Unmarshal(table, &items)
@@ -245,9 +248,16 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, err
 	}
 
+	pathSet := util.NewSortedSet[string]()
 	for _, item := range items {
-		envKeys[item.Key] = &item.Value
+		if item.Key == "PATH" {
+			pathSet.Add(item.Value)
+		} else {
+			envKeys.Variables[item.Key] = &item.Value
+		}
 	}
+
+	envKeys.Paths = pathSet.Slice()
 
 	return envKeys, nil
 }

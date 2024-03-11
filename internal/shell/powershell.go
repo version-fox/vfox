@@ -48,7 +48,7 @@ func (sh pwsh) Activate() (string, error) {
 	return hook, nil
 }
 
-func (sh pwsh) Export(e env.Envs) (out string) {
+func (sh pwsh) Export(e env.Vars) (out string) {
 	for key, value := range e {
 		if value == nil {
 			out += sh.unset(key)

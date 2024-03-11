@@ -118,6 +118,10 @@ function PLUGIN:EnvKeys(ctx)
         {
             key = "PATH",
             value = mainPath .. "/bin"
+        },
+        {
+            key = "PATH",
+            value = mainPath .. "/bin2"
         }
     }
 end

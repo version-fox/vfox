@@ -51,7 +51,7 @@ func (b bash) Activate() (string, error) {
 	return bashHook, nil
 }
 
-func (b bash) Export(envs env.Envs) (out string) {
+func (b bash) Export(envs env.Vars) (out string) {
 	for key, value := range envs {
 		if value == nil {
 			out += b.unset(key)

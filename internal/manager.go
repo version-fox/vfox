@@ -52,26 +52,20 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys() (env.Envs, error) {
-	shellEnvs := make(env.Envs)
-	var paths []string
+func (m *Manager) EnvKeys() (*env.Envs, error) {
+	shellEnvs := &env.Envs{
+		Variables: make(env.Vars),
+		Paths:     make(env.Paths, 0),
+	}
 	for k, v := range m.Record.Export() {
 		if lookupSdk, err := m.LookupSdk(k); err == nil {
-			if keys, err := lookupSdk.EnvKeys(Version(v)); err == nil {
-				for key, value := range keys {
-					if key == "PATH" {
-						paths = append(paths, *value)
-					} else {
-						shellEnvs[key] = value
-					}
+			if ek, err := lookupSdk.EnvKeys(Version(v)); err == nil {
+				for key, value := range ek.Variables {
+					shellEnvs.Variables[key] = value
 				}
+				shellEnvs.Paths = append(shellEnvs.Paths, ek.Paths...)
 			}
 		}
-	}
-	if len(paths) != 0 {
-		pathStr := m.EnvManager.Paths(paths[:])
-		shellEnvs["PATH"] = &pathStr
-	} else {
 	}
 	return shellEnvs, nil
 }
