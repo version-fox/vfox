@@ -323,13 +323,14 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
-
 	if err := vm.Instance.DoString(content); err != nil {
 		return nil, err
 	}
+
+	// !!!! Must be set after loading the script to prevent overwriting!
+	// set OS_TYPE and ARCH_TYPE
+	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
+	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
 
 	pluginObj := vm.Instance.GetGlobal(LuaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
