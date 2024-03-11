@@ -20,7 +20,6 @@ import (
 	_ "embed"
 
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -60,8 +59,6 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 }
 
 func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
-	logger.Debugf("CallFunction: %s", function.String())
-
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,

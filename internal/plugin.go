@@ -79,7 +79,7 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 		return nil, err
 	}
 
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString("Available"), l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("Available", l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +139,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
-	if err := l.vm.CallFunction(l.pluginObj.RawGetString("PreInstall"), l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PreInstall", l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -180,8 +180,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	L := l.vm.Instance
 
-	function := l.pluginObj.RawGetString("PostInstall")
-	if function.Type() == lua.LTNil {
+	if !l.HasFunction("PostInstall") {
 		return nil
 	}
 
@@ -200,7 +199,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 		return err
 	}
 
-	if err := l.vm.CallFunction(function, l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PostInstall", l.pluginObj, ctxTable); err != nil {
 		return err
 	}
 
@@ -228,7 +227,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		return nil, err
 	}
 
-	if err = l.vm.CallFunction(l.pluginObj.RawGetString("EnvKeys"), l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("EnvKeys", l.pluginObj, ctxTable); err != nil {
 		return nil, err
 	}
 
@@ -285,12 +284,11 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", err
 	}
 
-	function := l.pluginObj.RawGetString("PreUse")
-	if function.Type() == lua.LTNil {
+	if !l.HasFunction("PreUse") {
 		return "", nil
 	}
 
-	if err := l.vm.CallFunction(function, l.pluginObj, ctxTable); err != nil {
+	if err = l.CallFunction("PreUse", l.pluginObj, ctxTable); err != nil {
 		return "", err
 	}
 
@@ -306,6 +304,14 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	}
 
 	return Version(result.Version), nil
+}
+
+func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
+	logger.Debugf("CallFunction: %s\n", funcName)
+	if err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), args...); err != nil {
+		return err
+	}
+	return nil
 }
 
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
