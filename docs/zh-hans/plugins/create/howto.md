@@ -119,9 +119,14 @@ function PLUGIN:EnvKeys(ctx)
             key = "JAVA_HOME",
             value = mainPath
         },
+        --- 注意, 如果需要设置多个PATH路径, 只需要传递多个PATH即可,vfox将会自动去重并按配置顺序设置
         {
             key = "PATH",
             value = mainPath .. "/bin"
+        },
+        {
+            key = "PATH",
+            value = mainPath .. "/bin2"
         }
     }
 end
