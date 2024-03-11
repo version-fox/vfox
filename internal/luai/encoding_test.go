@@ -67,7 +67,7 @@ func TestEncoding(t *testing.T) {
 
 	s := []any{"value1", 2, true}
 
-	t.Run("Struct", (func(t *testing.T) {
+	t.Run("Struct", func(t *testing.T) {
 		luaVm := lua.NewState()
 		defer luaVm.Close()
 
@@ -85,11 +85,11 @@ func TestEncoding(t *testing.T) {
 		luaVm.SetGlobal("table", _table)
 
 		if err := luaVm.DoString(`
-			assert(table.Field1 == "test")
-			assert(table.Field2 == 1)
-			assert(table.Field3 == true)
-			print("lua Struct done")
-		`); err != nil {
+				assert(table.Field1 == "test")
+				assert(table.Field2 == 1)
+				assert(table.Field3 == true)
+				print("lua Struct done")
+			`); err != nil {
 			t.Fatal(err)
 		}
 
@@ -102,9 +102,9 @@ func TestEncoding(t *testing.T) {
 		if !reflect.DeepEqual(test, struct2) {
 			t.Errorf("expected %+v, got %+v", test, struct2)
 		}
-	}))
+	})
 
-	t.Run("Struct with Tag", (func(t *testing.T) {
+	t.Run("Struct with Tag", func(t *testing.T) {
 		luaVm := lua.NewState()
 		defer luaVm.Close()
 
@@ -123,11 +123,11 @@ func TestEncoding(t *testing.T) {
 
 		luaVm.SetGlobal("table", table)
 		if err := luaVm.DoString(`
-			assert(table.field1 == "test")
-			assert(table.field2 == 1)
-			assert(table.field3 == true)
-			print("lua Struct with Tag done")
-		`); err != nil {
+				assert(table.field1 == "test")
+				assert(table.field2 == 1)
+				assert(table.field3 == true)
+				print("lua Struct with Tag done")
+			`); err != nil {
 			t.Fatal(err)
 		}
 
@@ -140,9 +140,9 @@ func TestEncoding(t *testing.T) {
 		if !reflect.DeepEqual(test, struct2) {
 			t.Errorf("expected %+v, got %+v", test, struct2)
 		}
-	}))
+	})
 
-	t.Run("Support Map, Slice and Any", (func(t *testing.T) {
+	t.Run("Support Map, Slice and Any", func(t *testing.T) {
 		L := lua.NewState()
 		defer L.Close()
 		table, err := Marshal(L, m)
@@ -151,11 +151,11 @@ func TestEncoding(t *testing.T) {
 		}
 		L.SetGlobal("m", table)
 		if err := L.DoString(`
-			assert(m.key1 == "value1")
-			assert(m.key2 == 2)
-			assert(m.key3 == true)
-			print("lua Map done")
-			`); err != nil {
+				assert(m.key1 == "value1")
+				assert(m.key2 == 2)
+				assert(m.key3 == true)
+				print("lua Map done")
+				`); err != nil {
 			t.Errorf("map test failed: %v", err)
 		}
 
@@ -166,11 +166,11 @@ func TestEncoding(t *testing.T) {
 
 		L.SetGlobal("s", slice)
 		if err := L.DoString(`
-			assert(s[1] == "value1")
-			assert(s[2] == 2)
-			assert(s[3] == true)
-			print("lua Slice done")
-		`); err != nil {
+				assert(s[1] == "value1")
+				assert(s[2] == 2)
+				assert(s[3] == true)
+				print("lua Slice done")
+			`); err != nil {
 			t.Errorf("slice test failed: %v", err)
 		}
 
@@ -215,7 +215,7 @@ func TestEncoding(t *testing.T) {
 		if !reflect.DeepEqual(s, s3) {
 			t.Errorf("expected %+v, got %+v", s, s3)
 		}
-	}))
+	})
 
 	t.Run("MapSliceStructUnified", func(t *testing.T) {
 		L := lua.NewState()
@@ -275,6 +275,39 @@ func TestEncoding(t *testing.T) {
 
 		if !reflect.DeepEqual(input, output) {
 			t.Errorf("expected %+v, got %+v", input, output)
+		}
+	})
+
+	t.Run("TableWithEmptyField", func(t *testing.T) {
+		L := lua.NewState()
+		defer L.Close()
+
+		output := struct {
+			Field1 string  `luai:"field1"`
+			Field2 *string `luai:"field2"`
+		}{}
+
+		if err := L.DoString(`
+			return {
+				field1 = "value1",	
+            }
+		`); err != nil {
+			t.Errorf("map test failed: %v", err)
+		}
+
+		table := L.ToTable(-1) // returned value
+		L.Pop(1)
+		// Unmarshal
+		err := Unmarshal(table, &output)
+		if err != nil {
+			t.Fatalf("unmarshal map failed: %v", err)
+		}
+		fmt.Printf("output: %+v\n", output)
+		if output.Field1 != "value1" {
+			t.Errorf("expected %+v, got %+v", "value1", output.Field1)
+		}
+		if output.Field2 != nil {
+			t.Errorf("expected %+v, got %+v", nil, output.Field2)
 		}
 	})
 }

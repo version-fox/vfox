@@ -45,7 +45,9 @@ type PrepareOptions struct {
 }
 
 func (vm *LuaVM) Prepare(options *PrepareOptions) error {
-	vm.Instance.DoString(preloadScript)
+	if err := vm.Instance.DoString(preloadScript); err != nil {
+		return err
+	}
 	module.Preload(vm.Instance, options.Config)
 
 	return nil

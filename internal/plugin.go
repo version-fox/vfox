@@ -52,14 +52,14 @@ func (l *LuaPlugin) checkValid() error {
 	if l.vm == nil || l.vm.Instance == nil {
 		return fmt.Errorf("lua vm is nil")
 	}
-	obj := l.pluginObj
-	if obj.RawGetString("Available") == lua.LNil {
+
+	if !l.HasFunction("Available") {
 		return fmt.Errorf("[Available] function not found")
 	}
-	if obj.RawGetString("PreInstall") == lua.LNil {
+	if !l.HasFunction("PreInstall") {
 		return fmt.Errorf("[PreInstall] function not found")
 	}
-	if obj.RawGetString("EnvKeys") == lua.LNil {
+	if !l.HasFunction("EnvKeys") {
 		return fmt.Errorf("[EnvKeys] function not found")
 	}
 	return nil
@@ -215,7 +215,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 		// TODO Will be deprecated in future versions
 		Path:           mainInfo.Path,
 		RuntimeVersion: RuntimeVersion,
-		Main:           (mainInfo),
+		Main:           mainInfo,
 		SdkInfo:        make(map[string]*Info),
 	}
 
@@ -240,7 +240,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (env.Envs, error) {
 
 	envKeys := make(env.Envs)
 
-	items := []*EnvKeysHookResultItem{}
+	var items []*EnvKeysHookResultItem
 	err = luai.Unmarshal(table, &items)
 	if err != nil {
 		return nil, err
@@ -311,9 +311,11 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	vm := luai.NewLuaVM()
 
-	vm.Prepare(&luai.PrepareOptions{
+	if err := vm.Prepare(&luai.PrepareOptions{
 		Config: manager.Config,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	// set OS_TYPE and ARCH_TYPE
 	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
