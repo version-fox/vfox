@@ -33,12 +33,13 @@ const hook = `
 {{.EnvContent}}
 
 $__VFOX_PID=$pid;
+$originalPrompt = & $function:prompt
 function prompt {
     $export = &"{{.SelfPath}}" env -s pwsh;
     if ($export) {
-      Invoke-Expression -Command $export;
+		Invoke-Expression -Command $export;
     }
-	return "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) ";
+    return $originalPrompt;
 }
 
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
