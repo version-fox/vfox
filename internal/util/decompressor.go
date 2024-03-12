@@ -20,11 +20,12 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"github.com/ulikunitz/xz"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ulikunitz/xz"
 )
 
 type Decompressor interface {
@@ -179,13 +180,14 @@ type ZipDecompressor struct {
 }
 
 func (z *ZipDecompressor) Decompress(dest string) error {
+	rootFolderInZip := FindRootFolderInZip(z.src)
 	r, err := zip.OpenReader(z.src)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 	for _, f := range r.File {
-		err := z.processZipFile(f, dest)
+		err := z.processZipFile(f, dest, rootFolderInZip)
 		if err != nil {
 			return err
 		}
@@ -193,7 +195,45 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 	return nil
 }
 
-func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
+func FindRootFolderInZip(zipFilePath string) string {
+	r, err := zip.OpenReader(zipFilePath)
+	if err != nil {
+		return ""
+	}
+	defer r.Close()
+
+	// Stores the first element of the path of all files
+	var firstElements []string
+
+	// Checks if the slice contains the specified element
+	contains := func(slice []string, element string) bool {
+		for _, e := range slice {
+			if e == element {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, f := range r.File {
+		// Extract the first element of the file path
+		firstElement := strings.Split(f.Name, "/")[0]
+
+		// Adds the first element to the list
+		if !contains(firstElements, firstElement) {
+			firstElements = append(firstElements, firstElement)
+		}
+	}
+
+	// If there is only a first element, there is a root folder
+	if len(firstElements) == 1 {
+		return firstElements[0]
+	}
+
+	return ""
+}
+
+func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZip string) error {
 	rc, err := f.Open()
 	if err != nil {
 		return err
@@ -202,7 +242,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
 
 	// Split the file name into a slice
 	parts := strings.Split(f.Name, "/")
-	if len(parts) > 1 {
+	if len(parts) > 1 && rootFolderInZip != "" {
 		// Remove the first element
 		parts = parts[1:]
 	}
