@@ -18,8 +18,21 @@ API、配置文件和实现方式（比如，`$PATH`
 - 支持**Global**、**Project**、**Session** 三种作用域
 - 简单的 **插件系统** 来添加对你选择的语言的支持
 - 在您切换项目时, 帮您**自动切换**运行时版本
-- 支持常用Shell(Powershell、bash、zsh),并提供补全功能
+- 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
 - **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](../misc/vs-asdf.md)。
+
+## 已支持 Shell
+
+| Shell      | Support | Note                                                                            |
+|------------|---------|---------------------------------------------------------------------------------|
+| Powershell | ✅       |                                                                                 |
+| GitBash    | ✅       | [相关问题](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
+| Bash       | ✅       |                                                                                 |
+| ZSH        | ✅       |                                                                                 |
+| Fish       | ✅       |                                                                                 |
+| CMD        | ✅       | 仅支持`Global`作用域                                                                  |
+
+
 
 ## 贡献者
 

@@ -21,9 +21,22 @@ through a simple plugin interface.
 - Supports **Global**, **Project**, **Session** three scopes
 - Simple **plugin system** to add support for the languages you choose
 - **Automatically switch** runtime versions for you when you switch projects
-- Supports common Shells (Powershell, bash, zsh), and provides autocompletion
+- Supports common Shells (Powershell, Bash, ZSH), and provides autocompletion
 - **Faster than `asdf-vm`**, and provides simpler commands and true cross-platform unification.
   See [Comparison to asdf](../misc/vs-asdf.md)。
+
+## Supported Shell
+
+| Shell      | Support | Note                                                                             |
+|------------|---------|----------------------------------------------------------------------------------|
+| Powershell | ✅       |                                                                                  |
+| GitBash    | ✅       | [Issue](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
+| Bash       | ✅       |                                                                                  |
+| ZSH        | ✅       |                                                                                  |
+| Fish       | ✅       |                                                                                  |
+| CMD        | ✅       | Only Support `Global` Scope                                                      |
+
+
 
 ## Contributors
 

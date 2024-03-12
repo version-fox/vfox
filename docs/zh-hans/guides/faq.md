@@ -37,3 +37,11 @@ $ vfox remove nodejs
 ::: warning
 同一个SDK**最多重复两条**, 不会无限重复。如果>2次, 请反馈给我们。
 ::: 
+
+## GitBash下`use`和`search`命令无法进行选择?
+
+相关ISSUE: [GitBash下无法进行选择](https://github.com/version-fox/vfox/issues/98)
+
+仅限直接打开原生GitBash运行`vfox`会出现无法进行选择的问题, 临时解决办法:
+1. 通过`Windows Terminal`运行`GitBash`
+2. 在`VS Code`中运行`GitBash`

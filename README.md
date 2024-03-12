@@ -26,7 +26,7 @@ and switch between different environment you need via the command line.
 - support **Global**、**Project**、**Session** scopes when switching versions
 - simple **plugin system** to add support for your language of choice
 - **automatically switches** runtime versions as you traverse your project
-- shell completion available for common shells (Bash, Zsh, Powershell)
+- shell completion available for common shells (Bash, ZSH, Powershell)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
   see [Comparison with asdf](https://vfox.lhan.me/misc/vs-asdf.html)
 
