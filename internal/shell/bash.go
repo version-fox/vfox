@@ -25,6 +25,9 @@ import (
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
 {{.EnvContent}}
+
+export __VFOX_PID=$$;
+
 _vfox_hook() {
   local previous_exit_status=$?;
   trap -- '' SIGINT;

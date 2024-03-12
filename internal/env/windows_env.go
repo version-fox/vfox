@@ -20,11 +20,13 @@ package env
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
 	"unsafe"
 
+	"github.com/version-fox/vfox/internal/util"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -72,11 +74,18 @@ func (w *windowsEnvManager) Flush() (err error) {
 			customPathSet[path] = struct{}{}
 		}
 		pathValue := strings.Join(customPaths, ";")
-		if err = w.Load("VERSION_FOX_PATH", pathValue); err != nil {
+		if err = w.Load((&Envs{
+			Variables: Vars{
+				"VERSION_FOX_PATH": &pathValue,
+			},
+		})); err != nil {
 			return err
 		}
 	} else {
-		_ = w.Remove("VERSION_FOX_PATH")
+		_ = w.Remove(&Envs{
+			Variables: Vars{
+				"VERSION_FOX_PATH": nil,
+			}})
 	}
 	// user env
 	oldPath, success := w.Get("PATH")
@@ -119,20 +128,20 @@ func (w *windowsEnvManager) Flush() (err error) {
 
 func (w *windowsEnvManager) Load(envs *Envs) error {
 	for k, v := range envs.Variables {
-		err := os.Setenv(key, value)
+		err := os.Setenv(k, *v)
 		if err != nil {
 			return err
 		}
-		err = w.key.SetStringValue(key, value)
+		err = w.key.SetStringValue(k, *v)
 		if err != nil {
 			return err
 		}
 	}
 	for _, path := range envs.Paths {
-		_, ok := w.pathMap[k]
+		_, ok := w.pathMap[path]
 		if !ok {
-			w.pathMap[k] = struct{}{}
-			w.paths = append(w.paths, k)
+			w.pathMap[path] = struct{}{}
+			w.paths = append(w.paths, path)
 		}
 	}
 	return nil
@@ -148,7 +157,7 @@ func (w *windowsEnvManager) Get(key string) (string, bool) {
 
 func (w *windowsEnvManager) Remove(envs *Envs) error {
 	for k, _ := range envs.Variables {
-		if key == "PATH" {
+		if k == "PATH" {
 			return fmt.Errorf("can not remove PATH variable")
 		}
 		_ = w.key.DeleteValue(k)
@@ -187,8 +196,18 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 }
 
 func (w *windowsEnvManager) Paths(paths []string) string {
-	set := util.NewSortedSetWithSlice[string](paths)
-	return strings.Join(set.Slice(), ";")
+	if os.Getenv(HookFlag) == "bash" {
+		set := util.NewSortedSet[string]()
+		for _, p := range paths {
+			for _, pp := range strings.Split(p, ";") {
+				set.Add(pp)
+			}
+		}
+		return strings.Join(set.Slice(), ":")
+	} else {
+		set := util.NewSortedSetWithSlice(paths)
+		return strings.Join(set.Slice(), ";")
+	}
 }
 
 func NewEnvManager(vfConfigPath string) (Manager, error) {

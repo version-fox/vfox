@@ -31,6 +31,8 @@ var Pwsh Shell = pwsh{}
 
 const hook = `
 {{.EnvContent}}
+
+$__VFOX_PID=$pid;
 function prompt {
     $export = &"{{.SelfPath}}" env -s pwsh;
     if ($export) {

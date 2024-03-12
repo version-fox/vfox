@@ -19,11 +19,12 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
-	"os"
 )
 
 var Env = &cli.Command{
@@ -50,6 +51,7 @@ var Env = &cli.Command{
 }
 
 func envCmd(ctx *cli.Context) error {
+	// TODO  env not effect for git bash
 	if ctx.IsSet("json") {
 		type SDKs map[string]map[string]*string
 		data := struct {

@@ -31,33 +31,35 @@ var Fish Shell = fish{}
 
 const fishHook = `
 {{.EnvContent}}
-    function __vfox_export_eval --on-event fish_prompt;
-        "{{.SelfPath}}" env -s fish | source;
 
-        if test "$vfox_fish_mode" != "disable_arrow";
-            function __vfox_cd_hook --on-variable PWD;
-                if test "$vfox_fish_mode" = "eval_after_arrow";
-                    set -g __vfox_export_again 0;
-                else;
-                    "{{.SelfPath}}" env -s fish | source;
-                end;
-            end;
-        end;
-    end;
+set __VFOX_PID %self;
+function __vfox_export_eval --on-event fish_prompt;
+	"{{.SelfPath}}" env -s fish | source;
 
-    function __vfox_export_eval_2 --on-event fish_preexec;
-        if set -q __vfox_export_again;
-            set -e __vfox_export_again;
-            "{{.SelfPath}}" env -s fish | source;
-            echo;
-        end;
-
-        functions --erase __vfox_cd_hook;
-    end;
-	function cleanup_on_exit --on-process-exit %self
-
-		"{{.SelfPath}}" env --cleanup
+	if test "$vfox_fish_mode" != "disable_arrow";
+		function __vfox_cd_hook --on-variable PWD;
+			if test "$vfox_fish_mode" = "eval_after_arrow";
+				set -g __vfox_export_again 0;
+			else;
+				"{{.SelfPath}}" env -s fish | source;
+			end;
+		end;
 	end;
+end;
+
+function __vfox_export_eval_2 --on-event fish_preexec;
+	if set -q __vfox_export_again;
+		set -e __vfox_export_again;
+		"{{.SelfPath}}" env -s fish | source;
+		echo;
+	end;
+
+	functions --erase __vfox_cd_hook;
+end;
+function cleanup_on_exit --on-process-exit %self
+
+	"{{.SelfPath}}" env --cleanup
+end;
 `
 
 func (sh fish) Activate() (string, error) {

@@ -16,11 +16,15 @@
 
 package env
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 const (
 	HookFlag = "__VFOX_SHELL"
 	PathFlag = "__VFOX_ORIG_PATH"
+	PidFlag  = "__VFOX_PID"
 )
 
 func IsHookEnv() bool {
@@ -29,4 +33,12 @@ func IsHookEnv() bool {
 
 func GetOrigPath() string {
 	return os.Getenv(PathFlag)
+}
+
+func GetPid() int {
+	if pid := os.Getenv(PidFlag); pid != "" {
+		p, _ := strconv.Atoi(pid) // Convert pid from string to int
+		return p
+	}
+	return os.Getppid()
 }

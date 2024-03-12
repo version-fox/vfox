@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -59,7 +60,7 @@ func newPathMeta() (*PathMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	pid := os.Getppid()
+	pid := env.GetPid()
 	timestamp := util.GetBeginOfToday()
 	name := fmt.Sprintf("%d-%d", timestamp, pid)
 	curTmpPath := filepath.Join(tmpPath, name)

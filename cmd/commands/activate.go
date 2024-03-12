@@ -52,10 +52,10 @@ func activateCmd(ctx *cli.Context) error {
 		exportEnvs[k] = v
 	}
 
+	os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
 	originPath := os.Getenv("PATH")
 	exportEnvs[env.PathFlag] = &originPath
-
 	sdkPaths := envKeys.Paths
 	if len(sdkPaths) != 0 {
 		paths := manager.EnvManager.Paths(append(sdkPaths[:], originPath))

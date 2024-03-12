@@ -26,6 +26,9 @@ var Zsh = zsh{}
 
 const zshHook = `
 {{.EnvContent}}
+
+export __VFOX_PID=$$;
+
 _vfox_hook() {
   trap -- '' SIGINT;
   eval "$("{{.SelfPath}}" env -s zsh)";
