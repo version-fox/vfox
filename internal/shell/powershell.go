@@ -33,7 +33,7 @@ const hook = `
 {{.EnvContent}}
 
 $__VFOX_PID=$pid;
-$originalPrompt = & $function:prompt
+$originalPrompt = $function:prompt;
 function prompt {
     $export = &"{{.SelfPath}}" env -s pwsh;
     if ($export) {
