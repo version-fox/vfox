@@ -39,7 +39,7 @@ function prompt {
     if ($export) {
 		Invoke-Expression -Command $export;
     }
-    return $originalPrompt;
+    &$originalPrompt;
 }
 
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
