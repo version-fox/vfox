@@ -32,8 +32,14 @@ var Pwsh Shell = pwsh{}
 const hook = `
 {{.EnvContent}}
 
+<#
+Due to a bug in PowerShell, we have to cleanup first when the shell open.
+#>
+& '{{.SelfPath}}' env --cleanup 2>$null | Out-Null;
+
 $__VFOX_PID=$pid;
 $originalPrompt = $function:prompt;
+
 function prompt {
     $export = &"{{.SelfPath}}" env -s pwsh;
     if ($export) {
@@ -42,6 +48,11 @@ function prompt {
     &$originalPrompt;
 }
 
+<#
+ There is a bug here. 
+ When powershell is closed via the x button, this event will not be fired.
+ See https://github.com/PowerShell/PowerShell/issues/8000
+#>
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
 	&"{{.SelfPath}}" env --cleanup;
 }

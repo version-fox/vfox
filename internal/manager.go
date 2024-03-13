@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	pluginIndexUrl = "https://version-fox.github.io/version-fox-plugins/"
+	pluginIndexUrl      = "https://version-fox.github.io/version-fox-plugins/"
+	cleanupFlagFilename = ".cleanup"
 )
 
 type Arg struct {
@@ -138,7 +139,9 @@ func (m *Manager) Remove(pluginName string) error {
 		return fmt.Errorf("remove failed, err: %w", err)
 	}
 	pterm.Printf("Removing %s sdk...\n", source.InstallPath)
-	err = os.RemoveAll(source.InstallPath)
+	if err = os.RemoveAll(source.InstallPath); err != nil {
+		return err
+	}
 	pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	return nil
 }
@@ -335,6 +338,17 @@ func (m *Manager) Available() ([]*Category, error) {
 }
 
 func (m *Manager) CleanTmp() {
+	// once per day
+	cleanFlagPath := filepath.Join(m.PathMeta.TempPath, cleanupFlagFilename)
+	if !util.FileExists(cleanFlagPath) {
+		_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), 0666)
+	} else {
+		if str, err := os.ReadFile(cleanFlagPath); err == nil {
+			if i, err := strconv.ParseInt(string(str), 10, 64); err == nil && !util.IsBeforeToday(i) {
+				return
+			}
+		}
+	}
 	dir, err := os.ReadDir(m.PathMeta.TempPath)
 	if err == nil {
 		_ = os.RemoveAll(m.PathMeta.CurTmpPath)
@@ -352,7 +366,7 @@ func (m *Manager) CleanTmp() {
 				continue
 			}
 			if util.IsBeforeToday(i) {
-				_ = os.Remove(filepath.Join(m.PathMeta.TempPath, file.Name()))
+				_ = os.RemoveAll(filepath.Join(m.PathMeta.TempPath, file.Name()))
 			}
 		}
 	}
