@@ -6,6 +6,12 @@ Here we take `Nodejs` as an example to introduce how to use `vfox`.
 
 ### Windows
 
+::: details Scoop
+```shell
+scoop install vfox
+```
+:::
+
 ::: details Setup Installer
 Please go to the [Releases](https://github.com/version-fox/vfox/releases) page to download the latest version of
 the `setup` installer, and then follow the
