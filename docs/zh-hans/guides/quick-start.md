@@ -12,6 +12,12 @@ scoop install vfox
 ```
 :::
 
+::: details winget
+```shell
+winget install vfox
+```
+:::
+
 ::: details Setup安装器
    前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的`setup`安装器，然后按照安装向导进行安装。
 :::

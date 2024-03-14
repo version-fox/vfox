@@ -12,6 +12,12 @@ scoop install vfox
 ```
 :::
 
+::: details winget
+```shell
+winget install vfox
+```
+:::
+
 ::: details Setup Installer
 Please go to the [Releases](https://github.com/version-fox/vfox/releases) page to download the latest version of
 the `setup` installer, and then follow the
