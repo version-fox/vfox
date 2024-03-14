@@ -202,35 +202,21 @@ func FindRootFolderInZip(zipFilePath string) string {
 	}
 	defer r.Close()
 
-	// Stores the first element of the path of all files
-	var firstElements []string
-
-	// Checks if the slice contains the specified element
-	contains := func(slice []string, element string) bool {
-		for _, e := range slice {
-			if e == element {
-				return true
-			}
-		}
-		return false
-	}
+	var firstElement string
 
 	for _, f := range r.File {
-		// Extract the first element of the file path
-		firstElement := strings.Split(f.Name, "/")[0]
 
-		// Adds the first element to the list
-		if !contains(firstElements, firstElement) {
-			firstElements = append(firstElements, firstElement)
+		currentFirstElement := strings.Split(f.Name, "/")[0]
+
+		if firstElement != "" && firstElement != currentFirstElement {
+			return ""
+		}
+
+		if firstElement == "" {
+			firstElement = currentFirstElement
 		}
 	}
-
-	// If there is only a first element, there is a root folder
-	if len(firstElements) == 1 {
-		return firstElements[0]
-	}
-
-	return ""
+	return firstElement
 }
 
 func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZip string) error {
