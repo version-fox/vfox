@@ -195,7 +195,7 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 	return nil
 }
 
-func FindRootFolderInZip(zipFilePath string) string {
+func findRootFolderInZip(zipFilePath string) string {
 	r, err := zip.OpenReader(zipFilePath)
 	if err != nil {
 		return ""
