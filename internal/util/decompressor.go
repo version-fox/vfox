@@ -20,11 +20,12 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"github.com/ulikunitz/xz"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ulikunitz/xz"
 )
 
 type Decompressor interface {
@@ -179,13 +180,14 @@ type ZipDecompressor struct {
 }
 
 func (z *ZipDecompressor) Decompress(dest string) error {
+	rootFolderInZip := findRootFolderInZip(z.src)
 	r, err := zip.OpenReader(z.src)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 	for _, f := range r.File {
-		err := z.processZipFile(f, dest)
+		err := z.processZipFile(f, dest, rootFolderInZip)
 		if err != nil {
 			return err
 		}
@@ -193,7 +195,31 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 	return nil
 }
 
-func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
+func findRootFolderInZip(zipFilePath string) string {
+	r, err := zip.OpenReader(zipFilePath)
+	if err != nil {
+		return ""
+	}
+	defer r.Close()
+
+	var firstElement string
+
+	for _, f := range r.File {
+
+		currentFirstElement := strings.Split(f.Name, "/")[0]
+
+		if firstElement != "" && firstElement != currentFirstElement {
+			return ""
+		}
+
+		if firstElement == "" {
+			firstElement = currentFirstElement
+		}
+	}
+	return firstElement
+}
+
+func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZip string) error {
 	rc, err := f.Open()
 	if err != nil {
 		return err
@@ -202,7 +228,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string) error {
 
 	// Split the file name into a slice
 	parts := strings.Split(f.Name, "/")
-	if len(parts) > 1 {
+	if len(parts) > 1 && rootFolderInZip != "" {
 		// Remove the first element
 		parts = parts[1:]
 	}
