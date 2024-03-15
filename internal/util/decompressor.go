@@ -180,7 +180,7 @@ type ZipDecompressor struct {
 }
 
 func (z *ZipDecompressor) Decompress(dest string) error {
-	rootFolderInZip := FindRootFolderInZip(z.src)
+	rootFolderInZip := findRootFolderInZip(z.src)
 	r, err := zip.OpenReader(z.src)
 	if err != nil {
 		return err
