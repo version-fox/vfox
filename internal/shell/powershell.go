@@ -39,6 +39,7 @@ Due to a bug in PowerShell, we have to cleanup first when the shell open.
 
 $__VFOX_PID=$pid;
 $originalPrompt = $function:prompt;
+$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [Text.UTF8Encoding]::UTF8;
 
 function prompt {
     $export = &"{{.SelfPath}}" env -s pwsh;
