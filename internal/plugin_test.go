@@ -9,9 +9,9 @@ import (
 	"github.com/version-fox/vfox/internal/logger"
 )
 
-//go:embed testdata/plugins/java.lua
+//go:embed testdata/plugins/java/main.lua
 var pluginContent string
-var pluginPath = "testdata/plugins/java.lua"
+var pluginPath = "testdata/plugins/java/main.lua"
 
 func setupSuite(tb testing.TB) func(tb testing.TB) {
 	logger.SetLevel(logger.DebugLevel)
