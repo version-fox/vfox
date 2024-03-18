@@ -288,7 +288,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 			return err
 		}
 	}
-	b.sdkManager.Record.Add(b.Plugin.Filename, string(version))
+	b.sdkManager.Record.Add(b.Plugin.SdkName, string(version))
 	err = b.sdkManager.Record.Save()
 	if err != nil {
 		return err
@@ -333,7 +333,7 @@ func (b *Sdk) getLocalSdkPackages() []*Package {
 }
 
 func (b *Sdk) Current() Version {
-	version := b.sdkManager.Record.Export()[b.Plugin.Filename]
+	version := b.sdkManager.Record.Export()[b.Plugin.SdkName]
 	return Version(version)
 }
 
@@ -483,7 +483,7 @@ func (b *Sdk) label(version Version) string {
 func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.Filename)),
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SdkName)),
 		Plugin:      source,
 	}, nil
 }

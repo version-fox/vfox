@@ -36,8 +36,8 @@ func TestPlugin(t *testing.T) {
 			t.Fatalf("expected plugin to be set, got nil")
 		}
 
-		if plugin.Filename != "java" {
-			t.Errorf("expected filename 'java', got '%s'", plugin.Filename)
+		if plugin.SdkName != "java" {
+			t.Errorf("expected filename 'java', got '%s'", plugin.SdkName)
 		}
 
 		if plugin.Filepath != pluginPath {

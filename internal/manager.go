@@ -73,9 +73,21 @@ func (m *Manager) EnvKeys() (*env.Envs, error) {
 
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
-	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
+	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name), "main.lua")
 	if !util.FileExists(pluginPath) {
-		return nil, fmt.Errorf("%s not installed", name)
+		oldPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
+		if !util.FileExists(oldPath) {
+			return nil, fmt.Errorf("%s not installed", name)
+		}
+		// FIXME !!! This snippet will be removed in a later version
+		// rename old plugin path to new plugin path
+		err := os.Mkdir(filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)), 0777)
+		if err != nil {
+			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
+		}
+		if err = os.Rename(oldPath, pluginPath); err != nil {
+			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
+		}
 	}
 	content, err := m.loadLuaFromFileOrUrl(pluginPath)
 	if err != nil {
@@ -97,24 +109,34 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 	}
 	sdkMap := make(map[string]*Sdk)
 	for _, d := range dir {
-		if d.IsDir() {
+		sdkName := d.Name()
+		path := filepath.Join(m.PathMeta.PluginPath, sdkName, "main.lua")
+		if util.FileExists(path) {
+		} else if strings.HasSuffix(sdkName, ".lua") {
+			// FIXME !!! This snippet will be removed in a later version
+			// rename old plugin path to new plugin path
+			newPluginDir := filepath.Join(m.PathMeta.PluginPath, strings.TrimSuffix(sdkName, ".lua"))
+			err = os.Mkdir(newPluginDir, 0777)
+			if err != nil {
+				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
+			}
+			if err = os.Rename(filepath.Join(m.PathMeta.PluginPath, sdkName), filepath.Join(newPluginDir, "main.lua")); err != nil {
+				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
+			}
+			path = filepath.Join(newPluginDir, "main.lua")
+			sdkName = strings.TrimSuffix(sdkName, ".lua")
+		} else {
 			continue
 		}
-		sdkName := d.Name()
-		if strings.HasSuffix(sdkName, ".lua") {
-			// filename first as sdk name
-			path := filepath.Join(m.PathMeta.PluginPath, sdkName)
-			content, _ := m.loadLuaFromFileOrUrl(path)
-			source, err := NewLuaPlugin(content, path, m)
-			if err != nil {
-				pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
-				continue
-			}
-			sdk, _ := NewSdk(m, source)
-			name := strings.TrimSuffix(filepath.Base(path), ".lua")
-			sdkMap[strings.ToLower(name)] = sdk
-			m.openSdks[strings.ToLower(name)] = sdk
+		content, _ := m.loadLuaFromFileOrUrl(path)
+		source, err := NewLuaPlugin(content, path, m)
+		if err != nil {
+			pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
+			continue
 		}
+		sdk, _ := NewSdk(m, source)
+		sdkMap[strings.ToLower(sdkName)] = sdk
+		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
 	return sdkMap, nil
 }
@@ -236,11 +258,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if len(alias) > 0 {
 		pname = alias
 	}
-	destPath := filepath.Join(m.PathMeta.PluginPath, pname+".lua")
+	destPath := filepath.Join(m.PathMeta.PluginPath, pname, "main.lua")
 	if util.FileExists(destPath) {
 		return fmt.Errorf("plugin %s already exists", pname)
 	}
-	err = os.WriteFile(destPath, []byte(content), 0644)
+	err = os.WriteFile(destPath, []byte(content), 0777)
 	if err != nil {
 		return fmt.Errorf("add plugin error: %w", err)
 	}
@@ -341,7 +363,7 @@ func (m *Manager) CleanTmp() {
 	// once per day
 	cleanFlagPath := filepath.Join(m.PathMeta.TempPath, cleanupFlagFilename)
 	if !util.FileExists(cleanFlagPath) {
-		_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), 0666)
+		_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), 0777)
 	} else {
 		if str, err := os.ReadFile(cleanFlagPath); err == nil {
 			if i, err := strconv.ParseInt(string(str), 10, 64); err == nil && !util.IsBeforeToday(i) {

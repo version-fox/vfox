@@ -20,15 +20,13 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
-	"path/filepath"
-	"regexp"
-	"strings"
-
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
+	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
+	"path/filepath"
+	"regexp"
 )
 
 const (
@@ -43,7 +41,7 @@ type LuaPlugin struct {
 	// plugin source path
 	Filepath string
 	// plugin filename, this is also alias name, sdk-name
-	Filename string
+	SdkName string
 	// The name defined inside the plugin
 
 	LuaPluginInfo
@@ -353,7 +351,7 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 		vm:        vm,
 		pluginObj: PLUGIN,
 		Filepath:  path,
-		Filename:  strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+		SdkName:   filepath.Base(filepath.Dir(path)),
 	}
 
 	if err := source.checkValid(); err != nil {
