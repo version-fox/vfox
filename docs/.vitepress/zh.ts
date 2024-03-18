@@ -23,10 +23,22 @@ export const zh = defineConfig({
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
+        editLink: {
+            pattern: 'https://github.com/version-fox/vfox/edit/main/docs/:path',
+            text: '在 GitHub 上编辑此页面'
+        },
+
         footer: {
             message: '基于 Apache 2.0 许可发布',
             copyright: '版权所有 © 2023-现在 李晗'
-        }
+        },
+        docFooter: {
+            prev: '上一页',
+            next: '下一页'
+        },
+        outline: {
+            label: '页面导航'
+        },
     }
 })
 

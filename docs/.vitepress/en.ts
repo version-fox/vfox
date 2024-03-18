@@ -23,6 +23,10 @@ export const en= defineConfig({
     themeConfig: {
         nav: nav(),
         sidebar: sidebar(),
+        editLink: {
+            pattern: 'https://github.com/version-fox/vfox/edit/main/docs/:path',
+            text: 'Edit this page on GitHub'
+        },
         footer: {
             message: 'Released under the Apache 2.0 License.',
             copyright: 'Copyright © 2023-present Han Li'
