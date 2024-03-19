@@ -201,7 +201,9 @@ func (m *Manager) Update(pluginName string) error {
 	}()
 	pterm.Println("Checking plugin version...")
 	if util.CompareVersion(source.Version, sdk.Plugin.Version) <= 0 {
-		return fmt.Errorf("the plugin is already the latest version")
+		success = true
+		pterm.Printf("the plugin is already the latest version")
+		return nil
 	}
 	err = os.WriteFile(sdk.Plugin.Filepath, []byte(content), 0644)
 	if err != nil {
