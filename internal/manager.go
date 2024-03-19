@@ -154,7 +154,7 @@ func (m *Manager) Remove(pluginName string) error {
 		return err
 	}
 	source.clearCurrentEnvConfig()
-	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName+".lua")
+	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName)
 	pterm.Printf("Removing %s plugin...\n", pPath)
 	err = os.RemoveAll(pPath)
 	if err != nil {
@@ -262,8 +262,10 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if util.FileExists(destPath) {
 		return fmt.Errorf("plugin %s already exists", pname)
 	}
-	err = os.WriteFile(destPath, []byte(content), 0777)
-	if err != nil {
+	if err = os.Mkdir(filepath.Dir(destPath), 0777); err != nil {
+		return fmt.Errorf("add plugin error: %w", err)
+	}
+	if err = os.WriteFile(destPath, []byte(content), 0777); err != nil {
 		return fmt.Errorf("add plugin error: %w", err)
 	}
 	pterm.Println("Plugin info:")
