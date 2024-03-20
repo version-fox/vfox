@@ -96,7 +96,7 @@ New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
 # 如果它提示未能找到路径，那么你需要强制创建profile。添加"-Force"选项。
 # New-Item -Type File -Path $PROFILE –Force
 
-Invoke-Item $PROFILE
+Invoke-Item $PROFILE # 打开profile
 ```
 
 将下面一行添加到你的 $PROFILE 文件末尾并保存:
