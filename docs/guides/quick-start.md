@@ -110,7 +110,11 @@ Open PowerShell Profile:
 
 ```shell
 New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error.
-Invoke-Item $PROFILE
+
+# If it prompts "Unable to find the path", then you need to forcefully create profile. Add the "-Force" option.
+# New-Item -Type File -Path $PROFILE –Force
+
+Invoke-Item $PROFILE  # open Profile
 ```
 
 Add the following line to the end of your profile and save:
