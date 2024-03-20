@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
-	"os"
+	"github.com/version-fox/vfox/internal/logger"
 	"sort"
 	"strings"
 )
@@ -184,8 +184,8 @@ func (s *PageKVSelect) Show() (*KV, error) {
 			area.Update(s.renderSelect())
 		case keys.CtrlC:
 			s.result = nil
-			os.Exit(0)
-			return true, fmt.Errorf("keyboard interrupt")
+			logger.Info("Ctrl+C pressed, program stopped.")
+			return true, nil
 		case keys.Down:
 			s.changeIndex(1)
 			area.Update(s.renderSelect())
