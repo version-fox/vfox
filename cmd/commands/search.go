@@ -97,5 +97,8 @@ func searchCmd(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("select version error: %w", err)
 	}
+	if version == nil {
+		return nil
+	}
 	return source.Install(internal.Version(version.Key))
 }
