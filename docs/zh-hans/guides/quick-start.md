@@ -92,6 +92,10 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 ```shell
 New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
+
+# 如果它提示未能找到路径，那么你需要强制创建profile。添加"-Force"选项。
+# New-Item -Type File -Path $PROFILE –Force
+
 Invoke-Item $PROFILE
 ```
 
