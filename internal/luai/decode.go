@@ -88,13 +88,18 @@ func indirect(v reflect.Value) reflect.Value {
 
 func storeLiteral(value reflect.Value, lvalue lua.LValue) {
 	value = indirect(value)
-	switch lvalue.Type() {
-	case lua.LTString:
+
+	switch value.Kind() {
+	case reflect.String:
 		value.SetString(lvalue.String())
-	case lua.LTNumber:
-		value.SetInt(int64(lvalue.(lua.LNumber)))
-	case lua.LTBool:
+	case reflect.Bool:
 		value.SetBool(bool(lvalue.(lua.LBool)))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		value.SetInt(int64(lvalue.(lua.LNumber)))
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		value.SetUint(uint64(lvalue.(lua.LNumber)))
+	case reflect.Float32, reflect.Float64:
+		value.SetFloat(float64(lvalue.(lua.LNumber)))
 	}
 }
 
@@ -106,6 +111,15 @@ func objectInterface(lvalue *lua.LTable) any {
 	return v
 }
 
+// To unmarshal lua obj into an interface value,
+// Unmarshal stores one of these in the interface value:
+//
+//   - bool, for LTBool
+//   - float64, for LTNumber
+//   - string, for LTString
+//   - []interface{}, for LTTable arrays
+//   - map[string]interface{}, for LTTable objects
+//   - nil for LTNil
 func valueInterface(lvalue lua.LValue) any {
 	switch lvalue.Type() {
 	case lua.LTTable:
@@ -117,7 +131,7 @@ func valueInterface(lvalue lua.LValue) any {
 	case lua.LTString:
 		return lvalue.String()
 	case lua.LTNumber:
-		return int(lvalue.(lua.LNumber))
+		return float64(lvalue.(lua.LNumber))
 	case lua.LTBool:
 		return bool(lvalue.(lua.LBool))
 	}

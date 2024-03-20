@@ -55,7 +55,7 @@ type complexStruct struct {
 	Slice        []any
 }
 
-func TestEncoding(t *testing.T) {
+func TestExample(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
@@ -64,8 +64,14 @@ func TestEncoding(t *testing.T) {
 		"key2": 2,
 		"key3": true,
 	}
+	mFloat64 := map[string]interface{}{
+		"key1": "value1",
+		"key2": float64(2),
+		"key3": true,
+	}
 
 	s := []any{"value1", 2, true}
+	sFloat64 := []any{"value1", float64(2), true}
 
 	t.Run("Struct", func(t *testing.T) {
 		luaVm := lua.NewState()
@@ -128,13 +134,13 @@ func TestEncoding(t *testing.T) {
 				assert(table.field3 == true)
 				print("lua Struct with Tag done")
 			`); err != nil {
-			t.Fatal(err)
+			t.Fatalf("struct with tag test failed: %v", err)
 		}
 
 		struct2 := testStructTag{}
 		err = Unmarshal(table, &struct2)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unmarshal struct with tag failed: %v", err)
 		}
 
 		if !reflect.DeepEqual(test, struct2) {
@@ -177,43 +183,44 @@ func TestEncoding(t *testing.T) {
 		// Unmarshal
 
 		// Test case for map
-		m2 := map[string]any{}
+		mUnmarshaled := map[string]any{}
 
 		fmt.Println("==== start unmarshal ====")
 
-		err = Unmarshal(table, &m2)
+		err = Unmarshal(table, &mUnmarshaled)
 		if err != nil {
 			t.Fatalf("unmarshal map failed: %v", err)
 		}
 
-		fmt.Printf("m2: %+v\n", m2)
+		fmt.Printf("mUnmarshaled: %+v\n", mUnmarshaled)
 
-		if !reflect.DeepEqual(m, m2) {
-			t.Errorf("expected %+v, got %+v", m, m2)
+		// unmarshal a LTNumber to any will be converted to float64
+		if !reflect.DeepEqual(mFloat64, mUnmarshaled) {
+			t.Errorf("expected %+v, got %+v", mFloat64, mUnmarshaled)
 		}
 
 		// Test case for slice
-		s2 := []any{}
+		sUnmarshaled := []any{}
 
-		err = Unmarshal(slice, &s2)
+		err = Unmarshal(slice, &sUnmarshaled)
 		if err != nil {
 			t.Fatalf("unmarshal slice failed: %v", err)
 		}
 
-		fmt.Printf("s2: %+v\n", s2)
+		fmt.Printf("sUnmarshaled: %+v\n", sUnmarshaled)
 
-		if !reflect.DeepEqual(s, s2) {
-			t.Errorf("expected %+v, got %+v", s, s2)
+		if !reflect.DeepEqual(sFloat64, sUnmarshaled) {
+			t.Errorf("expected %+v, got %+v", sFloat64, sUnmarshaled)
 		}
 
-		var s3 any
-		err = Unmarshal(slice, &s3)
+		var sUnmarshalAny any
+		err = Unmarshal(slice, &sUnmarshalAny)
 		if err != nil {
 			t.Fatalf("unmarshal slice failed: %v", err)
 		}
 
-		if !reflect.DeepEqual(s, s3) {
-			t.Errorf("expected %+v, got %+v", s, s3)
+		if !reflect.DeepEqual(sFloat64, sUnmarshalAny) {
+			t.Errorf("expected %+v, got %+v", sFloat64, sUnmarshalAny)
 		}
 	})
 
@@ -266,15 +273,23 @@ func TestEncoding(t *testing.T) {
 			t.Fatalf("unmarshal map failed: %v", err)
 		}
 
-		isEqual := reflect.DeepEqual(input, output)
-		if !isEqual {
-			t.Fatalf("expected %+v, got %+v", input, output)
-		}
-
 		fmt.Printf("output: %+v\n", output)
 
-		if !reflect.DeepEqual(input, output) {
-			t.Errorf("expected %+v, got %+v", input, output)
+		expected := complexStruct{
+			Field1: "value1",
+			Field2: 123,
+			Field3: true,
+			Struct: testStructTag{
+				Field1: "value1",
+				Field2: 2,
+				Field3: true,
+			},
+			Map:   mFloat64,
+			Slice: sFloat64,
+		}
+
+		if !reflect.DeepEqual(expected, output) {
+			t.Errorf("expected %+v, got %+v", expected, output)
 		}
 	})
 
