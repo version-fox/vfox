@@ -17,12 +17,18 @@
 package http
 
 import (
+	"runtime"
+	"testing"
+
 	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
-	"testing"
 )
 
 func TestWithConfig(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Currently the error message only support darwin")
+	}
+
 	const str = `	
 	local http = require("http")
 	assert(type(http) == "table")

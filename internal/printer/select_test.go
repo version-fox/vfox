@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-
-	"github.com/pterm/pterm"
 )
 
 func TestSelect_Show(t *testing.T) {
@@ -76,8 +74,4 @@ func TestSelect_Show(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Cleanup(func() {
-		pterm.DefaultArea.Stop()
-	})
 }
