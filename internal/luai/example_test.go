@@ -326,3 +326,99 @@ func TestExample(t *testing.T) {
 		}
 	})
 }
+
+func TestCases(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	m := map[string]interface{}{
+		"key1": "value1",
+		"key2": 2,
+		"key3": true,
+	}
+	mFloat64 := map[string]interface{}{
+		"key1": "value1",
+		"key2": float64(2),
+		"key3": true,
+	}
+
+	s := []any{"value1", 2, true}
+	sFloat64 := []any{"value1", float64(2), true}
+
+	var unmarshalTests = []struct {
+		CaseName string
+		in       any
+		ptr      any // new(type)
+		out      any
+		err      error
+	}{
+		{
+			CaseName: "UnmarshalAnyMap",
+			in:       m,
+			ptr:      &map[string]any{},
+			out:      &mFloat64,
+		},
+		{
+			CaseName: "UnmarshalAnySlice",
+			in:       s,
+			ptr:      &[]any{},
+			out:      &sFloat64,
+		},
+		{
+			CaseName: "Map[Int]",
+			in: map[int]int{
+				1: 1,
+				2: 2,
+			},
+			ptr: &map[int]int{},
+			out: &map[int]int{
+				1: 1,
+				2: 2,
+			},
+		},
+	}
+
+	for _, tt := range unmarshalTests {
+		if tt.CaseName != "Map[Int]" {
+			continue
+		}
+		t.Run(tt.CaseName, func(t *testing.T) {
+			L := lua.NewState()
+			defer L.Close()
+
+			table, err := Marshal(L, tt.in)
+			if err != nil {
+				t.Fatalf("marshal map failed: %v", err)
+			}
+
+			L.SetGlobal("m", table)
+
+			if err := L.DoString(`
+				function printTable(t, indent)
+					indent = indent or 0
+					local strIndent = string.rep("  ", indent)
+					for key, value in pairs(t) do
+						local keyStr = tostring(key)
+						local valueStr = tostring(value)
+						if type(value) == "table" then
+							print(strIndent .. "[" .. keyStr .. "] =>")
+							printTable(value, indent + 1)
+						else
+							print(strIndent .. "[" .. keyStr .. "] => " .. valueStr)
+						end
+					end
+				end
+				printTable(m)
+			`); err != nil {
+				t.Errorf("print table error: %v", err)
+			}
+			err = Unmarshal(table, tt.ptr)
+			if err != tt.err {
+				t.Errorf("expected %+v, got %+v", tt.err, err)
+			}
+			if !reflect.DeepEqual(tt.out, tt.ptr) {
+				t.Errorf("expected %+v, got %+v", tt.out, tt.ptr)
+			}
+		})
+	}
+}

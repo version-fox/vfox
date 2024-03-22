@@ -98,7 +98,17 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 				return nil, err
 			}
 
-			table.RawSetString(key.String(), value)
+			switch key.Kind() {
+			case reflect.String:
+				table.RawSetString(key.String(), value)
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				table.RawSetInt(int(key.Int()), value)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				table.RawSetInt(int(key.Uint()), value)
+			default:
+				return nil, errors.New("marshal: unsupported type " + key.Kind().String() + " for key")
+			}
+
 		}
 		return table, nil
 	default:
