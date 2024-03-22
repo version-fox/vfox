@@ -225,26 +225,3 @@ func TestPlugin(t *testing.T) {
 		}
 	})
 }
-
-//go:embed testdata/plugins/java/buggy.lua
-var buggyPluginContent string
-var buggyPluginPath = "testdata/plugins/java/buggy.lua"
-
-func TestInvalidPlugin(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
-
-	t.Run("Version field is type int", func(t *testing.T) {
-		manager := NewSdkManager()
-		plugin, _ := NewLuaPlugin(buggyPluginContent, buggyPluginPath, manager)
-
-		pkgs, _ := plugin.Available()
-
-		pkg0 := pkgs[0]
-		addition0 := pkg0.Additions[0]
-
-		if addition0.Version != "8" {
-			t.Errorf("expected version '8', got '%s'", addition0.Version)
-		}
-	})
-}

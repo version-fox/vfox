@@ -59,260 +59,27 @@ func TestExample(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	m := map[string]interface{}{
-		"key1": "value1",
-		"key2": 2,
-		"key3": true,
-	}
-	mFloat64 := map[string]interface{}{
-		"key1": "value1",
-		"key2": float64(2),
-		"key3": true,
-	}
-
-	s := []any{"value1", 2, true}
-	sFloat64 := []any{"value1", float64(2), true}
-
-	t.Run("Struct", func(t *testing.T) {
-		luaVm := lua.NewState()
-		defer luaVm.Close()
-
-		test := testStruct{
-			Field1: "test",
-			Field2: 1,
-			Field3: true,
-		}
-
-		_table, err := Marshal(luaVm, &test)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		luaVm.SetGlobal("table", _table)
-
-		if err := luaVm.DoString(`
-				assert(table.Field1 == "test")
-				assert(table.Field2 == 1)
-				assert(table.Field3 == true)
-				print("lua Struct done")
-			`); err != nil {
-			t.Fatal(err)
-		}
-
-		struct2 := testStruct{}
-		err = Unmarshal(_table, &struct2)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(test, struct2) {
-			t.Errorf("expected %+v, got %+v", test, struct2)
-		}
-	})
-
-	t.Run("Struct with Tag", func(t *testing.T) {
-		luaVm := lua.NewState()
-		defer luaVm.Close()
-
-		test := testStructTag{
-			Field1: "test",
-			Field2: 1,
-			Field3: true,
-		}
-
-		_table, err := Marshal(luaVm, &test)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		table := _table.(*lua.LTable)
-
-		luaVm.SetGlobal("table", table)
-		if err := luaVm.DoString(`
-				assert(table.field1 == "test")
-				assert(table.field2 == 1)
-				assert(table.field3 == true)
-				print("lua Struct with Tag done")
-			`); err != nil {
-			t.Fatalf("struct with tag test failed: %v", err)
-		}
-
-		struct2 := testStructTag{}
-		err = Unmarshal(table, &struct2)
-		if err != nil {
-			t.Fatalf("unmarshal struct with tag failed: %v", err)
-		}
-
-		if !reflect.DeepEqual(test, struct2) {
-			t.Errorf("expected %+v, got %+v", test, struct2)
-		}
-	})
-
-	t.Run("Support Map, Slice and Any", func(t *testing.T) {
-		L := lua.NewState()
-		defer L.Close()
-		table, err := Marshal(L, m)
-		if err != nil {
-			t.Fatalf("marshal map failed: %v", err)
-		}
-		L.SetGlobal("m", table)
-		if err := L.DoString(`
-				assert(m.key1 == "value1")
-				assert(m.key2 == 2)
-				assert(m.key3 == true)
-				print("lua Map done")
-				`); err != nil {
-			t.Errorf("map test failed: %v", err)
-		}
-
-		slice, err := Marshal(L, s)
-		if err != nil {
-			t.Fatalf("marshal slice failed: %v", err)
-		}
-
-		L.SetGlobal("s", slice)
-		if err := L.DoString(`
-				assert(s[1] == "value1")
-				assert(s[2] == 2)
-				assert(s[3] == true)
-				print("lua Slice done")
-			`); err != nil {
-			t.Errorf("slice test failed: %v", err)
-		}
-
-		// Unmarshal
-
-		// Test case for map
-		mUnmarshaled := map[string]any{}
-
-		fmt.Println("==== start unmarshal ====")
-
-		err = Unmarshal(table, &mUnmarshaled)
-		if err != nil {
-			t.Fatalf("unmarshal map failed: %v", err)
-		}
-
-		fmt.Printf("mUnmarshaled: %+v\n", mUnmarshaled)
-
-		// unmarshal a LTNumber to any will be converted to float64
-		if !reflect.DeepEqual(mFloat64, mUnmarshaled) {
-			t.Errorf("expected %+v, got %+v", mFloat64, mUnmarshaled)
-		}
-
-		// Test case for slice
-		sUnmarshaled := []any{}
-
-		err = Unmarshal(slice, &sUnmarshaled)
-		if err != nil {
-			t.Fatalf("unmarshal slice failed: %v", err)
-		}
-
-		fmt.Printf("sUnmarshaled: %+v\n", sUnmarshaled)
-
-		if !reflect.DeepEqual(sFloat64, sUnmarshaled) {
-			t.Errorf("expected %+v, got %+v", sFloat64, sUnmarshaled)
-		}
-
-		var sUnmarshalAny any
-		err = Unmarshal(slice, &sUnmarshalAny)
-		if err != nil {
-			t.Fatalf("unmarshal slice failed: %v", err)
-		}
-
-		if !reflect.DeepEqual(sFloat64, sUnmarshalAny) {
-			t.Errorf("expected %+v, got %+v", sFloat64, sUnmarshalAny)
-		}
-	})
-
-	t.Run("MapSliceStructUnified", func(t *testing.T) {
-		L := lua.NewState()
-		defer L.Close()
-
-		input := complexStruct{
-			Field1: "value1",
-			Field2: 123,
-			Field3: true,
-			Struct: testStructTag{
-				Field1: "value1",
-				Field2: 2,
-				Field3: true,
-			},
-			Map:   m,
-			Slice: s,
-		}
-
-		table, err := Marshal(L, input)
-		if err != nil {
-			t.Fatalf("marshal map failed: %v", err)
-		}
-
-		L.SetGlobal("m", table)
-
-		if err := L.DoString(`
-			assert(m.Field1 == "value1")
-			assert(m.Field2 == 123)
-			assert(m.Field3 == true)
-			assert(m.Struct.field1 == "value1")
-			assert(m.Struct.field2 == 2)
-			assert(m.Struct.field3 == true)
-			assert(m.Map.key1 == "value1")
-			assert(m.Map.key2 == 2)
-			assert(m.Map.key3 == true)
-			assert(m.Slice[1] == "value1")
-			assert(m.Slice[2] == 2)
-			assert(m.Slice[3] == true)
-			print("lua MapSliceStructUnified done")
-		`); err != nil {
-			t.Errorf("map test failed: %v", err)
-		}
-
-		// Unmarshal
-		output := complexStruct{}
-		err = Unmarshal(table, &output)
-		if err != nil {
-			t.Fatalf("unmarshal map failed: %v", err)
-		}
-
-		fmt.Printf("output: %+v\n", output)
-
-		expected := complexStruct{
-			Field1: "value1",
-			Field2: 123,
-			Field3: true,
-			Struct: testStructTag{
-				Field1: "value1",
-				Field2: 2,
-				Field3: true,
-			},
-			Map:   mFloat64,
-			Slice: sFloat64,
-		}
-
-		if !reflect.DeepEqual(expected, output) {
-			t.Errorf("expected %+v, got %+v", expected, output)
-		}
-	})
-
-	t.Run("TableWithEmptyField", func(t *testing.T) {
-		L := lua.NewState()
+	t.Run("TableWithEmptyFieldAndIncompitibleType", func(t *testing.T) {
+		L := NewLuaVM()
 		defer L.Close()
 
 		output := struct {
-			Field1 string  `luai:"field1"`
-			Field2 *string `luai:"field2"`
+			Field1  string  `luai:"field1"`
+			Field2  *string `luai:"field2"`
+			AString string  `luai:"a_string"`
 		}{}
 
-		if err := L.DoString(`
+		if err := L.Instance.DoString(`
 			return {
 				field1 = "value1",	
+				--- notice: here we return a number
+				a_string = 8,
             }
 		`); err != nil {
 			t.Errorf("map test failed: %v", err)
 		}
 
-		table := L.ToTable(-1) // returned value
-		L.Pop(1)
-		// Unmarshal
+		table := L.ReturnedValue()
 		err := Unmarshal(table, &output)
 		if err != nil {
 			t.Fatalf("unmarshal map failed: %v", err)
@@ -323,6 +90,9 @@ func TestExample(t *testing.T) {
 		}
 		if output.Field2 != nil {
 			t.Errorf("expected %+v, got %+v", nil, output.Field2)
+		}
+		if output.AString != "8" {
+			t.Errorf("expected %+v, got %+v", "", output.AString)
 		}
 	})
 }
@@ -345,25 +115,66 @@ func TestCases(t *testing.T) {
 	s := []any{"value1", 2, true}
 	sFloat64 := []any{"value1", float64(2), true}
 
+	normalStruct := testStruct{
+		Field1: "test",
+		Field2: 1,
+		Field3: true,
+	}
+	normalStructWithTag := testStructTag{
+		Field1: "test",
+		Field2: 1,
+		Field3: true,
+	}
+
 	var unmarshalTests = []struct {
 		CaseName            string
 		in                  any
-		ptr                 any // new(type)
+		ptr                 any
 		out                 any
 		luaValidationScript string
 		err                 error
 	}{
 		{
-			CaseName: "UnmarshalAnyMap",
+			CaseName: "Struct",
+			in:       normalStruct,
+			ptr:      new(testStruct),
+			out:      &normalStruct,
+			luaValidationScript: `
+				assert(table.Field1 == "test")
+				assert(table.Field2 == 1)
+				assert(table.Field3 == true)
+				print("lua Struct done")
+			`,
+		},
+		{
+			CaseName: "Struct with Tag",
+			in:       normalStructWithTag,
+			ptr:      &testStructTag{},
+			out:      &normalStructWithTag,
+			luaValidationScript: `
+				assert(table.field1 == "test")
+				assert(table.field2 == 1)
+				assert(table.field3 == true)
+				print("lua Struct with Tag done")
+			`,
+		},
+		{
+			CaseName: "Map",
 			in:       m,
 			ptr:      &map[string]any{},
 			out:      &mFloat64,
 		},
 		{
-			CaseName: "UnmarshalAnySlice",
+			CaseName: "Slice",
 			in:       s,
 			ptr:      &[]any{},
 			out:      &sFloat64,
+		},
+		{
+			CaseName: "Any",
+			in:       m,
+			ptr:      new(any),
+			out:      &mFloat64,
 		},
 		{
 			CaseName: "Map[Int]",
@@ -380,6 +191,50 @@ func TestCases(t *testing.T) {
 				assert(m[1] == 1)
 				assert(m[2] == 2)
 				print("lua Map[Int] done")
+			`,
+		},
+		{
+			CaseName: "MapSliceStructUnified",
+			in: complexStruct{
+				Field1: "value1",
+				Field2: 123,
+				Field3: true,
+				Struct: testStructTag{
+					Field1: "value1",
+					Field2: 2,
+					Field3: true,
+				},
+				Map:   m,
+				Slice: s,
+			},
+			ptr: &complexStruct{},
+			out: &complexStruct{
+				Field1: "value1",
+				Field2: 123,
+				Field3: true,
+				Struct: testStructTag{
+					Field1: "value1",
+					Field2: 2,
+					Field3: true,
+				},
+				Map:   mFloat64,
+				Slice: sFloat64,
+			},
+			luaValidationScript: `
+
+				assert(m.Field1 == "value1")
+				assert(m.Field2 == 123)
+				assert(m.Field3 == true)
+				assert(m.Struct.field1 == "value1")
+				assert(m.Struct.field2 == 2)
+				assert(m.Struct.field3 == true)
+				assert(m.Map.key1 == "value1")
+				assert(m.Map.key2 == 2)
+				assert(m.Map.key3 == true)
+				assert(m.Slice[1] == "value1")
+				assert(m.Slice[2] == 2)
+				assert(m.Slice[3] == true)
+				print("lua MapSliceStructUnified done")
 			`,
 		},
 	}
