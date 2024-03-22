@@ -18,10 +18,17 @@ package printer
 
 import (
 	"fmt"
+	"os"
 	"testing"
+
+	"github.com/pterm/pterm"
 )
 
 func TestSelect_Show(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping TestSelect_Show in CI environment because it requires user input")
+	}
+
 	source := []*KV{
 		{
 			Key:   "1",
@@ -46,7 +53,7 @@ func TestSelect_Show(t *testing.T) {
 	}
 	s := &PageKVSelect{
 		index: 0,
-		SourceFunc: func(page, size int) ([]*KV, error) {
+		SourceFunc: func(page, size int, options []*KV) ([]*KV, error) {
 			// 计算开始和结束索引
 			start := page * size
 			end := start + size
@@ -69,4 +76,8 @@ func TestSelect_Show(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Cleanup(func() {
+		pterm.DefaultArea.Stop()
+	})
 }
