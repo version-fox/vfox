@@ -26,7 +26,6 @@ jobs:
       - name: Test and coverage
         # we cannot use `go test ./...` currently, because many test cases are failed
         run: |
-          go test ./internal -coverprofile=coverage.out -covermode=atomic
-          go test ./internal/luai -coverprofile=coverage.out -covermode=atomic
+          go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
