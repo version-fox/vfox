@@ -2,12 +2,16 @@ name: VersionFox CI
 
 on: [push]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-2019]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         go-version: [ '1.21.x' ]
 
     steps:
