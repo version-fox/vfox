@@ -17,7 +17,6 @@
 package http
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/config"
@@ -25,10 +24,6 @@ import (
 )
 
 func TestWithConfig(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Currently the error message only support darwin")
-	}
-
 	const str = `	
 	local http = require("http")
 	assert(type(http) == "table")
@@ -36,6 +31,7 @@ func TestWithConfig(t *testing.T) {
 	local resp, err = http.get({
         url = "http://ip.jsontest.com/"
     })
+	print(err)
 	assert(err == 'Get "http://ip.jsontest.com/": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
 	`
 	s := lua.NewState()
