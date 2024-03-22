@@ -346,11 +346,12 @@ func TestCases(t *testing.T) {
 	sFloat64 := []any{"value1", float64(2), true}
 
 	var unmarshalTests = []struct {
-		CaseName string
-		in       any
-		ptr      any // new(type)
-		out      any
-		err      error
+		CaseName            string
+		in                  any
+		ptr                 any // new(type)
+		out                 any
+		luaValidationScript string
+		err                 error
 	}{
 		{
 			CaseName: "UnmarshalAnyMap",
@@ -375,6 +376,11 @@ func TestCases(t *testing.T) {
 				1: 1,
 				2: 2,
 			},
+			luaValidationScript: `
+				assert(m[1] == 1)
+				assert(m[2] == 2)
+				print("lua Map[Int] done")
+			`,
 		},
 	}
 
@@ -393,25 +399,12 @@ func TestCases(t *testing.T) {
 
 			L.SetGlobal("m", table)
 
-			if err := L.DoString(`
-				function printTable(t, indent)
-					indent = indent or 0
-					local strIndent = string.rep("  ", indent)
-					for key, value in pairs(t) do
-						local keyStr = tostring(key)
-						local valueStr = tostring(value)
-						if type(value) == "table" then
-							print(strIndent .. "[" .. keyStr .. "] =>")
-							printTable(value, indent + 1)
-						else
-							print(strIndent .. "[" .. keyStr .. "] => " .. valueStr)
-						end
-					end
-				end
-				printTable(m)
-			`); err != nil {
-				t.Errorf("print table error: %v", err)
+			if tt.luaValidationScript != "" {
+				if err := L.DoString(tt.luaValidationScript); err != nil {
+					t.Errorf("validate %s error: %v", tt.CaseName, err)
+				}
 			}
+
 			err = Unmarshal(table, tt.ptr)
 			if err != tt.err {
 				t.Errorf("expected %+v, got %+v", tt.err, err)
