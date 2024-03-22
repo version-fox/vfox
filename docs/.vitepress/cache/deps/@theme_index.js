@@ -1,12 +1,12 @@
 import {
   useMediaQuery
-} from "./chunk-ALTI5GXB.js";
+} from "./chunk-TM5ZW4YT.js";
 import {
   computed,
   ref,
   shallowRef,
   watch
-} from "./chunk-GDOUI6H4.js";
+} from "./chunk-Z6B2QTD3.js";
 
 // node_modules/vitepress/dist/client/theme-default/index.js
 import "/Users/lihan/GolandProjects/version-fox/docs/node_modules/vitepress/dist/client/theme-default/styles/fonts.css";
