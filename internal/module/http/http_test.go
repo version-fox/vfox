@@ -17,6 +17,7 @@
 package http
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/config"
@@ -24,6 +25,10 @@ import (
 )
 
 func TestWithConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip on windows, the proxy won't error on windows.")
+	}
+
 	const str = `
 	local http = require("http")
 	assert(type(http) == "table")

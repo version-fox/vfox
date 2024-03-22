@@ -28,7 +28,6 @@ jobs:
         run: |
           go build .
       - name: Test and coverage
-        # we cannot use `go test ./...` currently, because many test cases are failed
         run: |
           go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
