@@ -89,11 +89,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	content, err := m.loadLuaFromFileOrUrl(pluginPath)
-	if err != nil {
-		return nil, err
-	}
-	luaPlugin, err := NewLuaPlugin(content, pluginPath, m)
+	luaPlugin, err := NewLuaPlugin(pluginPath, m)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +124,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		} else {
 			continue
 		}
-		content, _ := m.loadLuaFromFileOrUrl(path)
-		source, err := NewLuaPlugin(content, path, m)
+		source, err := NewLuaPlugin(path, m)
 		if err != nil {
 			pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
 			continue
@@ -182,7 +177,7 @@ func (m *Manager) Update(pluginName string) error {
 	if err != nil {
 		return fmt.Errorf("fetch plugin failed, err: %w", err)
 	}
-	source, err := NewLuaPlugin(content, updateUrl, m)
+	source, err := NewLegacyLuaPlugin(content, updateUrl, m)
 	if err != nil {
 		return fmt.Errorf("check %s plugin failed, err: %w", updateUrl, err)
 	}
@@ -245,7 +240,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		return fmt.Errorf("failed to load plugin: %w", err)
 	}
 	pterm.Println("Checking plugin...")
-	source, err := NewLuaPlugin(content, url, m)
+	source, err := NewLegacyLuaPlugin(content, url, m)
 	if err != nil {
 		return fmt.Errorf("check plugin error: %w", err)
 	}

@@ -30,9 +30,26 @@ import (
 )
 
 const (
-	LuaPluginObjKey = "PLUGIN"
-	OsType          = "OS_TYPE"
-	ArchType        = "ARCH_TYPE"
+	luaPluginObjKey = "PLUGIN"
+	osType          = "OS_TYPE"
+	archType        = "ARCH_TYPE"
+	runtime         = "RUNTIME"
+)
+
+type HookFunc struct {
+	Name     string
+	Required bool
+	Filename string
+}
+
+var (
+	HookFuncs = []HookFunc{
+		{Name: "Available", Required: true, Filename: "available"},
+		{Name: "PreInstall", Required: true, Filename: "pre_install"},
+		{Name: "EnvKeys", Required: true, Filename: "env_keys"},
+		{Name: "PostInstall", Required: false, Filename: "post_install"},
+		{Name: "PreUse", Required: false, Filename: "pre_use"},
+	}
 )
 
 type LuaPlugin struct {
@@ -322,7 +339,9 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	return nil
 }
 
-func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
+// NewLegacyLuaPlugin creates a new LuaPlugin instance from old plugin format.
+// TODO This will be deprecated in future versions.
+func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	vm := luai.NewLuaVM()
 
 	if err := vm.Prepare(&luai.PrepareOptions{
@@ -337,10 +356,10 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
+	vm.Instance.SetGlobal(osType, lua.LString(manager.osType))
+	vm.Instance.SetGlobal(archType, lua.LString(manager.archType))
 
-	pluginObj := vm.Instance.GetGlobal(LuaPluginObjKey)
+	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
 		return nil, fmt.Errorf("plugin object not found")
 	}
@@ -361,6 +380,105 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 	pluginInfo := LuaPluginInfo{}
 	err := luai.Unmarshal(PLUGIN, &pluginInfo)
 	if err != nil {
+		return nil, err
+	}
+
+	source.LuaPluginInfo = pluginInfo
+
+	if !isValidName(source.Name) {
+		return nil, fmt.Errorf("invalid plugin name")
+	}
+
+	if source.Name == "" {
+		return nil, fmt.Errorf("no plugin name provided")
+	}
+	return source, nil
+}
+
+// NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.
+// The plugin directory must meet one of the following conditions:
+// - The directory must contain a metadata.lua file and a hooks directory that includes all must be implemented hook functions.
+// - The directory contain a main.lua file that defines the plugin object and all hook functions.
+func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
+	vm := luai.NewLuaVM()
+
+	if err := vm.Prepare(&luai.PrepareOptions{
+		Config: manager.Config,
+	}); err != nil {
+		return nil, err
+	}
+
+	mainPath := filepath.Join(pluginDirPath, "main.lua")
+	// main.lua first
+	if util.FileExists(mainPath) {
+		vm.LimitPackagePath(filepath.Join(pluginDirPath, "?.lua"))
+		if err := vm.Instance.DoFile(mainPath); err != nil {
+			return nil, err
+		}
+	} else {
+		// Limit package search scope, hooks directory search priority is higher than lib directory
+		hookPath := filepath.Join(pluginDirPath, "hooks", "?.lua")
+		libPath := filepath.Join(pluginDirPath, "lib", "?.lua")
+		vm.LimitPackagePath(hookPath, libPath)
+
+		// load metadata file
+		metadataPath := filepath.Join(pluginDirPath, "metadata.lua")
+		if !util.FileExists(metadataPath) {
+			return nil, fmt.Errorf("plugin invalid, metadata file not found")
+		}
+
+		if err := vm.Instance.DoFile(metadataPath); err != nil {
+			return nil, fmt.Errorf("failed to load meatadata file, %w", err)
+		}
+
+		// load hook func files
+		for _, hf := range HookFuncs {
+			hp := filepath.Join(pluginDirPath, "hooks", hf.Filename+".lua")
+
+			if !hf.Required && !util.FileExists(hp) {
+				continue
+			}
+			if err := vm.Instance.DoFile(hp); err != nil {
+				return nil, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
+			}
+		}
+	}
+
+	// !!!! Must be set after loading the script to prevent overwriting!
+	// set OS_TYPE and ARCH_TYPE
+	vm.Instance.SetGlobal(osType, lua.LString(manager.osType))
+	vm.Instance.SetGlobal(archType, lua.LString(manager.archType))
+
+	r, err := luai.Marshal(vm.Instance, LuaRuntime{
+		OsType:   string(manager.osType),
+		ArchType: string(manager.archType),
+		Version:  RuntimeVersion,
+	})
+	if err != nil {
+		return nil, err
+	}
+	vm.Instance.SetGlobal(runtime, r)
+
+	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
+	if pluginObj.Type() == lua.LTNil {
+		return nil, fmt.Errorf("plugin object not found")
+	}
+
+	PLUGIN := pluginObj.(*lua.LTable)
+
+	source := &LuaPlugin{
+		vm:        vm,
+		pluginObj: PLUGIN,
+		Filepath:  pluginDirPath,
+		SdkName:   filepath.Base(pluginDirPath),
+	}
+
+	if err = source.checkValid(); err != nil {
+		return nil, err
+	}
+
+	pluginInfo := LuaPluginInfo{}
+	if err = luai.Unmarshal(PLUGIN, &pluginInfo); err != nil {
 		return nil, err
 	}
 
