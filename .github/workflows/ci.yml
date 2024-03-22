@@ -16,10 +16,9 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Display Go version
-        run: go version
       - name: Install dependencies
         run: |
+          go version
           go get .
       - name: Build
         run: |
