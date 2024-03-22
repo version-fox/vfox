@@ -161,7 +161,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 				result := valueInterface(value)
 				reflected.Set(reflect.ValueOf(result))
 			}
-		// map[T1]T2 where T1 is string, an integer type
+		// map[T1]T2 where T1 is string or an integer type
 		case reflect.Map:
 			t := reflected.Type()
 			keyType := t.Key()
