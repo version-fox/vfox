@@ -24,7 +24,7 @@ import (
 )
 
 func TestWithConfig(t *testing.T) {
-	const str = `	
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
@@ -39,14 +39,14 @@ func TestWithConfig(t *testing.T) {
 
 	s.PreloadModule("http", NewModule(&config.Proxy{
 		Enable: true,
-		Url:    "http://localhost",
+		Url:    "http://127.0.0.1",
 	}))
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}
 }
 func TestGetRequest(t *testing.T) {
-	const str = `	
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
@@ -61,7 +61,7 @@ func TestGetRequest(t *testing.T) {
 }
 
 func TestHeadRequest(t *testing.T) {
-	const str = `	
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
