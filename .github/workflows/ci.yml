@@ -20,11 +20,13 @@ jobs:
       - name: Install dependencies
         run: |
           go get .
-      - name: Build with the Go CLI
+      - name: Build
         run: |
           go build .
-      - name: Test with the Go CLI
+      - name: Test and coverage
         # we cannot use `go test ./...` currently, because many test cases are failed
         run: |
-          go test ./internal
-          go test ./internal/luai
+          go test ./internal -coverprofile=coverage.out -covermode=atomic
+          go test ./internal/luai -coverprofile=coverage.out -covermode=atomic
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
