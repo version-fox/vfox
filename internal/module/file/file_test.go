@@ -17,8 +17,9 @@
 package html
 
 import (
-	lua "github.com/yuin/gopher-lua"
 	"testing"
+
+	lua "github.com/yuin/gopher-lua"
 )
 
 func TestRequire(t *testing.T) {
@@ -26,35 +27,6 @@ func TestRequire(t *testing.T) {
 	local file = require("file")
 	assert(type(file) == "table")
 	assert(type(file.symlink) == "function")
-	`
-	evalLua(str, t)
-}
-
-func TestFind(t *testing.T) {
-	const str = `	
-	local file = require("file")
-	file.symlink(src, dest)
-	assert(div:text() == "hello world")
-	`
-	evalLua(str, t)
-}
-
-func TestFirst(t *testing.T) {
-	const str = `	
-	local html = require("html")
-	local doc = html.parse("<html><body><div id='test'>123</div><div id='test'>456</div></body></html>")
-	local div = doc:find("div")
-	assert(div:first():text() == "123")
-	`
-	evalLua(str, t)
-}
-
-func TestContinuousFind(t *testing.T) {
-	const str = `
-	local html = require("html")
-	local doc = html.parse("<html><body><div id='test'>test</div><div id='t2'>456</div></body></html>")
-	local div = doc:find("body"):find("#t2")
-	print(div:text() == "456")
 	`
 	evalLua(str, t)
 }
