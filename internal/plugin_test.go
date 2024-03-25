@@ -112,6 +112,11 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 		if plugin.MinRuntimeVersion != "0.2.2" {
 			t.Errorf("expected min runtime version '0.2.2', got '%s'", plugin.MinRuntimeVersion)
 		}
+		for _, hf := range HookFuncMap {
+			if !plugin.HasFunction(hf.Name) && hf.Required {
+				t.Errorf("expected to have function %s", hf.Name)
+			}
+		}
 	})
 	testHookFunc(t, func() (*LuaPlugin, error) {
 		manager := NewSdkManager()

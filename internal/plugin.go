@@ -56,8 +56,6 @@ var (
 type LuaPlugin struct {
 	vm        *luai.LuaVM
 	pluginObj *lua.LTable
-	// isLegacyMode indicates whether the plugin is in the old format, all in main.lua.
-	isLegacyMode bool
 	// plugin source path
 	Path string
 	// plugin filename, this is also alias name, sdk-name
@@ -81,9 +79,6 @@ func (l *LuaPlugin) Close() {
 }
 
 func (l *LuaPlugin) Available() ([]*Package, error) {
-	if goon, err := l.loadHookFunc("Available"); err != nil || !goon {
-		return nil, err
-	}
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, AvailableHookCtx{
 		RuntimeVersion: RuntimeVersion,
@@ -143,9 +138,6 @@ func (l *LuaPlugin) Available() ([]*Package, error) {
 }
 
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
-	if goon, err := l.loadHookFunc("PreInstall"); err != nil || !goon {
-		return nil, err
-	}
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, PreInstallHookCtx{
 		Version:        string(version),
@@ -195,10 +187,11 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 }
 
 func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
-	if goon, err := l.loadHookFunc("PostInstall"); err != nil || !goon {
-		return err
-	}
 	L := l.vm.Instance
+
+	if !l.HasFunction("PostInstall") {
+		return nil
+	}
 
 	ctx := &PostInstallHookCtx{
 		RuntimeVersion: RuntimeVersion,
@@ -223,9 +216,6 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 }
 
 func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
-	if goon, err := l.loadHookFunc("EnvKeys"); err != nil || !goon {
-		return nil, err
-	}
 	L := l.vm.Instance
 	mainInfo := sdkPackage.Main
 
@@ -285,18 +275,10 @@ func (l *LuaPlugin) Label(version string) string {
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
-	if !l.isLegacyMode {
-		if _, err := l.loadHookFunc(name); err != nil {
-			return false
-		}
-	}
 	return l.pluginObj.RawGetString(name) != lua.LNil
 }
 
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
-	if goon, err := l.loadHookFunc("PreUse"); err != nil || !goon {
-		return version, err
-	}
 	L := l.vm.Instance
 
 	ctx := PreUseHookCtx{
@@ -320,6 +302,10 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		return "", err
 	}
 
+	if !l.HasFunction("PreUse") {
+		return "", nil
+	}
+
 	if err = l.CallFunction("PreUse", ctxTable); err != nil {
 		return "", err
 	}
@@ -336,36 +322,6 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	}
 
 	return Version(result.Version), nil
-}
-
-// loadHookFunc loads the specified hook function.
-// If the function is not built-in, it will return an error.
-// If the function is not required and the file or the hook does not exist, it will return false
-// and no error.
-func (l *LuaPlugin) loadHookFunc(funcName string) (bool, error) {
-	if l.isLegacyMode {
-		return true, nil
-	}
-	hf, ok := HookFuncMap[funcName]
-	if !ok {
-		return false, fmt.Errorf("%s is not built-hook func", funcName)
-	}
-	hp := filepath.Join(l.Path, "hooks", hf.Filename+".lua")
-	logger.Debugf("Load [%s] function, from: %s\n", hf.Name, hp)
-	if !util.FileExists(hp) {
-		if hf.Required {
-			return false, fmt.Errorf("hook [%s] func not implemented", hf.Name)
-		}
-		return false, nil
-	}
-	if err := l.vm.Instance.DoFile(hp); err != nil {
-		return false, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
-	}
-	exist := l.pluginObj.RawGetString(hf.Name) != lua.LNil
-	if hf.Required && !exist {
-		return false, fmt.Errorf("hook [%s] func not implemented", hf.Name)
-	}
-	return true, nil
 }
 
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
@@ -404,11 +360,10 @@ func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, err
 	PLUGIN := pluginObj.(*lua.LTable)
 
 	source := &LuaPlugin{
-		vm:           vm,
-		pluginObj:    PLUGIN,
-		Path:         path,
-		SdkName:      filepath.Base(filepath.Dir(path)),
-		isLegacyMode: true,
+		vm:        vm,
+		pluginObj: PLUGIN,
+		Path:      path,
+		SdkName:   filepath.Base(filepath.Dir(path)),
 	}
 
 	if err := source.Validate(); err != nil {
@@ -447,14 +402,12 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 	}
 
 	mainPath := filepath.Join(pluginDirPath, "main.lua")
-	isLegacyMode := false
 	// main.lua first
 	if util.FileExists(mainPath) {
 		vm.LimitPackagePath(filepath.Join(pluginDirPath, "?.lua"))
 		if err := vm.Instance.DoFile(mainPath); err != nil {
 			return nil, err
 		}
-		isLegacyMode = true
 	} else {
 		// Limit package search scope, hooks directory search priority is higher than lib directory
 		hookPath := filepath.Join(pluginDirPath, "hooks", "?.lua")
@@ -471,7 +424,17 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 			return nil, fmt.Errorf("failed to load meatadata file, %w", err)
 		}
 
-		isLegacyMode = false
+		// load hook func files
+		for _, hf := range HookFuncMap {
+			hp := filepath.Join(pluginDirPath, "hooks", hf.Filename+".lua")
+
+			if !hf.Required && !util.FileExists(hp) {
+				continue
+			}
+			if err := vm.Instance.DoFile(hp); err != nil {
+				return nil, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
+			}
+		}
 	}
 
 	// !!!! Must be set after loading the script to prevent overwriting!
@@ -497,11 +460,14 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 	PLUGIN := pluginObj.(*lua.LTable)
 
 	source := &LuaPlugin{
-		vm:           vm,
-		pluginObj:    PLUGIN,
-		Path:         pluginDirPath,
-		SdkName:      filepath.Base(pluginDirPath),
-		isLegacyMode: isLegacyMode,
+		vm:        vm,
+		pluginObj: PLUGIN,
+		Path:      pluginDirPath,
+		SdkName:   filepath.Base(pluginDirPath),
+	}
+
+	if err = source.Validate(); err != nil {
+		return nil, err
 	}
 
 	pluginInfo := LuaPluginInfo{}
