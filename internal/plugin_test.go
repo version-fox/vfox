@@ -109,8 +109,8 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			t.Errorf("expected description 'xxx', got '%s'", plugin.Description)
 		}
 
-		if plugin.UpdateUrl != "{URL}/sdk.lua" {
-			t.Errorf("expected update url '{URL}/sdk.lua', got '%s'", plugin.UpdateUrl)
+		if plugin.ManifestUrl != "manifest.json" {
+			t.Errorf("expected manifest url 'manifest.json', got '%s'", plugin.ManifestUrl)
 		}
 
 		if plugin.MinRuntimeVersion != "0.2.2" {
