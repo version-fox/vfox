@@ -17,19 +17,26 @@
 package http
 
 import (
+	"runtime"
+	"testing"
+
 	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
-	"testing"
 )
 
 func TestWithConfig(t *testing.T) {
-	const str = `	
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip on windows, the proxy won't error on windows.")
+	}
+
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.get({
         url = "http://ip.jsontest.com/"
     })
+	print(err)
 	assert(err == 'Get "http://ip.jsontest.com/": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
 	`
 	s := lua.NewState()
@@ -37,14 +44,14 @@ func TestWithConfig(t *testing.T) {
 
 	s.PreloadModule("http", NewModule(&config.Proxy{
 		Enable: true,
-		Url:    "http://localhost",
+		Url:    "http://127.0.0.1",
 	}))
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}
 }
 func TestGetRequest(t *testing.T) {
-	const str = `	
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
@@ -59,7 +66,7 @@ func TestGetRequest(t *testing.T) {
 }
 
 func TestHeadRequest(t *testing.T) {
-	const str = `	
+	const str = `
 	local http = require("http")
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")

@@ -17,11 +17,16 @@ builds:
       - amd64
       - arm
       - arm64
+      - loong64
     goarm:
       - "7"
     ignore:
       - goos: windows
         goarch: arm
+      - goos: windows
+        goarch: loong64
+      - goos: darwin
+        goarch: loong64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath

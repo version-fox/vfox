@@ -18,10 +18,15 @@ package printer
 
 import (
 	"fmt"
+	"os"
 	"testing"
 )
 
 func TestSelect_Show(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping TestSelect_Show in CI environment because it requires user input")
+	}
+
 	source := []*KV{
 		{
 			Key:   "1",

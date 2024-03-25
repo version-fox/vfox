@@ -2,11 +2,16 @@ name: VersionFox CI
 
 on: [push]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
         go-version: [ '1.21.x' ]
 
     steps:
@@ -15,16 +20,14 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Display Go version
-        run: go version
       - name: Install dependencies
         run: |
           go get .
-      - name: Build with the Go CLI
+      - name: Build
         run: |
           go build .
-      - name: Test with the Go CLI
-        # we cannot use `go test ./...` currently, because many test cases are failed
+      - name: Test and coverage
         run: |
-          go test ./internal
-          go test ./internal/luai
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
