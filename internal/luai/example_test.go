@@ -240,9 +240,6 @@ func TestCases(t *testing.T) {
 	}
 
 	for _, tt := range unmarshalTests {
-		if tt.CaseName != "Map[Int]" {
-			continue
-		}
 		t.Run(tt.CaseName, func(t *testing.T) {
 			L := lua.NewState()
 			defer L.Close()
