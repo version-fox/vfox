@@ -45,15 +45,23 @@ type PathMeta struct {
 }
 
 func newPathMeta() (*PathMeta, error) {
-	userHomeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("get user home dir error: %w", err)
+	configPath := os.Getenv("VFOX_HOME")
+	if len(configPath) == 0 {
+		userHomeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("get user home dir error: %w", err)
+		}
+		configPath = filepath.Join(userHomeDir, ".version-fox")
 	}
-	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
-	configPath := filepath.Join(userHomeDir, ".version-fox")
-	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
-	_ = os.MkdirAll(sdkCachePath, 0755)
+	pluginPath := filepath.Join(configPath, "plugin")
+	sdkCachePath := filepath.Join(configPath, "cache")
+	tmpPath := filepath.Join(configPath, "temp")
+	if err := os.MkdirAll(sdkCachePath, 0755); err != nil {
+		if os.IsPermission(err) {
+			return nil, fmt.Errorf("%w\n%v: Directory permission is not set to 0755", err, configPath)
+		}
+		return nil, err
+	}
 	_ = os.MkdirAll(pluginPath, 0755)
 	_ = os.MkdirAll(tmpPath, 0755)
 	exePath, err := os.Executable()
