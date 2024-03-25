@@ -1,0 +1,9 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        # allow coverage to drop by this amount and still post success
+        threshold: 0.5%
+        if_ci_failed: error
+    patch: off # no github status notice for coverage of the PR diff.

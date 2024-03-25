@@ -73,7 +73,7 @@ func (m *Manager) EnvKeys() (*env.Envs, error) {
 
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
-	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name), "main.lua")
+	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name))
 	if !util.FileExists(pluginPath) {
 		oldPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
 		if !util.FileExists(oldPath) {
@@ -85,7 +85,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
-		if err = os.Rename(oldPath, pluginPath); err != nil {
+		if err = os.Rename(oldPath, filepath.Join(pluginPath, "main.lua")); err != nil {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
@@ -124,9 +124,9 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		} else {
 			continue
 		}
-		source, err := NewLuaPlugin(path, m)
+		source, err := NewLuaPlugin(filepath.Dir(path), m)
 		if err != nil {
-			pterm.Printf("Failed to load %s plugin, err: %s\n", path, err)
+			pterm.Printf("Failed to load %s plugin, err: %s\n", filepath.Dir(path), err)
 			continue
 		}
 		sdk, _ := NewSdk(m, source)
@@ -182,8 +182,8 @@ func (m *Manager) Update(pluginName string) error {
 		return fmt.Errorf("check %s plugin failed, err: %w", updateUrl, err)
 	}
 	success := false
-	backupPath := sdk.Plugin.Filepath + ".bak"
-	err = util.CopyFile(sdk.Plugin.Filepath, backupPath)
+	backupPath := sdk.Plugin.Path + ".bak"
+	err = util.CopyFile(sdk.Plugin.Path, backupPath)
 	if err != nil {
 		return fmt.Errorf("backup %s plugin failed, err: %w", updateUrl, err)
 	}
@@ -191,7 +191,7 @@ func (m *Manager) Update(pluginName string) error {
 		if success {
 			_ = os.Remove(backupPath)
 		} else {
-			_ = os.Rename(backupPath, sdk.Plugin.Filepath)
+			_ = os.Rename(backupPath, sdk.Plugin.Path)
 		}
 	}()
 	pterm.Println("Checking plugin version...")
@@ -200,7 +200,7 @@ func (m *Manager) Update(pluginName string) error {
 		pterm.Printf("the plugin is already the latest version")
 		return nil
 	}
-	err = os.WriteFile(sdk.Plugin.Filepath, []byte(content), 0644)
+	err = os.WriteFile(sdk.Plugin.Path, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("update %s plugin failed: %w", updateUrl, err)
 	}

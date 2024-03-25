@@ -39,8 +39,8 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 			t.Errorf("expected filename 'java', got '%s'", plugin.SdkName)
 		}
 
-		if plugin.Filepath != pluginPathWithMain {
-			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMain, plugin.Filepath)
+		if plugin.Path != pluginPathWithMain {
+			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMain, plugin.Path)
 		}
 
 		if plugin.Name != "java" {
@@ -89,8 +89,8 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			t.Errorf("expected filename 'java', got '%s'", plugin.SdkName)
 		}
 
-		if plugin.Filepath != pluginPathWithMetadata {
-			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMetadata, plugin.Filepath)
+		if plugin.Path != pluginPathWithMetadata {
+			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMetadata, plugin.Path)
 		}
 
 		if plugin.Name != "java" {
@@ -111,11 +111,6 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 
 		if plugin.MinRuntimeVersion != "0.2.2" {
 			t.Errorf("expected min runtime version '0.2.2', got '%s'", plugin.MinRuntimeVersion)
-		}
-		for _, hf := range HookFuncs {
-			if !plugin.HasFunction(hf.Name) && hf.Required {
-				t.Errorf("expected to have function %s", hf.Name)
-			}
 		}
 	})
 	testHookFunc(t, func() (*LuaPlugin, error) {
