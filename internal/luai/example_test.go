@@ -59,7 +59,7 @@ func TestExample(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	t.Run("TableWithEmptyFieldAndIncompitibleType", func(t *testing.T) {
+	t.Run("TableWithEmptyFieldAndIncompatibleType", func(t *testing.T) {
 		L := NewLuaVM()
 		defer L.Close()
 
