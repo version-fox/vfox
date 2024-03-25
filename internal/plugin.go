@@ -337,8 +337,8 @@ func NewLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(OsType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(ArchType, lua.LString(manager.archType))
+	vm.Instance.SetGlobal(OsType, lua.LString(util.GetOSType()))
+	vm.Instance.SetGlobal(ArchType, lua.LString(util.GetArchType()))
 
 	pluginObj := vm.Instance.GetGlobal(LuaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {

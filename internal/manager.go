@@ -48,8 +48,6 @@ type Manager struct {
 	openSdks   map[string]*Sdk
 	EnvManager env.Manager
 	Record     env.Record
-	osType     util.OSType
-	archType   util.ArchType
 	Config     *config.Config
 }
 
@@ -472,8 +470,6 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 		EnvManager: envManger,
 		Record:     record,
 		openSdks:   make(map[string]*Sdk),
-		osType:     util.GetOSType(),
-		archType:   util.GetArchType(),
 		Config:     c,
 	}
 	return manager

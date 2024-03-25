@@ -18,23 +18,15 @@ package util
 
 import "runtime"
 
-type OSType string
-
-const (
-	MacOS   OSType = "darwin"
-	Windows OSType = "windows"
-	Linux   OSType = "linux"
+type (
+	OSType   string
+	ArchType string
 )
 
 func GetOSType() OSType {
-	switch runtime.GOOS {
-	case "darwin":
-		return MacOS
-	case "windows":
-		return Windows
-	case "linux":
-		return Linux
-	default:
-		return OSType(runtime.GOOS)
-	}
+	return OSType(runtime.GOOS)
+}
+
+func GetArchType() ArchType {
+	return ArchType(runtime.GOARCH)
 }
