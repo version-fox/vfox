@@ -349,8 +349,8 @@ func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, err
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(osType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(archType, lua.LString(manager.archType))
+	vm.Instance.SetGlobal(osType, lua.LString(util.GetOSType()))
+	vm.Instance.SetGlobal(archType, lua.LString(util.GetArchType()))
 
 	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
@@ -439,12 +439,12 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(osType, lua.LString(manager.osType))
-	vm.Instance.SetGlobal(archType, lua.LString(manager.archType))
+	vm.Instance.SetGlobal(osType, lua.LString(util.GetOSType()))
+	vm.Instance.SetGlobal(archType, lua.LString(util.GetArchType()))
 
 	r, err := luai.Marshal(vm.Instance, LuaRuntime{
-		OsType:   string(manager.osType),
-		ArchType: string(manager.archType),
+		OsType:   string(util.GetOSType()),
+		ArchType: string(util.GetArchType()),
 		Version:  RuntimeVersion,
 	})
 	if err != nil {
