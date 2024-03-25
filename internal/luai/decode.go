@@ -148,11 +148,10 @@ func arrayInterface(lvalue *lua.LTable) any {
 }
 
 func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
+	reflected = indirect(reflected)
 
 	switch value.Type() {
 	case lua.LTTable:
-		reflected = indirect(reflected)
-		tagMap := make(map[string]int)
 
 		switch reflected.Kind() {
 		case reflect.Interface:
@@ -253,6 +252,8 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 				reflected.Set(reflect.MakeSlice(reflected.Type(), 0, 0))
 			}
 		case reflect.Struct:
+			tagMap := make(map[string]int)
+
 			for i := 0; i < reflected.NumField(); i++ {
 				fieldTypeField := reflected.Type().Field(i)
 				tag := fieldTypeField.Tag.Get("luai")

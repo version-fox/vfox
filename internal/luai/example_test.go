@@ -101,80 +101,93 @@ func TestCases(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	m := map[string]interface{}{
-		"key1": "value1",
-		"key2": 2,
-		"key3": true,
-	}
-	mFloat64 := map[string]interface{}{
-		"key1": "value1",
-		"key2": float64(2),
-		"key3": true,
-	}
-
-	s := []any{"value1", 2, true}
-	sFloat64 := []any{"value1", float64(2), true}
-
-	normalStruct := testStruct{
-		Field1: "test",
-		Field2: 1,
-		Field3: true,
-	}
-	normalStructWithTag := testStructTag{
-		Field1: "test",
-		Field2: 1,
-		Field3: true,
-	}
-
 	var unmarshalTests = []struct {
 		CaseName            string
 		in                  any
-		ptr                 any
+		ptr                 any // new(type)
 		out                 any
 		luaValidationScript string
 		err                 error
 	}{
 		{
 			CaseName: "Struct",
-			in:       normalStruct,
-			ptr:      new(testStruct),
-			out:      &normalStruct,
+			in: testStruct{
+				Field1: "test",
+				Field2: 1,
+				Field3: true,
+			},
+			ptr: new(testStruct),
+			out: testStruct{
+				Field1: "test",
+				Field2: 1,
+				Field3: true,
+			},
 			luaValidationScript: `
-				assert(table.Field1 == "test")
-				assert(table.Field2 == 1)
-				assert(table.Field3 == true)
+				assert(m.Field1 == "test")
+				assert(m.Field2 == 1)
+				assert(m.Field3 == true)
 				print("lua Struct done")
 			`,
 		},
 		{
 			CaseName: "Struct with Tag",
-			in:       normalStructWithTag,
-			ptr:      &testStructTag{},
-			out:      &normalStructWithTag,
+			in: testStructTag{
+				Field1: "test",
+				Field2: 1,
+				Field3: true,
+			},
+			ptr: new(testStructTag),
+			out: testStructTag{
+				Field1: "test",
+				Field2: 1,
+				Field3: true,
+			},
 			luaValidationScript: `
-				assert(table.field1 == "test")
-				assert(table.field2 == 1)
-				assert(table.field3 == true)
+				assert(m.field1 == "test")
+				assert(m.field2 == 1)
+				assert(m.field3 == true)
 				print("lua Struct with Tag done")
 			`,
 		},
 		{
 			CaseName: "Map",
-			in:       m,
-			ptr:      &map[string]any{},
-			out:      &mFloat64,
+			in: map[string]interface{}{
+				"key1": "value1",
+				"key2": 2,
+				"key3": true,
+			},
+			ptr: new(map[string]any),
+			out: map[string]interface{}{
+				"key1": "value1",
+				"key2": float64(2),
+				"key3": true,
+			},
 		},
 		{
 			CaseName: "Slice",
-			in:       s,
-			ptr:      &[]any{},
-			out:      &sFloat64,
+			in:       []any{"value1", 2, true},
+			ptr:      new([]any),
+			out:      []any{"value1", float64(2), true},
 		},
 		{
 			CaseName: "Any",
-			in:       m,
-			ptr:      new(any),
-			out:      &mFloat64,
+			in: map[string]interface{}{
+				"key1": "value1",
+				"key2": 2,
+				"key3": true,
+			},
+			ptr: new(any),
+			out: map[string]interface{}{
+				"key1": "value1",
+				"key2": float64(2),
+				"key3": true,
+			},
+			luaValidationScript: `
+			assert(m.key1 == "value1")
+			assert(m.key2 == 2)
+			assert(m.key3 == true)
+			print("Any Done")
+		`,
 		},
 		{
 			CaseName: "Map[Int]",
@@ -182,8 +195,8 @@ func TestCases(t *testing.T) {
 				1: 1,
 				2: 2,
 			},
-			ptr: &map[int]int{},
-			out: &map[int]int{
+			ptr: new(map[int]int),
+			out: map[int]int{
 				1: 1,
 				2: 2,
 			},
@@ -204,11 +217,15 @@ func TestCases(t *testing.T) {
 					Field2: 2,
 					Field3: true,
 				},
-				Map:   m,
-				Slice: s,
+				Map: map[string]interface{}{
+					"key1": "value1",
+					"key2": float64(2),
+					"key3": true,
+				},
+				Slice: []any{"value1", 2, true},
 			},
-			ptr: &complexStruct{},
-			out: &complexStruct{
+			ptr: new(complexStruct),
+			out: complexStruct{
 				Field1: "value1",
 				Field2: 123,
 				Field3: true,
@@ -217,11 +234,14 @@ func TestCases(t *testing.T) {
 					Field2: 2,
 					Field3: true,
 				},
-				Map:   mFloat64,
-				Slice: sFloat64,
+				Map: map[string]interface{}{
+					"key1": "value1",
+					"key2": float64(2),
+					"key3": true,
+				},
+				Slice: []any{"value1", float64(2), true},
 			},
 			luaValidationScript: `
-
 				assert(m.Field1 == "value1")
 				assert(m.Field2 == 123)
 				assert(m.Field3 == true)
@@ -249,20 +269,49 @@ func TestCases(t *testing.T) {
 				t.Fatalf("marshal map failed: %v", err)
 			}
 
-			L.SetGlobal("m", table)
-
 			if tt.luaValidationScript != "" {
+				L.SetGlobal("m", table)
+
 				if err := L.DoString(tt.luaValidationScript); err != nil {
 					t.Errorf("validate %s error: %v", tt.CaseName, err)
 				}
 			}
 
-			err = Unmarshal(table, tt.ptr)
+			if tt.ptr == nil {
+				return
+			}
+
+			typ := reflect.TypeOf(tt.ptr)
+			if typ.Kind() != reflect.Pointer {
+				t.Fatalf("%s: unmarshalTest.ptr %T is not a pointer type", tt.CaseName, tt.ptr)
+			}
+
+			typ = typ.Elem()
+
+			// equals to: v = new(right-type)
+			v := reflect.New(typ)
+
+			if !reflect.DeepEqual(tt.ptr, v.Interface()) {
+				// There's no reason for ptr to point to non-zero data,
+				// as we decode into new(right-type), so the data is
+				// discarded.
+				// This can easily mean tests that silently don't test
+				// what they should. To test decoding into existing
+				// data, see TestPrefilled.
+				t.Fatalf("%s: unmarshalTest.ptr %#v is not a pointer to a zero value", tt.CaseName, tt.ptr)
+			}
+
+			err = Unmarshal(table, v.Interface())
+
 			if err != tt.err {
 				t.Errorf("expected %+v, got %+v", tt.err, err)
 			}
-			if !reflect.DeepEqual(tt.out, tt.ptr) {
-				t.Errorf("expected %+v, got %+v", tt.out, tt.ptr)
+
+			// get the value out of the pointer, equals to: v = *v
+			got := v.Elem().Interface()
+
+			if !reflect.DeepEqual(tt.out, got) {
+				t.Errorf("expected %+v, got %+v", tt.out, got)
 			}
 		})
 	}
