@@ -161,7 +161,6 @@ type EnvKeysHookResultItem struct {
 
 type LuaPluginInfo struct {
 	Name              string   `luai:"name"`
-	Author            string   `luai:"author"`
 	Version           string   `luai:"version"`
 	Description       string   `luai:"description"`
 	UpdateUrl         string   `luai:"updateUrl"` // TODO Will be deprecated in future versions

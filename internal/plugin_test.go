@@ -55,10 +55,6 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 			t.Errorf("expected description 'xxx', got '%s'", plugin.Description)
 		}
 
-		if plugin.Author != "Lihan" {
-			t.Errorf("expected author 'Lihan', got '%s'", plugin.Author)
-		}
-
 		if plugin.UpdateUrl != "{URL}/sdk.lua" {
 			t.Errorf("expected update url '{URL}/sdk.lua', got '%s'", plugin.UpdateUrl)
 		}

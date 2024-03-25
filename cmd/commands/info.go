@@ -44,7 +44,6 @@ func infoCmd(ctx *cli.Context) error {
 
 	pterm.Println("Plugin info:")
 	pterm.Println("Name     ", "->", pterm.LightBlue(source.Name))
-	pterm.Println("Author   ", "->", pterm.LightBlue(source.Author))
 	pterm.Println("Version  ", "->", pterm.LightBlue(source.Version))
 	pterm.Println("Desc     ", "->", pterm.LightBlue(source.Description))
 	pterm.Println("UpdateUrl", "->", pterm.LightBlue(source.UpdateUrl))
