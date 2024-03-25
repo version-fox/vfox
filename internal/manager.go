@@ -54,7 +54,7 @@ type Manager struct {
 func (m *Manager) EnvKeys() (*env.Envs, error) {
 	shellEnvs := &env.Envs{
 		Variables: make(env.Vars),
-		Paths:     make(env.Paths, 0),
+		Paths:     env.NewPaths(env.EmptyPaths),
 	}
 	for k, v := range m.Record.Export() {
 		if lookupSdk, err := m.LookupSdk(k); err == nil {
@@ -62,7 +62,7 @@ func (m *Manager) EnvKeys() (*env.Envs, error) {
 				for key, value := range ek.Variables {
 					shellEnvs.Variables[key] = value
 				}
-				shellEnvs.Paths = append(shellEnvs.Paths, ek.Paths...)
+				shellEnvs.Paths.Merge(ek.Paths)
 			}
 		}
 	}
@@ -414,7 +414,7 @@ func newSdkManagerWithSource(sources ...RecordSource) *Manager {
 	for _, source := range sources {
 		switch source {
 		case GlobalRecordSource:
-			paths = append(paths, meta.ConfigPath)
+			paths = append(paths, meta.HomePath)
 		case ProjectRecordSource:
 			paths = append(paths, meta.WorkingDirectory)
 		case SessionRecordSource:
@@ -448,11 +448,11 @@ func NewSdkManager(sources ...RecordSource) *Manager {
 }
 
 func newSdkManager(record env.Record, meta *PathMeta) *Manager {
-	envManger, err := env.NewEnvManager(meta.ConfigPath)
+	envManger, err := env.NewEnvManager(meta.HomePath)
 	if err != nil {
 		panic("Init env manager error")
 	}
-	c, err := config.NewConfig(meta.ConfigPath)
+	c, err := config.NewConfig(meta.HomePath)
 	if err != nil {
 		panic(fmt.Errorf("init Config error: %w", err))
 	}

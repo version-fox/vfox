@@ -47,7 +47,7 @@ func (m *macosEnvManager) Load(envs *Envs) error {
 	for k, v := range envs.Variables {
 		m.envMap[k] = *v
 	}
-	for _, path := range envs.Paths {
+	for _, path := range envs.Paths.Slice() {
 		if _, ok := m.pathMap[path]; ok {
 			continue
 		}
@@ -64,7 +64,7 @@ func (m *macosEnvManager) Remove(envs *Envs) error {
 		delete(m.envMap, k)
 		m.deletedEnvMap[k] = struct{}{}
 	}
-	for _, k := range envs.Paths {
+	for _, k := range envs.Paths.Slice() {
 		if _, ok := m.pathMap[k]; ok {
 			delete(m.pathMap, k)
 			var newPaths []string
@@ -134,4 +134,8 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 		deletedEnvMap:  make(map[string]struct{}),
 	}
 	return manager, nil
+}
+
+func (p *Paths) String() string {
+	return strings.Join(p.Slice(), ":")
 }

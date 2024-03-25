@@ -22,17 +22,13 @@ import (
 )
 
 const (
-	HookFlag = "__VFOX_SHELL"
-	PathFlag = "__VFOX_ORIG_PATH"
-	PidFlag  = "__VFOX_PID"
+	HookFlag          = "__VFOX_SHELL"
+	PreviousPathsFlag = "__VFOX_PREVIOUS_PATHS"
+	PidFlag           = "__VFOX_PID"
 )
 
 func IsHookEnv() bool {
 	return os.Getenv(HookFlag) != ""
-}
-
-func GetOrigPath() string {
-	return os.Getenv(PathFlag)
 }
 
 func GetPid() int {

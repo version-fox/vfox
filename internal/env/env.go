@@ -17,7 +17,10 @@
 package env
 
 import (
+	"github.com/version-fox/vfox/internal/util"
 	"io"
+	"os"
+	"strings"
 )
 
 type Manager interface {
@@ -32,11 +35,50 @@ type Manager interface {
 // Vars is a map of environment variables
 type Vars map[string]*string
 
-// Paths is a slice of PATH.
-type Paths []string
-
 // Envs is a struct that contains environment variables and PATH.
 type Envs struct {
 	Variables Vars
-	Paths     Paths
+	Paths     *Paths
+}
+
+type PathFrom int
+
+const (
+	EmptyPaths PathFrom = iota
+	OsPaths
+	PreviousPaths
+)
+
+// Paths is a slice of PATH.
+type Paths struct {
+	util.Set[string]
+}
+
+func (p *Paths) Merge(other *Paths) *Paths {
+	for _, path := range other.Slice() {
+		p.Add(path)
+	}
+	return p
+}
+
+// NewPaths returns a new Paths.
+// from is the source of the paths.
+// If from is OsPaths, it returns the paths from the environment variable PATH.
+// If from is PreviousPaths, it returns the paths from the environment variable VERSION_FOX_PATH.
+// If from is neither OsPaths nor PreviousPaths, it returns an empty Paths.
+func NewPaths(from PathFrom) *Paths {
+	var paths []string
+	switch from {
+	case OsPaths:
+		paths = strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
+	case PreviousPaths:
+		if preStr := os.Getenv(PreviousPathsFlag); preStr != "" {
+			paths = strings.Split(preStr, string(os.PathListSeparator))
+		}
+	default:
+
+	}
+	return &Paths{
+		util.NewSortedSetWithSlice(paths),
+	}
 }

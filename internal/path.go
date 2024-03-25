@@ -37,7 +37,7 @@ type PathMeta struct {
 	TempPath string
 	// Temporary directory for the current process
 	CurTmpPath       string
-	ConfigPath       string
+	HomePath         string
 	SdkCachePath     string
 	PluginPath       string
 	ExecutablePath   string
@@ -50,7 +50,7 @@ func newPathMeta() (*PathMeta, error) {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
 	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
-	configPath := filepath.Join(userHomeDir, ".version-fox")
+	homePath := filepath.Join(userHomeDir, ".version-fox")
 	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
 	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
 	_ = os.MkdirAll(sdkCachePath, 0755)
@@ -79,7 +79,7 @@ func newPathMeta() (*PathMeta, error) {
 	return &PathMeta{
 		TempPath:         tmpPath,
 		CurTmpPath:       curTmpPath,
-		ConfigPath:       configPath,
+		HomePath:         homePath,
 		SdkCachePath:     sdkCachePath,
 		PluginPath:       pluginPath,
 		ExecutablePath:   exePath,

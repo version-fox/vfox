@@ -78,6 +78,7 @@ func (w *windowsEnvManager) Flush() (err error) {
 			Variables: Vars{
 				"VERSION_FOX_PATH": &pathValue,
 			},
+			Paths: NewPaths(EmptyPaths),
 		})); err != nil {
 			return err
 		}
@@ -137,7 +138,7 @@ func (w *windowsEnvManager) Load(envs *Envs) error {
 			return err
 		}
 	}
-	for _, path := range envs.Paths {
+	for _, path := range envs.Paths.Slice() {
 		_, ok := w.pathMap[path]
 		if !ok {
 			w.pathMap[path] = struct{}{}
@@ -163,7 +164,7 @@ func (w *windowsEnvManager) Remove(envs *Envs) error {
 		_ = w.key.DeleteValue(k)
 	}
 
-	for _, k := range envs.Paths {
+	for _, k := range envs.Paths.Slice() {
 		if _, ok := w.pathMap[k]; ok {
 			delete(w.pathMap, k)
 			var newPaths []string
@@ -226,4 +227,12 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 		return nil, err
 	}
 	return manager, nil
+}
+
+func (p *Paths) String() string {
+	if os.Getenv(HookFlag) == "bash" {
+		return strings.Join(p.Slice(), ":")
+	} else {
+		return strings.Join(p.Slice(), ";")
+	}
 }

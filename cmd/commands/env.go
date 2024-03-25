@@ -19,8 +19,6 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
@@ -51,7 +49,6 @@ var Env = &cli.Command{
 }
 
 func envCmd(ctx *cli.Context) error {
-	// TODO  env not effect for git bash
 	if ctx.IsSet("json") {
 		type SDKs map[string]map[string]*string
 		data := struct {
@@ -69,7 +66,7 @@ func envCmd(ctx *cli.Context) error {
 			if lookupSdk, err := manager.LookupSdk(k); err == nil {
 				if keys, err := lookupSdk.EnvKeys(internal.Version(v)); err == nil {
 					data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
-					data.Paths = append(data.Paths, keys.Paths...)
+					data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				}
 			}
 		}
@@ -94,7 +91,7 @@ func envCmd(ctx *cli.Context) error {
 		if s == nil {
 			return fmt.Errorf("unknow target shell %s", shellName)
 		}
-		manager := internal.NewSdkManagerWithSource(internal.SessionRecordSource, internal.ProjectRecordSource)
+		manager := internal.NewSdkManagerWithSource(internal.GlobalRecordSource, internal.SessionRecordSource, internal.ProjectRecordSource)
 		defer manager.Close()
 		envKeys, err := manager.EnvKeys()
 		if err != nil {
@@ -106,12 +103,26 @@ func envCmd(ctx *cli.Context) error {
 			exportEnvs[k] = v
 		}
 		sdkPaths := envKeys.Paths
-		if len(sdkPaths) != 0 {
-			originPath := os.Getenv(env.PathFlag)
-			paths := manager.EnvManager.Paths(append(sdkPaths[:], originPath))
-			exportEnvs["PATH"] = &paths
-		}
 
+		// Takes the complement of previousPaths and sdkPaths, and removes the complement from osPaths.
+		previousPaths := env.NewPaths(env.PreviousPaths)
+		for _, pp := range previousPaths.Slice() {
+			if sdkPaths.Contains(pp) {
+				previousPaths.Remove(pp)
+			}
+		}
+		osPaths := env.NewPaths(env.OsPaths)
+		if previousPaths.Len() != 0 {
+			for _, pp := range previousPaths.Slice() {
+				osPaths.Remove(pp)
+			}
+		}
+		// Set the sdk paths to the new previous paths.
+		newPreviousPathStr := sdkPaths.String()
+		exportEnvs[env.PreviousPathsFlag] = &newPreviousPathStr
+
+		pathStr := sdkPaths.Merge(osPaths).String()
+		exportEnvs["PATH"] = &pathStr
 		exportStr := s.Export(exportEnvs)
 		fmt.Println(exportStr)
 		return nil

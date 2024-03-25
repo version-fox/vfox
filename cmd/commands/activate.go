@@ -52,15 +52,22 @@ func activateCmd(ctx *cli.Context) error {
 		exportEnvs[k] = v
 	}
 
-	os.Setenv(env.HookFlag, name)
+	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
-	originPath := os.Getenv("PATH")
-	exportEnvs[env.PathFlag] = &originPath
-	sdkPaths := envKeys.Paths
-	if len(sdkPaths) != 0 {
-		paths := manager.EnvManager.Paths(append(sdkPaths[:], originPath))
-		exportEnvs["PATH"] = &paths
+	allPaths := envKeys.Paths.Merge(env.NewPaths(env.OsPaths))
+	pathStr := allPaths.String()
+	exportEnvs["PATH"] = &pathStr
+
+	// filter vfox sdk path
+	homePath := manager.PathMeta.HomePath
+	previousPaths := env.NewPaths(env.EmptyPaths)
+	for _, p := range allPaths.Slice() {
+		if strings.HasPrefix(p, homePath) {
+			previousPaths.Add(p)
+		}
 	}
+	prePathsStr := previousPaths.String()
+	exportEnvs[env.PreviousPathsFlag] = &prePathsStr
 
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)

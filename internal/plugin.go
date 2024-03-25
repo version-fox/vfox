@@ -246,7 +246,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 		return nil, err
 	}
 
-	pathSet := util.NewSortedSet[string]()
+	pathSet := env.NewPaths(env.EmptyPaths)
 	for _, item := range items {
 		if item.Key == "PATH" {
 			pathSet.Add(item.Value)
@@ -255,7 +255,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 		}
 	}
 
-	envKeys.Paths = pathSet.Slice()
+	envKeys.Paths = pathSet
 
 	return envKeys, nil
 }
