@@ -60,7 +60,7 @@ type LuaPlugin struct {
 	Path string
 	// plugin filename, this is also alias name, sdk-name
 	SdkName string
-	LuaPluginInfo
+	*LuaPluginInfo
 }
 
 func (l *LuaPlugin) Validate() error {
@@ -370,8 +370,8 @@ func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, err
 		return nil, err
 	}
 
-	pluginInfo := LuaPluginInfo{}
-	err := luai.Unmarshal(PLUGIN, &pluginInfo)
+	pluginInfo := &LuaPluginInfo{}
+	err := luai.Unmarshal(PLUGIN, pluginInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -470,8 +470,8 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	pluginInfo := LuaPluginInfo{}
-	if err = luai.Unmarshal(PLUGIN, &pluginInfo); err != nil {
+	pluginInfo := &LuaPluginInfo{}
+	if err = luai.Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, err
 	}
 

@@ -4,3 +4,6 @@ proxy:
 
 storage:
   sdkPath: /tmp
+
+registry:
+  address: "https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins"
