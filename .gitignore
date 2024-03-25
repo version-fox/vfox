@@ -1,3 +1,6 @@
 .DS_Store
 .idea
 /docs/node_modules/
+
+
+coverage.out

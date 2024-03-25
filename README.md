@@ -80,6 +80,18 @@ $ node -v
 
 See [vfox.lhan.me](https://vfox.lhan.me) for full documentation.
 
+## Roadmap
+
+Our future plans and high priority features and enhancements are:
+
+- [ ] Refactoring the plugin mechanism:
+  - Introducing plugin templates to facilitate multi-file plugin development.
+  - Establishing a global registry (similar to `NPM Registry` or `Scoop Main Bucket`) to provide a unified entry point for plugin distribution.
+  - Decomposing the existing plugin repository into individual repositories, one for each plugin.
+- [ ] Allowing the switching of registry addresses.
+- [ ] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
+- [ ] Plugin capabilities: Allowing plugins to load installed runtimes and provide information about the runtime.
+
 ## Supported Plugins
 
 > If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
