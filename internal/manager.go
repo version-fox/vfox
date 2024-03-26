@@ -456,48 +456,6 @@ func (m *Manager) httpClient() *http.Client {
 	return client
 }
 
-func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
-	if !strings.HasSuffix(path, ".lua") {
-		return "", fmt.Errorf("%s not a lua file", path)
-	}
-	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		client := m.httpClient()
-		resp, err := client.Get(path)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-		cd := resp.Header.Get("Content-Disposition")
-		if strings.HasPrefix(cd, "attachment") {
-			return "", fmt.Errorf("not a lua file")
-		}
-		if resp.StatusCode == http.StatusNotFound {
-			return "", fmt.Errorf("file not found")
-		}
-		if str, err := io.ReadAll(resp.Body); err != nil {
-			return "", err
-		} else {
-			return string(str), nil
-		}
-	}
-
-	if !util.FileExists(path) {
-		return "", fmt.Errorf("file not found")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	str, err := io.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-	return string(str), nil
-
-}
-
 func (m *Manager) Available() (RegistryIndex, error) {
 	client := m.httpClient()
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
