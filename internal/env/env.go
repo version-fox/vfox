@@ -64,7 +64,7 @@ func (p *Paths) Merge(other *Paths) *Paths {
 // NewPaths returns a new Paths.
 // from is the source of the paths.
 // If from is OsPaths, it returns the paths from the environment variable PATH.
-// If from is PreviousPaths, it returns the paths from the environment variable VERSION_FOX_PATH.
+// If from is PreviousPaths, it returns the paths from the environment variable __VFOX_PREVIOUS_PATHS
 // If from is neither OsPaths nor PreviousPaths, it returns an empty Paths.
 func NewPaths(from PathFrom) *Paths {
 	var paths []string

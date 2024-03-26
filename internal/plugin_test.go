@@ -168,7 +168,7 @@ func TestPlugin(t *testing.T) {
 		if *javaHome == "" {
 			t.Errorf("expected JAVA_HOME to be set, got '%s'", *javaHome)
 		}
-		path := keys.Paths
+		path := keys.Paths.Slice()
 		if len(path) != 2 {
 			t.Errorf("expected 2 paths, got %d", len(path))
 		}
