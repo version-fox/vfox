@@ -5,9 +5,14 @@ local html = require("html")
 
 --- The following two parameters are injected by VersionFox at runtime
 --- Operating system type at runtime (Windows, Linux, Darwin)
-OS_TYPE = ""
---- Operating system architecture at runtime (amd64, arm64, etc.)
-ARCH_TYPE = ""
+RUNTIME = {
+    --- Operating system type at runtime (Windows, Linux, Darwin)
+    osType = "",
+    --- Operating system architecture at runtime (amd64, arm64, etc.)
+    archType = "",
+    --- vfox runtime version
+    version = "",
+}
 
 PLUGIN = {
     --- Plugin name
@@ -30,6 +35,7 @@ PLUGIN = {
 --- @field ctx.version string User-input version
 --- @return table Version information
 function PLUGIN:PreInstall(ctx)
+    print(json.encode(RUNTIME))
     local version = ctx.version
     local runtimeVersion = ctx.runtimeVersion
     return {

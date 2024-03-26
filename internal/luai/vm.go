@@ -18,10 +18,10 @@ package luai
 
 import (
 	_ "embed"
-
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
+	"strings"
 )
 
 //go:embed fixtures/preload.lua
@@ -50,6 +50,12 @@ func (vm *LuaVM) Prepare(options *PrepareOptions) error {
 	module.Preload(vm.Instance, options.Config)
 
 	return nil
+}
+
+// LimitPackagePath limits the package path of the Lua VM.
+func (vm *LuaVM) LimitPackagePath(packagePaths ...string) {
+	packageModule := vm.Instance.GetGlobal("package").(*lua.LTable)
+	packageModule.RawSetString("path", lua.LString(strings.Join(packagePaths, ";")))
 }
 
 func (vm *LuaVM) ReturnedValue() *lua.LTable {

@@ -36,6 +36,7 @@ type macosEnvManager struct {
 
 func (m *macosEnvManager) Paths(paths []string) string {
 	set := util.NewSortedSetWithSlice[string](paths)
+	// TODO can replace with filepath.ListSeparator
 	return strings.Join(set.Slice(), ":")
 }
 
