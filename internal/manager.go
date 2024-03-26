@@ -326,6 +326,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 			pname = strings.Split(pluginName, "/")[1]
 		}
 
+		installPath := filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin %s already exists", pname)
+		}
+
 		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pname + ".json"))
 		if err != nil {
 			return err
