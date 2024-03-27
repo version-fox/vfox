@@ -91,7 +91,8 @@ list. If there is no version, return an empty array.
 
 ```lua
 function PLUGIN:Available(ctx)
-    local runtimeVersion = ctx.runtimeVersion
+    --- input parameters, array
+    local args = ctx.args
     return {
         {
             version = "xxxx",

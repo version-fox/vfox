@@ -44,7 +44,7 @@ func searchCmd(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
 	}
-	result, err := source.Available()
+	result, err := source.Available(ctx.Args().Tail())
 	if err != nil {
 		return fmt.Errorf("plugin [Available] method error: %w", err)
 	}

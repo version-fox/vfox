@@ -209,8 +209,8 @@ func (b *Sdk) Uninstall(version Version) error {
 	return nil
 }
 
-func (b *Sdk) Available() ([]*Package, error) {
-	return b.Plugin.Available()
+func (b *Sdk) Available(args []string) ([]*Package, error) {
+	return b.Plugin.Available(args)
 }
 
 func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {

@@ -85,7 +85,8 @@ end
 
 ```lua
 function PLUGIN:Available(ctx)
-    local runtimeVersion = ctx.runtimeVersion
+    --- 用户输入附带的参数, 数组
+    local args = ctx.args
     return {
         {
             version = "xxxx",

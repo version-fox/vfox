@@ -56,10 +56,11 @@ $ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-pl
 **用法**
 
 ```shell
-vfox search <sdk-name>
+vfox search <sdk-name> [...optionArgs]
 ```
 
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
+`optionArgs`: 搜索命令的附加参数。注意：是否支持取决于插件。
 
 ::: tip 快捷安装
 选择目标版本， 回车即可快速安装。

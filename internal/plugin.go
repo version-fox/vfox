@@ -78,10 +78,10 @@ func (l *LuaPlugin) Close() {
 	l.vm.Close()
 }
 
-func (l *LuaPlugin) Available() ([]*Package, error) {
+func (l *LuaPlugin) Available(args []string) ([]*Package, error) {
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, AvailableHookCtx{
-		RuntimeVersion: RuntimeVersion,
+		Args: args,
 	})
 
 	if err != nil {

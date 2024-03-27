@@ -59,10 +59,11 @@ View for all available versions of the specified SDK.
 **Usage**
 
 ```shell
-vfox search <sdk-name>
+vfox search <sdk-name> [...optionArgs]
 ```
 
 `sdk-name`: SDK name, such as `nodejs`, `custom-node`.
+`optionArgs`: Additional arguments for the search command. NOTE: Whether it is supported or not depends on the plugin.
 
 ::: tip Quick install
 Select the target version, and press Enter to install quickly.

@@ -50,7 +50,7 @@ func (c *LuaCheckSum) Checksum() *Checksum {
 }
 
 type AvailableHookCtx struct {
-	RuntimeVersion string `luai:"runtimeVersion"`
+	Args []string `luai:"args"`
 }
 
 type AvailableHookResultItem struct {
