@@ -19,7 +19,9 @@ package util
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -241,6 +243,14 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 		if err != nil {
 			return err
 		}
+	} else if z.isSymlink(f.FileInfo()) {
+		// symlink target is the contents of the file
+		buf := new(bytes.Buffer)
+		_, err := io.Copy(buf, rc)
+		if err != nil {
+			return fmt.Errorf("%s: reading symlink target: %v", f.FileHeader.Name, err)
+		}
+		return z.writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
 	} else {
 		var fdir string
 		if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
@@ -262,6 +272,31 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (z *ZipDecompressor) isSymlink(fi os.FileInfo) bool {
+	return fi.Mode()&os.ModeSymlink != 0
+}
+
+func (z *ZipDecompressor) writeNewSymbolicLink(fpath string, target string) error {
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	_, err = os.Lstat(fpath)
+	if err == nil {
+		err = os.Remove(fpath)
+		if err != nil {
+			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
+		}
+	}
+
+	err = os.Symlink(target, fpath)
+	if err != nil {
+		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
 	}
 	return nil
 }
