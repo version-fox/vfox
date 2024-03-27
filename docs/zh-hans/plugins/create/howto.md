@@ -14,8 +14,36 @@
 
 ## 插件里有什么
 
-插件就是一个`lua`脚本。 里面提供了四个Hook函数， 分别是`PLUGIN:PreInstall`、`PLUGIN:PostInstall`、`PLUGIN:EnvKeys`、`PLUGIN:Available`。你需要做的就是实现这四个函数即可。
+目录结构如下:
+```shell
+    .
+    ├── README.md
+    ├── LICENSE
+    └── hooks
+        └── available.lua
+        └── env_keys.lua
+        └── post_install.lua
+        └── pre_install.lua
+        ....
+    └── lib
+        └── xxx.lua
+        └── xxx.lua
+        └── xxx.lua
+    └── metadata.lua
 
+```
+
+- `hooks` 目录用于存放插件的钩子函数。**一个钩子函数对应一个`.lua`文件。**
+- `lib` 目录用于存放插件的依赖库。`vfox`会自动加载这个目录下的所有`.lua`文件。**放在其他目录下,则无法加载。**
+- `metadata.lua` 插件的元数据信息。用于描述插件的基本信息，如插件名称、版本等。
+- `README.md` 插件的说明文档。
+- `LICENSE` 插件的许可证。
+
+::: warning 插件模板
+为了方便插件的开发，我们提供了一个插件模板，你可以直接使用[vfox-plugin-template](https://github.com/version-fox/vfox-plugin-template)创建一个插件。
+:::
+
+## 必须实现的钩子函数
 
 ### PreInstall
 
@@ -58,24 +86,6 @@ function PLUGIN:PreInstall(ctx)
             }
         }
     }
-end
-```
-
-### PostInstall
-
-拓展点，在`PreInstall`执行之后调用，用于执行额外的操作， 如编译源码等。根据需要实现。
-
-```lua
-function PLUGIN:PostInstall(ctx)
-    --- ctx.rootPath SDK 安装目录
-    local rootPath = ctx.rootPath
-    local runtimeVersion = ctx.runtimeVersion
-    --- 根据PreInstall返回的name获取
-    local sdkInfo = ctx.sdkInfo['sdk-name']
-    --- 文件存放路径
-    local path = sdkInfo.path
-    local version = sdkInfo.version
-    local name = sdkInfo.name
 end
 ```
 
@@ -133,7 +143,29 @@ function PLUGIN:EnvKeys(ctx)
 end
 ```
 
-## PreUse
+
+
+## 可选钩子函数
+
+### PostInstall
+
+拓展点，在`PreInstall`执行之后调用，用于执行额外的操作， 如编译源码等。根据需要实现。
+
+```lua
+function PLUGIN:PostInstall(ctx)
+    --- ctx.rootPath SDK 安装目录
+    local rootPath = ctx.rootPath
+    local runtimeVersion = ctx.runtimeVersion
+    --- 根据PreInstall返回的name获取
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    --- 文件存放路径
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
+end
+```
+
+### PreUse
 
 当用户使用 `vfox use` 的时候，会调用插件的 `PreUse` 函数。这个函数的作用是返回用户输入的版本信息。
 如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。
@@ -176,6 +208,10 @@ end
 
 
 
-## 发布插件
+## 向官方插件存储库提交插件
 
-当你完成插件并测试无误之后， 就可以直接[发起PR](https://github.com/version-fox/version-fox-plugins/pulls)啦~
+vfox可以允许自定义安装插件，比如`vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip `
+
+为了使你的用户更轻松，你可以将插件添加到官方插件存储库中，以列出你的插件并使用较短的命令轻松安装，比如 `vfox add nodejs`。
+
+具体步骤请查看[如何将插件提交到索引仓库](./howto_registry.md)。

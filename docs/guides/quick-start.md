@@ -137,7 +137,7 @@ If you don't know which plugin to add, you can use the `vfox available` command 
 :::
 
 ```bash 
-$ vfox add nodejs/nodejs
+$ vfox add nodejs
 ```
 
 ::: tip About plugins and SDKs
