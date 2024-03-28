@@ -59,7 +59,7 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 #### 3. Add an SDK plugin
 ```bash 
-$ vfox add nodejs/nodejs
+$ vfox add nodejs
 ```
 
 #### 4. Install a runtime
