@@ -20,6 +20,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"strings"
 )
 
 var Available = &cli.Command{
@@ -31,29 +32,20 @@ var Available = &cli.Command{
 func availableCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManagerWithSource()
 	defer manager.Close()
-	categoryName := ctx.Args().First()
-	categories, err := manager.Available()
+	//categoryName := ctx.Args().First()
+	available, err := manager.Available()
 	if err != nil {
 		return err
 	}
 	data := pterm.TableData{
-		{"NAME", "VERSION", "AUTHOR", "DESCRIPTION"},
+		{"NAME", "OFFICIAL", "HOMEPAGE", "DESCRIPTION"},
 	}
-	for _, category := range categories {
-		if len(categoryName) > 0 {
-			if categoryName != category.Name {
-				continue
-			}
+	for _, item := range available {
+		official := pterm.LightRed("NO")
+		if strings.HasPrefix(item.Homepage, "https://github.com/version-fox/") {
+			official = pterm.LightGreen("YES")
 		}
-		for _, p := range category.Plugins {
-			desc := p.Desc
-			if len(desc) == 0 {
-				desc = "-"
-			} else if len(desc) > 100 {
-				desc = desc[:100] + "..."
-			}
-			data = append(data, []string{category.Name + "/" + p.Filename, p.Version, p.Author, desc})
-		}
+		data = append(data, []string{item.Name, official, item.Homepage, item.Desc})
 	}
 
 	_ = pterm.DefaultTable.

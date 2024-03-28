@@ -16,6 +16,30 @@
 
 package internal
 
+const (
+	pluginRegistryAddress = "https://vfox-plugins.lhan.me"
+)
+
+// RegistryIndex is the index of the registry
+type RegistryIndex []*RegistryIndexItem
+
+// RegistryIndexItem is the item in the registry index
+type RegistryIndexItem struct {
+	Name     string `json:"name"`
+	Desc     string `json:"desc"`
+	Homepage string `json:"homepage"`
+}
+
+// RegistryPluginManifest is the manifest of a remote plugin
+type RegistryPluginManifest struct {
+	Name              string `json:"name"`
+	Version           string `json:"version"`
+	License           string `json:"license"`
+	Author            string `json:"author"`
+	DownloadUrl       string `json:"downloadUrl"`
+	MinRuntimeVersion string `json:"minRuntimeVersion"`
+}
+
 type RemotePluginInfo struct {
 	Filename string `json:"name"`
 	Author   string `json:"plugin_author"`

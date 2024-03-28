@@ -38,6 +38,7 @@ var Add = &cli.Command{
 	Action: addCmd,
 }
 
+// addCmd is the command to add a plugin of sdk
 func addCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManagerWithSource()
 	defer manager.Close()

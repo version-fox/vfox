@@ -60,7 +60,7 @@ type LuaPlugin struct {
 	Path string
 	// plugin filename, this is also alias name, sdk-name
 	SdkName string
-	LuaPluginInfo
+	*LuaPluginInfo
 }
 
 func (l *LuaPlugin) Validate() error {
@@ -332,62 +332,6 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	return nil
 }
 
-// NewLegacyLuaPlugin creates a new LuaPlugin instance from old plugin format.
-// TODO This will be deprecated in future versions.
-func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
-	vm := luai.NewLuaVM()
-
-	if err := vm.Prepare(&luai.PrepareOptions{
-		Config: manager.Config,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := vm.Instance.DoString(content); err != nil {
-		return nil, err
-	}
-
-	// !!!! Must be set after loading the script to prevent overwriting!
-	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(osType, lua.LString(util.GetOSType()))
-	vm.Instance.SetGlobal(archType, lua.LString(util.GetArchType()))
-
-	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
-	if pluginObj.Type() == lua.LTNil {
-		return nil, fmt.Errorf("plugin object not found")
-	}
-
-	PLUGIN := pluginObj.(*lua.LTable)
-
-	source := &LuaPlugin{
-		vm:        vm,
-		pluginObj: PLUGIN,
-		Path:      path,
-		SdkName:   filepath.Base(filepath.Dir(path)),
-	}
-
-	if err := source.Validate(); err != nil {
-		return nil, err
-	}
-
-	pluginInfo := LuaPluginInfo{}
-	err := luai.Unmarshal(PLUGIN, &pluginInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	source.LuaPluginInfo = pluginInfo
-
-	if !isValidName(source.Name) {
-		return nil, fmt.Errorf("invalid plugin name")
-	}
-
-	if source.Name == "" {
-		return nil, fmt.Errorf("no plugin name provided")
-	}
-	return source, nil
-}
-
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.
 // The plugin directory must meet one of the following conditions:
 // - The directory must contain a metadata.lua file and a hooks directory that includes all must be implemented hook functions.
@@ -470,8 +414,8 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	pluginInfo := LuaPluginInfo{}
-	if err = luai.Unmarshal(PLUGIN, &pluginInfo); err != nil {
+	pluginInfo := &LuaPluginInfo{}
+	if err = luai.Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, err
 	}
 
