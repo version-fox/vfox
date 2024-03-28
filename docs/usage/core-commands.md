@@ -4,21 +4,13 @@
 
 ## Available
 
-View all available plugins. If you specify a category, it will only show the plugins in that category. If you don't
-specify a category, it will show all available plugins.
+View all available plugins. 
 
 **Usage**
 
 ```shell
-vfox available [<category>]
+vfox available 
 ```
-
-`category`[optional]: Category, such as java, nodejs, flutter, etc. If not passed, all available plugins will be
-displayed.
-
-::: warning
-Note that the plugin name consists of two parts, `category/plugin-name`, such as `nodejs/nodejs`, `java/graalvm`
-:::
 
 ## Add
 
@@ -31,7 +23,7 @@ Therefore, before using them, you need to install the corresponding plugin.
 vfox add [options] <plugin-name>
 ```
 
-`plugin-name`: Plugin name, such as `nodejs/nodejs`.
+`plugin-name`: Plugin name, such as `nodejs`.
 
 **Options**
 
@@ -43,13 +35,13 @@ vfox add [options] <plugin-name>
 **Install plugin from the official repository**
 
 ```shell
-$ vfox add --alias node nodejs/nodejs
+$ vfox add --alias node nodejs
 ```
 
 **Install custom plugin**
 
 ```shell
-$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua custom-node
+$ vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip custom-node
 ```
 
 ## Search

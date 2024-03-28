@@ -55,7 +55,7 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 #### 3.添加插件
 ```bash 
-$ vfox add nodejs/nodejs
+$ vfox add nodejs
 ```
 
 #### 4. 安装运行时

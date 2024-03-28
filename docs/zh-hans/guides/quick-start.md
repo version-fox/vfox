@@ -118,21 +118,9 @@ Invoke-Expression "$(vfox activate pwsh)"
 如果你不知道添加哪个插件, 你可以使用 `vfox available` 命令查看所有可用插件
 :::
 
-为了得到更好的体验, 我们使用`npmmirror`镜像源插件!
-
 ```bash 
-$ vfox add nodejs/npmmirror
+$ vfox add nodejs
 ```
-::: tip 关于插件和SDK的关系
-在`vfox`理念中, 插件即SDK、SDK即插件. 你可以将插件理解为`vfox`的一种扩展, 用于管理不同的工具和运行环境。
-
-以`nodejs/npmmirror`插件为例, `nodejs`是分类, `npmmirror`是插件名, 插件内部`name`字段标注的叫**SDK名**。
-
-所以, 在删除插件时, 需要使用**SDK名**进行删除, 而不是插件名`nodejs/npmirror`或`npmmirror`。
-
-:::
-
-
 
 ## 4. 安装运行时
 

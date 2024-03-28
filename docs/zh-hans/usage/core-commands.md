@@ -4,18 +4,12 @@
 
 ## Available
 
-列举[插件仓库](https://github.com/version-fox/version-fox-plugins)中所有可用的插件。
+列举[索引仓库](https://github.com/version-fox/vfox-plugins)中所有可用的插件。
 
 **用法**
 ```shell
-vfox available [<category>]
+vfox available
 ```
-
-`category`[可选]: 分类， 如java、nodejs、flutter等， 如果不传则展示所有可用插件。
-
-::: warning 
-注意插件名由两部分组成，`分类/插件名`, 例如`nodejs/nodejs`、`java/graalvm`
-:::
 
 ## Add
 
@@ -27,8 +21,7 @@ vfox available [<category>]
 ```shell
 vfox add [options] <plugin-name>
 ```
-
-`plugin-name`: 插件名称， 如`nodejs/nodejs`。
+`plugin-name`: 插件名称， 如`nodejs`。
 
 **选项**
 - `-a, --alias`: 设置插件别名。
@@ -39,12 +32,12 @@ vfox add [options] <plugin-name>
 
 **安装仓库插件**
 ```shell
-$ vfox add --alias node nodejs/nodejs
+$ vfox add --alias node nodejs
 ```
 
 **安装自定义插件**
 ```shell
-$ vfox add --source https://raw.githubusercontent.com/version-fox/version-fox-plugins/main/nodejs/nodejs.lua custom-node
+$ vfox add --source  https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip custom-node
 ```
 
 
