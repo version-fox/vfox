@@ -140,8 +140,7 @@ func (l *LuaPlugin) Available(args []string) ([]*Package, error) {
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, PreInstallHookCtx{
-		Version:        string(version),
-		RuntimeVersion: RuntimeVersion,
+		Version: string(version),
 	})
 
 	if err != nil {
@@ -194,9 +193,8 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	}
 
 	ctx := &PostInstallHookCtx{
-		RuntimeVersion: RuntimeVersion,
-		RootPath:       rootPath,
-		SdkInfo:        make(map[string]*Info),
+		RootPath: rootPath,
+		SdkInfo:  make(map[string]*Info),
 	}
 
 	for _, v := range sdks {
@@ -282,7 +280,6 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	L := l.vm.Instance
 
 	ctx := PreUseHookCtx{
-		RuntimeVersion:  RuntimeVersion,
 		Cwd:             cwd,
 		Scope:           scope.String(),
 		Version:         string(version),
