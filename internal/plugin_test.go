@@ -133,7 +133,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 
-		pkgs, err := plugin.Available()
+		pkgs, err := plugin.Available([]string{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -245,7 +245,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pkgs, err := plugin.Available()
+		pkgs, err := plugin.Available([]string{})
 		if err != nil {
 			t.Fatal(err)
 		}
