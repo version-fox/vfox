@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -235,4 +236,9 @@ func (p *Paths) String() string {
 	} else {
 		return strings.Join(p.Slice(), ";")
 	}
+}
+
+func (p *Paths) Add(str string) bool {
+	str = filepath.FromSlash(str)
+	return p.Set.Add(str)
 }
