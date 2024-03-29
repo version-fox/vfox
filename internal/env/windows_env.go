@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -139,6 +140,7 @@ func (w *windowsEnvManager) Load(envs *Envs) error {
 		}
 	}
 	for _, path := range envs.Paths.Slice() {
+		path = filepath.FromSlash(path)
 		_, ok := w.pathMap[path]
 		if !ok {
 			w.pathMap[path] = struct{}{}
