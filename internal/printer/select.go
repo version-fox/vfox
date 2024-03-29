@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 	"sort"
@@ -32,7 +31,7 @@ import (
 
 type PageKVSelect struct {
 	index             int
-	InstallVersions   util.Set[internal.Version]
+	HighlightOptions  util.Set[string]
 	Options           []*KV
 	searchOptions     []*KV
 	pageOptions       []*KV
@@ -100,7 +99,7 @@ func (s *PageKVSelect) renderSelect() string {
 
 	for i, option := range indexMapper {
 		value := option.Value
-		if s.InstallVersions.Contains(internal.Version(option.Key)) {
+		if s.HighlightOptions.Contains(option.Key) {
 			value = pterm.LightGreen(value)
 		}
 		if i == s.index {
