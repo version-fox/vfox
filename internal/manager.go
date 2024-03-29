@@ -399,7 +399,7 @@ func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
 		}()
 	}
 	success := false
-	tempInstallPath, err := os.MkdirTemp("", "vfox-")
+	tempInstallPath, err := os.MkdirTemp(m.PathMeta.TempPath, "vfox-")
 	if err != nil {
 		return nil, fmt.Errorf("install plugin error: %w", err)
 	}
