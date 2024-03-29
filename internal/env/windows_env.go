@@ -140,7 +140,6 @@ func (w *windowsEnvManager) Load(envs *Envs) error {
 		}
 	}
 	for _, path := range envs.Paths.Slice() {
-		path = filepath.FromSlash(path)
 		_, ok := w.pathMap[path]
 		if !ok {
 			w.pathMap[path] = struct{}{}
@@ -237,4 +236,9 @@ func (p *Paths) String() string {
 	} else {
 		return strings.Join(p.Slice(), ";")
 	}
+}
+
+func (p *Paths) Add(str string) bool {
+	str = filepath.FromSlash(str)
+	return p.Set.Add(str)
 }
