@@ -143,8 +143,7 @@ type PostInstallHookCtx struct {
 }
 
 type EnvKeysHookCtx struct {
-	RuntimeVersion string `luai:"runtimeVersion"`
-	Main           *Info  `luai:"main"`
+	Main *Info `luai:"main"`
 	// TODO Will be deprecated in future versions
 	Path    string           `luai:"path"`
 	SdkInfo map[string]*Info `luai:"sdkInfo"`

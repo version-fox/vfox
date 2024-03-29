@@ -367,11 +367,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if len(tempPlugin.Notes) != 0 {
 		fmt.Println(pterm.LightYellow("Notes:"))
 		for _, note := range tempPlugin.Notes {
-			fmt.Println("  -", note)
+			fmt.Println("  ", note)
 		}
 	}
-	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pluginName))
-	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pluginName)))
+	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
+	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
 }
 

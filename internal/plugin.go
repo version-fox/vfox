@@ -219,10 +219,9 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 
 	ctx := &EnvKeysHookCtx{
 		// TODO Will be deprecated in future versions
-		Path:           mainInfo.Path,
-		RuntimeVersion: RuntimeVersion,
-		Main:           mainInfo,
-		SdkInfo:        make(map[string]*Info),
+		Path:    mainInfo.Path,
+		Main:    mainInfo,
+		SdkInfo: make(map[string]*Info),
 	}
 
 	for _, v := range sdkPackage.Additions {
