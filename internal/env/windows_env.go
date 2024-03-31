@@ -105,7 +105,7 @@ func (w *windowsEnvManager) Flush() (err error) {
 		}
 		userNewPaths = append(userNewPaths, v)
 	}
-	if err = w.key.SetStringValue("PATH", strings.Join(userNewPaths, ";")); err != nil {
+	if err = w.setEnv("PATH", strings.Join(userNewPaths, ";")); err != nil {
 		return err
 	}
 	// sys env
@@ -134,7 +134,7 @@ func (w *windowsEnvManager) Load(envs *Envs) error {
 		if err != nil {
 			return err
 		}
-		err = w.key.SetStringValue(k, *v)
+		err = w.setEnv(k, *v)
 		if err != nil {
 			return err
 		}
@@ -147,6 +147,13 @@ func (w *windowsEnvManager) Load(envs *Envs) error {
 		}
 	}
 	return nil
+}
+
+func (w *windowsEnvManager) setEnv(key, val string) error {
+	if strings.Contains(val, "%") {
+		return w.key.SetExpandStringValue(key, val)
+	}
+	return w.key.SetStringValue(key, val)
 }
 
 func (w *windowsEnvManager) Get(key string) (string, bool) {
