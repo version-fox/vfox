@@ -21,6 +21,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
+	"github.com/version-fox/vfox/internal/util"
 	"golang.org/x/crypto/ssh/terminal"
 	"math"
 	"os"
@@ -73,12 +74,18 @@ func searchCmd(ctx *cli.Context) error {
 		})
 	}
 
+	highlightOptions := util.NewSet[string]()
+	for _, version := range source.List() {
+		highlightOptions.Add(string(version))
+	}
+
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
-		TopText: "Please select a version of " + sdkName,
-		Filter:  true,
-		Size:    int(math.Min(math.Max(float64(height-3), 1), 20)),
-		Options: options,
+		TopText:          "Please select a version of " + sdkName,
+		Filter:           true,
+		Size:             int(math.Min(math.Max(float64(height-3), 1), 20)),
+		HighlightOptions: highlightOptions,
+		Options:          options,
 		SourceFunc: func(page, size int, options []*printer.KV) ([]*printer.KV, error) {
 			start := page * size
 			end := start + size

@@ -21,6 +21,7 @@ import (
 	"github.com/version-fox/vfox/internal/module/html"
 	"github.com/version-fox/vfox/internal/module/http"
 	"github.com/version-fox/vfox/internal/module/json"
+	"github.com/version-fox/vfox/internal/module/string"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -28,4 +29,5 @@ func Preload(L *lua.LState, config *config.Config) {
 	L.PreloadModule("http", http.NewModule(config.Proxy))
 	json.Preload(L)
 	html.Preload(L)
+	string.Preload(L)
 }

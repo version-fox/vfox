@@ -6,7 +6,6 @@
 function PLUGIN:EnvKeys(ctx)
     --- this variable is same as ctx.sdkInfo['plugin-name'].path
     local mainPath = ctx.path
-    local runtimeVersion = ctx.runtimeVersion
     local mainSdkInfo = ctx.main
     local mpath = mainSdkInfo.path
     local mversion = mainSdkInfo.version

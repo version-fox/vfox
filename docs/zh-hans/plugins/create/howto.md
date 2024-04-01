@@ -53,13 +53,13 @@
 function PLUGIN:PreInstall(ctx)
     --- 用户输入
     local version = ctx.version
-    --- 当前vfox运行时版本
-    local runtimeVersion = ctx.runtimeVersion
     return {
         --- 版本号
         version = "xxx",
-        --- remote URL or local file path [optional]
+        --- 文件地址, 可以是远程地址或者本地文件路径[可选]
         url = "xxx",
+        --- 备注信息[可选]
+        note = "xxx",
         --- SHA256 checksum [optional]
         sha256 = "xxx",
         --- md5 checksum [optional]
@@ -73,16 +73,7 @@ function PLUGIN:PreInstall(ctx)
             {
                 --- additional file name !
                 name = "xxx",
-                --- remote URL or local file path [optional]
-                url = "xxx",
-                --- SHA256 checksum [optional]
-                sha256 = "xxx",
-                --- md5 checksum [optional]
-                md5= "xxx",
-                --- sha1 checksum [optional]
-                sha1 = "xxx",
-                --- sha512 checksum [optional]
-                sha512 = "xx",
+                --- 其余同上
             }
         }
     }
@@ -120,7 +111,6 @@ end
 function PLUGIN:EnvKeys(ctx)
     --- this variable is same as ctx.sdkInfo['plugin-name'].path
     local mainPath = ctx.path
-    local runtimeVersion = ctx.runtimeVersion
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
     local version = sdkInfo.version
@@ -155,7 +145,6 @@ end
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK 安装目录
     local rootPath = ctx.rootPath
-    local runtimeVersion = ctx.runtimeVersion
     --- 根据PreInstall返回的name获取
     local sdkInfo = ctx.sdkInfo['sdk-name']
     --- 文件存放路径
@@ -172,7 +161,6 @@ end
 
 ```lua
 function PLUGIN:PreUse(ctx)
-    local runtimeVersion = ctx.runtimeVersion
     --- 用户输入的版本
     local version = ctx.version
     --- 用户之前环境中设置的版本

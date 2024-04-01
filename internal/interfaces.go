@@ -63,14 +63,13 @@ type AvailableHookResultItem struct {
 type AvailableHookResult = []*AvailableHookResultItem
 
 type PreInstallHookCtx struct {
-	Version        string `luai:"version"`
-	RuntimeVersion string `luai:"runtimeVersion"`
+	Version string `luai:"version"`
 }
 
 type PreInstallHookResultAdditionItem struct {
-	Name string `luai:"name"`
-	Url  string `luai:"url"`
-
+	Name   string `luai:"name"`
+	Url    string `luai:"url"`
+	Note   string `luai:"note"`
 	Sha256 string `luai:"sha256"`
 	Sha512 string `luai:"sha512"`
 	Sha1   string `luai:"sha1"`
@@ -89,20 +88,19 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 		Name:     i.Name,
 		Version:  Version(""),
 		Path:     i.Url,
-		Note:     "",
+		Note:     i.Note,
 		Checksum: sum.Checksum(),
 	}
 }
 
 type PreInstallHookResult struct {
-	Version string `luai:"version"`
-	Url     string `luai:"url"`
-
-	Sha256 string `luai:"sha256"`
-	Sha512 string `luai:"sha512"`
-	Sha1   string `luai:"sha1"`
-	Md5    string `luai:"md5"`
-
+	Version  string                              `luai:"version"`
+	Url      string                              `luai:"url"`
+	Note     string                              `luai:"note"`
+	Sha256   string                              `luai:"sha256"`
+	Sha512   string                              `luai:"sha512"`
+	Sha1     string                              `luai:"sha1"`
+	Md5      string                              `luai:"md5"`
 	Addition []*PreInstallHookResultAdditionItem `luai:"addition"`
 }
 
@@ -122,13 +120,12 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 		Name:     "",
 		Version:  Version(i.Version),
 		Path:     i.Url,
-		Note:     "",
+		Note:     i.Note,
 		Checksum: sum.Checksum(),
 	}, nil
 }
 
 type PreUseHookCtx struct {
-	RuntimeVersion  string           `luai:"runtimeVersion"`
 	Cwd             string           `luai:"cwd"`
 	Scope           string           `luai:"scope"`
 	Version         string           `luai:"version"`
@@ -141,14 +138,12 @@ type PreUseHookResult struct {
 }
 
 type PostInstallHookCtx struct {
-	RuntimeVersion string           `luai:"runtimeVersion"`
-	RootPath       string           `luai:"rootPath"`
-	SdkInfo        map[string]*Info `luai:"sdkInfo"`
+	RootPath string           `luai:"rootPath"`
+	SdkInfo  map[string]*Info `luai:"sdkInfo"`
 }
 
 type EnvKeysHookCtx struct {
-	RuntimeVersion string `luai:"runtimeVersion"`
-	Main           *Info  `luai:"main"`
+	Main *Info `luai:"main"`
 	// TODO Will be deprecated in future versions
 	Path    string           `luai:"path"`
 	SdkInfo map[string]*Info `luai:"sdkInfo"`
@@ -163,7 +158,7 @@ type LuaPluginInfo struct {
 	Name              string   `luai:"name"`
 	Version           string   `luai:"version"`
 	Description       string   `luai:"description"`
-	UpdateUrl         string   `luai:"updateUrl"` // TODO Will be deprecated in future versions
+	UpdateUrl         string   `luai:"updateUrl"`
 	ManifestUrl       string   `luai:"manifestUrl"`
 	Homepage          string   `luai:"homepage"`
 	License           string   `luai:"license"`

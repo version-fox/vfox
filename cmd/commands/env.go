@@ -19,6 +19,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
@@ -106,9 +107,11 @@ func envCmd(ctx *cli.Context) error {
 
 		// Takes the complement of previousPaths and sdkPaths, and removes the complement from osPaths.
 		previousPaths := env.NewPaths(env.PreviousPaths)
+		jointCnt := 0
 		for _, pp := range previousPaths.Slice() {
 			if sdkPaths.Contains(pp) {
 				previousPaths.Remove(pp)
+				jointCnt++
 			}
 		}
 		osPaths := env.NewPaths(env.OsPaths)
@@ -116,6 +119,9 @@ func envCmd(ctx *cli.Context) error {
 			for _, pp := range previousPaths.Slice() {
 				osPaths.Remove(pp)
 			}
+		} else if sdkPaths.Len() == jointCnt {
+			// sdkPaths == previousPaths, No need to set environment variables
+			return nil
 		}
 		// Set the sdk paths to the new previous paths.
 		newPreviousPathStr := sdkPaths.String()

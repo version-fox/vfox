@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/version-fox/vfox/internal/util"
 	"strings"
 	"testing"
 
@@ -227,12 +228,23 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 			t.Errorf("expected 2 paths, got %d", len(path))
 		}
 
-		if !strings.HasSuffix(path[0], "/bin") {
-			t.Errorf("expected PATH to end with '/bin', got '%s'", path[0])
+		if util.GetOSType() == "windows" {
+			if !strings.HasSuffix(path[0], "\\bin") {
+				t.Errorf("expected PATH to end with '\\bin', got '%s'", path[0])
+			}
+			if !strings.HasSuffix(path[1], "\\bin2") {
+				t.Errorf("expected PATH to end with '\\bin2', got '%s'", path[1])
+			}
+
+		} else {
+			if !strings.HasSuffix(path[0], "/bin") {
+				t.Errorf("expected PATH to end with '/bin', got '%s'", path[0])
+			}
+			if !strings.HasSuffix(path[1], "/bin2") {
+				t.Errorf("expected PATH to end with '/bin2', got '%s'", path[1])
+			}
 		}
-		if !strings.HasSuffix(path[1], "/bin2") {
-			t.Errorf("expected PATH to end with '/bin', got '%s'", path[1])
-		}
+
 	})
 
 	t.Run("PreUse", func(t *testing.T) {

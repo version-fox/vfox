@@ -18,8 +18,11 @@ package internal
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/logger"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,8 +37,11 @@ import (
 )
 
 const (
-	pluginIndexUrl      = "https://version-fox.github.io/version-fox-plugins/"
 	cleanupFlagFilename = ".cleanup"
+)
+
+var (
+	manifestNotFound = errors.New("manifest not found")
 )
 
 type Arg struct {
@@ -104,8 +110,8 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 	sdkMap := make(map[string]*Sdk)
 	for _, d := range dir {
 		sdkName := d.Name()
-		path := filepath.Join(m.PathMeta.PluginPath, sdkName, "main.lua")
-		if util.FileExists(path) {
+		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
+		if d.IsDir() {
 		} else if strings.HasSuffix(sdkName, ".lua") {
 			// FIXME !!! This snippet will be removed in a later version
 			// rename old plugin path to new plugin path
@@ -117,12 +123,12 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 			if err = os.Rename(filepath.Join(m.PathMeta.PluginPath, sdkName), filepath.Join(newPluginDir, "main.lua")); err != nil {
 				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 			}
-			path = filepath.Join(newPluginDir, "main.lua")
+			path = newPluginDir
 			sdkName = strings.TrimSuffix(sdkName, ".lua")
 		} else {
 			continue
 		}
-		source, err := NewLuaPlugin(filepath.Dir(path), m)
+		source, err := NewLuaPlugin(path, m)
 		if err != nil {
 			pterm.Printf("Failed to load %s plugin, err: %s\n", filepath.Dir(path), err)
 			continue
@@ -166,111 +172,270 @@ func (m *Manager) Update(pluginName string) error {
 	if err != nil {
 		return fmt.Errorf("%s plugin not installed", pluginName)
 	}
-	updateUrl := sdk.Plugin.UpdateUrl
-	if updateUrl == "" {
-		return fmt.Errorf("%s plugin not support update", pluginName)
+	pterm.Printf("Checking plugin manifest...\n")
+	// Update search priority: updateUrl > registry > manifestUrl
+	downloadUrl := sdk.Plugin.UpdateUrl
+	if sdk.Plugin.UpdateUrl == "" {
+		address := m.GetRegistryAddress(sdk.Plugin.Name + ".json")
+		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, address)
+		registryManifest, err := m.fetchPluginManifest(address)
+		if err != nil {
+			if errors.Is(err, manifestNotFound) {
+				if sdk.Plugin.ManifestUrl != "" {
+					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, sdk.Plugin.ManifestUrl)
+					du, err := m.fetchPluginManifest(sdk.Plugin.ManifestUrl)
+					if err != nil {
+						return err
+					}
+					if util.CompareVersion(du.Version, sdk.Plugin.Version) <= 0 {
+						pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+						return nil
+					}
+					downloadUrl = du.DownloadUrl
+				} else {
+					return fmt.Errorf("%s plugin not support update", pluginName)
+				}
+			}
+			return err
+		}
+		if util.CompareVersion(registryManifest.Version, sdk.Plugin.Version) <= 0 {
+			pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+			return nil
+		}
+		downloadUrl = registryManifest.DownloadUrl
+
 	}
-	pterm.Printf("Checking %s plugin...\n", updateUrl)
-	content, err := m.loadLuaFromFileOrUrl(updateUrl)
+	tempPlugin, err := m.installPluginToTemp(downloadUrl)
 	if err != nil {
-		return fmt.Errorf("fetch plugin failed, err: %w", err)
+		return err
 	}
-	source, err := NewLegacyLuaPlugin(content, updateUrl, m)
-	if err != nil {
-		return fmt.Errorf("check %s plugin failed, err: %w", updateUrl, err)
+	defer func() {
+		_ = os.RemoveAll(tempPlugin.Path)
+		tempPlugin.Close()
+	}()
+	pterm.Println("Comparing plugin version...")
+	if util.CompareVersion(tempPlugin.Version, sdk.Plugin.Version) <= 0 {
+		pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+		return nil
 	}
 	success := false
-	backupPath := sdk.Plugin.Path + ".bak"
-	err = util.CopyFile(sdk.Plugin.Path, backupPath)
-	if err != nil {
-		return fmt.Errorf("backup %s plugin failed, err: %w", updateUrl, err)
+	backupPath := sdk.Plugin.Path + "-bak"
+	logger.Debugf("Backup %s plugin to %s \n", sdk.Plugin.Path, backupPath)
+	if err = os.Rename(sdk.Plugin.Path, backupPath); err != nil {
+		return fmt.Errorf("backup %s plugin failed, err: %w", sdk.Plugin.Path, err)
 	}
 	defer func() {
 		if success {
-			_ = os.Remove(backupPath)
+			_ = os.RemoveAll(backupPath)
 		} else {
 			_ = os.Rename(backupPath, sdk.Plugin.Path)
 		}
 	}()
-	pterm.Println("Checking plugin version...")
-	if util.CompareVersion(source.Version, sdk.Plugin.Version) <= 0 {
-		success = true
-		pterm.Printf("the plugin is already the latest version")
-		return nil
-	}
-	err = os.WriteFile(sdk.Plugin.Path, []byte(content), 0644)
-	if err != nil {
-		return fmt.Errorf("update %s plugin failed: %w", updateUrl, err)
+	if err = os.Rename(tempPlugin.Path, sdk.Plugin.Path); err != nil {
+		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
 	}
 	success = true
-	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(source.Version))
+	// print some notes if there are
+	if len(tempPlugin.Notes) != 0 {
+		fmt.Println(pterm.LightYellow("Notes:"))
+		for _, note := range tempPlugin.Notes {
+			fmt.Println("  -", note)
+		}
+	}
+	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(tempPlugin.Version))
+
 	return nil
 }
 
+// fetchPluginManifest fetch plugin from registry by manifest url
+func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
+	fmt.Println("Fetching plugin manifest...")
+	resp, err := m.httpClient().Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch manifest error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, manifestNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch manifest error, status code: %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("fetch manfiest error: %w", err)
+	}
+	var plugin RegistryPluginManifest
+	if err = json.Unmarshal(body, &plugin); err != nil {
+		return nil, fmt.Errorf("parse plugin error: %w", err)
+	}
+	logger.Debugf("Manifest found, name: %s, version: %s,  downloadUrl: %s \n", plugin.Name, plugin.Version, plugin.DownloadUrl)
+
+	// Check if the plugin is compatible with the current runtime
+	if plugin.MinRuntimeVersion != "" && util.CompareVersion(plugin.MinRuntimeVersion, RuntimeVersion) > 0 {
+		return nil, fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(plugin.MinRuntimeVersion))
+	}
+	return &plugin, nil
+}
+
+// downloadPlugin download plugin from downloadUrl to plugin home directory.
+func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
+	req, err := http.NewRequest("GET", downloadUrl, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := m.httpClient().Do(req)
+	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			var netErr net.Error
+			if errors.As(urlErr.Err, &netErr) && netErr.Timeout() {
+				return "", errors.New("request timeout")
+			}
+		}
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("plugin not found at %s", downloadUrl)
+	}
+
+	path := filepath.Join(m.PathMeta.PluginPath, filepath.Base(downloadUrl))
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	fmt.Printf("Downloading %s... \n", downloadUrl)
+	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 func (m *Manager) Add(pluginName, url, alias string) error {
+	pluginPath := url
 	// official plugin
 	if len(url) == 0 {
-		args := strings.Split(pluginName, "/")
-		if len(args) < 2 {
-			return fmt.Errorf("invalid plugin name, format: <category>/<plugin-name>")
+		pname := pluginName
+		// For compatibility with older versions of plugin names <category>/<plugin-name>
+		if strings.Contains(pluginName, "/") {
+			pname = strings.Split(pluginName, "/")[1]
 		}
-		category := args[0]
-		name := args[1]
-		availablePlugins, err := m.Available()
+
+		installPath := filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin %s already exists", pname)
+		}
+
+		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pname + ".json"))
 		if err != nil {
 			return err
 		}
-		for _, available := range availablePlugins {
-			if category == available.Name {
-				for _, p := range available.Plugins {
-					if name == p.Filename {
-						url = p.Url
-						break
-					}
-				}
-			}
-		}
+		pluginPath = pluginManifest.DownloadUrl
 	}
-
-	pterm.Printf("Loading plugin from %s...\n", url)
-	content, err := m.loadLuaFromFileOrUrl(url)
+	tempPlugin, err := m.installPluginToTemp(pluginPath)
 	if err != nil {
-		return fmt.Errorf("failed to load plugin: %w", err)
+		return err
 	}
-	pterm.Println("Checking plugin...")
-	source, err := NewLegacyLuaPlugin(content, url, m)
-	if err != nil {
-		return fmt.Errorf("check plugin error: %w", err)
-	}
-	defer source.Close()
-
-	// Check if the plugin is compatible with the current runtime
-	if source.MinRuntimeVersion != "" && util.CompareVersion(source.MinRuntimeVersion, RuntimeVersion) > 0 {
-		return fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", source.MinRuntimeVersion)
-	}
-
-	pname := source.Name
+	defer func() {
+		_ = os.RemoveAll(tempPlugin.Path)
+		tempPlugin.Close()
+	}()
+	// set alias name
+	pname := tempPlugin.Name
 	if len(alias) > 0 {
 		pname = alias
 	}
-	destPath := filepath.Join(m.PathMeta.PluginPath, pname, "main.lua")
-	if util.FileExists(destPath) {
+	installPath := filepath.Join(m.PathMeta.PluginPath, pname)
+	if util.FileExists(installPath) {
 		return fmt.Errorf("plugin %s already exists", pname)
 	}
-	if err = os.Mkdir(filepath.Dir(destPath), 0777); err != nil {
-		return fmt.Errorf("add plugin error: %w", err)
-	}
-	if err = os.WriteFile(destPath, []byte(content), 0777); err != nil {
-		return fmt.Errorf("add plugin error: %w", err)
+	if err = os.Rename(tempPlugin.Path, installPath); err != nil {
+		return fmt.Errorf("install plugin error: %w", err)
 	}
 	pterm.Println("Plugin info:")
-	pterm.Println("Name   ", "->", pterm.LightBlue(source.Name))
-	pterm.Println("Version", "->", pterm.LightBlue(source.Version))
-	pterm.Println("Desc   ", "->", pterm.LightBlue(source.Description))
-	pterm.Println("Path   ", "->", pterm.LightBlue(destPath))
+	pterm.Println("Name    ", "->", pterm.LightBlue(tempPlugin.Name))
+	pterm.Println("Version ", "->", pterm.LightBlue(tempPlugin.Version))
+	pterm.Println("Homepage", "->", pterm.LightBlue(tempPlugin.Homepage))
+	pterm.Println("Desc    ", "->", pterm.LightBlue(tempPlugin.Description))
+
+	// print some notes if there are
+	if len(tempPlugin.Notes) != 0 {
+		fmt.Println(pterm.LightYellow("Notes:"))
+		for _, note := range tempPlugin.Notes {
+			fmt.Println("  ", note)
+		}
+	}
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
 	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
+}
+
+// installPluginToTemp install plugin from path that can be a local or remote file to temp dir.
+// NOTE:
+//
+//	1.only support .lua or .zip file type plugin.
+//	2.install plugin to temp dir first, then validate the plugin, if success, return *LuaPlugin
+func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
+	ext := filepath.Ext(path)
+	if ext != ".lua" && ext != ".zip" {
+		return nil, fmt.Errorf("unsupported %s type plugin to install, only supoort .lua or .zip", ext)
+	}
+	localPath := path
+	// remote file, download it first to local file.
+	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
+		logger.Debugf("Plugin from: %s \n", path)
+		pluginPath, err := m.downloadPlugin(path)
+		if err != nil {
+			return nil, fmt.Errorf("download plugin error: %w", err)
+		}
+		localPath = pluginPath
+		defer func() {
+			_ = os.Remove(localPath)
+		}()
+	}
+	success := false
+	tempInstallPath, err := os.MkdirTemp(m.PathMeta.TempPath, "vfox-")
+	if err != nil {
+		return nil, fmt.Errorf("install plugin error: %w", err)
+	}
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(tempInstallPath)
+		}
+	}()
+	// make a directory to store the plugin and rename the plugin file to main.lua
+	if ext == ".lua" {
+		logger.Debugf("Moving plugin %s to %s \n", localPath, tempInstallPath)
+		if err = os.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
+			return nil, fmt.Errorf("install plugin error: %w", err)
+		}
+	} else {
+		logger.Debugf("Unpacking plugin %s to %s \n", localPath, tempInstallPath)
+		if err = util.NewDecompressor(localPath).Decompress(tempInstallPath); err != nil {
+			return nil, fmt.Errorf("install plugin error: %w", err)
+		}
+	}
+
+	// validate the plugin
+	fmt.Printf("Validating %s ...\n", localPath)
+
+	plugin, err := NewLuaPlugin(tempInstallPath, m)
+	if err != nil {
+		return nil, fmt.Errorf("validate plugin failed: %w", err)
+	}
+	// Check if the plugin is compatible with the current runtime
+	if plugin.MinRuntimeVersion != "" && util.CompareVersion(plugin.MinRuntimeVersion, RuntimeVersion) > 0 {
+		return nil, fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(plugin.MinRuntimeVersion))
+	}
+
+	success = true
+
+	return plugin, nil
 }
 
 func (m *Manager) httpClient() *http.Client {
@@ -291,51 +456,9 @@ func (m *Manager) httpClient() *http.Client {
 	return client
 }
 
-func (m *Manager) loadLuaFromFileOrUrl(path string) (string, error) {
-	if !strings.HasSuffix(path, ".lua") {
-		return "", fmt.Errorf("%s not a lua file", path)
-	}
-	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		client := m.httpClient()
-		resp, err := client.Get(path)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-		cd := resp.Header.Get("Content-Disposition")
-		if strings.HasPrefix(cd, "attachment") {
-			return "", fmt.Errorf("not a lua file")
-		}
-		if resp.StatusCode == http.StatusNotFound {
-			return "", fmt.Errorf("file not found")
-		}
-		if str, err := io.ReadAll(resp.Body); err != nil {
-			return "", err
-		} else {
-			return string(str), nil
-		}
-	}
-
-	if !util.FileExists(path) {
-		return "", fmt.Errorf("file not found")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	str, err := io.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-	return string(str), nil
-
-}
-
-func (m *Manager) Available() ([]*Category, error) {
+func (m *Manager) Available() (RegistryIndex, error) {
 	client := m.httpClient()
-	resp, err := client.Get(pluginIndexUrl)
+	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", err)
 	}
@@ -346,12 +469,12 @@ func (m *Manager) Available() ([]*Category, error) {
 	if str, err := io.ReadAll(resp.Body); err != nil {
 		return nil, fmt.Errorf("read plugin index error: %w", err)
 	} else {
-		var categories []*Category
-		err = json.Unmarshal(str, &categories)
+		var index RegistryIndex
+		err = json.Unmarshal(str, &index)
 		if err != nil {
 			return nil, fmt.Errorf("parse plugin index error: %w", err)
 		}
-		return categories, nil
+		return index, nil
 	}
 }
 
@@ -388,6 +511,13 @@ func (m *Manager) CleanTmp() {
 			}
 		}
 	}
+}
+
+func (m *Manager) GetRegistryAddress(uri string) string {
+	if m.Config.Registry.Address != "" {
+		return m.Config.Registry.Address + "/" + uri
+	}
+	return pluginRegistryAddress + "/" + uri
 }
 
 func NewSdkManagerWithSource(sources ...RecordSource) *Manager {

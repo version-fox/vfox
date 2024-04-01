@@ -14,20 +14,12 @@
  *    limitations under the License.
  */
 
-package internal
+package config
 
-type RemotePluginInfo struct {
-	Filename string `json:"name"`
-	Author   string `json:"plugin_author"`
-	Desc     string `json:"plugin_desc"`
-	Name     string `json:"plugin_name"`
-	Version  string `json:"plugin_version"`
-	Sha256   string `json:"sha256"`
-	Url      string `json:"url"`
+type Registry struct {
+	Address string `yaml:"address"`
 }
 
-type Category struct {
-	Name    string              `json:"category"`
-	Count   string              `json:"count"`
-	Plugins []*RemotePluginInfo `json:"files"`
+var EmptyRegistry = &Registry{
+	Address: "",
 }

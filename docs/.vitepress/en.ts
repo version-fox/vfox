@@ -78,6 +78,7 @@ function sidebar(): DefaultTheme.Sidebar {
                         {text: 'http', link: '/plugins/library/http'},
                         {text: 'html', link: '/plugins/library/html'},
                         {text: 'json', link: '/plugins/library/json'},
+                        {text: 'strings', link: '/plugins/library/strings'},
                     ]
                 },
 

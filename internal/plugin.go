@@ -60,7 +60,7 @@ type LuaPlugin struct {
 	Path string
 	// plugin filename, this is also alias name, sdk-name
 	SdkName string
-	LuaPluginInfo
+	*LuaPluginInfo
 }
 
 func (l *LuaPlugin) Validate() error {
@@ -140,8 +140,7 @@ func (l *LuaPlugin) Available(args []string) ([]*Package, error) {
 func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 	L := l.vm.Instance
 	ctxTable, err := luai.Marshal(L, PreInstallHookCtx{
-		Version:        string(version),
-		RuntimeVersion: RuntimeVersion,
+		Version: string(version),
 	})
 
 	if err != nil {
@@ -194,9 +193,8 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 	}
 
 	ctx := &PostInstallHookCtx{
-		RuntimeVersion: RuntimeVersion,
-		RootPath:       rootPath,
-		SdkInfo:        make(map[string]*Info),
+		RootPath: rootPath,
+		SdkInfo:  make(map[string]*Info),
 	}
 
 	for _, v := range sdks {
@@ -221,10 +219,9 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 
 	ctx := &EnvKeysHookCtx{
 		// TODO Will be deprecated in future versions
-		Path:           mainInfo.Path,
-		RuntimeVersion: RuntimeVersion,
-		Main:           mainInfo,
-		SdkInfo:        make(map[string]*Info),
+		Path:    mainInfo.Path,
+		Main:    mainInfo,
+		SdkInfo: make(map[string]*Info),
 	}
 
 	for _, v := range sdkPackage.Additions {
@@ -282,7 +279,6 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	L := l.vm.Instance
 
 	ctx := PreUseHookCtx{
-		RuntimeVersion:  RuntimeVersion,
 		Cwd:             cwd,
 		Scope:           scope.String(),
 		Version:         string(version),
@@ -330,62 +326,6 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 		return err
 	}
 	return nil
-}
-
-// NewLegacyLuaPlugin creates a new LuaPlugin instance from old plugin format.
-// TODO This will be deprecated in future versions.
-func NewLegacyLuaPlugin(content, path string, manager *Manager) (*LuaPlugin, error) {
-	vm := luai.NewLuaVM()
-
-	if err := vm.Prepare(&luai.PrepareOptions{
-		Config: manager.Config,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := vm.Instance.DoString(content); err != nil {
-		return nil, err
-	}
-
-	// !!!! Must be set after loading the script to prevent overwriting!
-	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(osType, lua.LString(util.GetOSType()))
-	vm.Instance.SetGlobal(archType, lua.LString(util.GetArchType()))
-
-	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
-	if pluginObj.Type() == lua.LTNil {
-		return nil, fmt.Errorf("plugin object not found")
-	}
-
-	PLUGIN := pluginObj.(*lua.LTable)
-
-	source := &LuaPlugin{
-		vm:        vm,
-		pluginObj: PLUGIN,
-		Path:      path,
-		SdkName:   filepath.Base(filepath.Dir(path)),
-	}
-
-	if err := source.Validate(); err != nil {
-		return nil, err
-	}
-
-	pluginInfo := LuaPluginInfo{}
-	err := luai.Unmarshal(PLUGIN, &pluginInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	source.LuaPluginInfo = pluginInfo
-
-	if !isValidName(source.Name) {
-		return nil, fmt.Errorf("invalid plugin name")
-	}
-
-	if source.Name == "" {
-		return nil, fmt.Errorf("no plugin name provided")
-	}
-	return source, nil
 }
 
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.
@@ -470,8 +410,8 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
-	pluginInfo := LuaPluginInfo{}
-	if err = luai.Unmarshal(PLUGIN, &pluginInfo); err != nil {
+	pluginInfo := &LuaPluginInfo{}
+	if err = luai.Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, err
 	}
 

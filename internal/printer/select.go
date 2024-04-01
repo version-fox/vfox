@@ -24,12 +24,14 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 	"sort"
 	"strings"
 )
 
 type PageKVSelect struct {
 	index             int
+	HighlightOptions  util.Set[string]
 	Options           []*KV
 	searchOptions     []*KV
 	pageOptions       []*KV
@@ -96,10 +98,14 @@ func (s *PageKVSelect) renderSelect() string {
 	}
 
 	for i, option := range indexMapper {
+		value := option.Value
+		if s.HighlightOptions.Contains(option.Key) {
+			value = pterm.LightGreen(value)
+		}
 		if i == s.index {
-			content += pterm.Sprintln(pterm.LightGreen("-> "), option.Value)
+			content += pterm.Sprintln(pterm.LightGreen("-> "), value)
 		} else {
-			content += pterm.Sprintln("  ", option.Value)
+			content += pterm.Sprintln("  ", value)
 		}
 	}
 	content += pterm.Sprintln("Press ↑/↓ to select and press ←/→ to page, and press Enter to confirm")
