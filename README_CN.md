@@ -28,7 +28,7 @@
 
 ## 演示
 
-[![asciicast](https://asciinema.org/a/630778.svg)](https://asciinema.org/a/630778)
+[![asciicast](https://asciinema.org/a/650100.svg)](https://asciinema.org/a/650100)
 
 ## 快速入门
 

@@ -140,18 +140,6 @@ If you don't know which plugin to add, you can use the `vfox available` command 
 $ vfox add nodejs
 ```
 
-::: tip About plugins and SDKs
-In the `vfox` concept, the plugin is the SDK, and the SDK is the plugin. You can think of the plugin as an extension of `vfox`
-to manage different tools and runtime environments.
-
-Taking the `nodejs/npmmirror` plugin as an example, `nodejs` is the category, `npmmirror` is the plugin name, and the
-**SDK name** marked by the `name` field inside the plugin.
-
-So, when deleting the plugin, you need to use the **SDK name** (here is `nodejs`) for deletion, not the plugin name
-`nodejs/npmirror` or `npmmirror`.
-
-:::
-
 ## 4. Install a runtime
 
 After the plugin is successfully installed, you can install the corresponding version of Nodejs.

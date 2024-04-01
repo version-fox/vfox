@@ -32,7 +32,7 @@ and switch between different environment you need via the command line.
 
 ## Demo
 
-[![asciicast](https://asciinema.org/a/630778.svg)](https://asciinema.org/a/630778)
+[![asciicast](https://asciinema.org/a/650100.svg)](https://asciinema.org/a/650100)
 
 ## Quickstart
 
