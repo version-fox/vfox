@@ -80,18 +80,18 @@ $ node -v
 
 > 如果您已经安装了 `vfox`，您可以使用 `vfox available` 命令查看所有可用的插件。
 
-[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://github.com/version-fox/version-fox-plugins)
+[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://vfox.lhan.me/zh-hans/plugins/available.html)
 
 详细内容,请看 [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
 
 ## 路线图
 
 我们未来的计划以及高度优先的功能和增强功能是：
-- [ ] 重构插件机制: 
+- [X] 重构插件机制: 
   - 增加插件模板, 允许多文件开发插件 
   - 增加全局注册表(类似于:`NPM Registry`、`Scoop Main Bucket`), 为插件分发提供统一入口
   - 拆分现有的插件仓库, 一个插件一个仓库
-- [ ] 允许切换注册表地址
+- [X] 允许切换注册表地址
 - [ ] 插件能力: 允许插件解析旧版本的配置文件. 例如: `.nvmrc`, `.node-version`, `.sdkmanrc`等
 - [ ] 插件能力: 允许插件加载已安装的运行时, 并提供运行时的信息
 
