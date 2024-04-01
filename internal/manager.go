@@ -123,7 +123,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 			if err = os.Rename(filepath.Join(m.PathMeta.PluginPath, sdkName), filepath.Join(newPluginDir, "main.lua")); err != nil {
 				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 			}
-			path = filepath.Join(newPluginDir, "main.lua")
+			path = newPluginDir
 			sdkName = strings.TrimSuffix(sdkName, ".lua")
 		} else {
 			continue
