@@ -98,7 +98,7 @@ Our future plans and high priority features and enhancements are:
 
 [![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://vfox.lhan.me/plugins/available.html)
 
-For more details, see the [version-fox-plugins](https://github.com/version-fox/version-fox-plugins)
+For more details, see the [Public Registry](https://github.com/version-fox/vfox-plugins)
 
 ## Contributors
 
