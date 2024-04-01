@@ -39,19 +39,3 @@ type RegistryPluginManifest struct {
 	DownloadUrl       string `json:"downloadUrl"`
 	MinRuntimeVersion string `json:"minRuntimeVersion"`
 }
-
-type RemotePluginInfo struct {
-	Filename string `json:"name"`
-	Author   string `json:"plugin_author"`
-	Desc     string `json:"plugin_desc"`
-	Name     string `json:"plugin_name"`
-	Version  string `json:"plugin_version"`
-	Sha256   string `json:"sha256"`
-	Url      string `json:"url"`
-}
-
-type Category struct {
-	Name    string              `json:"category"`
-	Count   string              `json:"count"`
-	Plugins []*RemotePluginInfo `json:"files"`
-}

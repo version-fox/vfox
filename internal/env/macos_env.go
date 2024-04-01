@@ -20,7 +20,6 @@ package env
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"strings"
 )
@@ -32,12 +31,6 @@ type macosEnvManager struct {
 	paths          []string
 	pathMap        map[string]struct{}
 	deletedPathMap map[string]struct{}
-}
-
-func (m *macosEnvManager) Paths(paths []string) string {
-	set := util.NewSortedSetWithSlice[string](paths)
-	// TODO can replace with filepath.ListSeparator
-	return strings.Join(set.Slice(), ":")
 }
 
 func (m *macosEnvManager) Close() error {

@@ -2,7 +2,6 @@
 --- valid version information.
 --- @param ctx table Context information
 function PLUGIN:PreUse(ctx)
-    local runtimeVersion = ctx.runtimeVersion
     --- user input version
     local version = ctx.version
     --- installed sdks

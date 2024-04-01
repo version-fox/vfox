@@ -28,7 +28,6 @@ type Manager interface {
 	Load(envs *Envs) error
 	Get(key string) (string, bool)
 	Remove(envs *Envs) error
-	Paths(paths []string) string
 	io.Closer
 }
 

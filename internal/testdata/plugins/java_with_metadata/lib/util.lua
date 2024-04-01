@@ -6,7 +6,6 @@ local util = {}
 
 function util:PreInstall(ctx)
     local version = ctx.version
-    local runtimeVersion = ctx.runtimeVersion
     print(OS_TYPE)
     return {
         --- Version number

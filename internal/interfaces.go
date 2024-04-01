@@ -158,7 +158,7 @@ type LuaPluginInfo struct {
 	Name              string   `luai:"name"`
 	Version           string   `luai:"version"`
 	Description       string   `luai:"description"`
-	UpdateUrl         string   `luai:"updateUrl"` // TODO Will be deprecated in future versions
+	UpdateUrl         string   `luai:"updateUrl"`
 	ManifestUrl       string   `luai:"manifestUrl"`
 	Homepage          string   `luai:"homepage"`
 	License           string   `luai:"license"`

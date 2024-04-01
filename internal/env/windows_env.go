@@ -27,7 +27,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/version-fox/vfox/internal/util"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -202,21 +201,6 @@ func (w *windowsEnvManager) broadcastEnvironment() error {
 		return err
 	}
 	return nil
-}
-
-func (w *windowsEnvManager) Paths(paths []string) string {
-	if os.Getenv(HookFlag) == "bash" {
-		set := util.NewSortedSet[string]()
-		for _, p := range paths {
-			for _, pp := range strings.Split(p, ";") {
-				set.Add(pp)
-			}
-		}
-		return strings.Join(set.Slice(), ":")
-	} else {
-		set := util.NewSortedSetWithSlice(paths)
-		return strings.Join(set.Slice(), ";")
-	}
 }
 
 func NewEnvManager(vfConfigPath string) (Manager, error) {
