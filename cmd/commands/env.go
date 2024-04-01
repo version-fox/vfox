@@ -107,11 +107,11 @@ func envCmd(ctx *cli.Context) error {
 
 		// Takes the complement of previousPaths and sdkPaths, and removes the complement from osPaths.
 		previousPaths := env.NewPaths(env.PreviousPaths)
-		removeCnt := 0
+		jointCnt := 0
 		for _, pp := range previousPaths.Slice() {
 			if sdkPaths.Contains(pp) {
 				previousPaths.Remove(pp)
-				removeCnt++
+				jointCnt++
 			}
 		}
 		osPaths := env.NewPaths(env.OsPaths)
@@ -119,7 +119,7 @@ func envCmd(ctx *cli.Context) error {
 			for _, pp := range previousPaths.Slice() {
 				osPaths.Remove(pp)
 			}
-		} else if sdkPaths.Len() == removeCnt {
+		} else if sdkPaths.Len() == jointCnt {
 			// sdkPaths == previousPaths, No need to set environment variables
 			return nil
 		}
