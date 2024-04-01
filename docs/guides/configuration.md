@@ -31,3 +31,20 @@ Before configuring, please make sure that `vfox` has write permission to the fol
 storage:
   sdkPath: /tmp
 ```
+
+## Plugin Registry Address
+
+
+`vfox` will default to retrieve plugins from [vfox-plugins.lhan.me](https://vfox-plugins.lhan.me).
+
+If you want to use **your own registry or third-party mirror registry**, please configure it following:
+
+```yaml
+registry:
+  address: 'https://vfox-plugins.lhan.me'
+```
+
+::: tip Available Mirrors
+- https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
+- https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
+  :::

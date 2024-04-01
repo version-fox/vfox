@@ -9,11 +9,39 @@ Use `Lua` script to provide the `vfox` plugin. The advantage of this method is:
 - Plugins can be customized, shared, and used by others.
 - The plugin can be shared with others.
 
-## Scripts Overview
+## What's in the plugin?
 
-The plugin is a `lua` script. It provides four hook
-functions, `PLUGIN:PreInstall`, `PLUGIN:PostInstall`, `PLUGIN:EnvKeys`, and `PLUGIN:Available`. What you need to do is
-implement these four functions.
+The directory structure is as follows:
+```shell
+    .
+    ├── README.md
+    ├── LICENSE
+    └── hooks
+        └── available.lua
+        └── env_keys.lua
+        └── post_install.lua
+        └── pre_install.lua
+        ....
+    └── lib
+        └── xxx.lua
+        └── xxx.lua
+        └── xxx.lua
+    └── metadata.lua
+
+```
+
+- `hooks` directory is used to store the plugin's hook functions. **One hook function corresponds to one `.lua` file.**
+- `lib` directory is used to store the plugin's dependent libraries. `vfox` will automatically load all `.lua` files in this directory. **If placed in other directories, it will not be loaded.**
+- `metadata.lua` Plugin metadata information. Used to describe the basic information of the plugin, such as the plugin name, version, etc.
+- `README.md` Plugin documentation.
+- `LICENSE` Plugin license.
+- 
+
+::: warning Plugin template
+To facilitate the development of plugins, we provide a plugin template that you can use directly [vfox-plugin-template](https://github.com/version-fox/vfox-plugin-template) to develop a plugin.
+:::
+
+## Required hook functions
 
 ### PreInstall
 
@@ -58,24 +86,6 @@ function PLUGIN:PreInstall(ctx)
 end
 ```
 
-### PostInstall
-
-This hook function is called after the `PreInstall` function is executed. It is used to execute additional operations,
-such
-as compiling source code, etc. Implement as needed.
-
-```lua
-function PLUGIN:PostInstall(ctx)
-    --- SDK installation root path
-    local rootPath = ctx.rootPath
-    local runtimeVersion = ctx.runtimeVersion
-    ---  Get it from the name returned by PreInstall
-    local sdkInfo = ctx.sdkInfo['sdk-name']
-    local path = sdkInfo.path
-    local version = sdkInfo.version
-    local name = sdkInfo.name
-end
-```
 
 ### Available
 
@@ -133,7 +143,29 @@ function PLUGIN:EnvKeys(ctx)
 end
 ```
 
-## PreUse
+
+## Optional hook functions
+
+### PostInstall
+
+This hook function is called after the `PreInstall` function is executed. It is used to execute additional operations,
+such
+as compiling source code, etc. Implement as needed.
+
+```lua
+function PLUGIN:PostInstall(ctx)
+    --- SDK installation root path
+    local rootPath = ctx.rootPath
+    local runtimeVersion = ctx.runtimeVersion
+    ---  Get it from the name returned by PreInstall
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
+end
+```
+
+### PreUse
 
 When the user uses `vfox use`, the plugin's `PreUse` function is called. The purpose of this function is to return the
 version information entered by the user. If the `PreUse` function returns version information, `vfox` will use this new
@@ -178,7 +210,10 @@ Currently, VersionFox plugin testing is straightforward. You only need to place 
 - PLUGIN:Available -> `vfox search <sdk-name>`
 - PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
 
-## Publish Plugin
+## Publish to the public registry
 
-When you have completed the plugin and tested it without any problems, you can
-directly [create a PR](https://github.com/version-fox/version-fox-plugins/pulls).
+`vfox` allows custom installation of plugins, such as `vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip`
+
+In order to make it easier for your users, you can add the plugin to the public registry to list your plugin and easily install it with shorter commands, such as `vfox add nodejs`.
+
+For details, see [How to submit a plugin to the public registry](./howto_registry.md).

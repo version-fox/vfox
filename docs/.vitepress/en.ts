@@ -39,7 +39,7 @@ function nav(): DefaultTheme.NavItem[] {
         {text: 'Home', link: '/'},
         {text: 'Documentation', link: '/guides/intro'},
         {text: 'FAQ', link: '/guides/faq'},
-        {text: 'Plugins', link: 'https://github.com/version-fox/version-fox-plugins'}
+        {text: 'Available Plugins', link: '/plugins/available'},
     ]
 }
 
@@ -68,7 +68,8 @@ function sidebar(): DefaultTheme.Sidebar {
                     text: 'Authors',
                     items:[
                         {text: 'Create a Plugin', link: '/plugins/create/howto'},
-                        {text: 'Plugin Template', link: 'https://github.com/version-fox/vfox/blob/main/template.lua'},
+                        {text: 'How to publish a plugin?', link: '/plugins/create/howto_registry'},
+                        {text: 'Plugin Template', link: 'https://github.com/version-fox/vfox-plugin-template'},
                     ]
                 },
                 {
@@ -81,7 +82,7 @@ function sidebar(): DefaultTheme.Sidebar {
                     ]
                 },
 
-                {text: 'Available Plugins', link: 'https://github.com/version-fox/version-fox-plugins'},
+                {text: 'Available Plugins', link: '/plugins/available'},
             ]
         },
         {
