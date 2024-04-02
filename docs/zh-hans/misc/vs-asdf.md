@@ -33,32 +33,3 @@
 `asdf-vm`生态很强, 但是他对**Windows原生**无能为力, 虽然[vfox](https://github.com/version-fox/vfox)很新,
 但是性能和平台兼容方面做的比`asdf-vm`更好。
 
-
-
-### 插件换源
-
-大多数时候, 我们会因为网络问题而困扰, 所以切换下载源的操作是必不可少的。
-
-以Nodejs为例:
-`asdf-vm`是通过`asdf-vm/asdf-nodejs`插件实现了对于Nodejs的支持, 而该插件是通过预定义一个环境变量来修改下载源, 如下所示:
-```markdown
--   `NODEJS_ORG_MIRROR`: (Legacy) overrides the default mirror used for downloading the distibutions, alternative to the `NODE_BUILD_MIRROR_URL` node-build env var
-```
-这种方法的优点是相当灵活, 你可以切换任何镜像源。 但是*缺点*也很明显, 那就是*使用这个插件之前, 如果你不阅读这个插件的`README`, 你是不知道该怎么操作的*, 对用户不友好。
-
-只涉及一种SDK的使用, 这种成本也可以接受。 那如果涉及多个呢? `Flutter`、`Python`等等**需要配置镜像的SDK**呢? 你是不是依然需要查看对应支持插件的README文档, 也算一种学习成本对不对!
-
-
-而[vfox](https://github.com/version-fox/vfox)选择了另一种方式即*一个镜像源对应一个插件*, 如下所示:
-```bash
-$ vfox add nodejs/nodejs # 使用官方下载源
-$ vfox add nodejs/npmmirror # 使用npmmirror镜像
-
-$ vfox add python/python # 官方下载源
-$ vfox add python/npmmirror 
-
-$ vfox add flutter/flutter
-$ vfox add flutter/flutter-cn
-```
-
-虽然仓库的插件多了, 但是用户使用起来心智负担低了, 也没有乱七八糟的环境变量需要配置, 对用户非常友好!

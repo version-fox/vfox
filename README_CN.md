@@ -88,7 +88,7 @@ $ node -v
 
 [![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://vfox.lhan.me/zh-hans/plugins/available.html)
 
-详细内容,请看 [fox-plugins](https://github.com/version-fox/vfox-plugins)
+详细内容,请看 [vfox-plugins](https://github.com/version-fox/vfox-plugins)
 
 ## 路线图
 
