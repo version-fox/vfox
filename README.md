@@ -115,7 +115,7 @@ on [issues](http://github.com/version-fox/vfox/issues).
 
 See more at [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-Plugin Contributions, please go to [version-fox-plugins](https://github.com/version-fox/version-fox-plugins).
+Plugin Contributions, please go to [Public Registry](https://github.com/version-fox/vfox-plugins)
 
 ## Star History
 
