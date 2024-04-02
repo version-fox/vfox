@@ -29,7 +29,7 @@ end
 local vfox_ls_version = clink.argmatcher():nofiles():addarg({ vfox_ls_func })
 
 local vfox_use_list = clink.argmatcher():nofiles():addarg({ vfox_ls_func, vfox_sdk })
-local vfox_use = clink.argmatcher():nofiles():addflags({
+local vfox_use = clink.argmatcher():nofiles():addarg({ vfox_use_list }):addflags({
     '--global' .. vfox_use_list, '-g' .. vfox_use_list,
     '--session' .. vfox_use_list, '-s' .. vfox_use_list,
     '--project' .. vfox_use_list, '-p' .. vfox_use_list,
