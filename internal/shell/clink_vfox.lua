@@ -28,20 +28,11 @@ local vfox_ls_func = function()
 end
 local vfox_ls_version = clink.argmatcher():nofiles():addarg({ vfox_ls_func })
 
-local vfox_use_list = clink.argmatcher():nofiles():addarg({ vfox_ls_func, vfox_sdk })
-local vfox_use = clink.argmatcher():nofiles():addarg({ vfox_use_list }):addflags({
-    '--global' .. vfox_use_list, '-g' .. vfox_use_list,
-    '--session' .. vfox_use_list, '-s' .. vfox_use_list,
-    '--project' .. vfox_use_list, '-p' .. vfox_use_list,
-})
+local vfox_use = clink.argmatcher():nofiles():addarg({
+    clink.argmatcher():nofiles():addarg({ vfox_ls_func, vfox_sdk }),
+}):addflags('--global', '-g', '--session', '-s', '--project', '-p')
 
 local vfox_shell = clink.argmatcher():nofiles():addarg('bash', 'zsh', 'pwsh', 'fish', 'clink')
-
-local vfox_env = clink.argmatcher():nofiles():addarg({ vfox_sdk }):addflags({
-    '--shell' .. vfox_shell, '-s' .. vfox_shell,
-    '--cleanup', '-c',
-    '--json', '-j',
-})
 
 clink.argmatcher('vfox'):nofiles():addarg({
     'add' .. clink.argmatcher():nofiles():addarg({ vfox_sdk }):addflags('--source', '-s', '--alias'),
@@ -55,7 +46,11 @@ clink.argmatcher('vfox'):nofiles():addarg({
     'list' .. vfox_sdk, 'ls' .. vfox_sdk,
     'uninstall' .. vfox_ls_version, 'un' .. vfox_ls_version,
     'install' .. vfox_sdk, 'i' .. vfox_sdk,
-    'env' .. vfox_env,
+    'env' .. clink.argmatcher():nofiles():addflags({
+        '--shell' .. vfox_shell, '-s' .. vfox_shell,
+        '--cleanup', '-c',
+        '--json', '-j',
+    }),
     'activate' .. vfox_shell,
 })
 
