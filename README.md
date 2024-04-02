@@ -53,6 +53,12 @@ New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error
 Invoke-Item $PROFILE
 # 2. Add the following line to the end of your $PROFILE and save:
 Invoke-Expression "$(vfox activate pwsh)"
+
+# For Clink:
+# 1. Install clink: https://github.com/chrisant996/clink/releases
+#    Or Install cmder: https://github.com/cmderdev/cmder/releases
+# 2. Find script path: clink info | findstr scripts
+# 3. copy internal/shell/clink_vfox.lua to script path
 ```
 
 > Remember to restart your shell to apply the changes.
