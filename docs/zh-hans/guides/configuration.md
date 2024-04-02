@@ -45,6 +45,7 @@ registry:
 ```
 
 ::: tip 可用镜像
+- https://gitee.com/version-fox/vfox-plugins/raw/main/plugins
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
 :::
