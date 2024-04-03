@@ -383,9 +383,10 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 	vm.Instance.SetGlobal(archType, lua.LString(util.GetArchType()))
 
 	r, err := luai.Marshal(vm.Instance, LuaRuntime{
-		OsType:   string(util.GetOSType()),
-		ArchType: string(util.GetArchType()),
-		Version:  RuntimeVersion,
+		OsType:        string(util.GetOSType()),
+		ArchType:      string(util.GetArchType()),
+		Version:       RuntimeVersion,
+		PluginDirPath: pluginDirPath,
 	})
 	if err != nil {
 		return nil, err

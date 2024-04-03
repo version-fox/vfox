@@ -168,7 +168,8 @@ type LuaPluginInfo struct {
 
 // LuaRuntime represents the runtime information of the Lua environment.
 type LuaRuntime struct {
-	OsType   string `luai:"osType"`
-	ArchType string `luai:"archType"`
-	Version  string `luai:"version"`
+	OsType        string `luai:"osType"`
+	ArchType      string `luai:"archType"`
+	Version       string `luai:"version"`
+	PluginDirPath string `luai:"pluginDirPath"`
 }
