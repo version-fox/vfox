@@ -17,10 +17,11 @@
 package env
 
 import (
-	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/util"
 )
 
 type Manager interface {
@@ -77,7 +78,11 @@ func NewPaths(from PathFrom) *Paths {
 	default:
 
 	}
-	return &Paths{
-		util.NewSortedSetWithSlice(paths),
+	p := &Paths{
+		util.NewSortedSet[string](),
 	}
+	for _, v := range paths {
+		p.Add(v)
+	}
+	return p
 }

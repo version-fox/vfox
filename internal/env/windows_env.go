@@ -229,7 +229,15 @@ func (p *Paths) String() string {
 	}
 }
 
-func (p *Paths) Add(str string) bool {
-	str = filepath.FromSlash(str)
-	return p.Set.Add(str)
+func (p *Paths) Add(path string) bool {
+	if os.Getenv(HookFlag) == "bash" {
+		path = filepath.ToSlash(path)
+		// Convert drive letter (e.g., "C:") to "/c"
+		if len(path) > 1 && path[1] == ':' {
+			path = "/" + strings.ToLower(string(path[0])) + path[2:]
+		}
+	} else {
+		path = filepath.FromSlash(path)
+	}
+	return p.Set.Add(path)
 }
