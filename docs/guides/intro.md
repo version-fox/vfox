@@ -35,6 +35,8 @@ through a simple plugin interface.
 | ZSH        | ✅       |                                                                                  |
 | Fish       | ✅       |                                                                                  |
 | CMD        | ✅       | Only Support `Global` Scope                                                      |
+| Clink      | ✅       |                                                                                  |
+| Cmder      | ✅       |                                                                                  |
 
 
 

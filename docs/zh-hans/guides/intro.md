@@ -31,6 +31,8 @@ API、配置文件和实现方式（比如，`$PATH`
 | ZSH        | ✅       |                                                                                 |
 | Fish       | ✅       |                                                                                 |
 | CMD        | ✅       | 仅支持`Global`作用域                                                                  |
+| Clink      | ✅       |                                                                                 |
+| Cmder      | ✅       |                                                                                 |
 
 
 

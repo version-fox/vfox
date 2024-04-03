@@ -125,6 +125,16 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 :::
 
+::: details Clink & Cmder
+
+1. Find the scripts path:
+   ```shell
+   clink info | findstr scripts
+   ```
+2. Copy [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) to the scripts directory
+3. Restart Clink or Cmder
+:::
+
 ## 3. Add a plugin
 
 **Command**: `vfox add <plugin-name>`

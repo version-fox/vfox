@@ -107,6 +107,17 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 :::
 
+::: details Clink & Cmder
+
+1. 找到脚本存放路径:
+   ```shell
+   clink info | findstr scripts
+   ```
+2. 复制 [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) 到脚本目录下
+3. 重启 Clink 或 Cmder
+
+:::
+
 ## 3. 添加插件
 
 **命令**: `vfox add <plugin-name>`
