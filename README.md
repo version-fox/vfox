@@ -96,7 +96,7 @@ Our future plans and high priority features and enhancements are:
 
 > If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
 
-[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://vfox.lhan.me/plugins/available.html)
+[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno,scala&theme=light)](https://vfox.lhan.me/plugins/available.html)
 
 For more details, see the [Public Registry](https://github.com/version-fox/vfox-plugins)
 

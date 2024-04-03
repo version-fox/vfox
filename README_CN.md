@@ -80,7 +80,7 @@ $ node -v
 
 > 如果您已经安装了 `vfox`，您可以使用 `vfox available` 命令查看所有可用的插件。
 
-[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno&theme=light)](https://vfox.lhan.me/zh-hans/plugins/available.html)
+[![plugins](https://skillicons.dev/icons?i=java,kotlin,nodejs,flutter,dotnet,python,dart,golang,gradle,maven,zig,deno,scala&theme=light)](https://vfox.lhan.me/zh-hans/plugins/available.html)
 
 详细内容,请看 [vfox-plugins](https://github.com/version-fox/vfox-plugins)
 
