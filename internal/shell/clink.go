@@ -17,29 +17,35 @@
 package shell
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/version-fox/vfox/internal/env"
 )
 
-type Shell interface {
-	Activate() (string, error)
-	Export(envs env.Vars) string
+const clinkHook = `
+{{.EnvContent}}
+"{{.SelfPath}}" env --cleanup > nul 2> nul
+`
+
+type clink struct{}
+
+var Clink = clink{}
+
+func (b clink) Activate() (string, error) {
+	return clinkHook, nil
 }
 
-func NewShell(name string) Shell {
-	switch strings.ToLower(name) {
-	case "bash":
-		return Bash
-	case "zsh":
-		return Zsh
-	case "pwsh":
-		return Pwsh
-	case "fish":
-		return Fish
-	case "clink":
-		return Clink
+func (b clink) Export(envs env.Vars) (out string) {
+	for key, value := range envs {
+		if value == nil {
+			out += b.set(key, "")
+		} else {
+			out += b.set(key, *value)
+		}
 	}
-	return nil
+	return
+}
 
+func (b clink) set(key, value string) string {
+	return fmt.Sprintf("set \"%s=%s\"\n", key, value)
 }
