@@ -52,7 +52,8 @@ clink.argmatcher('vfox'):nofiles():addarg({
         '--json', '-j',
     }),
     'activate' .. vfox_shell,
-})
+    'help', 'h',
+}):addflags('--debug', '--help', '-h', '--version', '-v', '-V')
 
 local vfox_setenv = function(str)
     local key, val = str:match('^set "(.+)=(.*)"')
