@@ -215,7 +215,12 @@ func (s *PageKVSelect) Show() (*KV, error) {
 				area.Update(s.renderSelect())
 			}
 		case keys.Enter:
-			s.result = s.pageOptions[s.index]
+			if s.index < len(s.pageOptions) {
+				s.result = s.pageOptions[s.index]
+			} else {
+				s.result = nil
+				logger.Info("No search, program stopped.")
+			}
 			return true, nil
 		default:
 			return false, nil
