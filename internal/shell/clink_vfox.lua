@@ -37,13 +37,13 @@ local vfox_sdk = clink.argmatcher():nofiles():addarg(function()
     return res
 end):addflags('--help', '-h')
 local vfox_use = clink.argmatcher():nofiles():addarg(function()
-    local ls = vfox_ls_func()
+    local ls, res = vfox_ls_func(), {}
     for k, v in pairs(ls) do
-        if v == true then
-            table.insert(ls, k)
+        if v then
+            table.insert(res, v == true and k or v)
         end
     end
-    return ls
+    return res
 end):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--help', '-h')
 local vfox_help = clink.argmatcher():nofiles():addflags('--help', '-h')
 local vfox_shell = clink.argmatcher():nofiles():addarg('bash', 'zsh', 'pwsh', 'fish', 'clink')
