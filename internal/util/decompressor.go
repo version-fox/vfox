@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/bodgit/sevenzip"
 	"io"
 	"os"
 	"path/filepath"
@@ -222,7 +223,7 @@ func findRootFolderInZip(zipFilePath string) string {
 	return firstElement
 }
 
-func (z *ZipDecompressor) isDir(path string) bool {
+func isDir(path string) bool {
 	return strings.HasSuffix(path, "/")
 }
 
@@ -244,19 +245,19 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	fname := strings.Join(parts, "/")
 
 	fpath := filepath.Join(dest, fname)
-	if f.FileInfo().IsDir() || z.isDir(fname) {
+	if f.FileInfo().IsDir() || isDir(fname) {
 		err := os.MkdirAll(fpath, os.ModePerm)
 		if err != nil {
 			return err
 		}
-	} else if z.isSymlink(f.FileInfo()) {
+	} else if isSymlink(f.FileInfo()) {
 		// symlink target is the contents of the file
 		buf := new(bytes.Buffer)
 		_, err := io.Copy(buf, rc)
 		if err != nil {
 			return fmt.Errorf("%s: reading symlink target: %v", f.FileHeader.Name, err)
 		}
-		return z.writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
+		return writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
 	} else {
 		err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm)
 		if err != nil {
@@ -277,11 +278,11 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	return nil
 }
 
-func (z *ZipDecompressor) isSymlink(fi os.FileInfo) bool {
+func isSymlink(fi os.FileInfo) bool {
 	return fi.Mode()&os.ModeSymlink != 0
 }
 
-func (z *ZipDecompressor) writeNewSymbolicLink(fpath string, target string) error {
+func writeNewSymbolicLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -302,6 +303,109 @@ func (z *ZipDecompressor) writeNewSymbolicLink(fpath string, target string) erro
 	return nil
 }
 
+type SevenZipDecompressor struct {
+	src string
+}
+
+func findRootFolderIn7Zip(zipFilePath string) string {
+	r, err := sevenzip.OpenReader(zipFilePath)
+	if err != nil {
+		return ""
+	}
+	defer r.Close()
+
+	var firstElement string
+
+	for _, f := range r.File {
+
+		normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
+
+		currentFirstElement := strings.Split(normalizedPath, "/")[0]
+
+		if firstElement != "" && firstElement != currentFirstElement {
+			return ""
+		}
+
+		if firstElement == "" {
+			firstElement = currentFirstElement
+		}
+	}
+	return firstElement
+}
+
+func (s *SevenZipDecompressor) Decompress(dest string) error {
+	rootFolderInZip := findRootFolderIn7Zip(s.src)
+	r, err := sevenzip.OpenReader(s.src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		if err = s.extractFile(f, dest, rootFolderInZip); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *SevenZipDecompressor) extractFile(f *sevenzip.File, dest string, rootFolderInZip string) error {
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
+	// Split the file name into a slice
+	parts := strings.Split(normalizedPath, "/")
+	if len(parts) > 1 && rootFolderInZip != "" {
+		// Remove the first element
+		parts = parts[1:]
+	}
+	// Join the remaining elements to get the new file name
+	fname := strings.Join(parts, "/")
+
+	fpath := filepath.Join(dest, fname)
+	if f.FileInfo().IsDir() || isDir(fname) {
+		err := os.MkdirAll(fpath, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	} else if isSymlink(f.FileInfo()) {
+		// symlink target is the contents of the file
+		buf := new(bytes.Buffer)
+		_, err := io.Copy(buf, rc)
+		if err != nil {
+			return fmt.Errorf("%s: reading symlink target: %v", f.FileHeader.Name, err)
+		}
+		return writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
+	} else {
+		var fdir string
+		if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+			fdir = fpath[:lastIndex]
+		}
+
+		err = os.MkdirAll(fdir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		f, err := os.OpenFile(
+			fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		_, err = io.Copy(f, rc)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func NewDecompressor(src string) Decompressor {
 	filename := filepath.Base(src)
 	if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
@@ -316,6 +420,11 @@ func NewDecompressor(src string) Decompressor {
 	}
 	if strings.HasSuffix(filename, ".zip") {
 		return &ZipDecompressor{
+			src: src,
+		}
+	}
+	if strings.HasSuffix(filename, ".7z") {
+		return &SevenZipDecompressor{
 			src: src,
 		}
 	}
