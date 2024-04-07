@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/toolset"
 	"os"
 	"strings"
 	"text/template"
@@ -40,10 +41,16 @@ func activateCmd(ctx *cli.Context) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := internal.NewSdkManager(internal.GlobalRecordSource, internal.ProjectRecordSource)
-	defer manager.Record.Save()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
-	envKeys, err := manager.EnvKeys()
+	tvs, err := toolset.NewMultiToolVersions([]string{
+		manager.PathMeta.HomePath,
+		manager.PathMeta.WorkingDirectory,
+	})
+	if err != nil {
+		return err
+	}
+	envKeys, err := manager.EnvKeys(tvs)
 	if err != nil {
 		return err
 	}

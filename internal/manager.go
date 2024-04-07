@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/toolset"
 	"io"
 	"net"
 	"net/http"
@@ -53,22 +54,28 @@ type Manager struct {
 	PathMeta   *PathMeta
 	openSdks   map[string]*Sdk
 	EnvManager env.Manager
-	Record     env.Record
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys() (*env.Envs, error) {
+func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (*env.Envs, error) {
 	shellEnvs := &env.Envs{
 		Variables: make(env.Vars),
 		Paths:     env.NewPaths(env.EmptyPaths),
 	}
-	for k, v := range m.Record.Export() {
-		if lookupSdk, err := m.LookupSdk(k); err == nil {
-			if ek, err := lookupSdk.EnvKeys(Version(v)); err == nil {
-				for key, value := range ek.Variables {
-					shellEnvs.Variables[key] = value
+
+	tools := make(map[string]string)
+	for _, t := range tvs {
+		for name, version := range t.Record {
+			if _, ok := tools[name]; ok {
+				continue
+			}
+			if lookupSdk, err := m.LookupSdk(name); err == nil {
+				if ek, err := lookupSdk.EnvKeys(Version(version)); err == nil {
+					for key, value := range ek.Variables {
+						shellEnvs.Variables[key] = value
+					}
+					shellEnvs.Paths.Merge(ek.Paths)
 				}
-				shellEnvs.Paths.Merge(ek.Paths)
 			}
 		}
 	}
@@ -152,6 +159,7 @@ func (m *Manager) Remove(pluginName string) error {
 	if err != nil {
 		return err
 	}
+
 	source.clearCurrentEnvConfig()
 	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName)
 	pterm.Printf("Removing %s plugin...\n", pPath)
@@ -520,58 +528,59 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 	return pluginRegistryAddress + "/" + uri
 }
 
-func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
-	if env.IsHookEnv() {
-		return newSdkManagerWithSource(sources...)
-	} else {
-		return newSdkManagerWithSource(SessionRecordSource, GlobalRecordSource, ProjectRecordSource)
-	}
-}
+//func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
+//	if env.IsHookEnv() {
+//		return newSdkManagerWithSource(sources...)
+//	} else {
+//		return newSdkManagerWithSource(SessionRecordSource, GlobalRecordSource, ProjectRecordSource)
+//	}
+//}
+//
+//func newSdkManagerWithSource(sources ...RecordSource) *Manager {
+//	meta, err := newPathMeta()
+//	if err != nil {
+//		panic("Init path meta error")
+//	}
+//
+//	var paths []string
+//	for _, source := range sources {
+//		switch source {
+//		case GlobalRecordSource:
+//			paths = append(paths, meta.HomePath)
+//		case ProjectRecordSource:
+//			paths = append(paths, meta.WorkingDirectory)
+//		case SessionRecordSource:
+//			paths = append(paths, meta.CurTmpPath)
+//		}
+//	}
+//	var record env.Record
+//	if len(paths) == 0 {
+//		record = env.EmptyRecord
+//	} else if len(paths) == 1 {
+//		r, err := env.NewRecord(paths[0])
+//		if err != nil {
+//			panic(err)
+//		}
+//		record = r
+//	} else {
+//		r, err := env.NewRecord(paths[0], paths[1:]...)
+//		if err != nil {
+//			panic(err)
+//		}
+//		record = r
+//	}
+//	return newSdkManager(record, meta)
+//}
 
-func newSdkManagerWithSource(sources ...RecordSource) *Manager {
+func NewSdkManager() *Manager {
 	meta, err := newPathMeta()
 	if err != nil {
 		panic("Init path meta error")
 	}
-
-	var paths []string
-	for _, source := range sources {
-		switch source {
-		case GlobalRecordSource:
-			paths = append(paths, meta.HomePath)
-		case ProjectRecordSource:
-			paths = append(paths, meta.WorkingDirectory)
-		case SessionRecordSource:
-			paths = append(paths, meta.CurTmpPath)
-		}
-	}
-	var record env.Record
-	if len(paths) == 0 {
-		record = env.EmptyRecord
-	} else if len(paths) == 1 {
-		r, err := env.NewRecord(paths[0])
-		if err != nil {
-			panic(err)
-		}
-		record = r
-	} else {
-		r, err := env.NewRecord(paths[0], paths[1:]...)
-		if err != nil {
-			panic(err)
-		}
-		record = r
-	}
-	return newSdkManager(record, meta)
+	return newSdkManager(meta)
 }
 
-func NewSdkManager(sources ...RecordSource) *Manager {
-	if len(sources) == 0 {
-		return NewSdkManagerWithSource(SessionRecordSource, ProjectRecordSource)
-	}
-	return newSdkManagerWithSource(sources...)
-}
-
-func newSdkManager(record env.Record, meta *PathMeta) *Manager {
+func newSdkManager(meta *PathMeta) *Manager {
 	envManger, err := env.NewEnvManager(meta.HomePath)
 	if err != nil {
 		panic("Init env manager error")
@@ -592,7 +601,6 @@ func newSdkManager(record env.Record, meta *PathMeta) *Manager {
 	manager := &Manager{
 		PathMeta:   meta,
 		EnvManager: envManger,
-		Record:     record,
 		openSdks:   make(map[string]*Sdk),
 		Config:     c,
 	}

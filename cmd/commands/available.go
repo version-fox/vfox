@@ -30,7 +30,7 @@ var Available = &cli.Command{
 }
 
 func availableCmd(ctx *cli.Context) error {
-	manager := internal.NewSdkManagerWithSource()
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	//categoryName := ctx.Args().First()
 	available, err := manager.Available()

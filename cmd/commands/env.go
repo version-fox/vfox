@@ -19,6 +19,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/version-fox/vfox/internal/toolset"
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
@@ -61,16 +62,26 @@ func envCmd(ctx *cli.Context) error {
 			Paths:     []string{},
 			SDKs:      make(SDKs),
 		}
-		manager := internal.NewSdkManagerWithSource(internal.GlobalRecordSource, internal.SessionRecordSource, internal.ProjectRecordSource)
+		manager := internal.NewSdkManager()
 		defer manager.Close()
-		for k, v := range manager.Record.Export() {
-			if lookupSdk, err := manager.LookupSdk(k); err == nil {
-				if keys, err := lookupSdk.EnvKeys(internal.Version(v)); err == nil {
+		tvs, err := toolset.NewMultiToolVersions([]string{
+			manager.PathMeta.WorkingDirectory,
+			manager.PathMeta.CurTmpPath,
+			manager.PathMeta.HomePath,
+		})
+		if err != nil {
+			return err
+		}
+		tvs.FilterTools(func(name, version string) bool {
+			if lookupSdk, err := manager.LookupSdk(name); err == nil {
+				if keys, err := lookupSdk.EnvKeys(internal.Version(version)); err == nil {
 					data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
 					data.Paths = append(data.Paths, keys.Paths.Slice()...)
+					return true
 				}
 			}
-		}
+			return false
+		})
 		jsonData, err := json.Marshal(data)
 		if err != nil {
 			return err
@@ -92,9 +103,19 @@ func envCmd(ctx *cli.Context) error {
 		if s == nil {
 			return fmt.Errorf("unknow target shell %s", shellName)
 		}
-		manager := internal.NewSdkManagerWithSource(internal.GlobalRecordSource, internal.SessionRecordSource, internal.ProjectRecordSource)
+		manager := internal.NewSdkManager()
 		defer manager.Close()
-		envKeys, err := manager.EnvKeys()
+
+		tvs, err := toolset.NewMultiToolVersions([]string{
+			manager.PathMeta.WorkingDirectory,
+			manager.PathMeta.CurTmpPath,
+			manager.PathMeta.HomePath,
+		})
+		if err != nil {
+			return err
+		}
+
+		envKeys, err := manager.EnvKeys(tvs)
 		if err != nil {
 			return err
 		}

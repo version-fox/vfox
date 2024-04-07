@@ -69,19 +69,15 @@ func useCmd(ctx *cli.Context) error {
 		version = internal.Version(argArr[1])
 	}
 
-	var recordSources []internal.RecordSource
 	scope := internal.Session
 	if ctx.IsSet("global") {
 		scope = internal.Global
-		recordSources = append(recordSources, internal.SessionRecordSource, internal.GlobalRecordSource)
 	} else if ctx.IsSet("project") {
 		scope = internal.Project
-		recordSources = append(recordSources, internal.ProjectRecordSource)
 	} else {
 		scope = internal.Session
-		recordSources = append(recordSources, internal.SessionRecordSource)
 	}
-	manager := internal.NewSdkManagerWithSource(recordSources...)
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 
 	source, err := manager.LookupSdk(name)

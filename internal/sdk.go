@@ -19,6 +19,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/toolset"
 	"io"
 	"net"
 	"net/http"
@@ -249,12 +250,6 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 }
 
 func (b *Sdk) Use(version Version, scope UseScope) error {
-	// FIXME The default is Session under unix-like, and the default is Global under windows.
-	if !env.IsHookEnv() {
-		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-		scope = Global
-	}
-
 	logger.Debugf("use sdk version: %s\n", string(version))
 
 	version, err := b.PreUse(version, scope)
@@ -266,19 +261,28 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	if !b.checkExists(version) {
 		return fmt.Errorf("%s is not installed", label)
 	}
-	// TODO Need to optimize envManager
-	if scope == Global {
+
+	if !env.IsHookEnv() {
+		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 		sdkPackage, err := b.getLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
+		}
+
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 		keys, err := b.Plugin.EnvKeys(sdkPackage)
 		if err != nil {
 			return fmt.Errorf("plugin [EnvKeys] method error: %w", err)
 		}
 
-		b.clearCurrentEnvConfig()
+		// clear global env
+		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+			b.clearGlobalEnv(Version(oldVersion))
+		}
 
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
 			return err
@@ -287,13 +291,68 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
+		toolVersion.Record[b.Plugin.SdkName] = string(version)
+		if err = toolVersion.Save(); err != nil {
+			return fmt.Errorf("failed to save tool versions, err:%w", err)
+		}
+		return shell.GetProcess().Open(os.Getppid())
+	} else {
+		return b.useInHook(version, scope)
 	}
-	b.sdkManager.Record.Add(b.Plugin.SdkName, string(version))
-	err = b.sdkManager.Record.Save()
+}
+
+func (b *Sdk) useInHook(version Version, scope UseScope) error {
+	var multiToolVersion toolset.MultiToolVersions
+	if scope == Global {
+		sdkPackage, err := b.getLocalSdkPackage(version)
+		if err != nil {
+			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
+			return err
+		}
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+		keys, err := b.Plugin.EnvKeys(sdkPackage)
+		if err != nil {
+			return fmt.Errorf("plugin [EnvKeys] method error: %w", err)
+		}
+
+		// clear global env
+		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+			b.clearGlobalEnv(Version(oldVersion))
+		}
+
+		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
+			return err
+		}
+		err = b.sdkManager.EnvManager.Flush()
+		if err != nil {
+			return err
+		}
+		multiToolVersion = append(multiToolVersion, toolVersion)
+	} else if scope == Project {
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+		multiToolVersion = append(multiToolVersion, toolVersion)
+	}
+
+	// It must also be saved once at the session level.
+	toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read tool versions, err:%w", err)
 	}
-	pterm.Printf("Now using %s.\n", pterm.LightGreen(label))
+	multiToolVersion = append(multiToolVersion, toolVersion)
+
+	multiToolVersion.Add(b.Plugin.SdkName, string(version))
+
+	if err = multiToolVersion.Save(); err != nil {
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))
 	if !env.IsHookEnv() {
 		return shell.GetProcess().Open(os.Getppid())
 	}
@@ -332,23 +391,35 @@ func (b *Sdk) getLocalSdkPackages() []*Package {
 	return infos
 }
 
+// Current returns the current version of the SDK.
+// Lookup priority is: project > session > global
 func (b *Sdk) Current() Version {
-	version := b.sdkManager.Record.Export()[b.Plugin.SdkName]
-	return Version(version)
+	toolVersion, err := toolset.NewMultiToolVersions([]string{
+		b.sdkManager.PathMeta.WorkingDirectory,
+		b.sdkManager.PathMeta.CurTmpPath,
+		b.sdkManager.PathMeta.HomePath,
+	})
+	if err != nil {
+		return ""
+	}
+	current := toolVersion.FilterTools(func(name, version string) bool {
+		return name == b.Plugin.SdkName && b.checkExists(Version(version))
+	})
+	if len(current) == 0 {
+		return ""
+	}
+	return Version(current[b.Plugin.SdkName])
 }
 
 func (b *Sdk) Close() {
 	b.Plugin.Close()
 }
-func (b *Sdk) clearCurrentEnvConfig() {
-	b.clearEnvConfig(b.Current())
-}
 
-func (b *Sdk) clearEnvConfig(version Version) {
+// clearGlobalEnv Mainly used to clear record from Windows registry
+func (b *Sdk) clearGlobalEnv(version Version) {
 	if version == "" {
 		return
 	}
-	b.sdkManager.Record.Remove(string(version))
 	sdkPackage, err := b.getLocalSdkPackage(version)
 	if err != nil {
 		return
@@ -359,6 +430,40 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	}
 	envManager := b.sdkManager.EnvManager
 	_ = envManager.Remove(envKV)
+}
+
+// clearCurrentEnvConfig will clear all env config about the current sdk for all places.
+// such as: global, session, project and Windows registry
+func (b *Sdk) clearCurrentEnvConfig() {
+	b.clearEnvConfig(b.Current())
+}
+
+// clearEnvConfig will clear all env config about the current sdk for all places.
+// such as: global, session and Windows registry
+func (b *Sdk) clearEnvConfig(version Version) {
+	if version == "" {
+		return
+	}
+	sdkPackage, err := b.getLocalSdkPackage(version)
+	if err != nil {
+		return
+	}
+	envKV, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		return
+	}
+	envManager := b.sdkManager.EnvManager
+	_ = envManager.Remove(envKV)
+	_ = envManager.Flush()
+
+	// clear tool versions
+	toolVersion, err := toolset.NewMultiToolVersions([]string{
+		b.sdkManager.PathMeta.CurTmpPath,
+		b.sdkManager.PathMeta.HomePath,
+	})
+	for _, tv := range toolVersion {
+		delete(tv.Record, b.Plugin.SdkName)
+	}
 }
 
 func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {

@@ -32,7 +32,7 @@ var Current = &cli.Command{
 }
 
 func currentCmd(ctx *cli.Context) error {
-	manager := internal.NewSdkManager(internal.GlobalRecordSource, internal.SessionRecordSource, internal.ProjectRecordSource)
+	manager := internal.NewSdkManager()
 	defer manager.Close()
 	sdkName := ctx.Args().First()
 	if sdkName == "" {

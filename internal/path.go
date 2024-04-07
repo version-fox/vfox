@@ -25,14 +25,6 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
-type RecordSource string
-
-const (
-	GlobalRecordSource  RecordSource = "global"
-	ProjectRecordSource RecordSource = "project"
-	SessionRecordSource RecordSource = "session"
-)
-
 type PathMeta struct {
 	TempPath string
 	// Temporary directory for the current process
