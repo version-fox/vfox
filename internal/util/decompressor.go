@@ -207,8 +207,9 @@ func findRootFolderInZip(zipFilePath string) string {
 	var firstElement string
 
 	for _, f := range r.File {
+		normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
 
-		currentFirstElement := strings.Split(f.Name, "/")[0]
+		currentFirstElement := strings.Split(normalizedPath, "/")[0]
 
 		if firstElement != "" && firstElement != currentFirstElement {
 			return ""
@@ -221,6 +222,10 @@ func findRootFolderInZip(zipFilePath string) string {
 	return firstElement
 }
 
+func (z *ZipDecompressor) isDir(path string) bool {
+	return strings.HasSuffix(path, "/")
+}
+
 func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZip string) error {
 	rc, err := f.Open()
 	if err != nil {
@@ -228,8 +233,9 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	}
 	defer rc.Close()
 
+	normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
 	// Split the file name into a slice
-	parts := strings.Split(f.Name, "/")
+	parts := strings.Split(normalizedPath, "/")
 	if len(parts) > 1 && rootFolderInZip != "" {
 		// Remove the first element
 		parts = parts[1:]
@@ -238,7 +244,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	fname := strings.Join(parts, "/")
 
 	fpath := filepath.Join(dest, fname)
-	if f.FileInfo().IsDir() {
+	if f.FileInfo().IsDir() || z.isDir(fname) {
 		err := os.MkdirAll(fpath, os.ModePerm)
 		if err != nil {
 			return err
@@ -252,12 +258,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 		}
 		return z.writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
 	} else {
-		var fdir string
-		if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-			fdir = fpath[:lastIndex]
-		}
-
-		err = os.MkdirAll(fdir, os.ModePerm)
+		err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm)
 		if err != nil {
 			return err
 		}
