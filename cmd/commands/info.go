@@ -43,9 +43,18 @@ func infoCmd(ctx *cli.Context) error {
 	source := s.Plugin
 
 	pterm.Println("Plugin info:")
-	pterm.Println("Name     ", "->", pterm.LightBlue(source.Name))
-	pterm.Println("Version  ", "->", pterm.LightBlue(source.Version))
-	pterm.Println("Desc     ", "->", pterm.LightBlue(source.Description))
-	pterm.Println("UpdateUrl", "->", pterm.LightBlue(source.UpdateUrl))
+	pterm.Println("Name    ", "->", pterm.LightBlue(source.Name))
+	pterm.Println("Version ", "->", pterm.LightBlue(source.Version))
+	pterm.Println("Homepage", "->", pterm.LightBlue(source.Homepage))
+	pterm.Println("Desc    ", "->", pterm.LightBlue(source.Description))
+
+	// print some notes if there are
+	if len(source.Notes) != 0 {
+		fmt.Println(pterm.LightYellow("Notes:"))
+		fmt.Println("======")
+		for _, note := range source.Notes {
+			fmt.Println("  ", note)
+		}
+	}
 	return nil
 }

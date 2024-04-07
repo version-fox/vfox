@@ -528,50 +528,6 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 	return pluginRegistryAddress + "/" + uri
 }
 
-//func NewSdkManagerWithSource(sources ...RecordSource) *Manager {
-//	if env.IsHookEnv() {
-//		return newSdkManagerWithSource(sources...)
-//	} else {
-//		return newSdkManagerWithSource(SessionRecordSource, GlobalRecordSource, ProjectRecordSource)
-//	}
-//}
-//
-//func newSdkManagerWithSource(sources ...RecordSource) *Manager {
-//	meta, err := newPathMeta()
-//	if err != nil {
-//		panic("Init path meta error")
-//	}
-//
-//	var paths []string
-//	for _, source := range sources {
-//		switch source {
-//		case GlobalRecordSource:
-//			paths = append(paths, meta.HomePath)
-//		case ProjectRecordSource:
-//			paths = append(paths, meta.WorkingDirectory)
-//		case SessionRecordSource:
-//			paths = append(paths, meta.CurTmpPath)
-//		}
-//	}
-//	var record env.Record
-//	if len(paths) == 0 {
-//		record = env.EmptyRecord
-//	} else if len(paths) == 1 {
-//		r, err := env.NewRecord(paths[0])
-//		if err != nil {
-//			panic(err)
-//		}
-//		record = r
-//	} else {
-//		r, err := env.NewRecord(paths[0], paths[1:]...)
-//		if err != nil {
-//			panic(err)
-//		}
-//		record = r
-//	}
-//	return newSdkManager(record, meta)
-//}
-
 func NewSdkManager() *Manager {
 	meta, err := newPathMeta()
 	if err != nil {
