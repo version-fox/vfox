@@ -12,12 +12,14 @@ local vfox_ls_func = function()
     local pre, ls = '', {}
     local vfox_ls = io.popen('vfox ls')
     for line in vfox_ls:lines() do
-        local txt = line:gsub('%c%[%d+m', ''):match('(%a.+)')
+        local txt = line:gsub('%c%[%d+m', ''):match('^%A+(%a.+)')
         if txt then
             if string.find(txt, 'v') == 1 then
+                ls[pre] = true
                 table.insert(ls, pre .. '@' .. string.sub(txt, 2))
             else
                 pre = txt
+                ls[pre] = false
             end
         end
     end
@@ -25,16 +27,30 @@ local vfox_ls_func = function()
     return ls
 end
 
-local vfox_sdk = clink.argmatcher():nofiles():addarg(vfox_sdk_table):addflags('--help', '-h')
-local vfox_use = clink.argmatcher():nofiles():addarg({
-    clink.argmatcher():nofiles():addarg({ vfox_ls_func, vfox_sdk }),
-}):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--help', '-h')
+local vfox_sdk = clink.argmatcher():nofiles():addarg(function()
+    local ls, res = vfox_ls_func(), {}
+    for k, v in pairs(ls) do
+        if type(v) == 'boolean' then
+            table.insert(res, k)
+        end
+    end
+    return res
+end):addflags('--help', '-h')
+local vfox_use = clink.argmatcher():nofiles():addarg(function()
+    local ls, res = vfox_ls_func(), {}
+    for k, v in pairs(ls) do
+        if v then
+            table.insert(res, v == true and k or v)
+        end
+    end
+    return res
+end):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--help', '-h')
 local vfox_help = clink.argmatcher():nofiles():addflags('--help', '-h')
 local vfox_shell = clink.argmatcher():nofiles():addarg('bash', 'zsh', 'pwsh', 'fish', 'clink')
 local vfox_ls_version = clink.argmatcher():nofiles():addarg({ vfox_ls_func }):addflags('--help', '-h')
 
 clink.argmatcher('vfox'):nofiles():addarg({
-    'add' .. clink.argmatcher():nofiles():addarg({ vfox_sdk }):addflags('--source', '-s', '--alias', '--help', '-h'),
+    'add' .. clink.argmatcher():nofiles():addarg(vfox_sdk_table):addflags('--source', '-s', '--alias', '--help', '-h'),
     'use' .. vfox_use, 'u' .. vfox_use,
     'info' .. vfox_sdk,
     'remove' .. vfox_sdk,
