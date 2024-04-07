@@ -56,12 +56,13 @@ vfox remove <sdk-name>
 
 ## Update
 
-Update plugin.
+Update a specified or all plugin(s)
 
 **Usage**
 
 ```shell
 vfox update <sdk-name>
+vfox update --all # update all installed plugins
 ```
 
 ## Overview
@@ -71,7 +72,7 @@ vfox - VersionFox, a tool for sdk version management
 vfox available List all available plugins
 vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin from offical repository or custom source
 vfox remove <sdk-name>          Remove a plugin
-vfox update <sdk-name>          Update a plugin
+vfox update [<sdk-name> | --all] Update a specified or all plugin(s)
 vfox info <sdk-name>            Show plugin info
 vfox search <sdk-name>          Search available versions of a SDK
 vfox install <sdk-name>@<version> Install the specified version of SDK
