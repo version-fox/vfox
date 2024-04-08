@@ -20,3 +20,8 @@ PLUGIN.description = "xxx"
 PLUGIN.minRuntimeVersion = "0.2.2"
 
 PLUGIN.manifestUrl = "manifest.json"
+
+PLUGIN.legacyFilenames = {
+    ".node-version",
+    ".nvmrc"
+}

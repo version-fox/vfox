@@ -154,6 +154,15 @@ type EnvKeysHookResultItem struct {
 	Value string `luai:"value"`
 }
 
+type ParseLegacyFileHookCtx struct {
+	Filepath string `luai:"filepath"`
+	Filename string `luai:"filename"`
+}
+
+type ParseLegacyFileResult struct {
+	Version string `luai:"version"`
+}
+
 type LuaPluginInfo struct {
 	Name              string   `luai:"name"`
 	Version           string   `luai:"version"`
@@ -164,6 +173,7 @@ type LuaPluginInfo struct {
 	License           string   `luai:"license"`
 	MinRuntimeVersion string   `luai:"minRuntimeVersion"`
 	Notes             []string `luai:"notes"`
+	LegacyFilenames   []string `luai:"legacyFilenames"`
 }
 
 // LuaRuntime represents the runtime information of the Lua environment.

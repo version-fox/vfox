@@ -27,6 +27,10 @@ PLUGIN = {
     updateUrl = "{URL}/sdk.lua",
     -- minimum compatible vfox version
     minRuntimeVersion = "0.2.2",
+    legacyFilenames = {
+        ".node-version",
+        ".nvmrc"
+    }
 }
 
 --- Returns some pre-installed information, such as version number, download address, local files, etc.
@@ -167,4 +171,20 @@ function PLUGIN:PreUse(ctx)
     return {
         version = "1.0.0"
     }
+end
+
+function PLUGIN:ParseLegacyFile(ctx)
+    printTable(ctx)
+    local filename = ctx.filename
+    local filepath = ctx.filepath
+    if filename == ".node-version" then
+        return {
+            version = "14.17.0"
+        }
+    else
+        return {
+            version = "0.0.1"
+        }
+    end
+
 end
