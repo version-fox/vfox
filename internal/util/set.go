@@ -107,7 +107,7 @@ func (s *SortedSet[T]) Len() int {
 }
 
 func (s *SortedSet[T]) Slice() []T {
-	return s.elements
+	return append([]T{}, s.elements...)
 }
 
 func NewSortedSet[T comparable]() Set[T] {
