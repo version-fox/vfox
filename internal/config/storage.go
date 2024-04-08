@@ -42,11 +42,11 @@ func (s *Storage) Validate() error {
 		return fmt.Errorf("%s is not a directory", s.SdkPath)
 	}
 	tmpfn := filepath.Join(s.SdkPath, ".tmpfile")
-	f, err := os.OpenFile(tmpfn, os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	f, err := os.OpenFile(tmpfn, os.O_WRONLY|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpfn)
 	defer f.Close()
+	defer os.Remove(tmpfn)
 	return nil
 }
