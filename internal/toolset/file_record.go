@@ -10,12 +10,13 @@ import (
 
 // FileRecord is a file that contains a map of string to string
 type FileRecord struct {
-	Record map[string]string
-	Path   string
+	Record      map[string]string
+	Path        string
+	isInitEmpty bool
 }
 
 func (m *FileRecord) Save() error {
-	if len(m.Record) == 0 {
+	if m.isInitEmpty && len(m.Record) == 0 {
 		return nil
 	}
 	file, err := os.Create(m.Path)
@@ -57,7 +58,8 @@ func NewFileRecord(path string) (*FileRecord, error) {
 		}
 	}
 	return &FileRecord{
-		Record: versionsMap,
-		Path:   path,
+		Record:      versionsMap,
+		Path:        path,
+		isInitEmpty: len(versionsMap) == 0,
 	}, nil
 }

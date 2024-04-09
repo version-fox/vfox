@@ -292,7 +292,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		ctx.InstalledSdks[string(lSdk.Version)] = lSdk
 	}
 
-	logger.Debugf("PreUseHookCtx: %+v", ctx)
+	logger.Debugf("PreUseHookCtx: %+v \n", ctx)
 
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
@@ -321,7 +321,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	return Version(result.Version), nil
 }
 
-func (l *LuaPlugin) ParseLegacyFile(path string) (Version, error) {
+func (l *LuaPlugin) ParseLegacyFile(path string, installedVersions func() []Version) (Version, error) {
 	if len(l.LegacyFilenames) == 0 {
 		return "", nil
 	}
@@ -336,9 +336,20 @@ func (l *LuaPlugin) ParseLegacyFile(path string) (Version, error) {
 	ctx := ParseLegacyFileHookCtx{
 		Filepath: path,
 		Filename: filename,
+		GetInstalledVersions: func(L *lua.LState) int {
+			versions := installedVersions()
+			logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
+			table, err := luai.Marshal(L, versions)
+			if err != nil {
+				L.RaiseError(err.Error())
+				return 0
+			}
+			L.Push(table)
+			return 1
+		},
 	}
 
-	logger.Debugf("ParseLegacyFile: %+v", ctx)
+	logger.Debugf("ParseLegacyFile: %+v \n", ctx)
 
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {

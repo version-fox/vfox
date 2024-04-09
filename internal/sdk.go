@@ -411,6 +411,12 @@ func (b *Sdk) Current() Version {
 	return Version(current[b.Plugin.SdkName])
 }
 
+func (b *Sdk) ParseLegacyFile(path string) (Version, error) {
+	return b.Plugin.ParseLegacyFile(path, func() []Version {
+		return b.List()
+	})
+}
+
 func (b *Sdk) Close() {
 	b.Plugin.Close()
 }
@@ -585,10 +591,15 @@ func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
-func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
+// NewSdk creates a new SDK instance.
+func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
+	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
+	}
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SdkName)),
-		Plugin:      source,
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
+		Plugin:      luaPlugin,
 	}, nil
 }

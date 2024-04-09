@@ -99,11 +99,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	luaPlugin, err := NewLuaPlugin(pluginPath, m)
-	if err != nil {
-		return nil, err
-	}
-	sdk, _ := NewSdk(m, luaPlugin)
+	sdk, _ := NewSdk(m, pluginPath)
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
@@ -134,12 +130,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		} else {
 			continue
 		}
-		source, err := NewLuaPlugin(path, m)
-		if err != nil {
-			pterm.Printf("Failed to load %s plugin, err: %s\n", filepath.Dir(path), err)
-			continue
-		}
-		sdk, _ := NewSdk(m, source)
+		sdk, _ := NewSdk(m, path)
 		sdkMap[strings.ToLower(sdkName)] = sdk
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
@@ -576,6 +567,7 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 // loadLegacyFileRecord load legacy file record which store the mapping of legacy filename and sdk-name
 func (m *Manager) loadLegacyFileRecord() (*toolset.FileRecord, error) {
 	file := filepath.Join(m.PathMeta.HomePath, ".legacy_filenames")
+	logger.Debugf("Loading legacy file record %s \n", file)
 	mapFile, err := toolset.NewFileRecord(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read .legacy_filenames file %s: %w", file, err)
@@ -595,11 +587,13 @@ func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
 		for filename, sdkname := range legacyFileRecord.Record {
 			path := filepath.Join(m.PathMeta.WorkingDirectory, filename)
 			if util.FileExists(path) {
+				logger.Debugf("Parsing legacy file %s \n", path)
 				if sdk, err := m.LookupSdk(sdkname); err == nil {
 					// The .tool-version in the current directory has the highest priority,
 					// checking to see if the version information in the legacy file exists in the former,
 					//  and updating to the former record (Don’t fall into the file!) if it doesn't.
-					if version, err := sdk.Plugin.ParseLegacyFile(path); err == nil && version != "" {
+					if version, err := sdk.ParseLegacyFile(path); err == nil && version != "" {
+						logger.Debugf("Found %s@%s in %s \n", sdkname, version, path)
 						output(sdkname, string(version))
 					}
 				}

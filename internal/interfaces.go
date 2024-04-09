@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+	lua "github.com/yuin/gopher-lua"
 )
 
 type LuaCheckSum struct {
@@ -155,8 +156,9 @@ type EnvKeysHookResultItem struct {
 }
 
 type ParseLegacyFileHookCtx struct {
-	Filepath string `luai:"filepath"`
-	Filename string `luai:"filename"`
+	Filepath             string         `luai:"filepath"`
+	Filename             string         `luai:"filename"`
+	GetInstalledVersions lua.LGFunction `luai:"getInstalledVersions"`
 }
 
 type ParseLegacyFileResult struct {
