@@ -296,7 +296,9 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 
 	t.Run("ParseLegacyFile", func(t *testing.T) {
 		plugin, err := factory()
-		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version")
+		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
+			return nil
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,7 +306,9 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 		if version != "14.17.0" {
 			t.Errorf("expected version '14.17.0', got '%s'", version)
 		}
-		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc")
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+			return nil
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -313,7 +317,9 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 			t.Errorf("expected version '0.0.1', got '%s'", version)
 		}
 		plugin.LegacyFilenames = []string{}
-		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc")
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+			return nil
+		})
 		if err != nil && version != "" {
 			t.Errorf("expected non version, got '%s'", version)
 		}
