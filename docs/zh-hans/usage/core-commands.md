@@ -43,8 +43,7 @@ $ vfox add --source  https://github.com/version-fox/vfox-nodejs/releases/downloa
 
 ## Search
 
-获取当前SDK所有可用的运行时版本。
-
+获取指定SDK所有可用的运行时版本。
 
 **用法**
 
@@ -57,6 +56,10 @@ vfox search <sdk-name> [...optionArgs]
 
 ::: tip 快捷安装
 选择目标版本， 回车即可快速安装。
+:::
+
+::: tip 自动安装
+如果本地没有安装SDK，`search`命令会从远端仓库检索插件并安装到本地。
 :::
 
 ## Install
@@ -76,6 +79,10 @@ vfox i <sdk-name>@<version>
 
 `version`: 需要安装的版本号
 
+
+::: tip 自动安装
+如果本地没有安装SDK，`install`命令会从远端仓库检索插件并安装到本地。
+:::
 
 ## Use
 

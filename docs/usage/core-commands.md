@@ -61,6 +61,10 @@ vfox search <sdk-name> [...optionArgs]
 Select the target version, and press Enter to install quickly.
 :::
 
+::: tip
+`search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
+:::
+
 ## Install
 
 Install the specified SDK version to your computer and cache it for future use.
@@ -76,6 +80,11 @@ vfox i <sdk-name>@<version>
 `sdk-name`: SDK name
 
 `version`: The version to install
+
+
+::: tip 
+`search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
+:::
 
 ## Use
 
@@ -105,6 +114,8 @@ vfox u [options] <sdk-name>[@<version>]
 
 `Unix-like`: `Session` scope
 :::
+
+
 
 ## Uninstall
 
