@@ -72,12 +72,13 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (*env.Envs, error) {
 		Paths:     env.NewPaths(env.EmptyPaths),
 	}
 
-	tools := make(map[string]string)
+	tools := make(map[string]struct{})
 	for _, t := range tvs {
 		for name, version := range t.Record {
 			if _, ok := tools[name]; ok {
 				continue
 			}
+			tools[name] = struct{}{}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
 				if ek, err := lookupSdk.EnvKeys(Version(version)); err == nil {
 					for key, value := range ek.Variables {
