@@ -87,6 +87,7 @@ function sidebar(): DefaultTheme.Sidebar {
                         {text: 'html', link: '/zh-hans/plugins/library/html'},
                         {text: 'json', link: '/zh-hans/plugins/library/json'},
                         {text: 'strings', link: '/zh-hans/plugins/library/strings'},
+                        {text: 'archiver', link: '/zh-hans/plugins/library/archiver'},
                     ]
                 }, 
 

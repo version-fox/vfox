@@ -80,5 +80,29 @@ func TestSortedSetSort(t *testing.T) {
 	if !reflect.DeepEqual(s.Slice(), elements) {
 		t.Errorf("Expected set to contain %v, got %v", elements, s.Slice())
 	}
+}
 
+func TestLoopRemoveSortedSet(t *testing.T) {
+	s1 := NewSortedSet[int]()
+	s2 := NewSortedSet[int]()
+	s3 := NewSortedSet[int]()
+	for i := 0; i < 10; i++ {
+		s1.Add(i)
+		if i < 5 {
+			s2.Add(i)
+		} else {
+			s3.Add(i)
+		}
+	}
+	for _, s := range s1.Slice() {
+		if s2.Contains(s) {
+			s1.Remove(s)
+		}
+	}
+	for _, s := range s1.Slice() {
+		if !s3.Contains(s) {
+			t.Errorf("Expected set to equal %v, got %v", s3.Slice(), s1.Slice())
+			break
+		}
+	}
 }

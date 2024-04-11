@@ -529,7 +529,7 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := b.sdkManager.httpClient().Do(req)
+	resp, err := b.sdkManager.HttpClient().Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {

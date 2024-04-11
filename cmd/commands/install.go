@@ -17,7 +17,6 @@
 package commands
 
 import (
-	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"strings"
@@ -51,9 +50,9 @@ func installCmd(ctx *cli.Context) error {
 			name = strings.ToLower(argArr[0])
 			version = ""
 		}
-		source, err := manager.LookupSdk(name)
+		source, err := manager.LookupSdkWithInstall(name)
 		if err != nil {
-			return fmt.Errorf("%s not supported, error: %w", name, err)
+			return err
 		}
 		return source.Install(version)
 	}

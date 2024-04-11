@@ -36,7 +36,6 @@ installation wizard to install.
 ::: details Homebrew
 
 ```shell
-$ brew tap version-fox/tap
 $ brew install vfox
 ```
 
@@ -139,8 +138,7 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 **Command**: `vfox add <plugin-name>`
 
-After you have installed [vfox](https://github.com/version-fox/vfox), you still can't do anything. You need to install
-the corresponding plugin first.
+After you have installed [vfox](https://github.com/version-fox/vfox), you still can't do anything. **You need to install the corresponding plugin first**.
 
 ::: tip
 If you don't know which plugin to add, you can use the `vfox available` command to see all available plugins.
@@ -162,16 +160,24 @@ We only install the latest available `latest` version:
 $ vfox install nodejs@latest
 ```
 
-::: tip
-`vfox` forces the use of an exact version. `latest` is a behavior that is parsed to the actual version number at
-runtime, depending on the plugin's implementation.
-:::
-
 Of course, we can also install a specific version:
 
 ```bash
 $ vfox install nodejs@21.5.0
 ```
+
+::: warning
+`vfox` forces the use of an exact version. `latest` is a behavior that is parsed to the actual version number at
+runtime, depending on the plugin's implementation.
+
+If you **don't know the specific version **, you can use `vfox search nodejs` to see all available versions.
+:::
+
+::: tip 
+`install` and `search` commands will check if the plugin is already added locally. If not, they will **automatically
+add the plugin**.
+:::
+
 
 ## 5. Switch runtime
 

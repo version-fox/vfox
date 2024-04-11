@@ -17,23 +17,49 @@
 package commands
 
 import (
+	"fmt"
+
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 )
 
+const allFlag = "all"
+
 var Update = &cli.Command{
-	Name:   "update",
-	Usage:  "update specified plug-ins",
+	Name:  "update",
+	Usage: "update specified plug-ins, --all/-a to update all installed plug-ins",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    allFlag,
+			Aliases: []string{"a"},
+			Usage:   "all plugins flag",
+		},
+	},
 	Action: updateCmd,
 }
 
 func updateCmd(ctx *cli.Context) error {
-	args := ctx.Args()
-	l := args.Len()
-	if l < 1 {
-		return cli.Exit("invalid arguments", 1)
-	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	return manager.Update(args.First())
+	if ctx.Bool(allFlag) {
+		if sdks, err := manager.LoadAllSdk(); err == nil {
+			for sdk := range sdks {
+				if err = manager.Update(sdk); err != nil {
+					pterm.Println(fmt.Sprintf("update plugin(%s) failed, %s", sdk, err.Error()))
+				}
+			}
+		} else {
+			return cli.Exit(err.Error(), 1)
+		}
+	} else {
+		args := ctx.Args()
+		l := args.Len()
+		if l < 1 {
+			return cli.Exit("invalid arguments", 1)
+		}
+
+		return manager.Update(args.First())
+	}
+	return nil
 }

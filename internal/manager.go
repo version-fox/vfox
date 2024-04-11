@@ -23,6 +23,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
@@ -43,6 +44,14 @@ const (
 var (
 	manifestNotFound = errors.New("manifest not found")
 )
+
+type NotFoundError struct {
+	Msg string
+}
+
+func (n NotFoundError) Error() string {
+	return n.Msg
+}
 
 type Arg struct {
 	Name    string
@@ -87,7 +96,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	if !util.FileExists(pluginPath) {
 		oldPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
 		if !util.FileExists(oldPath) {
-			return nil, fmt.Errorf("%s not installed", name)
+			return nil, NotFoundError{Msg: fmt.Sprintf("%s not installed", name)}
 		}
 		// FIXME !!! This snippet will be removed in a later version
 		// rename old plugin path to new plugin path
@@ -102,6 +111,37 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	sdk, _ := NewSdk(m, pluginPath)
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
+}
+
+func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
+	source, err := m.LookupSdk(name)
+	if err != nil {
+		if errors.As(err, &NotFoundError{}) {
+			fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
+			if result, _ := pterm.DefaultInteractiveConfirm.
+				WithTextStyle(&pterm.ThemeDefault.DefaultText).
+				WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+				WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+				WithDefaultText("Please confirm").
+				Show(); result {
+
+				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
+				if errors.Is(err, manifestNotFound) {
+					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
+				}
+
+				if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
+					return nil, err
+				}
+				return m.LookupSdk(manifest.Name)
+			} else {
+				return nil, cli.Exit("", 1)
+			}
+		}
+		return nil, fmt.Errorf("%s not supported, error: %w", name, err)
+	} else {
+		return source, nil
+	}
 }
 
 func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
@@ -279,7 +319,7 @@ func (m *Manager) Update(pluginName string) error {
 // fetchPluginManifest fetch plugin from registry by manifest url
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
 	fmt.Println("Fetching plugin manifest...")
-	resp, err := m.httpClient().Get(url)
+	resp, err := m.HttpClient().Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
@@ -313,7 +353,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := m.httpClient().Do(req)
+	resp, err := m.HttpClient().Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
@@ -482,7 +522,7 @@ func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
 	return plugin, nil
 }
 
-func (m *Manager) httpClient() *http.Client {
+func (m *Manager) HttpClient() *http.Client {
 	var client *http.Client
 	if m.Config.Proxy.Enable {
 		if uri, err := url.Parse(m.Config.Proxy.Url); err == nil {
@@ -501,7 +541,7 @@ func (m *Manager) httpClient() *http.Client {
 }
 
 func (m *Manager) Available() (RegistryIndex, error) {
-	client := m.httpClient()
+	client := m.HttpClient()
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", err)
