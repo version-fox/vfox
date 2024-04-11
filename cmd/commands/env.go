@@ -19,6 +19,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/version-fox/vfox/internal/toolset"
 
 	"github.com/urfave/cli/v2"
@@ -47,7 +48,8 @@ var Env = &cli.Command{
 			Usage:   "get envs as json",
 		},
 	},
-	Action: envCmd,
+	Action:   envCmd,
+	Category: CategorySDK,
 }
 
 func envCmd(ctx *cli.Context) error {

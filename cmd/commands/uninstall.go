@@ -18,18 +18,20 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
-	"os"
-	"strings"
 )
 
 var Uninstall = &cli.Command{
-	Name:    "uninstall",
-	Aliases: []string{"un"},
-	Usage:   "uninstall a version of sdk",
-	Action:  uninstallCmd,
+	Name:     "uninstall",
+	Aliases:  []string{"un"},
+	Usage:    "Uninstall a version of the target SDK",
+	Action:   uninstallCmd,
+	Category: CategorySDK,
 }
 
 func uninstallCmd(ctx *cli.Context) error {

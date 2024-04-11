@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/urfave/cli/v2"
@@ -25,10 +26,11 @@ import (
 )
 
 var List = &cli.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "list all versions of the target sdk",
-	Action:  listCmd,
+	Name:     "list",
+	Aliases:  []string{"ls"},
+	Usage:    "List all versions of the target SDK",
+	Action:   listCmd,
+	Category: CategorySDK,
 }
 
 func listCmd(ctx *cli.Context) error {

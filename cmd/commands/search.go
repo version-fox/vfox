@@ -18,20 +18,22 @@ package commands
 
 import (
 	"fmt"
+	"math"
+	"os"
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/util"
 	"golang.org/x/crypto/ssh/terminal"
-	"math"
-	"os"
-	"strings"
 )
 
 var Search = &cli.Command{
-	Name:   "search",
-	Usage:  "search a version of sdk",
-	Action: searchCmd,
+	Name:     "search",
+	Usage:    "Search a version of the target SDK",
+	Action:   searchCmd,
+	Category: CategorySDK,
 }
 
 func searchCmd(ctx *cli.Context) error {

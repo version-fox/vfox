@@ -18,10 +18,11 @@ package commands
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/toolset"
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/version-fox/vfox/internal/toolset"
 
 	"github.com/version-fox/vfox/internal"
 
@@ -31,9 +32,10 @@ import (
 )
 
 var Activate = &cli.Command{
-	Name:   "activate",
-	Hidden: true,
-	Action: activateCmd,
+	Name:     "activate",
+	Hidden:   true,
+	Action:   activateCmd,
+	Category: CategorySDK,
 }
 
 func activateCmd(ctx *cli.Context) error {

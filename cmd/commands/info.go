@@ -18,15 +18,17 @@ package commands
 
 import (
 	"fmt"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 )
 
 var Info = &cli.Command{
-	Name:   "info",
-	Usage:  "show sdk info",
-	Action: infoCmd,
+	Name:     "info",
+	Usage:    "Show target SDK info",
+	Action:   infoCmd,
+	Category: CategorySDK,
 }
 
 func infoCmd(ctx *cli.Context) error {

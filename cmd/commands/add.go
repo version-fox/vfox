@@ -23,7 +23,7 @@ import (
 
 var Add = &cli.Command{
 	Name:  "add",
-	Usage: "add a plugin of sdk",
+	Usage: "Add a plugin",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -35,7 +35,8 @@ var Add = &cli.Command{
 			Usage: "plugin alias",
 		},
 	},
-	Action: addCmd,
+	Action:   addCmd,
+	Category: CategoryPlugin,
 }
 
 // addCmd is the command to add a plugin of sdk
