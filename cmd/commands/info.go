@@ -26,9 +26,9 @@ import (
 
 var Info = &cli.Command{
 	Name:     "info",
-	Usage:    "Show target SDK info",
+	Usage:    "Show plugin info",
 	Action:   infoCmd,
-	Category: CategorySDK,
+	Category: CategoryPlugin,
 }
 
 func infoCmd(ctx *cli.Context) error {
