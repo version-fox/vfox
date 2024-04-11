@@ -187,18 +187,23 @@ add the plugin**.
 
 ### Global
 
-Global default configuration is managed in the `$HOME/.version-fox/.tool-versions` file. Use the following command to
-set:
+**It takes effect globally**
 
 ```shell
 $ vfox use -g nodejs
 ```
 
-The contents of the `$HOME/.version-fox/.tool-versions` file as follows:
+::: tip
+
+`Global` is managed in the `$HOME/.version-fox/.tool-versions` file. 
+
+The contents of the `.tool-versions` file as follows:
 
 ```text
 nodejs 21.5.0
 ```
+
+:::
 
 ::: danger Does not take effect after execution?
 Please check if there is a runtime installed **previously** through other means in the `$PATH`!
@@ -212,27 +217,23 @@ For **Windows** users:
 2. `vfox` will automatically add the installed runtime to the **user environment variable** `Path`.
 
 3. If there is a runtime installed **previously** through other means in your `Path`, please remove it manually!
-   :::
+ :::
 
-### Session
-
-The session scope takes effect only for the current shell session. In other words, the versions are not shared between.
-
-The session scope is defined in the `$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` file (temporary directory). Use
-the following command to set:
-
-```shell
-$ vfox use -s nodejs
-```
 
 ### Project
 
-The project scope is defined in the `$PWD/.tool-versions` file (current working directory). Typically, this is a
-project's Git repository. Use the following command to set:
+**Different versions for different projects**
 
 ```shell
 $ vfox use -p nodejs
 ```
+
+`vfox` will **automatically detect whether there is a `.tool-versions` file** in the directory when you enter a directory. 
+If it exists, `vfox` will **automatically switch to the version specified by the project**.
+
+::: tip
+`Project` is managed in the `$PWD/.tool-versions` file (current working directory). 
+::: 
 
 ::: warning Default scope
 
@@ -242,6 +243,28 @@ For **Windows**: The default scope is `Global`
 
 For **Unix-like**: The default scope is `Session`
 :::
+
+### Session
+
+**Different versions for different Shells**
+
+```shell
+$ vfox use -s nodejs
+```
+
+The session scope takes effect only for the current shell session. In other words, the versions are not shared between.
+
+The main purpose of this scope is to meet **temporary needs**. 
+When you close the current terminal, `vfox` will **automatically switch back to the `Global`/`Project` version**.
+
+
+::: tip
+
+`Session` is managed in the `$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` file (temporary directory). 
+
+:::
+
+
 
 ## Demo
 
