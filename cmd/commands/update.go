@@ -28,7 +28,7 @@ const allFlag = "all"
 
 var Update = &cli.Command{
 	Name:  "update",
-	Usage: "Update specified plugin, use --all/-a to update all installed plugins.",
+	Usage: "Update specified plugin, use --all/-a to update all installed plugins",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    allFlag,
