@@ -78,9 +78,9 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (*env.Envs, error) {
 			if _, ok := tools[name]; ok {
 				continue
 			}
-			tools[name] = struct{}{}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
 				if ek, err := lookupSdk.EnvKeys(Version(version)); err == nil {
+					tools[name] = struct{}{}
 					for key, value := range ek.Variables {
 						shellEnvs.Variables[key] = value
 					}
