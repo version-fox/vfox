@@ -16,4 +16,4 @@
 
 package internal
 
-const RuntimeVersion = "0.3.2"
+const RuntimeVersion = "0.3.3"
