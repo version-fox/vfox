@@ -147,6 +147,10 @@ If you don't know which plugin to add, you can use the `vfox available` command 
 ```bash 
 $ vfox add nodejs
 ```
+or add more SDK plugins
+```bash
+$ vfox add nodejs golang
+```
 
 ## 4. Install a runtime
 

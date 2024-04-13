@@ -34,6 +34,10 @@ vfox add [options] <plugin-name>
 ```shell
 $ vfox add --alias node nodejs
 ```
+或者安装多个仓库插件
+```bash
+$ vfox add nodejs golang
+```
 
 **安装自定义插件**
 ```shell

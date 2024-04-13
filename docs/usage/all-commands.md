@@ -70,7 +70,7 @@ vfox update --all # update all installed plugins
 ```shell
 vfox - VersionFox, a tool for sdk version management
 vfox available List all available plugins
-vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin from offical repository or custom source
+vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add plugins from offical repository or custom source, --alias and --source only support first SDK name.
 vfox remove <sdk-name>          Remove a plugin
 vfox update [<sdk-name> | --all] Update a specified or all plugin(s)
 vfox info <sdk-name>            Show plugin info
