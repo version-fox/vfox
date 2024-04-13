@@ -63,6 +63,10 @@ Invoke-Expression "$(vfox activate pwsh)"
 ```bash 
 $ vfox add nodejs
 ```
+或者同时增加多个SDK插件
+```bash
+$ vfox add nodejs golang
+```
 
 #### 4. 安装运行时
 
@@ -91,8 +95,8 @@ $ node -v
 ## 路线图
 
 我们未来的计划以及高度优先的功能和增强功能是：
-- [X] 重构插件机制: 
-  - 增加插件模板, 允许多文件开发插件 
+- [X] 重构插件机制:
+  - 增加插件模板, 允许多文件开发插件
   - 增加全局注册表(类似于:`NPM Registry`、`Scoop Main Bucket`), 为插件分发提供统一入口
   - 拆分现有的插件仓库, 一个插件一个仓库
 - [X] 允许切换注册表地址

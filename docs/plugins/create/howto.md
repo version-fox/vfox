@@ -212,7 +212,7 @@ Currently, VersionFox plugin testing is straightforward. You only need to place 
 
 ## Publish to the public registry
 
-`vfox` allows custom installation of plugins, such as `vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip`
+`vfox` allows custom installation of plugins, such as `vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip`, --alias and --source only support first SDK name.
 
 In order to make it easier for your users, you can add the plugin to the public registry to list your plugin and easily install it with shorter commands, such as `vfox add nodejs`.
 

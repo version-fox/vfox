@@ -54,7 +54,7 @@ func availableCmd(ctx *cli.Context) error {
 		WithHasHeader().
 		WithSeparator("\t ").
 		WithData(data).Render()
-	pterm.Printf("Please use %s to install plugin\n", pterm.LightBlue("vfox add <plugin name>"))
+	pterm.Printf("Please use %s to install plugins\n", pterm.LightBlue("vfox add <plugin name>"))
 	return nil
 
 }
