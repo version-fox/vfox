@@ -22,6 +22,14 @@ import (
 	"path/filepath"
 )
 
+func FileSave(file string, data []byte) error {
+	err := os.WriteFile(file, data, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func FileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	if os.IsNotExist(err) {

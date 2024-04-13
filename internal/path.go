@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/config"
 	"os"
 	"path/filepath"
 
@@ -41,10 +42,10 @@ func newPathMeta() (*PathMeta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
-	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
-	homePath := filepath.Join(userHomeDir, ".version-fox")
-	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
+	pluginPath := filepath.Join(userHomeDir, config.VFoxPath, "plugin")
+	homePath := config.GetHomePath()
+	sdkCachePath := filepath.Join(userHomeDir, config.VFoxPath, "cache")
+	tmpPath := filepath.Join(userHomeDir, config.VFoxPath, "temp")
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
 	_ = os.MkdirAll(tmpPath, 0755)
