@@ -17,6 +17,7 @@
 package config
 
 import (
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -30,6 +31,7 @@ type Config struct {
 }
 
 const filename = "config.yaml"
+const VFoxPath = ".version-fox"
 
 var (
 	defaultConfig = &Config{
@@ -72,4 +74,30 @@ func NewConfigWithPath(p string) (*Config, error) {
 func NewConfig(path string) (*Config, error) {
 	p := filepath.Join(path, filename)
 	return NewConfigWithPath(p)
+}
+
+func GetHomePath() string {
+	userHomeDir, _ := os.UserHomeDir()
+	homePath := filepath.Join(userHomeDir, VFoxPath)
+	return homePath
+}
+
+// SaveConfig save config to config.yaml
+func SaveConfig(config *Config) bool {
+	content, err := yaml.Marshal(config)
+	if err != nil {
+		return false
+	}
+
+	err = util.FileSave(filepath.Join(GetHomePath(), filename), content)
+	logger.Info(string(content))
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func GetConfig(config *Config) string {
+	content, _ := yaml.Marshal(config)
+	return string(content)
 }

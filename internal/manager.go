@@ -569,8 +569,26 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 	return pluginRegistryAddress + "/" + uri
 }
 
+// UpdateConfigStorageSdkPath update config storage sdk path
+func (m *Manager) UpdateConfigStorageSdkPath(sdkPath string) error {
+	if sdkPath != "" && m.Config.Storage.SdkPath != sdkPath {
+		m.Config.Storage.SdkPath = sdkPath
+		config.SaveConfig(m.Config)
+	}
+	return nil
+}
+
+func (m *Manager) PrintConfigInfo() {
+	getConfig := config.GetConfig(m.Config)
+	logger.Info(getConfig)
+}
+
+func GetPathMeta() (*PathMeta, error) {
+	return newPathMeta()
+}
+
 func NewSdkManager() *Manager {
-	meta, err := newPathMeta()
+	meta, err := GetPathMeta()
 	if err != nil {
 		panic("Init path meta error")
 	}

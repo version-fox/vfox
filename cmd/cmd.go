@@ -93,6 +93,7 @@ func newCmd() *cmd {
 		commands.Update,
 		commands.Remove,
 		commands.Add,
+		commands.Config,
 		commands.Activate,
 		commands.Env,
 	}
