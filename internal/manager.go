@@ -20,9 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"net"
 	"net/http"
@@ -31,11 +35,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/util"
 )
 
 const (
@@ -110,11 +109,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	luaPlugin, err := NewLuaPlugin(pluginPath, m)
-	if err != nil {
-		return nil, err
-	}
-	sdk, _ := NewSdk(m, luaPlugin)
+	sdk, _ := NewSdk(m, pluginPath)
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
@@ -176,12 +171,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		} else {
 			continue
 		}
-		source, err := NewLuaPlugin(path, m)
-		if err != nil {
-			pterm.Printf("Failed to load %s plugin, err: %s\n", filepath.Dir(path), err)
-			continue
-		}
-		sdk, _ := NewSdk(m, source)
+		sdk, _ := NewSdk(m, path)
 		sdkMap[strings.ToLower(sdkName)] = sdk
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
@@ -211,6 +201,19 @@ func (m *Manager) Remove(pluginName string) error {
 	pterm.Printf("Removing %s sdk...\n", source.InstallPath)
 	if err = os.RemoveAll(source.InstallPath); err != nil {
 		return err
+	}
+	// clear legacy filenames
+	if len(source.Plugin.LegacyFilenames) > 0 {
+		lfr, err := m.loadLegacyFileRecord()
+		if err != nil {
+			return err
+		}
+		for _, filename := range source.Plugin.LegacyFilenames {
+			delete(lfr.Record, filename)
+		}
+		if err = lfr.Save(); err != nil {
+			return fmt.Errorf("remove legacy filenames failed: %w", err)
+		}
 	}
 	pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
 	return nil
@@ -282,6 +285,24 @@ func (m *Manager) Update(pluginName string) error {
 	}()
 	if err = os.Rename(tempPlugin.Path, sdk.Plugin.Path); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
+	}
+
+	// update legacy filenames
+	if len(tempPlugin.LegacyFilenames) != len(sdk.Plugin.LegacyFilenames) {
+		logger.Debugf("Update legacy filenames for %s plugin, from: %+v to: %+v \n", pluginName, sdk.Plugin.LegacyFilenames, tempPlugin.LegacyFilenames)
+		lfr, err := m.loadLegacyFileRecord()
+		if err != nil {
+			return err
+		}
+		for _, filename := range sdk.Plugin.LegacyFilenames {
+			delete(lfr.Record, filename)
+		}
+		for _, filename := range tempPlugin.LegacyFilenames {
+			lfr.Record[filename] = pluginName
+		}
+		if err = lfr.Save(); err != nil {
+			return fmt.Errorf("update legacy filenames failed: %w", err)
+		}
 	}
 	success = true
 	// print some notes if there are
@@ -406,6 +427,21 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if err = os.Rename(tempPlugin.Path, installPath); err != nil {
 		return fmt.Errorf("install plugin error: %w", err)
 	}
+
+	// set legacy filenames
+	if len(tempPlugin.LegacyFilenames) > 0 {
+		lfr, err := m.loadLegacyFileRecord()
+		if err != nil {
+			return err
+		}
+		for _, filename := range tempPlugin.LegacyFilenames {
+			lfr.Record[filename] = pname
+		}
+		if err = lfr.Save(); err != nil {
+			return fmt.Errorf("add legacy filenames failed: %w", err)
+		}
+	}
+
 	pterm.Println("Plugin info:")
 	pterm.Println("Name    ", "->", pterm.LightBlue(tempPlugin.Name))
 	pterm.Println("Version ", "->", pterm.LightBlue(tempPlugin.Version))
@@ -567,6 +603,46 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 		return m.Config.Registry.Address + "/" + uri
 	}
 	return pluginRegistryAddress + "/" + uri
+}
+
+// loadLegacyFileRecord load legacy file record which store the mapping of legacy filename and sdk-name
+func (m *Manager) loadLegacyFileRecord() (*toolset.FileRecord, error) {
+	file := filepath.Join(m.PathMeta.HomePath, ".legacy_filenames")
+	logger.Debugf("Loading legacy file record %s \n", file)
+	mapFile, err := toolset.NewFileRecord(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .legacy_filenames file %s: %w", file, err)
+	}
+	return mapFile, nil
+}
+
+// ParseLegacyFile parse legacy file and output the sdkname and version
+func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
+	legacyFileRecord, err := m.loadLegacyFileRecord()
+	if err != nil {
+		return err
+	}
+
+	// There are some legacy files to be parsed.
+	if len(legacyFileRecord.Record) > 0 {
+		for filename, sdkname := range legacyFileRecord.Record {
+			path := filepath.Join(m.PathMeta.WorkingDirectory, filename)
+			if util.FileExists(path) {
+				logger.Debugf("Parsing legacy file %s \n", path)
+				if sdk, err := m.LookupSdk(sdkname); err == nil {
+					// The .tool-version in the current directory has the highest priority,
+					// checking to see if the version information in the legacy file exists in the former,
+					//  and updating to the former record (Don’t fall into the file!) if it doesn't.
+					if version, err := sdk.ParseLegacyFile(path); err == nil && version != "" {
+						logger.Debugf("Found %s@%s in %s \n", sdkname, version, path)
+						output(sdkname, string(version))
+					}
+				}
+			}
+		}
+
+	}
+	return nil
 }
 
 func NewSdkManager() *Manager {

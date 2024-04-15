@@ -316,3 +316,39 @@ func TestCases(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeFunc(t *testing.T) {
+
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	t.Run("EncodeFunc", func(t *testing.T) {
+		testdata := struct {
+			Func1 func(*lua.LState) int
+			Func2 func(*lua.LState) int `luai:"f2"`
+		}{
+			Func1: lua.LGFunction(func(L *lua.LState) int {
+				L.Push(lua.LString("hello, world"))
+				return 1
+			}),
+			Func2: lua.LGFunction(func(L *lua.LState) int {
+				L.Push(lua.LString("good"))
+				return 1
+			}),
+		}
+		L := NewLuaVM()
+		defer L.Close()
+
+		table, err := Marshal(L.Instance, testdata)
+		if err != nil {
+			t.Fatalf("marshal map failed: %v", err)
+		}
+		L.Instance.SetGlobal("m", table)
+		if err := L.Instance.DoString(`
+				assert(m:Func1() == "hello, world")
+				assert(m:f2() == "good")
+		`); err != nil {
+			t.Errorf("map test failed: %v", err)
+		}
+	})
+}
