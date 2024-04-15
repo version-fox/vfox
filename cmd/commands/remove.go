@@ -23,9 +23,10 @@ import (
 )
 
 var Remove = &cli.Command{
-	Name:   "remove",
-	Usage:  "remove a plugin of sdk",
-	Action: removeCmd,
+	Name:     "remove",
+	Usage:    "Remove a plugin",
+	Action:   removeCmd,
+	Category: CategoryPlugin,
 }
 
 func removeCmd(ctx *cli.Context) error {

@@ -45,7 +45,8 @@ var Env = &cli.Command{
 			Usage:   "output json format",
 		},
 	},
-	Action: envCmd,
+	Action:   envCmd,
+	Category: CategorySDK,
 }
 
 func envCmd(ctx *cli.Context) error {

@@ -143,7 +143,7 @@ Invoke-Expression "$(vfox activate pwsh)"
 安装了[vfox](https://github.com/version-fox/vfox)后，你还做不了任何事情，您**需要先安装相应的插件**。
 
 ::: tip 注意
-如果你不知道添加哪个插件, 你可以使用 `vfox available` 命令查看所有可用插件。
+你可以使用 `vfox available` 命令查看所有可用插件。
 :::
 
 ```bash 
@@ -186,17 +186,23 @@ $ vfox install nodejs@21.5.0
 
 ### Global
 
-全局默认配置在`$HOME/.version-fox/.tool-versions`文件中进行管理。使用以下命令可以设置一个全局版本：
+**全局唯一**
 
+使用以下命令可以设置一个全局版本：
 ```shell
 $ vfox use -g nodejs
 ```
+
+::: tip
+默认配置在`$HOME/.version-fox/.tool-versions`文件中进行管理。
 
 `$HOME/.version-fox/.tool-versions` 文件内容将会如下所示：
 
 ```text
 nodejs 21.5.0
 ```
+:::
+
 
 ::: danger 执行之后不生效?
 请检查`$PATH`中, 是否存在**之前**通过其他方式安装的运行时!
@@ -210,23 +216,21 @@ nodejs 21.5.0
 3.如果你的`Path`中存在**之前**通过其他方式安装的运行时, 请手动删除!
 :::
 
-### Session
-
-该作用域生效范围为Shell会话。也就是说Shell之间不会共享版本。
-
-会话作用域被定义在`$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` 文件中（临时目录）。使用以下命令可以设置一个会话版本：
-
-```shell
-$ vfox use -s nodejs
-```
-
 ### Project
 
-项目作用域被定义在 `$PWD/.tool-versions` 文件中（当前工作目录）。通常，这将会是一个项目的 Git 存储库。当在你想要的目录执行：
+**不同项目不同版本**
 
 ```shell
 $ vfox use -p nodejs
 ```
+
+当你进入到一个目录时，`vfox` 会**自动检测该目录下是否存在 `.tool-versions` 文件**，如果存在，`vfox` 会**自动切换到该项目指定的版本**。
+
+::: tip
+
+配置放置在 `$PWD/.tool-versions` 文件中（当前工作目录）。
+
+:::
 
 ::: warning 默认作用域
 
@@ -236,6 +240,22 @@ $ vfox use -p nodejs
 
 对于**Unix-like**: 默认作用域为`Session`
 :::
+
+### Session
+
+**不同Shell不同版本**
+
+```shell
+$ vfox use -s nodejs
+```
+
+当前作用域的作用主要是满足**临时需求**，当你关闭当前终端时，`vfox` 会**自动切换回全局版本/项目版本**。
+
+::: tip
+默认配置在`$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` 文件中（临时目录）。
+:::
+
+
 
 ## 效果演示
 

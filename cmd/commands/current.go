@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
@@ -26,9 +27,10 @@ import (
 var Current = &cli.Command{
 	Name:      "current",
 	Aliases:   []string{"c"},
-	Usage:     "show current version of the targeted sdk",
-	UsageText: "show current version of all SDK's if no parameters are passed",
+	Usage:     "Show current version of the target SDK",
+	UsageText: "Show current version of all SDK's if no parameters are passed",
 	Action:    currentCmd,
+	Category:  CategorySDK,
 }
 
 func currentCmd(ctx *cli.Context) error {

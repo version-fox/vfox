@@ -28,7 +28,7 @@ const allFlag = "all"
 
 var Update = &cli.Command{
 	Name:  "update",
-	Usage: "update specified plug-ins, --all/-a to update all installed plug-ins",
+	Usage: "Update specified plugin, use --all/-a to update all installed plugins",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    allFlag,
@@ -36,7 +36,8 @@ var Update = &cli.Command{
 			Usage:   "all plugins flag",
 		},
 	},
-	Action: updateCmd,
+	Action:   updateCmd,
+	Category: CategoryPlugin,
 }
 
 func updateCmd(ctx *cli.Context) error {

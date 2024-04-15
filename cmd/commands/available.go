@@ -17,16 +17,18 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
-	"strings"
 )
 
 var Available = &cli.Command{
-	Name:   "available",
-	Usage:  "show available plugins",
-	Action: availableCmd,
+	Name:     "available",
+	Usage:    "Show all available plugins",
+	Action:   availableCmd,
+	Category: CategoryPlugin,
 }
 
 func availableCmd(ctx *cli.Context) error {

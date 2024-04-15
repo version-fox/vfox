@@ -17,16 +17,18 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
-	"strings"
 )
 
 var Install = &cli.Command{
-	Name:    "install",
-	Aliases: []string{"i"},
-	Usage:   "install a version of sdk",
-	Action:  installCmd,
+	Name:     "install",
+	Aliases:  []string{"i"},
+	Usage:    "Install a version of the target SDK",
+	Action:   installCmd,
+	Category: CategorySDK,
 }
 
 func installCmd(ctx *cli.Context) error {

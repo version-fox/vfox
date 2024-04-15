@@ -102,6 +102,12 @@ loop:
 		}
 	}
 	for _, s := range symlinks {
+		dir := filepath.Dir(s.newname)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+		}
 		if err = os.Symlink(s.oldname, s.newname); err != nil {
 			return err
 		}
@@ -171,6 +177,12 @@ loop:
 		}
 	}
 	for _, s := range symlinks {
+		dir := filepath.Dir(s.newname)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+		}
 		if err = os.Symlink(s.oldname, s.newname); err != nil {
 			return err
 		}
