@@ -569,10 +569,35 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 	return pluginRegistryAddress + "/" + uri
 }
 
+// UpdateConfigProxyEnable update config proxy enable
+func (m *Manager) UpdateConfigProxyEnable(enable bool) error {
+	m.Config.Proxy.Enable = enable
+	config.SaveConfig(m.Config)
+	return nil
+}
+
+// UpdateConfigProxyUrl update config proxy url
+func (m *Manager) UpdateConfigProxyUrl(url string) error {
+	if m.Config.Proxy.Url != url {
+		m.Config.Proxy.Url = url
+		config.SaveConfig(m.Config)
+	}
+	return nil
+}
+
 // UpdateConfigStorageSdkPath update config storage sdk path
 func (m *Manager) UpdateConfigStorageSdkPath(sdkPath string) error {
 	if sdkPath != "" && m.Config.Storage.SdkPath != sdkPath {
 		m.Config.Storage.SdkPath = sdkPath
+		config.SaveConfig(m.Config)
+	}
+	return nil
+}
+
+// UpdateRegistryAddress update config register address
+func (m *Manager) UpdateRegistryAddress(address string) error {
+	if m.Config.Registry.Address != address {
+		m.Config.Registry.Address = address
 		config.SaveConfig(m.Config)
 	}
 	return nil
