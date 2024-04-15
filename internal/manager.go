@@ -21,9 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pterm/pterm"
+	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
@@ -618,6 +618,10 @@ func (m *Manager) loadLegacyFileRecord() (*toolset.FileRecord, error) {
 
 // ParseLegacyFile parse legacy file and output the sdkname and version
 func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
+	// If the legacy version file is enabled, the legacy file will be parsed.
+	if !m.Config.LegacyVersionFile.Enable {
+		return nil
+	}
 	legacyFileRecord, err := m.loadLegacyFileRecord()
 	if err != nil {
 		return err

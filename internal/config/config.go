@@ -24,18 +24,20 @@ import (
 )
 
 type Config struct {
-	Proxy    *Proxy    `yaml:"proxy"`
-	Storage  *Storage  `yaml:"storage"`
-	Registry *Registry `yaml:"registry"`
+	Proxy             *Proxy             `yaml:"proxy"`
+	Storage           *Storage           `yaml:"storage"`
+	Registry          *Registry          `yaml:"registry"`
+	LegacyVersionFile *LegacyVersionFile `yaml:"legacyVersionFile"`
 }
 
 const filename = "config.yaml"
 
 var (
 	defaultConfig = &Config{
-		Proxy:    EmptyProxy,
-		Storage:  EmptyStorage,
-		Registry: EmptyRegistry,
+		Proxy:             EmptyProxy,
+		Storage:           EmptyStorage,
+		Registry:          EmptyRegistry,
+		LegacyVersionFile: EmptyLegacyVersionFile,
 	}
 )
 
@@ -64,6 +66,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Registry == nil {
 		config.Registry = EmptyRegistry
+	}
+	if config.LegacyVersionFile == nil {
+		config.LegacyVersionFile = EmptyLegacyVersionFile
 	}
 	return config, nil
 
