@@ -6,7 +6,8 @@
 如果你是首次运行`vfox`, 则会自动创建一个空的config.yaml文件。
 :::
 
-## 兼容版本文件
+## 兼容版本文件 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
 
 插件 **支持** 读取其他版本管理器的配置文件, 例如: Nodejs的`nvm`的`.nvmrc`文件, Java的`SDKMAN`的`.sdkmanrc`文件等。
 

@@ -203,7 +203,7 @@ function PLUGIN:PreUse(ctx)
 end
 ```
 
-### ParseLegacyFile
+### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 This hook is used to parse other configuration files to determine the version of the tool. For example, the
 `.nvmrc` file of `nvm`, the `.sdkmanrc` file of `SDKMAN`, etc.

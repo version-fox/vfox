@@ -7,7 +7,7 @@ file.
 If you use `vfox` for the first time, an empty `config.yaml` file will be created automatically.
 :::
 
-## Legacy Version File
+## Legacy Version File <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 Plugins **with support** can read the versions files used by other version managers,
 for example, `.nvmrc` in the case of Nodejs's `nvm`.

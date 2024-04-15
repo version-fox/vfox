@@ -21,12 +21,12 @@ and switch between different environment you need via the command line.
 ## Why use vfox?
 
 - **cross-platform support** (Windows, Linux, macOS)
-- single CLI for multiple languages
 - **consistent commands** to manage all your languages
 - support **Global**、**Project**、**Session** scopes when switching versions
 - simple **plugin system** to add support for your language of choice
 - **automatically switches** runtime versions as you traverse your project
-- shell completion available for common shells (Bash, ZSH, Powershell)
+- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
+- support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
   see [Comparison with asdf](https://vfox.lhan.me/misc/vs-asdf.html)
 

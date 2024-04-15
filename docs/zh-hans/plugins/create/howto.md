@@ -191,7 +191,7 @@ function PLUGIN:PreUse(ctx)
     }
 end
 ```
-### ParseLegacyFile
+### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 解析其他配置文件，以确定工具的版本。例如，`nvm` 的 `.nvmrc` 文件、`SDKMAN` 的 `.sdkmanrc` 文件等。
 
