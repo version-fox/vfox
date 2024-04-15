@@ -66,6 +66,7 @@ function sidebar(): DefaultTheme.Sidebar {
             text: '用法',
             items: [
                 {text: '核心', link: '/zh-hans/usage/core-commands'},
+                {text: '插件', link: '/zh-hans/usage/plugins-commands'},
                 {text: '所有命令', link: '/zh-hans/usage/all-commands'},
             ]
         },

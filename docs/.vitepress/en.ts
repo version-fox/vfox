@@ -58,6 +58,7 @@ function sidebar(): DefaultTheme.Sidebar {
             text: 'Usage',
             items: [
                 {text: 'Core', link: '/usage/core-commands'},
+                {text: 'Plugins', link: '/usage/plugins-commands'},
                 {text: 'All Commands', link: '/usage/all-commands'},
             ]
         },

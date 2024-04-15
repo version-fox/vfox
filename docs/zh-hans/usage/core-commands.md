@@ -1,46 +1,5 @@
 # 核心命令
 
-核心`vfox`命令很少， 下面列举的是最频繁使用的命令。
-
-## Available
-
-列举[索引仓库](https://github.com/version-fox/vfox-plugins)中所有可用的插件。
-
-**用法**
-```shell
-vfox available
-```
-
-## Add
-
-在 `vfox` 中，插件就是 SDK，而 SDK 就是插件。因此，在使用它们之前，您需要安装相应的插件。
-
-
-**用法**
-
-```shell
-vfox add [options] <plugin-name>
-```
-`plugin-name`: 插件名称， 如`nodejs`。
-
-**选项**
-- `-a, --alias`: 设置插件别名。
-- `-s, --source`: 安装指定路径下的插件（可以是远程文件也可以是本地文件）
-
-
-**例子**
-
-**安装仓库插件**
-```shell
-$ vfox add --alias node nodejs
-```
-
-**安装自定义插件**
-```shell
-$ vfox add --source  https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip custom-node
-```
-
-
 ## Search
 
 获取指定SDK所有可用的运行时版本。
@@ -130,3 +89,29 @@ vfox un <sdk-name>@<version>
 `sdk-name`: SDK名
 
 `version`: 具体版本号
+
+## List
+
+查看当前已安装的所有SDK版本。
+
+**用法**
+
+```shell
+vfox list [<sdk-name>]
+
+vfox ls[<sdk-name>]
+```
+
+`sdk-name`: SDK名称， 不传展示所有。
+
+## Current
+
+查看当前SDK的版本。
+
+
+**用法**
+
+```shell
+vfox current [<sdk-name>]
+vfox c
+```
