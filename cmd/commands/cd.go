@@ -52,6 +52,7 @@ func cdCmd(ctx *cli.Context) error {
 			cmd.Dir = sdkPackage.Main.Path
 		}
 	}
+	manager.Close()
 
 	return cmd.Run()
 }
