@@ -24,7 +24,7 @@ import (
 
 var Add = &cli.Command{
 	Name:  "add",
-	Usage: "Add plugins, use blank spaces separate the SDK name",
+	Usage: "Add a plugin or plugins",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -48,6 +48,7 @@ func addCmd(ctx *cli.Context) error {
 	var alias = ""
 	var err error
 
+	manager := internal.NewSdkManager()
 	for _, sdkName := range args.Slice() {
 		// only for when adding one plugin
 		if args.Len() == 1 {
@@ -55,17 +56,17 @@ func addCmd(ctx *cli.Context) error {
 			alias = ctx.String("alias")
 		}
 
-		manager := internal.NewSdkManager()
 		err = manager.Add(sdkName, source, alias)
 		if err != nil {
 			errStr += err.Error() + "\r\n"
 			continue
 		}
-		manager.Close()
 	}
+	manager.Close()
 	if errStr != "" {
 		err = errors.New(errStr)
+		return err
 	}
 
-	return err
+	return nil
 }
