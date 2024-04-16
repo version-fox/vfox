@@ -5,7 +5,7 @@ use `require("vfox.archiver")` to access it.
 
 **Usage**
 
-```shell
+```lua
 local archiver = require("vfox.archiver")
 local err = archiver.decompress("testdata/test.zip", "testdata/test")
 ```
