@@ -219,7 +219,7 @@ func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 	if !b.checkExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get local sdk info, err:%w", err)
 	}
@@ -264,7 +264,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -304,7 +304,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	var multiToolVersion toolset.MultiToolVersions
 	if scope == Global {
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -382,7 +382,7 @@ func (b *Sdk) List() []Version {
 func (b *Sdk) getLocalSdkPackages() []*Package {
 	var infos []*Package
 	for _, version := range b.List() {
-		info, err := b.getLocalSdkPackage(version)
+		info, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			continue
 		}
@@ -426,7 +426,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -450,7 +450,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -472,7 +472,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	}
 }
 
-func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
+func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	versionPath := b.VersionPath(version)
 	mainSdk := &Info{
 		Name:    b.Plugin.Name,
