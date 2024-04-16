@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-var CD = &cli.Command{
+var Cd = &cli.Command{
 	Name:  "cd",
 	Usage: "Launch a shell in the VFOX_HOME or SDK directory",
 	Flags: []cli.Flag{
