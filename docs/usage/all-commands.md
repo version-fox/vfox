@@ -13,5 +13,6 @@ vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
+vfox config [<key>] [<value>]       Setup, view config
 vfox help                      Show this help message
 ```

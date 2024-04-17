@@ -16,7 +16,7 @@ var Config = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "list",
 			Aliases: []string{"l"},
-			Usage:   "list all",
+			Usage:   "list all config",
 		},
 		&cli.BoolFlag{
 			Name:    "unset",
@@ -77,7 +77,7 @@ func configList(prefix string, v reflect.Value) {
 }
 
 func configGet(v reflect.Value, keys []string) {
-	var foundTimes int
+	var foundCount int
 	for _, key := range keys {
 		if v.Kind() == reflect.Ptr {
 			v = v.Elem()
@@ -85,12 +85,12 @@ func configGet(v reflect.Value, keys []string) {
 		for i := 0; i < v.NumField(); i++ {
 			if v.Type().Field(i).Tag.Get("yaml") == key {
 				v = v.Field(i)
-				foundTimes = foundTimes + 1
+				foundCount = foundCount + 1
 				break
 			}
 		}
 	}
-	if foundTimes == len(keys) {
+	if foundCount == len(keys) {
 		if (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct) || v.Kind() == reflect.Struct {
 			configList(strings.Join(keys, ".")+".", v)
 		} else {

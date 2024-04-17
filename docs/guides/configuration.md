@@ -20,11 +20,12 @@ legacyVersionFile:
 ```
 
 ::: warning
+
 1. If both `.tool-versions` and other version manager's configuration files (`.nvmrc`, `.sdkmanrc`, etc.) exist in the
    directory, `vfox` **priority read** the `.tool-versions` file.
 2. Enabling this feature may cause `vfox` to refresh environment variables slightly slower, **please enable it according
    to your needs**.
-:::
+   :::
 
 ## Proxy Settings
 
@@ -61,7 +62,7 @@ If you want to use **your own registry or third-party mirror registry**, please 
 
 ```yaml
 registry:
-  address: 'https://vfox-plugins.lhan.me'
+  address: "https://vfox-plugins.lhan.me"
 ```
 
 ::: tip Available Mirrors
@@ -69,3 +70,25 @@ registry:
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
+
+## Config Command
+
+Setup, view config
+
+**Usage**
+
+```shell
+vfox config [<key>] [<value>]
+
+vfox config proxy.enable true
+vfox config proxy.url http://localhost:7890
+vfox config storage.sdkPath /tmp
+```
+
+`key`：Configuration item, separated by `. `.
+`value`：If not passed, look at the value of the configuration item.
+
+**Options**
+
+- `-l, --list`: list all config.
+- `-un, --unset`: remove a config.
