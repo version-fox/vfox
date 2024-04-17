@@ -231,12 +231,25 @@ func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 }
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
+	installedSdks := b.getLocalSdkPackages()
 	if !b.Plugin.HasFunction("PreUse") {
 		logger.Debug("plugin does not have PreUse function")
+		installedVersions := make(util.VersionSort, 0, len(installedSdks))
+		for _, sdk := range installedSdks {
+			installedVersions = append(installedVersions, string(sdk.Main.Version))
+		}
+		sort.Sort(installedVersions)
+		prefix := string(version) + "."
+		for _, v := range installedVersions {
+			if strings.HasPrefix(v, prefix) {
+				version = Version(v)
+				break
+			}
+		}
 		return version, nil
 	}
 
-	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
 	if err != nil {
 		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
 	}
