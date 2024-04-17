@@ -110,9 +110,9 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
-## Cd
+## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
-在 VFOX_HOME 或 SDK 目录下启动 shell。
+在 `VFOX_HOME` 或 SDK 目录下启动 shell。
 
 **用法**
 
@@ -120,7 +120,7 @@ vfox c
 vfox cd [options] [<sdk-name>]
 ```
 
-`sdk-name`: SDK 名称, 不传默认为 VFOX_HOME.
+`sdk-name`: SDK 名称, 不传默认为 `VFOX_HOME`.
 
 **选项**
 

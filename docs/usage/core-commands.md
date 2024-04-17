@@ -110,9 +110,9 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
-## Cd
+## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
-Launch a shell in the VFOX_HOME or SDK directory.
+Launch a shell in the `VFOX_HOME` or SDK directory.
 
 **Usage**
 
@@ -120,7 +120,7 @@ Launch a shell in the VFOX_HOME or SDK directory.
 vfox cd [options] [<sdk-name>]
 ```
 
-`sdk-name`: SDK name, if not passed, default VFOX_HOME.
+`sdk-name`: SDK name, if not passed, default `VFOX_HOME`.
 
 **Options**
 
