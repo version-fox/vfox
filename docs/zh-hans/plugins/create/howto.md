@@ -195,7 +195,7 @@ end
 
 ## 向官方插件存储库提交插件
 
-vfox可以允许自定义安装插件，比如`vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip `, --alias and --source 不支持多个插件安装.
+vfox可以允许自定义安装插件，比如`vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip `, `--alias` 和 `--source` 不支持在安装多个插件时使用。
 
 为了使你的用户更轻松，你可以将插件添加到官方插件存储库中，以列出你的插件并使用较短的命令轻松安装，比如 `vfox add nodejs`。
 

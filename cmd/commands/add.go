@@ -48,14 +48,14 @@ func addCmd(ctx *cli.Context) error {
 	var alias = ""
 	var err error
 
+	if args.Len() == 1 {
+		source = ctx.String("source")
+		alias = ctx.String("alias")
+	}
+
 	manager := internal.NewSdkManager()
 	for _, sdkName := range args.Slice() {
 		// only for when adding one plugin
-		if args.Len() == 1 {
-			source = ctx.String("source")
-			alias = ctx.String("alias")
-		}
-
 		err = manager.Add(sdkName, source, alias)
 		if err != nil {
 			errStr += err.Error() + "\r\n"
