@@ -240,7 +240,7 @@ func (m *Manager) Update(pluginName string) error {
 						return err
 					}
 					if util.CompareVersion(du.Version, sdk.Plugin.Version) <= 0 {
-						pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+						pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
 						return nil
 					}
 					downloadUrl = du.DownloadUrl
@@ -265,9 +265,8 @@ func (m *Manager) Update(pluginName string) error {
 		_ = os.RemoveAll(tempPlugin.Path)
 		tempPlugin.Close()
 	}()
-	pterm.Println("Comparing plugin version...")
 	if util.CompareVersion(tempPlugin.Version, sdk.Plugin.Version) <= 0 {
-		pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+		pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
 		return nil
 	}
 	success := false
@@ -305,21 +304,16 @@ func (m *Manager) Update(pluginName string) error {
 		}
 	}
 	success = true
-	// print some notes if there are
-	if len(tempPlugin.Notes) != 0 {
-		fmt.Println(pterm.LightYellow("Notes:"))
-		for _, note := range tempPlugin.Notes {
-			fmt.Println("  -", note)
-		}
-	}
-	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(tempPlugin.Version))
+
+	tempPlugin.ShowNotes()
+
+	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.Green(pluginName), pterm.Blue(tempPlugin.Version))
 
 	return nil
 }
 
 // fetchPluginManifest fetch plugin from registry by manifest url
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
-	fmt.Println("Fetching plugin manifest...")
 	resp, err := m.HttpClient().Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
@@ -378,7 +372,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	fmt.Printf("Downloading %s... \n", downloadUrl)
+	fmt.Printf("Downloading %s... \n", filepath.Base(downloadUrl))
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
 		return "", err
@@ -448,13 +442,8 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	pterm.Println("Homepage", "->", pterm.LightBlue(tempPlugin.Homepage))
 	pterm.Println("Desc    ", "->", pterm.LightBlue(tempPlugin.Description))
 
-	// print some notes if there are
-	if len(tempPlugin.Notes) != 0 {
-		fmt.Println(pterm.LightYellow("Notes:"))
-		for _, note := range tempPlugin.Notes {
-			fmt.Println("  ", note)
-		}
-	}
+	tempPlugin.ShowNotes()
+
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
 	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
