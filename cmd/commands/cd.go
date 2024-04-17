@@ -2,11 +2,11 @@ package commands
 
 import (
 	"fmt"
-	"github.com/twpayne/go-shell"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shell"
 	"os"
-	"os/exec"
 )
 
 var Cd = &cli.Command{
@@ -23,15 +23,11 @@ var Cd = &cli.Command{
 }
 
 func cdCmd(ctx *cli.Context) error {
-	userShell, _ := shell.CurrentUserShell()
-	cmd := exec.Command(userShell)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var dir string
 
 	manager := internal.NewSdkManager()
 	if ctx.Args().Len() == 0 {
-		cmd.Dir = manager.PathMeta.HomePath
+		dir = manager.PathMeta.HomePath
 	} else {
 		sdkName := ctx.Args().First()
 		sdk, err := manager.LookupSdk(sdkName)
@@ -39,7 +35,7 @@ func cdCmd(ctx *cli.Context) error {
 			return err
 		}
 		if ctx.Bool("plugin") {
-			cmd.Dir = sdk.Plugin.Path
+			dir = sdk.Plugin.Path
 		} else {
 			current := sdk.Current()
 			if current == "" {
@@ -49,10 +45,14 @@ func cdCmd(ctx *cli.Context) error {
 			if err != nil {
 				return err
 			}
-			cmd.Dir = sdkPackage.Main.Path
+			dir = sdkPackage.Main.Path
 		}
 	}
 	manager.Close()
 
-	return cmd.Run()
+	err := os.Chdir(dir)
+	if err != nil {
+		return err
+	}
+	return shell.GetProcess().Open(env.GetPid())
 }
