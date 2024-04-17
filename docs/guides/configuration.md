@@ -85,8 +85,8 @@ vfox config proxy.url http://localhost:7890
 vfox config storage.sdkPath /tmp
 ```
 
-`key`：Configuration item, separated by `. `.
-`value`：If not passed, look at the value of the configuration item.
+`key`: Configuration item, separated by `. `.
+`value`: If not passed, look at the value of the configuration item.
 
 **Options**
 

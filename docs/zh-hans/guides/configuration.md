@@ -88,5 +88,5 @@ vfox config storage.sdkPath /tmp
 
 **选项**
 
-- `-l, --list`: 列出所有配置。
-- `-un, --unset`: 删除一个配置。
+- `-l, --list`：列出所有配置。
+- `-un, --unset`：删除一个配置。
