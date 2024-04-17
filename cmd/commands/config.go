@@ -22,6 +22,7 @@ import (
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/logger"
 	"strconv"
+	"strings"
 )
 
 var example string = `
@@ -121,7 +122,28 @@ func configCmd(ctx *cli.Context) error {
 		manager.Config.Registry = config.EmptyRegistry
 		config.SaveConfig(manager.Config)
 	} else {
-		logger.Error("vfox config, you do not input any command or flag!")
+		first := ctx.Args().First()
+		if strings.Contains(first, "=") {
+			command := strings.Split(first, "=")
+			manager := internal.NewSdkManager()
+			defer manager.Close()
+
+			switch command[0] {
+			case "proxy.enable":
+				manager.Config.Proxy.Enable = config.EmptyProxy.Enable
+			case "proxy.url":
+
+				manager.Config.Proxy.Url = config.EmptyProxy.Url
+			case "storage.sdk-path":
+				manager.Config.Storage.SdkPath = config.EmptyStorage.SdkPath
+			case "registry.address":
+				manager.Config.Registry.Address = config.EmptyRegistry.Address
+			}
+
+			config.SaveConfig(manager.Config)
+		} else {
+			logger.Error("vfox config, you do not input any command or flag!")
+		}
 	}
 	return nil
 }
