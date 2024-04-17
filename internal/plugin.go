@@ -51,6 +51,7 @@ var (
 		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
+		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 	}
 )
 
