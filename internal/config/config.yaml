@@ -7,3 +7,6 @@ storage:
 
 registry:
   address: "https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins"
+
+legacyVersionFile:
+  enable: true

@@ -1,49 +1,5 @@
 # Core
 
-`vfox` has a few core commands that are used frequently. The following are the most frequently used commands.
-
-## Available
-
-View all available plugins. 
-
-**Usage**
-
-```shell
-vfox available 
-```
-
-## Add
-
-Add a plugin from the official repository or a custom source. In `vfox`, a plugin is an SDK, and an SDK is a plugin.
-Therefore, before using them, you need to install the corresponding plugin.
-
-**Usage**
-
-```shell
-vfox add [options] <plugin-name>
-```
-
-`plugin-name`: Plugin name, such as `nodejs`.
-
-**Options**
-
-- `-a, --alias`: Set the plugin alias.
-- `-s, --source`: Install the plugin from the specified path (can be a remote file or a local file).
-
-**Examples**
-
-**Install plugin from the official repository**
-
-```shell
-$ vfox add --alias node nodejs
-```
-
-**Install custom plugin**
-
-```shell
-$ vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip custom-node
-```
-
 ## Search
 
 View for all available versions of the specified SDK.
@@ -81,8 +37,7 @@ vfox i <sdk-name>@<version>
 
 `version`: The version to install
 
-
-::: tip 
+::: tip
 `search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
 :::
 
@@ -115,8 +70,6 @@ vfox u [options] <sdk-name>[@<version>]
 `Unix-like`: `Session` scope
 :::
 
-
-
 ## Uninstall
 
 Uninstall the specified version of the SDK.
@@ -131,3 +84,44 @@ vfox un <sdk-name>@<version>
 `sdk-name`: SDK name
 
 `version`: The specific version number
+
+## List
+
+View all installed sdks.
+
+**Usage**
+
+```shell
+vfox list [<sdk-name>]
+
+vfox ls [<sdk-name>]
+```
+
+`sdk-name`: SDK name, if not passed, display all.
+
+## Current
+
+View the current version of the SDK.
+
+**Usage**
+
+```shell
+vfox current [<sdk-name>]
+vfox c
+```
+
+## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+Launch a shell in the `VFOX_HOME` or SDK directory.
+
+**Usage**
+
+```shell
+vfox cd [options] [<sdk-name>]
+```
+
+`sdk-name`: SDK name, if not passed, default `VFOX_HOME`.
+
+**Options**
+
+- `-p, --plugin`: Launch a shell in the plugin directory.

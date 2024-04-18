@@ -5,7 +5,7 @@ functionality encapsulated. You can use `require("html")` to access it, for exam
 
 
 **Usage**
-```shell
+```lua
 local html = require("html")
 local doc = html.parse("<html><body><div id='t2' name='123'>456</div><div>222</div></body></html>")
 local s = doc:find("div"):eq(1)

@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
@@ -45,11 +46,12 @@ type HookFunc struct {
 var (
 	// HookFuncMap is a map of built-in hook functions.
 	HookFuncMap = map[string]HookFunc{
-		"Available":   {Name: "Available", Required: true, Filename: "available"},
-		"PreInstall":  {Name: "PreInstall", Required: true, Filename: "pre_install"},
-		"EnvKeys":     {Name: "EnvKeys", Required: true, Filename: "env_keys"},
-		"PostInstall": {Name: "PostInstall", Required: false, Filename: "post_install"},
-		"PreUse":      {Name: "PreUse", Required: false, Filename: "pre_use"},
+		"Available":       {Name: "Available", Required: true, Filename: "available"},
+		"PreInstall":      {Name: "PreInstall", Required: true, Filename: "pre_install"},
+		"EnvKeys":         {Name: "EnvKeys", Required: true, Filename: "env_keys"},
+		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
+		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
+		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
 	}
 )
 
@@ -291,7 +293,7 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 		ctx.InstalledSdks[string(lSdk.Version)] = lSdk
 	}
 
-	logger.Debugf("PreUseHookCtx: %+v", ctx)
+	logger.Debugf("PreUseHookCtx: %+v \n", ctx)
 
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
@@ -320,12 +322,78 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	return Version(result.Version), nil
 }
 
+func (l *LuaPlugin) ParseLegacyFile(path string, installedVersions func() []Version) (Version, error) {
+	if len(l.LegacyFilenames) == 0 {
+		return "", nil
+	}
+	if !l.HasFunction("ParseLegacyFile") {
+		return "", nil
+	}
+
+	L := l.vm.Instance
+
+	filename := filepath.Base(path)
+
+	ctx := ParseLegacyFileHookCtx{
+		Filepath: path,
+		Filename: filename,
+		GetInstalledVersions: func(L *lua.LState) int {
+			versions := installedVersions()
+			logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
+			table, err := luai.Marshal(L, versions)
+			if err != nil {
+				L.RaiseError(err.Error())
+				return 0
+			}
+			L.Push(table)
+			return 1
+		},
+	}
+
+	logger.Debugf("ParseLegacyFile: %+v \n", ctx)
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if err = l.CallFunction("ParseLegacyFile", ctxTable); err != nil {
+		return "", err
+	}
+
+	table := l.vm.ReturnedValue()
+	if table == nil || table.Type() == lua.LTNil {
+		return "", nil
+	}
+
+	result := &ParseLegacyFileResult{}
+
+	if err := luai.Unmarshal(table, result); err != nil {
+		return "", err
+	}
+
+	return Version(result.Version), nil
+
+}
+
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	logger.Debugf("CallFunction: %s\n", funcName)
 	if err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), append([]lua.LValue{l.pluginObj}, args...)...); err != nil {
 		return err
 	}
 	return nil
+}
+
+// ShowNotes prints the notes of the plugin.
+func (l *LuaPlugin) ShowNotes() {
+	// print some notes if there are
+	if len(l.Notes) != 0 {
+		fmt.Println(pterm.Yellow("Notes:"))
+		fmt.Println("======")
+		for _, note := range l.Notes {
+			fmt.Println("  ", note)
+		}
+	}
 }
 
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.

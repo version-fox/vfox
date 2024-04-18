@@ -1,72 +1,5 @@
 # All Commands
 
-## List
-
-View all installed sdks.
-
-**Usage**
-
-```shell
-vfox list [<sdk-name>]
-
-vfox ls[<sdk-name>]
-```
-
-`sdk-name`: SDK name, if not passed, display all.
-
-## Current
-
-View the current version of the SDK.
-
-
-**Usage**
-
-```shell
-vfox current [<sdk-name>]
-vfox c
-```
-
-
-
-## Info
-
-View the SDK information installed locally.
-
-**Usage**
-
-```shell
-vfox info <sdk-name>
-```
-
-## Remove
-
-Remove the installed plugin.
-
-**Usage**
-
-```shell
-vfox remove <sdk-name>
-```
-
-::: danger
-`vfox` will remove all versions of the runtime installed by the current plugin.
-:::
-
-
-
-## Update
-
-Update a specified or all plugin(s)
-
-**Usage**
-
-```shell
-vfox update <sdk-name>
-vfox update --all # update all installed plugins
-```
-
-## Overview
-
 ```shell
 vfox - VersionFox, a tool for sdk version management
 vfox available List all available plugins
@@ -80,5 +13,6 @@ vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
+vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
 vfox help                      Show this help message
 ```

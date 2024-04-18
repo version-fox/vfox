@@ -4,7 +4,7 @@ Based on [gopher-json](https://github.com/layeh/gopher-json/)
 
 
 **Usage**
-```shell
+```lua
 local json = require("json")
 
 local obj = { "a", 1, "b", 2, "c", 3 }

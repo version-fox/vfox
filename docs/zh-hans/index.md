@@ -31,8 +31,11 @@ features:
     details: "简单的API, 添加新工具的支持变得轻而易举！"
     icon: 🔌
   - title: "Shells"
-    details: "支持 Powershell、Bash、ZSH和Fish，并提供补全功能。"
+    details: "支持 Powershell、Bash、ZSH、Fish和Clink，并提供补全功能。"
     icon: 🐚
+  - title: 向后兼容
+    details: "支持从现有配置文件.nvmrc、.node-version、.sdkmanrc平滑迁移！"
+    icon: ⏮
   - title: "一个配置文件"
     details: "一个可共享的 .tool-versions 配置文件管理所有工具、运行环境及其版本。"
     icon: 📄

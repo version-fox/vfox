@@ -219,7 +219,7 @@ func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 	if !b.checkExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get local sdk info, err:%w", err)
 	}
@@ -264,7 +264,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -304,7 +304,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	var multiToolVersion toolset.MultiToolVersions
 	if scope == Global {
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -382,7 +382,7 @@ func (b *Sdk) List() []Version {
 func (b *Sdk) getLocalSdkPackages() []*Package {
 	var infos []*Package
 	for _, version := range b.List() {
-		info, err := b.getLocalSdkPackage(version)
+		info, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			continue
 		}
@@ -411,6 +411,12 @@ func (b *Sdk) Current() Version {
 	return Version(current[b.Plugin.SdkName])
 }
 
+func (b *Sdk) ParseLegacyFile(path string) (Version, error) {
+	return b.Plugin.ParseLegacyFile(path, func() []Version {
+		return b.List()
+	})
+}
+
 func (b *Sdk) Close() {
 	b.Plugin.Close()
 }
@@ -420,7 +426,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -444,7 +450,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -466,7 +472,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	}
 }
 
-func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
+func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	versionPath := b.VersionPath(version)
 	mainSdk := &Info{
 		Name:    b.Plugin.Name,
@@ -585,10 +591,15 @@ func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
 }
 
-func NewSdk(manager *Manager, source *LuaPlugin) (*Sdk, error) {
+// NewSdk creates a new SDK instance.
+func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
+	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
+	}
 	return &Sdk{
 		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(source.SdkName)),
-		Plugin:      source,
+		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
+		Plugin:      luaPlugin,
 	}, nil
 }
