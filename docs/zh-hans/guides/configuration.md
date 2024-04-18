@@ -69,7 +69,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## Config 命令
+## Config 命令 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 设置，查看配置
 
