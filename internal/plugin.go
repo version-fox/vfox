@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
@@ -381,6 +382,18 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 		return err
 	}
 	return nil
+}
+
+// ShowNotes prints the notes of the plugin.
+func (l *LuaPlugin) ShowNotes() {
+	// print some notes if there are
+	if len(l.Notes) != 0 {
+		fmt.Println(pterm.Yellow("Notes:"))
+		fmt.Println("======")
+		for _, note := range l.Notes {
+			fmt.Println("  ", note)
+		}
+	}
 }
 
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.

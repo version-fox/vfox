@@ -34,7 +34,7 @@ const parseGitHubUrl = (url) => {
 
 </script>
 
-# Available Plguins
+# Available Plugins
 
 > Current listed plugins are all from the [Registry](https://github.com/version-fox/vfox-plugins)
 

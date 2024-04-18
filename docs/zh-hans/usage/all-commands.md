@@ -14,5 +14,6 @@ vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specifi
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox config [<key>] [<value>]       Setup, view config
+vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
 vfox help                      Show this help message
 ```
