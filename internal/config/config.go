@@ -78,3 +78,12 @@ func NewConfig(path string) (*Config, error) {
 	p := filepath.Join(path, filename)
 	return NewConfigWithPath(p)
 }
+
+func (c *Config) SaveConfig(path string) error {
+	p := filepath.Join(path, filename)
+	content, err := yaml.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(p, content, 0644)
+}
