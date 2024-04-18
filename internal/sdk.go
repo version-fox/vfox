@@ -232,8 +232,15 @@ func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 	installedSdks := b.getLocalSdkPackages()
-	if !b.Plugin.HasFunction("PreUse") {
-		logger.Debug("plugin does not have PreUse function")
+	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
+	if err != nil {
+		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
+	}
+
+	// If the plugin does not return a version, it means that the plugin does
+	// not want to change the version or not implement the PreUse function.
+	// We can simply fuzzy match the version based on the input version.
+	if newVersion == "" {
 		installedVersions := make(util.VersionSort, 0, len(installedSdks))
 		for _, sdk := range installedSdks {
 			installedVersions = append(installedVersions, string(sdk.Main.Version))
@@ -242,21 +249,10 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 		prefix := string(version) + "."
 		for _, v := range installedVersions {
 			if strings.HasPrefix(v, prefix) {
-				version = Version(v)
+				newVersion = Version(v)
 				break
 			}
 		}
-		return version, nil
-	}
-
-	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
-	if err != nil {
-		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
-	}
-
-	// If the plugin does not return a version, it means that the plugin does not want to change the version.
-	if newVersion == "" {
-		return version, nil
 	}
 
 	return newVersion, nil

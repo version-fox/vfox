@@ -277,6 +277,11 @@ func (l *LuaPlugin) HasFunction(name string) bool {
 }
 
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
+	if !l.HasFunction("PreUse") {
+		logger.Debug("plugin does not have PreUse function")
+		return "", nil
+	}
+
 	L := l.vm.Instance
 
 	ctx := PreUseHookCtx{
@@ -297,10 +302,6 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
 		return "", err
-	}
-
-	if !l.HasFunction("PreUse") {
-		return "", nil
 	}
 
 	if err = l.CallFunction("PreUse", ctxTable); err != nil {
