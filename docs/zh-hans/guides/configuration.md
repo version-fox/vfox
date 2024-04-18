@@ -6,6 +6,24 @@
 如果你是首次运行`vfox`, 则会自动创建一个空的config.yaml文件。
 :::
 
+## 兼容版本文件 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+
+插件 **支持** 读取其他版本管理器的配置文件, 例如: Nodejs的`nvm`的`.nvmrc`文件, Java的`SDKMAN`的`.sdkmanrc`文件等。
+
+此能力**默认是关闭的**, 如果你想开启, 请按照以下方式配置:
+
+```yaml
+legacyVersionFile:
+  enable: true
+```
+
+::: warning
+1. 如果目录里同时存在`.tool-versions`和其他版本管理器的配置文件(`.nvmrc`, `.sdkmanrc`等),
+`vfox` **优先加载**`.tool-versions`文件.
+2. 开启此功能可能会导致`vfox`刷新环境变量时略微变慢, **请根据自己的需求开启**。
+:::
+
 ## 代理设置
 
 ::: tip 注意
@@ -45,7 +63,8 @@ registry:
 ```
 
 ::: tip 可用镜像
+
 - https://gitee.com/version-fox/vfox-plugins/raw/main/plugins
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
-:::
+  :::

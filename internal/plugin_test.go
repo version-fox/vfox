@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/version-fox/vfox/internal/util"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -113,6 +114,10 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 		if plugin.MinRuntimeVersion != "0.2.2" {
 			t.Errorf("expected min runtime version '0.2.2', got '%s'", plugin.MinRuntimeVersion)
 		}
+		if !reflect.DeepEqual(plugin.LegacyFilenames, []string{".node-version", ".nvmrc"}) {
+			t.Errorf("expected legacy filenames '.node-version', '.nvmrc', got '%s'", plugin.LegacyFilenames)
+		}
+
 		for _, hf := range HookFuncMap {
 			if !plugin.HasFunction(hf.Name) && hf.Required {
 				t.Errorf("expected to have function %s", hf.Name)
@@ -287,5 +292,37 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 		if version != "1.0.0" {
 			t.Errorf("expected version '1.0.0', got '%s'", version)
 		}
+	})
+
+	t.Run("ParseLegacyFile", func(t *testing.T) {
+		plugin, err := factory()
+		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if version != "14.17.0" {
+			t.Errorf("expected version '14.17.0', got '%s'", version)
+		}
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if version != "0.0.1" {
+			t.Errorf("expected version '0.0.1', got '%s'", version)
+		}
+		plugin.LegacyFilenames = []string{}
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+			return nil
+		})
+		if err != nil && version != "" {
+			t.Errorf("expected non version, got '%s'", version)
+		}
+
 	})
 }

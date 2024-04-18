@@ -1,12 +1,8 @@
 package toolset
 
 import (
-	"bufio"
 	"fmt"
-	"github.com/version-fox/vfox/internal/util"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 const filename = ".tool-versions"
@@ -43,57 +39,19 @@ func (m MultiToolVersions) Save() error {
 	return nil
 }
 
+// ToolVersion represents a .tool-versions file
 type ToolVersion struct {
-	// Sdks sdkName -> version
-	Record map[string]string
-	path   string
-}
-
-func (t *ToolVersion) Save() error {
-	if len(t.Record) == 0 {
-		return nil
-	}
-	file, err := os.Create(t.path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for k, v := range t.Record {
-		_, err := fmt.Fprintf(file, "%s %s\n", k, v)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	*FileRecord
 }
 
 func NewToolVersion(dirPath string) (*ToolVersion, error) {
 	file := filepath.Join(dirPath, filename)
-	versionsMap := make(map[string]string)
-	if util.FileExists(file) {
-		file, err := os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			parts := strings.Split(line, " ")
-			if len(parts) == 2 {
-				versionsMap[parts[0]] = parts[1]
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return nil, err
-		}
+	mapFile, err := NewFileRecord(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tool versions file %s: %w", file, err)
 	}
 	return &ToolVersion{
-		Record: versionsMap,
-		path:   file,
+		FileRecord: mapFile,
 	}, nil
 }
 

@@ -17,11 +17,15 @@
 package http
 
 import (
+	"fmt"
+	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 )
 
 type Module struct {
@@ -51,6 +55,7 @@ func (m *Module) Get(L *lua.LState) int {
 	if urlStr == lua.LNil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("url is required"))
+		return 2
 	}
 
 	req, err := http.NewRequest("GET", urlStr.String(), nil)
@@ -102,6 +107,7 @@ func (m *Module) Head(L *lua.LState) int {
 	if urlStr == lua.LNil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("url is required"))
+		return 2
 	}
 
 	req, err := http.NewRequest("HEAD", urlStr.String(), nil)
@@ -124,6 +130,8 @@ func (m *Module) Head(L *lua.LState) int {
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
+	defer resp.Body.Close()
+
 	headers := L.NewTable()
 	for k, v := range resp.Header {
 		if len(v) > 0 {
@@ -138,10 +146,96 @@ func (m *Module) Head(L *lua.LState) int {
 	return 1
 }
 
+// DownloadFile performs a http get request to write stream to a file.
+// @param url string
+// @param headers table
+// @return err string
+// local http = require("http")
+//
+//		http.download_file({
+//		    url = "http://ip.jsontest.com/"
+//	     headers = {}
+//		}, "/usr/path/file/") return error
+func (m *Module) DownloadFile(L *lua.LState) int {
+	param := L.CheckTable(1)
+	fp := L.CheckString(2)
+	if fp == "" {
+		L.Push(lua.LString("filepath is required"))
+		return 1
+	}
+	urlStr := param.RawGetString("url")
+	if urlStr == lua.LNil {
+		L.Push(lua.LString("url is required"))
+		return 1
+	}
+
+	req, err := http.NewRequest("GET", urlStr.String(), nil)
+	if err != nil {
+		L.Push(lua.LString(err.Error()))
+		return 1
+	}
+	headersTable := param.RawGetString("headers")
+	if headersTable != lua.LNil {
+		if table, ok := headersTable.(*lua.LTable); ok {
+			table.ForEach(func(key lua.LValue, value lua.LValue) {
+				req.Header.Add(key.String(), value.String())
+			})
+		}
+	}
+	resp, err := m.client.Do(req)
+	if err != nil {
+		L.Push(lua.LString(err.Error()))
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		L.Push(lua.LString("file not found"))
+		return 1
+	}
+	out, err := os.Create(fp)
+	if err != nil {
+		L.Push(lua.LString(err.Error()))
+		return 1
+	}
+	defer out.Close()
+
+	desc := "Downloading..."
+	if filepath.Ext(urlStr.String()) != "" {
+		desc = filepath.Base(urlStr.String())
+	}
+
+	bar := progressbar.NewOptions64(
+		resp.ContentLength,
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionOnCompletion(func() {
+			fmt.Fprintf(os.Stderr, "\n")
+		}),
+		progressbar.OptionSetDescription(desc),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+	)
+	defer bar.Close()
+	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
+	if err != nil {
+		L.Push(lua.LString(err.Error()))
+		return 1
+	}
+	return 0
+}
+
 func (m *Module) luaMap() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
-		"get":  m.Get,
-		"head": m.Head,
+		"get":           m.Get,
+		"head":          m.Head,
+		"download_file": m.DownloadFile,
 	}
 }
 

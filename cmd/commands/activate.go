@@ -45,14 +45,27 @@ func activateCmd(ctx *cli.Context) error {
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	tvs, err := toolset.NewMultiToolVersions([]string{
-		manager.PathMeta.HomePath,
-		manager.PathMeta.WorkingDirectory,
-	})
+
+	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
 	if err != nil {
 		return err
 	}
-	envKeys, err := manager.EnvKeys(tvs)
+
+	if err = manager.ParseLegacyFile(func(sdkname, version string) {
+		if _, ok := workToolVersion.Record[sdkname]; !ok {
+			workToolVersion.Record[sdkname] = version
+		}
+	}); err != nil {
+		return err
+	}
+	homeToolVersion, err := toolset.NewToolVersion(manager.PathMeta.HomePath)
+	if err != nil {
+		return err
+	}
+	envKeys, err := manager.EnvKeys(toolset.MultiToolVersions{
+		workToolVersion,
+		homeToolVersion,
+	})
 	if err != nil {
 		return err
 	}

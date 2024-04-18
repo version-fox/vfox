@@ -1,14 +1,5 @@
 # Create a Plugin
 
-Plugins are the core of `vfox`. The plugin is the SDK, and the SDK is the plugin.
-
-Use `Lua` script to provide the `vfox` plugin. The advantage of this method is:
-
-- Low cost of plugin development; only need to have a basic understanding of Lua syntax.
-- Decoupled from the platform; plugins can run on any platform, just put the plugin file in the specified directory.
-- Plugins can be customized, shared, and used by others.
-- The plugin can be shared with others.
-
 ## What's in the plugin?
 
 The directory structure is as follows:
@@ -40,6 +31,19 @@ The directory structure is as follows:
 ::: warning Plugin template
 To facilitate the development of plugins, we provide a plugin template that you can use directly [vfox-plugin-template](https://github.com/version-fox/vfox-plugin-template) to develop a plugin.
 :::
+
+## Hooks Overview
+
+The full list of hooks callable from vfox.
+
+| Hook                                            | **Required** | Description                                                                     |
+|:------------------------------------------------|:-------------|:--------------------------------------------------------------------------------|
+| [hooks/available.lua](#available)               | ✅            | List all available versions                                                     |
+| [hooks/pre_install.lua](#preinstall)            | ✅            | Parse version and return pre-installation information                           |
+| [hooks/env_keys.lua](#envkeys)                  | ✅            | Configure environment variables                                                 |
+| [hooks/post_install.lua](#postinstall)          | ❌            | Execute additional operations after install, such as compiling source code, etc |
+| [hooks/pre_use.lua](#preuse)                    | ❌            | An opportunity to change the version before using it                            |
+| [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌            | Custom parser for legacy version files                                          |
 
 ## Required hook functions
 
@@ -195,6 +199,40 @@ function PLUGIN:PreUse(ctx)
     --- return the version information
     return {
         version = version,
+    }
+end
+```
+
+### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+This hook is used to parse other configuration files to determine the version of the tool. For example, the
+`.nvmrc` file of `nvm`, the `.sdkmanrc` file of `SDKMAN`, etc.
+
+
+::: danger
+This hook must be used with the `legacyFilenames` configuration item to tell `vfox` which files your plugin can parse.
+:::
+
+**location**: `metadata.lua`
+```lua 
+--- The list of legacy file names that the current plugin supports parsing, such as: .nvmrc, .node-version, .sdkmanrc
+PLUGIN.legacyFilenames = {
+    '.nvmrc',
+    '.node-version',
+}
+```
+
+**location**: `hooks/parse_legacy_file.lua`
+```lua 
+function PLUGIN:ParseLegacyFile(ctx)
+    local filename = ctx.filename
+    local filepath = ctx.filepath
+    --- Get the list of versions of the current plugin installed
+    local versions = ctx:getInstalledVersions()
+
+    return {
+        --- need to return the specific version
+        version = "x.y.z"
     }
 end
 ```

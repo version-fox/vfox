@@ -4,7 +4,7 @@
 For example:
 
 **Usage**
-```shell
+```lua
 local strings = require("vfox.strings")
 local str_parts = strings.split("hello world", " ")
 print(str_parts[1]) -- hello
