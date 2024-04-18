@@ -109,7 +109,10 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	sdk, _ := NewSdk(m, pluginPath)
+	sdk, err := NewSdk(m, pluginPath)
+	if err != nil {
+		return nil, err
+	}
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }

@@ -45,10 +45,11 @@ func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
 		content, err := yaml.Marshal(defaultConfig)
 		if err == nil {
-			_ = os.WriteFile(p, content, 0644)
+			_ = os.WriteFile(p, content, os.ModePerm)
 			return defaultConfig, nil
 		}
 	}
+	_ = util.ChangeModeIfNot(p, os.ModePerm)
 	content, err := os.ReadFile(p)
 	if err != nil {
 		return nil, err
@@ -85,5 +86,5 @@ func (c *Config) SaveConfig(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, content, 0644)
+	return os.WriteFile(p, content, os.ModePerm)
 }
