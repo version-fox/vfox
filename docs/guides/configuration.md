@@ -71,7 +71,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## Config Command
+## Config Command <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 Setup, view config
 
