@@ -63,10 +63,6 @@ Invoke-Expression "$(vfox activate pwsh)"
 ```bash 
 $ vfox add nodejs
 ```
-或者同时增加多个SDK插件
-```bash
-$ vfox add nodejs golang
-```
 
 #### 4. 安装运行时
 
