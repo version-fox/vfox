@@ -51,7 +51,7 @@ type Sdk struct {
 
 func (b *Sdk) Install(version Version) error {
 	label := b.label(version)
-	if b.checkExists(version) {
+	if b.CheckExists(version) {
 		return fmt.Errorf("%s is already installed", label)
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
@@ -86,7 +86,7 @@ func (b *Sdk) Install(version Version) error {
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
 	label = b.label(mainSdk.Version)
-	if b.checkExists(mainSdk.Version) {
+	if b.CheckExists(mainSdk.Version) {
 		return fmt.Errorf("%s is already installed", label)
 	}
 	var installedSdkInfos []*Info
@@ -194,7 +194,7 @@ func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 
 func (b *Sdk) Uninstall(version Version) error {
 	label := b.label(version)
-	if !b.checkExists(version) {
+	if !b.CheckExists(version) {
 		pterm.Printf("%s is not installed...\n", pterm.Red(label))
 		return fmt.Errorf("%s is not installed", label)
 	}
@@ -216,7 +216,7 @@ func (b *Sdk) Available(args []string) ([]*Package, error) {
 
 func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 	label := b.label(version)
-	if !b.checkExists(version) {
+	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
 	sdkPackage, err := b.GetLocalSdkPackage(version)
@@ -258,7 +258,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	}
 
 	label := b.label(version)
-	if !b.checkExists(version) {
+	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", label)
 	}
 
@@ -403,7 +403,7 @@ func (b *Sdk) Current() Version {
 		return ""
 	}
 	current := toolVersion.FilterTools(func(name, version string) bool {
-		return name == b.Plugin.SdkName && b.checkExists(Version(version))
+		return name == b.Plugin.SdkName && b.CheckExists(Version(version))
 	})
 	if len(current) == 0 {
 		return ""
@@ -516,7 +516,7 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	}, nil
 }
 
-func (b *Sdk) checkExists(version Version) bool {
+func (b *Sdk) CheckExists(version Version) bool {
 	return util.FileExists(b.VersionPath(version))
 }
 
