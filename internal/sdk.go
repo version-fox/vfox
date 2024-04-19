@@ -19,7 +19,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/toolset"
 	"io"
 	"net"
 	"net/http"
@@ -31,12 +30,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
-
-	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -62,6 +61,13 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("no information about the current version")
 	}
 	mainSdk := installInfo.Main
+
+	// A second check is required because the plug-in may change the version number,
+	// for example, latest is resolved to a specific version number.
+	label = b.label(mainSdk.Version)
+	if b.checkExists(mainSdk.Version) {
+		return fmt.Errorf("%s is already installed", label)
+	}
 	success := false
 	newDirPath := b.VersionPath(mainSdk.Version)
 
@@ -83,12 +89,6 @@ func (b *Sdk) Install(version Version) error {
 			_ = os.RemoveAll(newDirPath)
 		}
 	}()
-	// A second check is required because the plug-in may change the version number,
-	// for example, latest is resolved to a specific version number.
-	label = b.label(mainSdk.Version)
-	if b.checkExists(mainSdk.Version) {
-		return fmt.Errorf("%s is already installed", label)
-	}
 	var installedSdkInfos []*Info
 	path, err := b.preInstallSdk(mainSdk, newDirPath)
 	if err != nil {
