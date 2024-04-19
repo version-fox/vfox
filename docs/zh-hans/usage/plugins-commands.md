@@ -20,21 +20,27 @@ vfox available
 **用法**
 
 ```shell
-vfox add [options] <plugin-name>
+vfox add [options] <plugin-name> [<plugin-name2>...]
 ```
-`plugin-name`: 插件名称， 如`nodejs`。
+`plugin-name`: 插件名称， 如`nodejs`。可以同时安装多个插件, 用空格分隔。
 
 **选项**
 - `-a, --alias`: 设置插件别名。
 - `-s, --source`: 安装指定路径下的插件（可以是远程文件也可以是本地文件）
 
+::: warning 注意
+`--alias` 和 `--source` 不支持在安装多个插件时使用。
+:::
 
 **例子**
 
 **安装仓库插件**
 ```shell
 $ vfox add --alias node nodejs
+
+$ vfox add golang java nodejs
 ```
+
 
 **安装自定义插件**
 ```shell

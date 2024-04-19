@@ -17,13 +17,14 @@
 package commands
 
 import (
+	"errors"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 )
 
 var Add = &cli.Command{
 	Name:  "add",
-	Usage: "Add a plugin",
+	Usage: "Add a plugin or plugins",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -41,10 +42,30 @@ var Add = &cli.Command{
 
 // addCmd is the command to add a plugin of sdk
 func addCmd(ctx *cli.Context) error {
+	args := ctx.Args()
+	var errStr = ""
+	var source = ""
+	var alias = ""
+	var err error
+
+	if args.Len() == 1 {
+		source = ctx.String("source")
+		alias = ctx.String("alias")
+	}
+
 	manager := internal.NewSdkManager()
-	defer manager.Close()
-	sdkName := ctx.Args().First()
-	source := ctx.String("source")
-	alias := ctx.String("alias")
-	return manager.Add(sdkName, source, alias)
+	for _, sdkName := range args.Slice() {
+		err = manager.Add(sdkName, source, alias)
+		if err != nil {
+			errStr += err.Error() + "\r\n"
+			continue
+		}
+	}
+	manager.Close()
+	if errStr != "" {
+		err = errors.New(errStr)
+		return err
+	}
+
+	return nil
 }
