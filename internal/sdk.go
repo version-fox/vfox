@@ -195,8 +195,7 @@ func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 func (b *Sdk) Uninstall(version Version) error {
 	label := b.label(version)
 	if !b.checkExists(version) {
-		pterm.Printf("%s is not installed...\n", pterm.Red(label))
-		return fmt.Errorf("%s is not installed", label)
+		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
 	if b.Current() == version {
 		b.clearEnvConfig(version)
