@@ -384,14 +384,6 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
-func (m *Manager) pluginExist(name, alias string) bool {
-	pname := name
-	if len(alias) > 0 {
-		pname = alias
-	}
-	return util.FileExists(filepath.Join(m.PathMeta.PluginPath, pname))
-}
-
 // Add a plugin to plugin home directory
 // 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
 // 2. If the plugin is a custom plugin, install the plugin from the specified URL.
