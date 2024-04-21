@@ -92,6 +92,8 @@ end
 function PLUGIN:Available(ctx)
     --- 用户输入附带的参数, 数组
     local args = ctx.args
+    --- 插件的名称（别名）
+    local name = ctx.name
     return {
         {
             version = "xxxx",

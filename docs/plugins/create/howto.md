@@ -101,6 +101,8 @@ list. If there is no version, return an empty array.
 function PLUGIN:Available(ctx)
     --- input parameters, array
     local args = ctx.args
+    --- plugin name or alias if used
+    local name = ctx.name
     return {
         {
             version = "xxxx",
