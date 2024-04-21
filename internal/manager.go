@@ -384,6 +384,24 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+func (m *Manager) pluginExist(name, alias string) bool {
+	pname := name
+	if len(alias) > 0 {
+		pname = alias
+	}
+	return util.FileExists(filepath.Join(m.PathMeta.PluginPath, pname))
+}
+
+// Add a plugin to plugin home directory
+// 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
+// 2. If the plugin is a custom plugin, install the plugin from the specified URL.
+// 3. Validate the plugin and install it to the plugin home directory.
+// examples:
+//
+//	vfox add nodejs
+//	vfox add --alias node nodejs
+//	vfox add --source /path/to/plugin.zip
+//	vfox add --source /path/to/plugin.zip --alias node [nodejs]
 func (m *Manager) Add(pluginName, url, alias string) error {
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
 	if strings.Contains(pluginName, "/") {
@@ -394,11 +412,14 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if len(alias) > 0 {
 		pname = alias
 	}
-	installPath := filepath.Join(m.PathMeta.PluginPath, pname)
-	if util.FileExists(installPath) {
-		return fmt.Errorf("plugin named %s already exists", pname)
+	var installPath string
+	// first quick check.
+	if pname != "" {
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
 	}
-
 	// official plugin
 	if len(url) == 0 {
 		fmt.Printf("Fetching %s manifest... \n", pterm.Green(pluginName))
@@ -416,6 +437,14 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		_ = os.RemoveAll(tempPlugin.Path)
 		tempPlugin.Close()
 	}()
+	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
+	if pname == "" {
+		pname = tempPlugin.Name
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
+	}
 	if err = os.Rename(tempPlugin.Path, installPath); err != nil {
 		return fmt.Errorf("install plugin error: %w", err)
 	}

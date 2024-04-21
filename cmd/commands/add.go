@@ -17,7 +17,8 @@
 package commands
 
 import (
-	"errors"
+	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 )
@@ -43,29 +44,22 @@ var Add = &cli.Command{
 // addCmd is the command to add a plugin of sdk
 func addCmd(ctx *cli.Context) error {
 	args := ctx.Args()
-	var errStr = ""
-	var source = ""
-	var alias = ""
-	var err error
-
-	if args.Len() == 1 {
-		source = ctx.String("source")
-		alias = ctx.String("alias")
-	}
 
 	manager := internal.NewSdkManager()
-	for _, sdkName := range args.Slice() {
-		err = manager.Add(sdkName, source, alias)
-		if err != nil {
-			errStr += err.Error() + "\r\n"
-			continue
-		}
-	}
-	manager.Close()
-	if errStr != "" {
-		err = errors.New(errStr)
-		return err
-	}
+	defer manager.Close()
 
-	return nil
+	// multiple plugins
+	if args.Len() > 1 {
+		for index, sdkName := range args.Slice() {
+			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), args.Len(), pterm.Green(sdkName))
+			if err := manager.Add(sdkName, "", ""); err != nil {
+				pterm.Println(fmt.Sprintf("Add plugin(%s) failed: %s", pterm.Red(sdkName), err.Error()))
+			}
+		}
+		return nil
+	} else {
+		source := ctx.String("source")
+		alias := ctx.String("alias")
+		return manager.Add(args.First(), source, alias)
+	}
 }
