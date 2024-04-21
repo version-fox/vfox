@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -52,6 +53,7 @@ func (c *LuaCheckSum) Checksum() *Checksum {
 
 type AvailableHookCtx struct {
 	Args []string `luai:"args"`
+	Name string   `luai:"name"`
 }
 
 type AvailableHookResultItem struct {
