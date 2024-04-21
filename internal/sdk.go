@@ -597,7 +597,7 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 }
 
 func (b *Sdk) label(version Version) string {
-	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.SdkName), version)
 }
 
 // NewSdk creates a new SDK instance.
