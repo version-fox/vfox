@@ -20,13 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/toolset"
-	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"net"
 	"net/http"
@@ -35,6 +28,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/pterm/pterm"
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const (
@@ -109,7 +110,10 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	sdk, _ := NewSdk(m, pluginPath)
+	sdk, err := NewSdk(m, pluginPath)
+	if err != nil {
+		return nil, err
+	}
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
@@ -380,22 +384,38 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+// Add a plugin to plugin home directory
+// 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
+// 2. If the plugin is a custom plugin, install the plugin from the specified URL.
+// 3. Validate the plugin and install it to the plugin home directory.
+// examples:
+//
+//	vfox add nodejs
+//	vfox add --alias node nodejs
+//	vfox add --source /path/to/plugin.zip
+//	vfox add --source /path/to/plugin.zip --alias node [nodejs]
 func (m *Manager) Add(pluginName, url, alias string) error {
+	// For compatibility with older versions of plugin names <category>/<plugin-name>
+	if strings.Contains(pluginName, "/") {
+		pluginName = strings.Split(pluginName, "/")[1]
+	}
 	pluginPath := url
+	pname := pluginName
+	if len(alias) > 0 {
+		pname = alias
+	}
+	var installPath string
+	// first quick check.
+	if pname != "" {
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
+	}
 	// official plugin
 	if len(url) == 0 {
-		pname := pluginName
-		// For compatibility with older versions of plugin names <category>/<plugin-name>
-		if strings.Contains(pluginName, "/") {
-			pname = strings.Split(pluginName, "/")[1]
-		}
-
-		installPath := filepath.Join(m.PathMeta.PluginPath, pname)
-		if util.FileExists(installPath) {
-			return fmt.Errorf("plugin %s already exists", pname)
-		}
-
-		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pname + ".json"))
+		fmt.Printf("Fetching %s manifest... \n", pterm.Green(pluginName))
+		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pluginName + ".json"))
 		if err != nil {
 			return err
 		}
@@ -409,14 +429,13 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		_ = os.RemoveAll(tempPlugin.Path)
 		tempPlugin.Close()
 	}()
-	// set alias name
-	pname := tempPlugin.Name
-	if len(alias) > 0 {
-		pname = alias
-	}
-	installPath := filepath.Join(m.PathMeta.PluginPath, pname)
-	if util.FileExists(installPath) {
-		return fmt.Errorf("plugin %s already exists", pname)
+	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
+	if pname == "" {
+		pname = tempPlugin.Name
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
 	}
 	if err = os.Rename(tempPlugin.Path, installPath); err != nil {
 		return fmt.Errorf("install plugin error: %w", err)

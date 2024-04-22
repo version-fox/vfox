@@ -83,3 +83,18 @@ func MoveFiles(src, targetDir string) error {
 	}
 	return nil
 }
+
+// ChangeModeIfNot Change the permission mode of a file if it is not the same as the specified mode
+func ChangeModeIfNot(src string, mode os.FileMode) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.Mode() != mode {
+		err = os.Chmod(src, mode)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
