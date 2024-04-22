@@ -2,7 +2,7 @@
 
 
 function PLUGIN:PreUninstall(ctx)
-    local mainPath = ctx.path
+    printTable(ctx)
     local mainSdkInfo = ctx.main
     local mpath = mainSdkInfo.path
     local mversion = mainSdkInfo.version
@@ -11,5 +11,4 @@ function PLUGIN:PreUninstall(ctx)
     local path = sdkInfo.path
     local version = sdkInfo.version
     local name = sdkInfo.name
-
 end

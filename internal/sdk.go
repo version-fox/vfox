@@ -192,7 +192,7 @@ func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 	}
 }
 
-func (b *Sdk) Uninstall(version Version) error {
+func (b *Sdk) Uninstall(version Version) (err error) {
 	label := b.label(version)
 	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
@@ -201,12 +201,21 @@ func (b *Sdk) Uninstall(version Version) error {
 		b.clearEnvConfig(version)
 	}
 	path := b.VersionPath(version)
-	err := os.RemoveAll(path)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
-		return err
+		return
+	}
+	// Give the plugin a chance before actually uninstalling targeted version.
+	err = b.Plugin.PreUninstall(sdkPackage)
+	if err != nil {
+		return
+	}
+	err = os.RemoveAll(path)
+	if err != nil {
+		return
 	}
 	pterm.Printf("Uninstalled %s successfully!\n", label)
-	return nil
+	return
 }
 
 func (b *Sdk) Available(args []string) ([]*Package, error) {
