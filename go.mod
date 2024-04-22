@@ -6,6 +6,7 @@ require (
 	atomicgo.dev/cursor v0.2.0
 	atomicgo.dev/keyboard v0.2.9
 	github.com/PuerkitoBio/goquery v1.9.1
+	github.com/bodgit/sevenzip v1.5.1
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/pterm/pterm v0.12.79
 	github.com/schollz/progressbar/v3 v3.14.2
@@ -22,7 +23,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
-	github.com/bodgit/sevenzip v1.5.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
