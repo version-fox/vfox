@@ -95,7 +95,7 @@ Our future plans and high priority features and enhancements are:
   - Establishing a global registry (similar to `NPM Registry` or `Scoop Main Bucket`) to provide a unified entry point for plugin distribution.
   - Decomposing the existing plugin repository into individual repositories, one for each plugin.
 - [X] Allowing the switching of registry addresses.
-- [ ] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
+- [X] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
 - [ ] Plugin capabilities: Allowing plugins to load installed runtimes and provide information about the runtime.
 
 ## Available Plugins
