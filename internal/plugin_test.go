@@ -325,4 +325,31 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 		}
 
 	})
+
+	t.Run("PreUninstall", func(t *testing.T) {
+		plugin, err := factory()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = plugin.PreUninstall(&Package{
+			Main: &Info{
+				Name:    "java",
+				Version: "1.0.0",
+				Path:    "/path/to/java",
+				Note:    "xxxx",
+			},
+			Additions: []*Info{
+				{
+					Name:    "sdk-name",
+					Version: "9.0.0",
+					Path:    "/path/to/sdk",
+					Note:    "xxxx",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }

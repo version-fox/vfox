@@ -52,6 +52,7 @@ var (
 		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
+		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 	}
 )
 
@@ -375,6 +376,36 @@ func (l *LuaPlugin) ParseLegacyFile(path string, installedVersions func() []Vers
 
 	return Version(result.Version), nil
 
+}
+
+// PreUninstall executes the PreUninstall hook function.
+func (l *LuaPlugin) PreUninstall(p *Package) error {
+	if !l.HasFunction("PreUninstall") {
+		logger.Debug("plugin does not have PreUninstall function")
+		return nil
+	}
+
+	L := l.vm.Instance
+
+	ctx := &PreUninstallHookCtx{
+		Main:    p.Main,
+		SdkInfo: make(map[string]*Info),
+	}
+	logger.Debugf("PreUninstallHookCtx: %+v \n", ctx)
+
+	for _, v := range p.Additions {
+		ctx.SdkInfo[v.Name] = v
+	}
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return err
+	}
+
+	if err = l.CallFunction("PreUninstall", ctxTable); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
