@@ -45,9 +45,15 @@ func updateCmd(ctx *cli.Context) error {
 	defer manager.Close()
 	if ctx.Bool(allFlag) {
 		if sdks, err := manager.LoadAllSdk(); err == nil {
+			var (
+				index int
+				total = len(sdks)
+			)
 			for sdk := range sdks {
+				index++
+				pterm.Printf("[%s/%d]: Updating %s plugin...\n", pterm.Green(index), total, pterm.Green(sdk))
 				if err = manager.Update(sdk); err != nil {
-					pterm.Println(fmt.Sprintf("update plugin(%s) failed, %s", sdk, err.Error()))
+					pterm.Println(fmt.Sprintf("Update plugin(%s) failed, %s", sdk, err.Error()))
 				}
 			}
 		} else {

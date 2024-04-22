@@ -20,15 +20,20 @@ Add a plugin from the official repository or a custom source.
 **Usage**
 
 ```shell
-vfox add [options] <plugin-name>
+vfox add [options] <plugin-name> [<plugin-name2>...]
 ```
 
-`plugin-name`: Plugin name, such as `nodejs`.
+`plugin-name`: Plugin name, such as `nodejs`. You can install multiple plugins at once, separated by spaces.
 
 **Options**
 
 - `-a, --alias`: Set the plugin alias.
 - `-s, --source`: Install the plugin from the specified path (can be a remote file or a local file).
+
+
+::: warning
+`--alias` and `--source` are not supported when adding multiple plugins.
+:::
 
 **Examples**
 
@@ -36,6 +41,8 @@ vfox add [options] <plugin-name>
 
 ```shell
 $ vfox add --alias node nodejs
+
+$ vfox add golang java nodejs
 ```
 
 **Install custom plugin**

@@ -20,13 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/toolset"
-	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"net"
 	"net/http"
@@ -35,6 +28,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/pterm/pterm"
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 )
 
 var (
-	manifestNotFound = errors.New("manifest not found")
+	ManifestNotFound = errors.New("manifest not found")
 )
 
 type NotFoundError struct {
@@ -109,7 +110,10 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	sdk, _ := NewSdk(m, pluginPath)
+	sdk, err := NewSdk(m, pluginPath)
+	if err != nil {
+		return nil, err
+	}
 	m.openSdks[strings.ToLower(name)] = sdk
 	return sdk, nil
 }
@@ -127,7 +131,7 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 				Show(); result {
 
 				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
-				if errors.Is(err, manifestNotFound) {
+				if errors.Is(err, ManifestNotFound) {
 					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
 				}
 
@@ -232,7 +236,7 @@ func (m *Manager) Update(pluginName string) error {
 		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, address)
 		registryManifest, err := m.fetchPluginManifest(address)
 		if err != nil {
-			if errors.Is(err, manifestNotFound) {
+			if errors.Is(err, ManifestNotFound) {
 				if sdk.Plugin.ManifestUrl != "" {
 					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, sdk.Plugin.ManifestUrl)
 					du, err := m.fetchPluginManifest(sdk.Plugin.ManifestUrl)
@@ -240,7 +244,7 @@ func (m *Manager) Update(pluginName string) error {
 						return err
 					}
 					if util.CompareVersion(du.Version, sdk.Plugin.Version) <= 0 {
-						pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+						pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
 						return nil
 					}
 					downloadUrl = du.DownloadUrl
@@ -265,9 +269,8 @@ func (m *Manager) Update(pluginName string) error {
 		_ = os.RemoveAll(tempPlugin.Path)
 		tempPlugin.Close()
 	}()
-	pterm.Println("Comparing plugin version...")
 	if util.CompareVersion(tempPlugin.Version, sdk.Plugin.Version) <= 0 {
-		pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+		pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
 		return nil
 	}
 	success := false
@@ -305,28 +308,23 @@ func (m *Manager) Update(pluginName string) error {
 		}
 	}
 	success = true
-	// print some notes if there are
-	if len(tempPlugin.Notes) != 0 {
-		fmt.Println(pterm.LightYellow("Notes:"))
-		for _, note := range tempPlugin.Notes {
-			fmt.Println("  -", note)
-		}
-	}
-	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.LightGreen(pluginName), pterm.LightBlue(tempPlugin.Version))
+
+	tempPlugin.ShowNotes()
+
+	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.Green(pluginName), pterm.Blue(tempPlugin.Version))
 
 	return nil
 }
 
 // fetchPluginManifest fetch plugin from registry by manifest url
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
-	fmt.Println("Fetching plugin manifest...")
 	resp, err := m.HttpClient().Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, manifestNotFound
+		return nil, ManifestNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch manifest error, status code: %d", resp.StatusCode)
@@ -378,7 +376,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	fmt.Printf("Downloading %s... \n", downloadUrl)
+	fmt.Printf("Downloading %s... \n", filepath.Base(downloadUrl))
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
 		return "", err
@@ -386,22 +384,38 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+// Add a plugin to plugin home directory
+// 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
+// 2. If the plugin is a custom plugin, install the plugin from the specified URL.
+// 3. Validate the plugin and install it to the plugin home directory.
+// examples:
+//
+//	vfox add nodejs
+//	vfox add --alias node nodejs
+//	vfox add --source /path/to/plugin.zip
+//	vfox add --source /path/to/plugin.zip --alias node [nodejs]
 func (m *Manager) Add(pluginName, url, alias string) error {
+	// For compatibility with older versions of plugin names <category>/<plugin-name>
+	if strings.Contains(pluginName, "/") {
+		pluginName = strings.Split(pluginName, "/")[1]
+	}
 	pluginPath := url
+	pname := pluginName
+	if len(alias) > 0 {
+		pname = alias
+	}
+	var installPath string
+	// first quick check.
+	if pname != "" {
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
+	}
 	// official plugin
 	if len(url) == 0 {
-		pname := pluginName
-		// For compatibility with older versions of plugin names <category>/<plugin-name>
-		if strings.Contains(pluginName, "/") {
-			pname = strings.Split(pluginName, "/")[1]
-		}
-
-		installPath := filepath.Join(m.PathMeta.PluginPath, pname)
-		if util.FileExists(installPath) {
-			return fmt.Errorf("plugin %s already exists", pname)
-		}
-
-		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pname + ".json"))
+		fmt.Printf("Fetching %s manifest... \n", pterm.Green(pluginName))
+		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pluginName + ".json"))
 		if err != nil {
 			return err
 		}
@@ -415,14 +429,13 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		_ = os.RemoveAll(tempPlugin.Path)
 		tempPlugin.Close()
 	}()
-	// set alias name
-	pname := tempPlugin.Name
-	if len(alias) > 0 {
-		pname = alias
-	}
-	installPath := filepath.Join(m.PathMeta.PluginPath, pname)
-	if util.FileExists(installPath) {
-		return fmt.Errorf("plugin %s already exists", pname)
+	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
+	if pname == "" {
+		pname = tempPlugin.Name
+		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		if util.FileExists(installPath) {
+			return fmt.Errorf("plugin named %s already exists", pname)
+		}
 	}
 	if err = os.Rename(tempPlugin.Path, installPath); err != nil {
 		return fmt.Errorf("install plugin error: %w", err)
@@ -448,13 +461,8 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	pterm.Println("Homepage", "->", pterm.LightBlue(tempPlugin.Homepage))
 	pterm.Println("Desc    ", "->", pterm.LightBlue(tempPlugin.Description))
 
-	// print some notes if there are
-	if len(tempPlugin.Notes) != 0 {
-		fmt.Println(pterm.LightYellow("Notes:"))
-		for _, note := range tempPlugin.Notes {
-			fmt.Println("  ", note)
-		}
-	}
+	tempPlugin.ShowNotes()
+
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
 	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
