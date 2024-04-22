@@ -254,7 +254,7 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 			installedVersions = append(installedVersions, string(sdk.Main.Version))
 		}
 		sort.Sort(installedVersions)
-		prefix := string(version) + "."
+		prefix := string(version)
 		for _, v := range installedVersions {
 			if strings.HasPrefix(v, prefix) {
 				newVersion = Version(v)
