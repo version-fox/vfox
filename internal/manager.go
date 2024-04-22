@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	manifestNotFound = errors.New("manifest not found")
+	ManifestNotFound = errors.New("manifest not found")
 )
 
 type NotFoundError struct {
@@ -131,7 +131,7 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 				Show(); result {
 
 				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
-				if errors.Is(err, manifestNotFound) {
+				if errors.Is(err, ManifestNotFound) {
 					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
 				}
 
@@ -236,7 +236,7 @@ func (m *Manager) Update(pluginName string) error {
 		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, address)
 		registryManifest, err := m.fetchPluginManifest(address)
 		if err != nil {
-			if errors.Is(err, manifestNotFound) {
+			if errors.Is(err, ManifestNotFound) {
 				if sdk.Plugin.ManifestUrl != "" {
 					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, sdk.Plugin.ManifestUrl)
 					du, err := m.fetchPluginManifest(sdk.Plugin.ManifestUrl)
@@ -324,7 +324,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, manifestNotFound
+		return nil, ManifestNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch manifest error, status code: %d", resp.StatusCode)

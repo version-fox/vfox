@@ -37,6 +37,10 @@ vfox i <sdk-name>@<version>
 
 `version`: The version to install
 
+**Options**
+
+- `-a, --all`: Install all SDK versions recorded in .tool-versions
+
 ::: tip
 `search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
 :::

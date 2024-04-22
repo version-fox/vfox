@@ -37,6 +37,10 @@ vfox i <sdk-name>@<version>
 
 `version`: 需要安装的版本号
 
+**选项**
+
+- `-a, --all`: 安装 .tool-versions 中记录的所有 SDK 版本
+
 ::: tip 自动安装
 如果本地没有安装 SDK，`install`命令会从远端仓库检索插件并安装到本地。
 :::
@@ -120,7 +124,7 @@ vfox c
 vfox cd [options] [<sdk-name>]
 ```
 
-`sdk-name`: SDK 名称, 不传默认为 `VFOX_HOME`.
+`sdk-name`: SDK 名称, 不传默认为 `VFOX_HOME`。
 
 **选项**
 
