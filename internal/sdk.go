@@ -256,6 +256,10 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 		sort.Sort(installedVersions)
 		prefix := string(version)
 		for _, v := range installedVersions {
+			if prefix == v {
+				newVersion = Version(v)
+				break
+			}
 			if strings.HasPrefix(v, prefix) {
 				newVersion = Version(v)
 				break
