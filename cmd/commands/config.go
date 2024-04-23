@@ -69,11 +69,7 @@ func configList(prefix string, v reflect.Value) {
 		if (value.Kind() == reflect.Ptr && value.Elem().Kind() == reflect.Struct) || value.Kind() == reflect.Struct {
 			configList(prefix+key+".", value)
 		} else {
-			if value.Kind() == reflect.String && value.IsZero() {
-				fmt.Println(prefix + key + ` = ""`)
-			} else {
-				fmt.Printf(prefix+key+" = %v\n", value.Interface())
-			}
+			fmt.Printf(prefix+key+" = %v\n", value.Interface())
 		}
 	}
 }
