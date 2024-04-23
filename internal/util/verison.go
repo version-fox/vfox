@@ -36,8 +36,8 @@ func (s VersionSort) Less(i, j int) bool {
 }
 
 func CompareVersion(v1, v2 string) int {
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
+	parts1 := strings.FieldsFunc(v1, split)
+	parts2 := strings.FieldsFunc(v2, split)
 
 	len1 := len(parts1)
 	len2 := len(parts2)
@@ -72,4 +72,8 @@ func CompareVersion(v1, v2 string) int {
 
 	// If all parts are equal
 	return 0
+}
+
+func split(r rune) bool {
+	return r == '.' || r == '+' || r == '-'
 }
