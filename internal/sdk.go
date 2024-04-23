@@ -253,7 +253,7 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 		for _, sdk := range installedSdks {
 			installedVersions = append(installedVersions, string(sdk.Main.Version))
 		}
-		sort.Sort(installedVersions)
+		sort.Sort(sort.Reverse(installedVersions))
 		prefix := string(version)
 		for _, v := range installedVersions {
 			if prefix == v {
