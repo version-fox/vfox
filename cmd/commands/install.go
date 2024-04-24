@@ -25,7 +25,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -85,8 +84,7 @@ func installCmd(ctx *cli.Context) error {
 
 			err = source.Install(version)
 			if errors.Is(err, internal.ErrNoVersionProvided) {
-				// show prompt to let user select version
-				showAvailable := printer.Promptf("No %s version provided, do you want to select a version to install?", name)
+				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", name))
 				if showAvailable {
 					RunSearch(name, []string{})
 					continue
@@ -100,12 +98,10 @@ func installCmd(ctx *cli.Context) error {
 		}
 	}
 
-	if errorStore.HasError() {
-		notes := errorStore.GetNotes()
-		if (len(notes)) == 1 {
-			return fmt.Errorf("failed to install %s", notes[0])
-		}
-
+	notes := errorStore.GetNotes()
+	if (len(notes)) == 1 {
+		return fmt.Errorf("failed to install %s", notes[0])
+	} else if len(notes) > 1 {
 		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(errorStore.GetNotes(), ", "))
 	}
 
