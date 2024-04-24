@@ -17,6 +17,8 @@
 package http
 
 import (
+	"github.com/version-fox/vfox/internal/util"
+	"os"
 	"runtime"
 	"testing"
 
@@ -78,6 +80,27 @@ func TestHeadRequest(t *testing.T) {
 	assert(resp.content_length ~= 0)
 	`
 	eval(str, t)
+}
+
+func TestDownloadFile(t *testing.T) {
+	const str = `
+	local http = require("http")
+	assert(type(http) == "table")
+	assert(type(http.get) == "function")
+	local err = http.download_file({
+        url = "https://vfox-plugins.lhan.me/index.json"
+    }, "index.json")
+	assert(err == nil, [[must be nil]] )
+	local err = http.download_file({
+        url = "https://vfox-plugins.lhan.me/xxx.json"
+    }, "xxx.json")
+	assert(err == "file not found")
+	`
+	defer os.Remove("index.json")
+	eval(str, t)
+	if !util.FileExists("index.json") {
+		t.Error("file not exists")
+	}
 }
 
 func eval(str string, t *testing.T) {

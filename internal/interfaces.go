@@ -168,6 +168,11 @@ type ParseLegacyFileResult struct {
 	Version string `luai:"version"`
 }
 
+type PreUninstallHookCtx struct {
+	Main    *Info            `luai:"main"`
+	SdkInfo map[string]*Info `luai:"sdkInfo"`
+}
+
 type LuaPluginInfo struct {
 	Name              string   `luai:"name"`
 	Version           string   `luai:"version"`

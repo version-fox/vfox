@@ -30,14 +30,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/version-fox/vfox/internal/toolset"
-
+	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
-
-	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -52,7 +50,7 @@ type Sdk struct {
 
 func (b *Sdk) Install(version Version) error {
 	label := b.label(version)
-	if b.checkExists(version) {
+	if b.CheckExists(version) {
 		return fmt.Errorf("%s is already installed", label)
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
@@ -63,6 +61,13 @@ func (b *Sdk) Install(version Version) error {
 		return fmt.Errorf("no information about the current version")
 	}
 	mainSdk := installInfo.Main
+
+	// A second check is required because the plug-in may change the version number,
+	// for example, latest is resolved to a specific version number.
+	label = b.label(mainSdk.Version)
+	if b.CheckExists(mainSdk.Version) {
+		return fmt.Errorf("%s is already installed", label)
+	}
 	success := false
 	newDirPath := b.VersionPath(mainSdk.Version)
 
@@ -84,12 +89,6 @@ func (b *Sdk) Install(version Version) error {
 			_ = os.RemoveAll(newDirPath)
 		}
 	}()
-	// A second check is required because the plug-in may change the version number,
-	// for example, latest is resolved to a specific version number.
-	label = b.label(mainSdk.Version)
-	if b.checkExists(mainSdk.Version) {
-		return fmt.Errorf("%s is already installed", label)
-	}
 	var installedSdkInfos []*Info
 	path, err := b.preInstallSdk(mainSdk, newDirPath)
 	if err != nil {
@@ -193,22 +192,30 @@ func (b *Sdk) preInstallSdk(info *Info, sdkDestPath string) (string, error) {
 	}
 }
 
-func (b *Sdk) Uninstall(version Version) error {
+func (b *Sdk) Uninstall(version Version) (err error) {
 	label := b.label(version)
-	if !b.checkExists(version) {
-		pterm.Printf("%s is not installed...\n", pterm.Red(label))
-		return fmt.Errorf("%s is not installed", label)
+	if !b.CheckExists(version) {
+		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
 	if b.Current() == version {
 		b.clearEnvConfig(version)
 	}
 	path := b.VersionPath(version)
-	err := os.RemoveAll(path)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
-		return err
+		return
+	}
+	// Give the plugin a chance before actually uninstalling targeted version.
+	err = b.Plugin.PreUninstall(sdkPackage)
+	if err != nil {
+		return
+	}
+	err = os.RemoveAll(path)
+	if err != nil {
+		return
 	}
 	pterm.Printf("Uninstalled %s successfully!\n", label)
-	return nil
+	return
 }
 
 func (b *Sdk) Available(args []string) ([]*Package, error) {
@@ -217,10 +224,10 @@ func (b *Sdk) Available(args []string) ([]*Package, error) {
 
 func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 	label := b.label(version)
-	if !b.checkExists(version) {
+	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get local sdk info, err:%w", err)
 	}
@@ -232,19 +239,32 @@ func (b *Sdk) EnvKeys(version Version) (*env.Envs, error) {
 }
 
 func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
-	if !b.Plugin.HasFunction("PreUse") {
-		logger.Debug("plugin does not have PreUse function")
-		return version, nil
-	}
-
-	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, b.getLocalSdkPackages())
+	installedSdks := b.getLocalSdkPackages()
+	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
 	if err != nil {
 		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
 	}
 
-	// If the plugin does not return a version, it means that the plugin does not want to change the version.
+	// If the plugin does not return a version, it means that the plugin does
+	// not want to change the version or not implement the PreUse function.
+	// We can simply fuzzy match the version based on the input version.
 	if newVersion == "" {
-		return version, nil
+		installedVersions := make(util.VersionSort, 0, len(installedSdks))
+		for _, sdk := range installedSdks {
+			installedVersions = append(installedVersions, string(sdk.Main.Version))
+		}
+		sort.Sort(installedVersions)
+		prefix := string(version)
+		for _, v := range installedVersions {
+			if prefix == v {
+				newVersion = Version(v)
+				break
+			}
+			if strings.HasPrefix(v, prefix) {
+				newVersion = Version(v)
+				break
+			}
+		}
 	}
 
 	return newVersion, nil
@@ -259,13 +279,13 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	}
 
 	label := b.label(version)
-	if !b.checkExists(version) {
+	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", label)
 	}
 
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -305,7 +325,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	var multiToolVersion toolset.MultiToolVersions
 	if scope == Global {
-		sdkPackage, err := b.getLocalSdkPackage(version)
+		sdkPackage, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
@@ -383,7 +403,7 @@ func (b *Sdk) List() []Version {
 func (b *Sdk) getLocalSdkPackages() []*Package {
 	var infos []*Package
 	for _, version := range b.List() {
-		info, err := b.getLocalSdkPackage(version)
+		info, err := b.GetLocalSdkPackage(version)
 		if err != nil {
 			continue
 		}
@@ -404,7 +424,7 @@ func (b *Sdk) Current() Version {
 		return ""
 	}
 	current := toolVersion.FilterTools(func(name, version string) bool {
-		return name == b.Plugin.SdkName && b.checkExists(Version(version))
+		return name == b.Plugin.SdkName && b.CheckExists(Version(version))
 	})
 	if len(current) == 0 {
 		return ""
@@ -427,7 +447,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -451,7 +471,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.getLocalSdkPackage(version)
+	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
 		return
 	}
@@ -473,7 +493,7 @@ func (b *Sdk) clearEnvConfig(version Version) {
 	}
 }
 
-func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
+func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	versionPath := b.VersionPath(version)
 	mainSdk := &Info{
 		Name:    b.Plugin.Name,
@@ -517,7 +537,7 @@ func (b *Sdk) getLocalSdkPackage(version Version) (*Package, error) {
 	}, nil
 }
 
-func (b *Sdk) checkExists(version Version) bool {
+func (b *Sdk) CheckExists(version Version) bool {
 	return util.FileExists(b.VersionPath(version))
 }
 
@@ -589,7 +609,7 @@ func (b *Sdk) Download(u *url.URL) (string, error) {
 }
 
 func (b *Sdk) label(version Version) string {
-	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.Name), version)
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.SdkName), version)
 }
 
 // NewSdk creates a new SDK instance.

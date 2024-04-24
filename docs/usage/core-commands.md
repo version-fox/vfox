@@ -37,8 +37,11 @@ vfox i <sdk-name>@<version>
 
 `version`: The version to install
 
+**Options**
 
-::: tip 
+- `-a, --all`: Install all SDK versions recorded in .tool-versions
+
+::: tip
 `search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
 :::
 
@@ -71,8 +74,6 @@ vfox u [options] <sdk-name>[@<version>]
 `Unix-like`: `Session` scope
 :::
 
-
-
 ## Uninstall
 
 Uninstall the specified version of the SDK.
@@ -97,7 +98,7 @@ View all installed sdks.
 ```shell
 vfox list [<sdk-name>]
 
-vfox ls[<sdk-name>]
+vfox ls [<sdk-name>]
 ```
 
 `sdk-name`: SDK name, if not passed, display all.
@@ -106,7 +107,6 @@ vfox ls[<sdk-name>]
 
 View the current version of the SDK.
 
-
 **Usage**
 
 ```shell
@@ -114,3 +114,18 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
+## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+Launch a shell in the `VFOX_HOME` or SDK directory.
+
+**Usage**
+
+```shell
+vfox cd [options] [<sdk-name>]
+```
+
+`sdk-name`: SDK name, if not passed, default `VFOX_HOME`.
+
+**Options**
+
+- `-p, --plugin`: Launch a shell in the plugin directory.

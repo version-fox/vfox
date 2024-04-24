@@ -17,13 +17,15 @@
 package commands
 
 import (
+	"fmt"
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 )
 
 var Add = &cli.Command{
 	Name:  "add",
-	Usage: "Add a plugin",
+	Usage: "Add a plugin or plugins",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -41,10 +43,23 @@ var Add = &cli.Command{
 
 // addCmd is the command to add a plugin of sdk
 func addCmd(ctx *cli.Context) error {
+	args := ctx.Args()
+
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	sdkName := ctx.Args().First()
-	source := ctx.String("source")
-	alias := ctx.String("alias")
-	return manager.Add(sdkName, source, alias)
+
+	// multiple plugins
+	if args.Len() > 1 {
+		for index, sdkName := range args.Slice() {
+			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), args.Len(), pterm.Green(sdkName))
+			if err := manager.Add(sdkName, "", ""); err != nil {
+				pterm.Println(fmt.Sprintf("Add plugin(%s) failed: %s", pterm.Red(sdkName), err.Error()))
+			}
+		}
+		return nil
+	} else {
+		source := ctx.String("source")
+		alias := ctx.String("alias")
+		return manager.Add(args.First(), source, alias)
+	}
 }

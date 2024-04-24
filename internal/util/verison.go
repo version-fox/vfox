@@ -21,6 +21,20 @@ import (
 	"strings"
 )
 
+type VersionSort []string
+
+func (s VersionSort) Len() int {
+	return len(s)
+}
+
+func (s VersionSort) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s VersionSort) Less(i, j int) bool {
+	return CompareVersion(s[i], s[j]) > 0
+}
+
 func CompareVersion(v1, v2 string) int {
 	parts1 := strings.Split(v1, ".")
 	parts2 := strings.Split(v2, ".")

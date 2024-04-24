@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
@@ -52,6 +53,7 @@ var (
 		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
+		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 	}
 )
 
@@ -278,6 +280,11 @@ func (l *LuaPlugin) HasFunction(name string) bool {
 }
 
 func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error) {
+	if !l.HasFunction("PreUse") {
+		logger.Debug("plugin does not have PreUse function")
+		return "", nil
+	}
+
 	L := l.vm.Instance
 
 	ctx := PreUseHookCtx{
@@ -298,10 +305,6 @@ func (l *LuaPlugin) PreUse(version Version, previousVersion Version, scope UseSc
 	ctxTable, err := luai.Marshal(L, ctx)
 	if err != nil {
 		return "", err
-	}
-
-	if !l.HasFunction("PreUse") {
-		return "", nil
 	}
 
 	if err = l.CallFunction("PreUse", ctxTable); err != nil {
@@ -376,12 +379,54 @@ func (l *LuaPlugin) ParseLegacyFile(path string, installedVersions func() []Vers
 
 }
 
+// PreUninstall executes the PreUninstall hook function.
+func (l *LuaPlugin) PreUninstall(p *Package) error {
+	if !l.HasFunction("PreUninstall") {
+		logger.Debug("plugin does not have PreUninstall function")
+		return nil
+	}
+
+	L := l.vm.Instance
+
+	ctx := &PreUninstallHookCtx{
+		Main:    p.Main,
+		SdkInfo: make(map[string]*Info),
+	}
+	logger.Debugf("PreUninstallHookCtx: %+v \n", ctx)
+
+	for _, v := range p.Additions {
+		ctx.SdkInfo[v.Name] = v
+	}
+
+	ctxTable, err := luai.Marshal(L, ctx)
+	if err != nil {
+		return err
+	}
+
+	if err = l.CallFunction("PreUninstall", ctxTable); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	logger.Debugf("CallFunction: %s\n", funcName)
 	if err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), append([]lua.LValue{l.pluginObj}, args...)...); err != nil {
 		return err
 	}
 	return nil
+}
+
+// ShowNotes prints the notes of the plugin.
+func (l *LuaPlugin) ShowNotes() {
+	// print some notes if there are
+	if len(l.Notes) != 0 {
+		fmt.Println(pterm.Yellow("Notes:"))
+		fmt.Println("======")
+		for _, note := range l.Notes {
+			fmt.Println("  ", note)
+		}
+	}
 }
 
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.

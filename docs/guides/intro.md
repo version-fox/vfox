@@ -16,12 +16,13 @@ through a simple plugin interface.
 
 ## Why use vfox?
 
-- **Cross-platform** Supports Windows (non-WSL), Linux, macOS!
-- **Consistent commands** for managing all your languages
-- Supports **Global**, **Project**, **Session** three scopes
-- Simple **plugin system** to add support for the languages you choose
-- **Automatically switch** runtime versions for you when you switch projects
-- Supports common Shells (Powershell, Bash, ZSH), and provides autocompletion
+- **cross-platform support** (**Windows**, Linux, macOS)
+- **consistent commands** to manage all your languages
+- supports **different versions for different projects, different shells, and globally**.
+- simple **plugin system** to add support for your runtime of choice
+- **automatically switches** runtime versions as you traverse your project
+- support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
+- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
 - **Faster than `asdf-vm`**, and provides simpler commands and true cross-platform unification.
   See [Comparison to asdf](../misc/vs-asdf.md)。
 
@@ -34,7 +35,7 @@ through a simple plugin interface.
 | Bash       | ✅       |                                                                                  |
 | ZSH        | ✅       |                                                                                  |
 | Fish       | ✅       |                                                                                  |
-| CMD        | ✅       | Only Support `Global` Scope                                                      |
+| CMD        | ✅       | Only Support `Global` Scope. Not Recommend!!!                                    |
 | Clink      | ✅       |                                                                                  |
 | Cmder      | ✅       |                                                                                  |
 
@@ -50,6 +51,6 @@ through a simple plugin interface.
 
 ![pluigns](https://contrib.rocks/image?repo=version-fox/vfox)
 
-#### [vfox-plugins](https://github.com/version-fox/version-fox-plugins)
+#### [Public Registry](https://github.com/version-fox/vfox-plugins)
 
-![pluigns](https://contrib.rocks/image?repo=version-fox/version-fox-plugins)
+![pluigns](https://contrib.rocks/image?repo=version-fox/vfox-plugins))

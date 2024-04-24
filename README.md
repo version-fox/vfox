@@ -20,13 +20,13 @@ and switch between different environment you need via the command line.
 
 ## Why use vfox?
 
-- **cross-platform support** (Windows, Linux, macOS)
+- **cross-platform support** (**Windows**, Linux, macOS)
 - **consistent commands** to manage all your languages
-- support **Global**、**Project**、**Session** scopes when switching versions
-- simple **plugin system** to add support for your language of choice
+- supports **different versions for different projects, different shells, and globally**.
+- simple **plugin system** to add support for your runtime of choice
 - **automatically switches** runtime versions as you traverse your project
-- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
 - support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
+- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
   see [Comparison with asdf](https://vfox.lhan.me/misc/vs-asdf.html)
 
@@ -40,7 +40,7 @@ and switch between different environment you need via the command line.
 
 #### 1. Choose an [installation](https://vfox.lhan.me/guides/quick-start.html#_1-installation) that works for you.
 
-#### 2. ⚠️ **_Hook vfox into your shell_ (pick one that works for your shell)** ⚠️
+#### 2. ⚠️ **_Hook `vfox` into your shell_ (pick one that works for your shell)** ⚠️
 
 ```bash
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
@@ -95,7 +95,7 @@ Our future plans and high priority features and enhancements are:
   - Establishing a global registry (similar to `NPM Registry` or `Scoop Main Bucket`) to provide a unified entry point for plugin distribution.
   - Decomposing the existing plugin repository into individual repositories, one for each plugin.
 - [X] Allowing the switching of registry addresses.
-- [ ] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
+- [X] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
 - [ ] Plugin capabilities: Allowing plugins to load installed runtimes and provide information about the runtime.
 
 ## Available Plugins

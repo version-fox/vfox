@@ -44,19 +44,17 @@ func infoCmd(ctx *cli.Context) error {
 	}
 	source := s.Plugin
 
-	pterm.Println("Plugin info:")
+	pterm.Println("Plugin Info:")
 	pterm.Println("Name    ", "->", pterm.LightBlue(source.Name))
 	pterm.Println("Version ", "->", pterm.LightBlue(source.Version))
 	pterm.Println("Homepage", "->", pterm.LightBlue(source.Homepage))
-	pterm.Println("Desc    ", "->", pterm.LightBlue(source.Description))
-
-	// print some notes if there are
-	if len(source.Notes) != 0 {
-		fmt.Println(pterm.LightYellow("Notes:"))
-		fmt.Println("======")
-		for _, note := range source.Notes {
-			fmt.Println("  ", note)
-		}
+	pterm.Println("Desc    ", "->")
+	pterm.Println(pterm.LightBlue(source.Description))
+	if len(source.LegacyFilenames) == 0 {
+		pterm.Println("Legacy Files ->", pterm.LightRed("None"))
+	} else {
+		pterm.Println("Legacy Files ->", pterm.LightBlue(source.LegacyFilenames))
 	}
+	source.ShowNotes()
 	return nil
 }

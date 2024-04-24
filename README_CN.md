@@ -19,11 +19,11 @@
 ## 为什么选择 vfox？
 
 - 支持**Windows(非WSL)**、Linux、macOS!
-- 支持**Global**、**Project**、**Session** 三种作用域
+- 支持**不同项目不同版本**、**不同Shell不同版本**以及**全局版本**
 - 简单的 **插件系统** 来添加对你选择的语言的支持
 - 在您切换项目时, 帮您**自动切换**运行时版本
-- 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
 - 支持现有配置文件 `.node-version`、`.nvmrc`、`.sdkmanrc`，以方便迁移
+- 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
 - **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](https://vfox.lhan.me/zh-hans/misc/vs-asdf.html)。
 
 ## 演示
@@ -91,12 +91,12 @@ $ node -v
 ## 路线图
 
 我们未来的计划以及高度优先的功能和增强功能是：
-- [X] 重构插件机制: 
-  - 增加插件模板, 允许多文件开发插件 
+- [X] 重构插件机制:
+  - 增加插件模板, 允许多文件开发插件
   - 增加全局注册表(类似于:`NPM Registry`、`Scoop Main Bucket`), 为插件分发提供统一入口
   - 拆分现有的插件仓库, 一个插件一个仓库
 - [X] 允许切换注册表地址
-- [ ] 插件能力: 允许插件解析旧版本的配置文件. 例如: `.nvmrc`, `.node-version`, `.sdkmanrc`等
+- [X] 插件能力: 允许插件解析旧版本的配置文件. 例如: `.nvmrc`, `.node-version`, `.sdkmanrc`等
 - [ ] 插件能力: 允许插件加载已安装的运行时, 并提供运行时的信息
 
 ## 贡献者

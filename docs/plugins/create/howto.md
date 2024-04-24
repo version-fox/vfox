@@ -44,6 +44,7 @@ The full list of hooks callable from vfox.
 | [hooks/post_install.lua](#postinstall)          | ❌            | Execute additional operations after install, such as compiling source code, etc |
 | [hooks/pre_use.lua](#preuse)                    | ❌            | An opportunity to change the version before using it                            |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌            | Custom parser for legacy version files                                          |
+| [hooks/pre_uninstall.lua](#preuninstall)        | ❌            | Perform some operations before uninstalling targeted version                    |
 
 ## Required hook functions
 
@@ -239,6 +240,26 @@ function PLUGIN:ParseLegacyFile(ctx)
 end
 ```
 
+### PreUninstall <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+This is called before the SDK is uninstalled. If the plugin needs to perform some operations before
+uninstalling, it can implement this hook function. For example, cleaning up the cache, deleting configuration files, etc.
+
+**Location**: `hooks/pre_uninstall.lua`
+```lua 
+function PLUGIN:PreUninstall(ctx)
+    local mainSdkInfo = ctx.main
+    local mainPath = mainSdkInfo.path
+    local mversion = mainSdkInfo.version
+    local mname = mainSdkInfo.name
+    --- Other SDK information, the `addition` field returned in PreInstall, obtained by name
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
+end
+```
+
 ## Test Plugin
 
 Currently, VersionFox plugin testing is straightforward. You only need to place the plugin file in the
@@ -252,7 +273,11 @@ Currently, VersionFox plugin testing is straightforward. You only need to place 
 
 ## Publish to the public registry
 
-`vfox` allows custom installation of plugins, such as `vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip`
+`vfox` allows custom installation of plugins, such as:
+
+```shell
+vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip
+```
 
 In order to make it easier for your users, you can add the plugin to the public registry to list your plugin and easily install it with shorter commands, such as `vfox add nodejs`.
 

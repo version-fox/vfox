@@ -44,6 +44,7 @@
 | [hooks/post_install.lua](#postinstall)          | ❌      | 执行额外的操作, 如编译源码等      |
 | [hooks/pre_use.lua](#preuse)                    | ❌      | 在切换版本之前, 提供修改版本的机会   |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌      | 自定义解析遗留文件            |
+| [hooks/pre_uninstall.lua](#preuninstall)        | ❌      | 删除之前进行额外操作           |
 
 ## 必须实现的钩子函数
 
@@ -116,8 +117,10 @@ end
 **位置**: `hooks/env_keys.lua`
 ```lua
 function PLUGIN:EnvKeys(ctx)
-    --- this variable is same as ctx.sdkInfo['plugin-name'].path
-    local mainPath = ctx.path
+    local mainSdkInfo = ctx.main
+    local mainPath = mainSdkInfo.path
+    local mversion = mainSdkInfo.version
+    local mname = mainSdkInfo.name
     local sdkInfo = ctx.sdkInfo['sdk-name']
     local path = sdkInfo.path
     local version = sdkInfo.version
@@ -227,6 +230,24 @@ function PLUGIN:ParseLegacyFile(ctx)
 end
 ```
 
+### PreUninstall <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+
+在卸载 SDK 之前执行的钩子函数。如果插件需要在卸载之前执行一些操作，可以实现这个钩子函数。例如清理缓存、删除配置文件等。
+
+**位置**: `hooks/pre_uninstall.lua`
+```lua 
+function PLUGIN:PreUninstall(ctx)
+    local mainSdkInfo = ctx.main
+    local mainPath = mainSdkInfo.path
+    local mversion = mainSdkInfo.version
+    local mname = mainSdkInfo.name
+    --- 其他 SDK 信息, PreInstall中返回的`addition`字段, 通过name获取
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local path = sdkInfo.path
+    local version = sdkInfo.version
+    local name = sdkInfo.name
+end
+```
 
 ## 测试插件
 
@@ -241,7 +262,11 @@ end
 
 ## 向官方插件存储库提交插件
 
-vfox可以允许自定义安装插件，比如`vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip `
+`vfox`可以允许自定义安装插件，比如:
+
+```shell
+vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip 
+```
 
 为了使你的用户更轻松，你可以将插件添加到官方插件存储库中，以列出你的插件并使用较短的命令轻松安装，比如 `vfox add nodejs`。
 
