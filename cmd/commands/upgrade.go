@@ -164,7 +164,7 @@ func upgradeCmd(ctx *cli.Context) error {
 
 		if err := os.Rename(tempExePath, exePath); err != nil {
 			os.Rename(backupExePath, exePath)
-			return cli.Exit("Fail to restore: "+err.Error(), 1)
+			return cli.Exit("Fail to replace executable: "+err.Error(), 1)
 		}
 
 		batchContent := fmt.Sprintf(":Repeat\n"+
