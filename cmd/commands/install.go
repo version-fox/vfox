@@ -82,14 +82,13 @@ func installCmd(ctx *cli.Context) error {
 			err = source.Install(version)
 			if errors.Is(err, internal.ErrNoVersionProvided) {
 				// show prompt to let user select version
-				showAvailable, err := printer.Prompt("No version provided, do you want to select a version to install?")
-				if err != nil {
-					return err
-				}
+				showAvailable := printer.Prompt("No version provided, do you want to select a version to install?")
 				if showAvailable {
 					return RunSearch(name, []string{})
 				}
-			} else if err != nil {
+			}
+
+			if err != nil {
 				return err
 			}
 		}

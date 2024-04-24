@@ -17,51 +17,29 @@
 package printer
 
 import (
-	"fmt"
-
-	"atomicgo.dev/keyboard"
-
-	"atomicgo.dev/keyboard/keys"
+	"github.com/pterm/pterm"
 )
 
 // show {message} (y/n)
 // return true if user press y or Enter, otherwise false
-func Prompt(message string) (bool, error) {
-	fmt.Println(message + " (y/n)")
+func Prompt(message string) bool {
+	result, _ := pterm.DefaultInteractiveConfirm.Show(message)
 
-	result := false
+	// Print a blank line for better readability.
+	pterm.Println()
 
-	err := keyboard.Listen(func(key keys.Key) (stop bool, err error) {
-		switch key.Code {
-		case keys.CtrlC:
-			{
-				return true, nil // Stop listener by returning true on Ctrl+C
-			}
-		case keys.RuneKey:
-			if key.String() == "y" {
-				fmt.Printf("\rYou pressed: %s\n", key)
-				result = true
-				return true, nil
-			}
-			if key.String() == "n" {
-				fmt.Printf("\rYou pressed: %s\n", key)
-				result = false
-				return true, nil
-			}
-		case keys.Escape:
-			result = false
-			return true, nil
-		case keys.Enter:
-			result = true
-			return true, nil
-		}
+	// Print the user's answer in a formatted way.
+	pterm.Info.Printfln("You answered: %s", boolToText(result))
 
-		return false, nil
-	})
+	return result
+}
 
-	if err != nil {
-		return false, err
+// boolToText converts a boolean value to a colored text.
+// If the value is true, it returns a green "Yes".
+// If the value is false, it returns a red "No".
+func boolToText(b bool) string {
+	if b {
+		return pterm.Green("Yes")
 	}
-
-	return result, nil
+	return pterm.Red("No")
 }
