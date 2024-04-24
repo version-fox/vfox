@@ -17,44 +17,49 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal/util"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 var Upgrade = &cli.Command{
 	Name:   "upgrade",
-	Usage:  "Upgrade vfox to the latest version.",
+	Usage:  "upgrade vfox to the latest version",
 	Action: upgradeCmd,
 }
 
-type ReleaseInfo struct {
-	TagName string `json:"tag_name"`
-}
-
-func getLatestReleaseInfo(apiURL string) (ReleaseInfo, error) {
-	var releaseInfo ReleaseInfo
-
-	resp, err := http.Get(apiURL)
+func fetchLatestVersion() (string, error) {
+	response, err := http.Get("https://github.com/version-fox/vfox/tags")
 	if err != nil {
-		return releaseInfo, err
+		return "", err
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return releaseInfo, err
+		return "", err
+	}
+	re, err := regexp.Compile(`href="/version-fox/vfox/releases/tag/(v[0-9.]+)"`)
+	if err != nil {
+		return "", err
+	}
+	matches := re.FindAllStringSubmatch(string(body), -1)
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("Failed to fetch the version.")
 	}
 
-	err = json.Unmarshal(body, &releaseInfo)
-	return releaseInfo, err
+	latestVersion := matches[0][1]
+	return latestVersion, nil
 }
 
 func constructBinaryName(tagName string) string {
@@ -67,26 +72,23 @@ func constructBinaryName(tagName string) string {
 	if archType == "arm64" {
 		archType = "aarch64"
 	}
+	if archType == "amd64" {
+		archType = "x86_64"
+	}
 
-	fileName := fmt.Sprintf("vfox_%s_%s_%s.tar.gz", tagName[1:], osType, archType)
+	extName := "tar.gz"
+	if osType == "windows" {
+		extName = "zip"
+	}
+
+	fileName := fmt.Sprintf("vfox_%s_%s_%s.%s", tagName[1:], osType, archType, extName)
 	return fileName
 }
 
-// constructDiffURL constructs a GitHub diff URL between two version tags
-func constructDiffURL(oldTag, newTag string) string {
-	return fmt.Sprintf("https://github.com/version-fox/vfox/compare/%s...%s", oldTag, newTag)
-}
-
-func getUrls(apiURL string, currVersion string) (string, string) {
-	version := currVersion
-	releaseInfo, err := getLatestReleaseInfo(apiURL)
-	if err != nil {
-		fmt.Println("Error fetching release info:", err)
-		return "", ""
-	}
-	fileName := constructBinaryName(releaseInfo.TagName)
-	binURL := fmt.Sprintf("https://github.com/version-fox/vfox/releases/download/%s/%s", releaseInfo.TagName, fileName)
-	diffURL := constructDiffURL(version, releaseInfo.TagName)
+func generateUrls(currVersion string, tagName string) (string, string) {
+	fileName := constructBinaryName(tagName)
+	binURL := fmt.Sprintf("https://github.com/version-fox/vfox/releases/download/%s/%s", tagName, fileName)
+	diffURL := fmt.Sprintf("https://github.com/version-fox/vfox/compare/%s...%s", currVersion, tagName)
 	return binURL, diffURL
 }
 
@@ -105,56 +107,87 @@ func downloadFile(filepath string, url string) error {
 	return err
 }
 
-func extractTarGz(gzipFilePath, destDir string) error {
-	decompressor := util.NewDecompressor(gzipFilePath)
-	if err := decompressor.Decompress(destDir); err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
 func upgradeCmd(ctx *cli.Context) error {
-	apiURL := "https://api.github.com/repos/version-fox/vfox/releases/latest"
-	releaseInfo, err := getLatestReleaseInfo(apiURL)
 	currVersion := fmt.Sprintf("v%s", ctx.App.Version)
-	latestVersion := releaseInfo.TagName
+	latestVersion, err := fetchLatestVersion()
+	if err != nil {
+		return cli.Exit("Failed to fetch the latest version: "+err.Error(), 1)
+	}
 	fmt.Println("Current version: ", currVersion)
 	fmt.Println("Latest available:", latestVersion)
 
 	if currVersion == latestVersion {
-		return cli.Exit("vfox is already at latest version.", 0)
+		return cli.Exit("vfox is already up to date.", 0)
 	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
 	}
+	exeDir, exeName := filepath.Split(exePath)
 
-	binURL, diffURL := getUrls(apiURL, currVersion)
-	exeDir := filepath.Dir(exePath)
-	tempFile := "latest_vfox.tar.gz"
-	tempDir := filepath.Join(exeDir, "update_vfox")
+	binURL, diffURL := generateUrls(currVersion, latestVersion)
+	tempFile := "vfox_latest.tar.gz"
+	if runtime.GOOS == "windows" {
+		tempFile = "vfox_latest.zip"
+	}
+	tempFile = filepath.Join(exeDir, tempFile)
+	tempDir := filepath.Join(exeDir, "vfox_upgrade")
+	fmt.Println("Fetching", binURL)
 
 	if err := downloadFile(tempFile, binURL); err != nil {
 		return cli.Exit("Failed to download file: "+err.Error(), 1)
 	}
-	if err := extractTarGz(tempFile, tempDir); err != nil {
+	decompressor := util.NewDecompressor(tempFile)
+	if err := decompressor.Decompress(tempDir); err != nil {
 		return cli.Exit("Failed to extract file: "+err.Error(), 1)
 	}
-	newExePath := filepath.Join(tempDir, "vfox")
-	if err := os.Rename(newExePath, exePath); err != nil {
-		return cli.Exit("Failed to replace executable: "+err.Error(), 1)
-	}
-	if err := os.Chmod(exePath, 0755); err != nil {
-		panic("Failed to make executable: " + err.Error())
-	}
-	if err = os.RemoveAll(tempDir); err != nil {
-		fmt.Println("Error removing directory:", err)
-	}
-	if err = os.RemoveAll(tempFile); err != nil {
-		fmt.Println("Error removing directory:", err)
+	defer func() {
+		if err := os.RemoveAll(tempFile); err != nil {
+			fmt.Println("Error removing cache file: ", err)
+		}
+		if err := os.RemoveAll(tempDir); err != nil {
+			fmt.Println("Error removing directory: ", err)
+		}
+	}()
+
+	tempExePath := filepath.Join(tempDir, exeName)
+	if _, err := os.Stat(tempExePath); err != nil {
+		return cli.Exit("Fail to find valid executable: "+err.Error(), 1)
 	}
 
-	updateMsg := fmt.Sprintf("Updated to version: %s \nSee the diff at: %s \n", latestVersion, diffURL)
+	if runtime.GOOS == "windows" {
+		backupExePath := filepath.Join(exeDir, "."+exeName)
+		batchFile := filepath.Join(exeDir, ".update.bat")
+		if err := os.Rename(exePath, backupExePath); err != nil {
+			return cli.Exit("Fail to backup: "+err.Error(), 1)
+		}
+
+		if err := os.Rename(tempExePath, exePath); err != nil {
+			os.Rename(backupExePath, exePath)
+			return cli.Exit("Fail to restore: "+err.Error(), 1)
+		}
+
+		batchContent := fmt.Sprintf(":Repeat\n"+
+			"del \"%s\"\n"+
+			"if exist \"%s\" goto Repeat\n"+
+			"del \"%s\"", backupExePath, backupExePath, batchFile)
+		if err := os.WriteFile(batchFile, []byte(batchContent), 0666); err != nil {
+			return cli.Exit("Fail to clear: "+err.Error(), 1)
+		}
+
+		cmd := exec.Command("cmd.exe", "/C", batchFile)
+		if err := cmd.Start(); err != nil {
+			return cli.Exit("Fail to launch shell: "+err.Error(), 1)
+		}
+	} else {
+		if err := os.Rename(tempExePath, exePath); err != nil {
+			return cli.Exit("Failed to replace executable: "+err.Error(), 1)
+		}
+		if err := os.Chmod(exePath, 0755); err != nil {
+			return cli.Exit("Failed to make executable: "+err.Error(), 1)
+		}
+	}
+
+	updateMsg := fmt.Sprintf("Updated to version: %s\nSee the diff at: %s\n", latestVersion, diffURL)
 	return cli.Exit(updateMsg, 0)
 }
