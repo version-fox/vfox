@@ -27,6 +27,7 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 var Install = &cli.Command{
@@ -50,13 +51,14 @@ func installCmd(ctx *cli.Context) error {
 	}
 
 	args := ctx.Args()
-	sdkArg := ctx.Args().First()
-	if sdkArg == "" {
+	if args.First() == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
 
 	manager := internal.NewSdkManager()
 	defer manager.Close()
+
+	errorStore := util.NewErrorStore()
 
 	for i := 0; i < args.Len(); i++ {
 		sdkArg := args.Get(i)
@@ -64,7 +66,7 @@ func installCmd(ctx *cli.Context) error {
 		argsLen := len(argArr)
 
 		if argsLen > 2 {
-			return cli.Exit(fmt.Sprintf("Your input(%s) is invalid", sdkArg), 1)
+			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
 			var name string
 			var version internal.Version
@@ -77,21 +79,34 @@ func installCmd(ctx *cli.Context) error {
 			}
 			source, err := manager.LookupSdkWithInstall(name)
 			if err != nil {
-				return err
+				errorStore.AddAndShow(name, err)
+				continue
 			}
+
 			err = source.Install(version)
 			if errors.Is(err, internal.ErrNoVersionProvided) {
 				// show prompt to let user select version
-				showAvailable := printer.Prompt("No version provided, do you want to select a version to install?")
+				showAvailable := printer.Promptf("No %s version provided, do you want to select a version to install?", name)
 				if showAvailable {
-					return RunSearch(name, []string{})
+					RunSearch(name, []string{})
+					continue
 				}
 			}
 
 			if err != nil {
-				return err
+				errorStore.AddAndShow(name, err)
+				continue
 			}
 		}
+	}
+
+	if errorStore.HasError() {
+		notes := errorStore.GetNotes()
+		if (len(notes)) == 1 {
+			return fmt.Errorf("failed to install %s", notes[0])
+		}
+
+		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(errorStore.GetNotes(), ", "))
 	}
 
 	return nil

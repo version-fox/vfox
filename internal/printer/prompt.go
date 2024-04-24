@@ -17,16 +17,15 @@
 package printer
 
 import (
+	"fmt"
+
 	"github.com/pterm/pterm"
 )
 
 // show {message} (y/n)
 // return true if user press y or Enter, otherwise false
-func Prompt(message string) bool {
-	result, _ := pterm.DefaultInteractiveConfirm.Show(message)
-
-	// Print a blank line for better readability.
-	pterm.Println()
+func Promptf(message string, a ...any) bool {
+	result, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf(message, a...))
 
 	// Print the user's answer in a formatted way.
 	pterm.Printfln("You answered: %s", boolToText(result))
