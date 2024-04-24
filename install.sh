@@ -30,11 +30,20 @@ main() {
 
   ARCH_TYPE=$(uname -m)
 
+<<<<<<< HEAD
   if [ "$ARCH_TYPE" = "arm64" ]; then
       ARCH_TYPE="aarch64"
   elif [ "$ARCH_TYPE" = "loongarch64" ]; then
       ARCH_TYPE="loong64"
   fi
+=======
+if [ "$ARCH_TYPE" = "arm64" ]; then
+    ARCH_TYPE="aarch64"
+fi
+
+FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
+TAR_FILE="${FILENAME}.tar.gz"
+>>>>>>> 830d70646b53e2270e4356977065ddb9a81accaa
 
   FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
   TAR_FILE="${FILENAME}.tar.gz"
