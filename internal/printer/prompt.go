@@ -29,7 +29,7 @@ func Prompt(message string) bool {
 	pterm.Println()
 
 	// Print the user's answer in a formatted way.
-	pterm.Info.Printfln("You answered: %s", boolToText(result))
+	pterm.Printfln("You answered: %s", boolToText(result))
 
 	return result
 }
