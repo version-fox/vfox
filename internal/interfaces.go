@@ -17,7 +17,8 @@
 package internal
 
 import (
-	"fmt"
+	"errors"
+
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -105,9 +106,11 @@ type PreInstallHookResult struct {
 	Addition []*PreInstallHookResultAdditionItem `luai:"addition"`
 }
 
+var ErrNoVersionProvided = errors.New("no version number provided")
+
 func (i *PreInstallHookResult) Info() (*Info, error) {
 	if i.Version == "" {
-		return nil, fmt.Errorf("no version number provided")
+		return nil, ErrNoVersionProvided
 	}
 
 	sum := LuaCheckSum{

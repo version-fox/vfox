@@ -17,21 +17,25 @@
 package printer
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	"atomicgo.dev/cursor"
 	"atomicgo.dev/keyboard"
 	"atomicgo.dev/keyboard/keys"
-	"fmt"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
-	"sort"
-	"strings"
 )
 
 type PageKVSelect struct {
-	index             int
-	HighlightOptions  util.Set[string]
+	index int
+	// Options to highlight with green color
+	HighlightOptions util.Set[string]
+	// Options to disable
+	DisabledOptions   util.Set[string]
 	Options           []*KV
 	searchOptions     []*KV
 	pageOptions       []*KV
@@ -217,6 +221,9 @@ func (s *PageKVSelect) Show() (*KV, error) {
 		case keys.Enter:
 			if s.index < len(s.pageOptions) {
 				s.result = s.pageOptions[s.index]
+				if (s.result != nil) && s.DisabledOptions.Contains(s.result.Key) {
+					return false, nil
+				}
 			} else {
 				s.result = nil
 				logger.Info("No search, program stopped.")

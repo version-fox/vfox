@@ -17,10 +17,13 @@
 package commands
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/printer"
 )
 
 var Install = &cli.Command{
@@ -32,30 +35,51 @@ var Install = &cli.Command{
 }
 
 func installCmd(ctx *cli.Context) error {
-	sdkArg := ctx.Args().First()
+	args := ctx.Args()
+
+	sdkArg := args.First()
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	argArr := strings.Split(sdkArg, "@")
-	argsLen := len(argArr)
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	if argsLen > 2 {
-		return cli.Exit("sdk version is invalid", 1)
-	} else {
-		var name string
-		var version internal.Version
-		if argsLen == 2 {
-			name = strings.ToLower(argArr[0])
-			version = internal.Version(argArr[1])
+
+	for i := 0; i < args.Len(); i++ {
+		sdkArg := args.Get(i)
+		argArr := strings.Split(sdkArg, "@")
+		argsLen := len(argArr)
+
+		if argsLen > 2 {
+			return cli.Exit(fmt.Sprintf("Your input(%s) is invalid", sdkArg), 1)
 		} else {
-			name = strings.ToLower(argArr[0])
-			version = ""
+			var name string
+			var version internal.Version
+			if argsLen == 2 {
+				name = strings.ToLower(argArr[0])
+				version = internal.Version(argArr[1])
+			} else {
+				name = strings.ToLower(argArr[0])
+				version = ""
+			}
+			source, err := manager.LookupSdkWithInstall(name)
+			if err != nil {
+				return err
+			}
+			err = source.Install(version)
+			if errors.Is(err, internal.ErrNoVersionProvided) {
+				// show prompt to let user select version
+				showAvailable, err := printer.Prompt("No version provided, do you want to select a version to install?")
+				if err != nil {
+					return err
+				}
+				if showAvailable {
+					return RunSearch(name, []string{})
+				}
+			} else if err != nil {
+				return err
+			}
 		}
-		source, err := manager.LookupSdkWithInstall(name)
-		if err != nil {
-			return err
-		}
-		return source.Install(version)
 	}
+
+	return nil
 }

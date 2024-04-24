@@ -51,6 +51,8 @@
 
 返回预安装信息， 例如具体版本号、下载源等信息。 `vfox`会帮你提前将这些文件下载到特定目录下。如果是压缩包如`tar`、`tar.gz`、`tar.xz`、`zip`这四种压缩包， `vfox`会直接帮你解压处理。
 
+如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
+
 **位置**: `hooks/pre_install.lua`
 ```lua
 function PLUGIN:PreInstall(ctx)

@@ -19,7 +19,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/toolset"
 	"io"
 	"net"
 	"net/http"
@@ -30,6 +29,8 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+
+	"github.com/version-fox/vfox/internal/toolset"
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"

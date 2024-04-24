@@ -20,13 +20,14 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"regexp"
+
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
-	"path/filepath"
-	"regexp"
 )
 
 const (
