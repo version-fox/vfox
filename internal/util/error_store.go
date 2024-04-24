@@ -18,22 +18,26 @@ package util
 
 import "fmt"
 
+type errorItem struct {
+	Note string
+	Err  error
+}
+
 // ErrorStore is a struct that stores errors
-// And can throw them all at once
 type ErrorStore struct {
-	errors map[string]error
+	errors []errorItem
 }
 
 // NewErrorStore creates a new ErrorStore
 func NewErrorStore() *ErrorStore {
 	return &ErrorStore{
-		errors: make(map[string]error),
+		errors: make([]errorItem, 0),
 	}
 }
 
 // Add adds an error to the store
 func (e *ErrorStore) Add(note string, err error) {
-	e.errors[note] = err
+	e.errors = append(e.errors, errorItem{Note: note, Err: err})
 }
 
 // Add and show in the console
@@ -45,10 +49,21 @@ func (e *ErrorStore) AddAndShow(note string, err error) {
 // get all error notes
 func (e *ErrorStore) GetNotes() []string {
 	notes := make([]string, 0, len(e.errors))
-	for note := range e.errors {
-		notes = append(notes, note)
+
+	for _, item := range e.errors {
+		notes = append(notes, item.Note)
 	}
+
 	return notes
+}
+
+// get notes set
+func (e *ErrorStore) GetNotesSet() Set[string] {
+	set := NewSet[string]()
+	for _, item := range e.errors {
+		set.Add(item.Note)
+	}
+	return set
 }
 
 func (e *ErrorStore) HasError() bool {

@@ -86,7 +86,10 @@ func installCmd(ctx *cli.Context) error {
 			if errors.Is(err, internal.ErrNoVersionProvided) {
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", name))
 				if showAvailable {
-					RunSearch(name, []string{})
+					err := RunSearch(name, []string{})
+					if err != nil {
+						errorStore.AddAndShow(name, err)
+					}
 					continue
 				}
 			}
@@ -98,11 +101,12 @@ func installCmd(ctx *cli.Context) error {
 		}
 	}
 
-	notes := errorStore.GetNotes()
-	if (len(notes)) == 1 {
-		return fmt.Errorf("failed to install %s", notes[0])
-	} else if len(notes) > 1 {
-		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(errorStore.GetNotes(), ", "))
+	notes := errorStore.GetNotesSet()
+
+	if notes.Len() == 1 {
+		return fmt.Errorf("failed to install %s", notes.Slice()[0])
+	} else if notes.Len() > 1 {
+		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(notes.Slice(), ", "))
 	}
 
 	return nil
