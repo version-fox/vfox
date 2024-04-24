@@ -2,11 +2,12 @@ package commands
 
 import (
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal"
 )
 
 var Config = &cli.Command{
@@ -68,9 +69,6 @@ func configList(prefix string, v reflect.Value) {
 		if (value.Kind() == reflect.Ptr && value.Elem().Kind() == reflect.Struct) || value.Kind() == reflect.Struct {
 			configList(prefix+key+".", value)
 		} else {
-			if value.Kind() == reflect.String && value.IsZero() {
-				continue
-			}
 			fmt.Printf(prefix+key+" = %v\n", value.Interface())
 		}
 	}
