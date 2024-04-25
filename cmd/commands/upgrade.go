@@ -31,8 +31,10 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
+const SelfUpgradeName = "upgrade"
+
 var Upgrade = &cli.Command{
-	Name:   "upgrade",
+	Name:   SelfUpgradeName,
 	Usage:  "upgrade vfox to the latest version",
 	Action: upgradeCmd,
 }
@@ -119,6 +121,9 @@ func upgradeCmd(ctx *cli.Context) error {
 	if currVersion == latestVersion {
 		return cli.Exit("vfox is already up to date.", 0)
 	}
+	if err = RequestPermission(); err != nil {
+		return err
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
@@ -130,8 +135,8 @@ func upgradeCmd(ctx *cli.Context) error {
 	if runtime.GOOS == "windows" {
 		tempFile = "vfox_latest.zip"
 	}
-	tempFile = filepath.Join(exeDir, tempFile)
-	tempDir := filepath.Join(exeDir, "vfox_upgrade")
+	tempFile = filepath.Join(os.TempDir(), tempFile)
+	tempDir := filepath.Join(os.TempDir(), "vfox_upgrade")
 	fmt.Println("Fetching", binURL)
 
 	if err := downloadFile(tempFile, binURL); err != nil {
@@ -188,6 +193,12 @@ func upgradeCmd(ctx *cli.Context) error {
 		}
 	}
 
-	updateMsg := fmt.Sprintf("Updated to version: %s\nSee the diff at: %s\n", latestVersion, diffURL)
-	return cli.Exit(updateMsg, 0)
+	fmt.Printf("Updated to version: %s\n See the diff at: %s\n", latestVersion, diffURL)
+
+	if runtime.GOOS == "windows" {
+		fmt.Println("Press any key to continue...")
+		var b = make([]byte, 1)
+		_, _ = os.Stdin.Read(b)
+	}
+	return nil
 }
