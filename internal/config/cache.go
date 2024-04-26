@@ -22,7 +22,7 @@ import "time"
 // -1: never expire
 // 0: never cache
 type Cache struct {
-	AvailableHookDuration time.Duration `yaml:"availableHook"` // Available hook result cache time
+	AvailableHookDuration time.Duration `yaml:"availableHookDuration"` // Available hook result cache time
 }
 
 var (

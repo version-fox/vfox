@@ -108,6 +108,12 @@ function PLUGIN:Available(ctx)
 end
 ```
 
+::: warning 缓存
+
+`vfox`会缓存`Available`返回的结果, 默认缓存时间为`12h`。请查看[配置#缓存](../../guides/configuration.md#%E7%BC%93%E5%AD%98)。
+
+:::
+
 ### EnvKeys
 
 告诉`vfox`当前SDK需要配置的环境变量有哪些。

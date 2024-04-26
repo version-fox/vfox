@@ -20,6 +20,7 @@ import (
 	"github.com/version-fox/vfox/internal/config"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestNewConfig(t *testing.T) {
@@ -38,6 +39,9 @@ func TestNewConfig(t *testing.T) {
 	}
 	if !c.LegacyVersionFile.Enable {
 		t.Fatal("legacy version file enable is invalid")
+	}
+	if c.Cache.AvailableHookDuration != time.Second {
+		t.Fatal("cache available hook duration is invalid")
 	}
 }
 

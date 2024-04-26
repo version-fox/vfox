@@ -69,6 +69,25 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
+## 缓存 <Badge type="tip" text=">= 0.4.1" vertical="middle" />
+
+`vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。
+
+::: warning 特殊值
+- `-1`: 永不过期
+- `0`: 不进行缓存
+:::
+```yaml
+cache:
+  availableHookDuration: 12h # s 秒, m 分钟, h 小时
+```
+
+
+::: tip 缓存文件路径
+`$HOME/.version-fox/plugins/<plugin-name>/available.cache`
+:::
+
+
 ## Config 命令 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 设置，查看配置

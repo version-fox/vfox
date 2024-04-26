@@ -13,6 +13,19 @@ vfox search <sdk-name> [...optionArgs]
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
 `optionArgs`: 搜索命令的附加参数。注意：是否支持取决于插件。
 
+::: warning 缓存
+
+`vfox`会缓存`search`的结果, 默认缓存时间为`12h`。
+
+如果你想禁用，可以通过`vfox config`命令进行配置。
+```shell
+vfox config cache.availableHookDuration 0
+```
+
+其余操作, 请查看[配置#缓存](../guides/configuration.md#%E7%BC%93%E5%AD%98)。
+
+:::
+
 ::: tip 快捷安装
 选择目标版本， 回车即可快速安装。
 :::

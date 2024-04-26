@@ -13,6 +13,17 @@ vfox search <sdk-name> [...optionArgs]
 `sdk-name`: SDK name, such as `nodejs`, `custom-node`.
 `optionArgs`: Additional arguments for the search command. NOTE: Whether it is supported or not depends on the plugin.
 
+::: warning Cache
+
+`vfox` will cache the results of the `search` command to reduce the number of network requests. The default cache time is `12h`.
+
+You can disable it through the following command.
+```shell
+vfox config cache.availableHookDuration 0
+```
+For details, see [Cache Settings](../guides/configuration.md#cache-settings).
+:::
+
 ::: tip Quick install
 Select the target version, and press Enter to install quickly.
 :::
