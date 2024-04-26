@@ -36,18 +36,14 @@ var Search = &cli.Command{
 	Category: CategorySDK,
 }
 
-func searchCmd(ctx *cli.Context) error {
-	sdkName := ctx.Args().First()
-	if sdkName == "" {
-		return cli.Exit("sdk name is required", 1)
-	}
+func RunSearch(sdkName string, availableArgs []string) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	source, err := manager.LookupSdkWithInstall(sdkName)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
 	}
-	result, err := source.Available(ctx.Args().Tail())
+	result, err := source.Available(availableArgs)
 	if err != nil {
 		return fmt.Errorf("plugin [Available] method error: %w", err)
 	}
@@ -76,17 +72,18 @@ func searchCmd(ctx *cli.Context) error {
 		})
 	}
 
-	highlightOptions := util.NewSet[string]()
+	installedVersions := util.NewSet[string]()
 	for _, version := range source.List() {
-		highlightOptions.Add(string(version))
+		installedVersions.Add(string(version))
 	}
 
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
-		TopText:          "Please select a version of " + sdkName,
+		TopText:          "Please select a version of " + sdkName + " to install",
 		Filter:           true,
 		Size:             int(math.Min(math.Max(float64(height-3), 1), 20)),
-		HighlightOptions: highlightOptions,
+		HighlightOptions: installedVersions,
+		DisabledOptions:  installedVersions,
 		Options:          options,
 		SourceFunc: func(page, size int, options []*printer.KV) ([]*printer.KV, error) {
 			start := page * size
@@ -110,4 +107,12 @@ func searchCmd(ctx *cli.Context) error {
 		return nil
 	}
 	return source.Install(internal.Version(version.Key))
+}
+
+func searchCmd(ctx *cli.Context) error {
+	sdkName := ctx.Args().First()
+	if sdkName == "" {
+		return cli.Exit("sdk name is required", 1)
+	}
+	return RunSearch(sdkName, ctx.Args().Tail())
 }

@@ -19,12 +19,14 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/toolset"
-	"os"
-	"strings"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 var Install = &cli.Command{
@@ -47,32 +49,67 @@ func installCmd(ctx *cli.Context) error {
 		return installAll()
 	}
 
-	sdkArg := ctx.Args().First()
-	if sdkArg == "" {
+	args := ctx.Args()
+	if args.First() == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	argArr := strings.Split(sdkArg, "@")
-	argsLen := len(argArr)
+
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	if argsLen > 2 {
-		return cli.Exit("sdk version is invalid", 1)
-	} else {
-		var name string
-		var version internal.Version
-		if argsLen == 2 {
-			name = strings.ToLower(argArr[0])
-			version = internal.Version(argArr[1])
+
+	errorStore := util.NewErrorStore()
+
+	for i := 0; i < args.Len(); i++ {
+		sdkArg := args.Get(i)
+		argArr := strings.Split(sdkArg, "@")
+		argsLen := len(argArr)
+
+		if argsLen > 2 {
+			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
-			name = strings.ToLower(argArr[0])
-			version = ""
+			var name string
+			var version internal.Version
+			if argsLen == 2 {
+				name = strings.ToLower(argArr[0])
+				version = internal.Version(argArr[1])
+			} else {
+				name = strings.ToLower(argArr[0])
+				version = ""
+			}
+			source, err := manager.LookupSdkWithInstall(name)
+			if err != nil {
+				errorStore.AddAndShow(name, err)
+				continue
+			}
+
+			err = source.Install(version)
+			if errors.Is(err, internal.ErrNoVersionProvided) {
+				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", name))
+				if showAvailable {
+					err := RunSearch(name, []string{})
+					if err != nil {
+						errorStore.AddAndShow(name, err)
+					}
+					continue
+				}
+			}
+
+			if err != nil {
+				errorStore.AddAndShow(name, err)
+				continue
+			}
 		}
-		source, err := manager.LookupSdkWithInstall(name)
-		if err != nil {
-			return err
-		}
-		return source.Install(version)
 	}
+
+	notes := errorStore.GetNotesSet()
+
+	if notes.Len() == 1 {
+		return fmt.Errorf("failed to install %s", notes.Slice()[0])
+	} else if notes.Len() > 1 {
+		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(notes.Slice(), ", "))
+	}
+
+	return nil
 }
 
 func installAll() error {

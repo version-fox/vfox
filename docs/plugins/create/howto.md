@@ -57,6 +57,8 @@ directory
 in advance. If it is a compressed package such as `tar`, `tar.gz`, `tar.xz`, `zip`, `vfox` will help you to decompress
 it directly.
 
+if the return value of version is empty, it means that the version is not found, and `vfox` will ask the user whether to perform a search operation.
+
 ```lua
 function PLUGIN:PreInstall(ctx)
     --- input parameters
