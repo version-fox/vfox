@@ -35,6 +35,7 @@ func TestFileCache(t *testing.T) {
 		{"test2", newKv(t, true)},
 		{"test3", newKv(t, 123)},
 		{"test4", newKv(t, 'c')},
+		{"test5", nil},
 	}
 	t.Run("TestSimpleType", func(t *testing.T) {
 
