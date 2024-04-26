@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -40,13 +41,13 @@ var Upgrade = &cli.Command{
 }
 
 func fetchLatestVersion() (string, error) {
-	response, err := http.Get("https://github.com/version-fox/vfox/tags")
+	resp, err := http.Get("https://github.com/version-fox/vfox/tags")
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close()
+	defer resp.Body.Close()
 
-	body, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +118,6 @@ func upgradeCmd(ctx *cli.Context) error {
 	}
 	fmt.Println("Current version: ", currVersion)
 	fmt.Println("Latest available:", latestVersion)
-
 	if currVersion == latestVersion {
 		return cli.Exit("vfox is already up to date.", 0)
 	}
@@ -129,14 +129,16 @@ func upgradeCmd(ctx *cli.Context) error {
 		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
 	}
 	exeDir, exeName := filepath.Split(exePath)
-
 	binURL, diffURL := generateUrls(currVersion, latestVersion)
 	tempFile := "vfox_latest.tar.gz"
 	if runtime.GOOS == "windows" {
 		tempFile = "vfox_latest.zip"
 	}
-	tempFile = filepath.Join(os.TempDir(), tempFile)
-	tempDir := filepath.Join(os.TempDir(), "vfox_upgrade")
+	manager := internal.NewSdkManager()
+	vfoxTempDir := manager.PathMeta.TempPath
+	tempFile = filepath.Join(vfoxTempDir, tempFile)
+	tempDir := filepath.Join(vfoxTempDir, "vfox_upgrade")
+
 	fmt.Println("Fetching", binURL)
 
 	if err := downloadFile(tempFile, binURL); err != nil {
@@ -154,35 +156,31 @@ func upgradeCmd(ctx *cli.Context) error {
 			fmt.Println("Error removing directory: ", err)
 		}
 	}()
-
 	tempExePath := filepath.Join(tempDir, exeName)
 	if _, err := os.Stat(tempExePath); err != nil {
-		return cli.Exit("Fail to find valid executable: "+err.Error(), 1)
+		return cli.Exit("Failed to find valid executable: "+err.Error(), 1)
 	}
 
 	if runtime.GOOS == "windows" {
 		backupExePath := filepath.Join(exeDir, "."+exeName)
 		batchFile := filepath.Join(exeDir, ".update.bat")
 		if err := os.Rename(exePath, backupExePath); err != nil {
-			return cli.Exit("Fail to backup: "+err.Error(), 1)
+			return cli.Exit("Failed to backup: "+err.Error(), 1)
 		}
-
 		if err := os.Rename(tempExePath, exePath); err != nil {
 			os.Rename(backupExePath, exePath)
-			return cli.Exit("Fail to replace executable: "+err.Error(), 1)
+			return cli.Exit("Failed to replace executable: "+err.Error(), 1)
 		}
-
 		batchContent := fmt.Sprintf(":Repeat\n"+
 			"del \"%s\"\n"+
 			"if exist \"%s\" goto Repeat\n"+
 			"del \"%s\"", backupExePath, backupExePath, batchFile)
 		if err := os.WriteFile(batchFile, []byte(batchContent), 0666); err != nil {
-			return cli.Exit("Fail to clear: "+err.Error(), 1)
+			return cli.Exit("Failed to clear: "+err.Error(), 1)
 		}
-
 		cmd := exec.Command("cmd.exe", "/C", batchFile)
 		if err := cmd.Start(); err != nil {
-			return cli.Exit("Fail to launch shell: "+err.Error(), 1)
+			return cli.Exit("Failed to launch shell: "+err.Error(), 1)
 		}
 	} else {
 		if err := os.Rename(tempExePath, exePath); err != nil {
