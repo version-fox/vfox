@@ -188,7 +188,7 @@ func upgradeCmd(ctx *cli.Context) error {
 		}
 	}
 
-	fmt.Printf("Updated to version: %s\n See the diff at: %s\n", latestVersion, diffURL)
+	fmt.Printf("Updated to version: %s\nSee the diff at: %s\n", latestVersion, diffURL)
 
 	if runtime.GOOS == "windows" {
 		fmt.Println("Press any key to continue...")
