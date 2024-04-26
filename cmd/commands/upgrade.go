@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
-	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -134,10 +133,11 @@ func upgradeCmd(ctx *cli.Context) error {
 	if runtime.GOOS == "windows" {
 		tempFile = "vfox_latest.zip"
 	}
-	manager := internal.NewSdkManager()
-	vfoxTempDir := manager.PathMeta.TempPath
-	tempFile = filepath.Join(vfoxTempDir, tempFile)
-	tempDir := filepath.Join(vfoxTempDir, "vfox_upgrade")
+	tempDir := filepath.Join(exeDir, "vfox_upgrade")
+	tempFile = filepath.Join(tempDir, tempFile)
+	if err := os.Mkdir(tempDir, 0755); err != nil {
+		return cli.Exit("Failed to create directory: "+err.Error(), 1)
+	}
 
 	fmt.Println("Fetching", binURL)
 
@@ -163,7 +163,7 @@ func upgradeCmd(ctx *cli.Context) error {
 
 	if runtime.GOOS == "windows" {
 		backupExePath := filepath.Join(exeDir, "."+exeName)
-		batchFile := filepath.Join(exeDir, ".update.bat")
+		batchFile := filepath.Join(exeDir, ".upgrade.bat")
 		if err := os.Rename(exePath, backupExePath); err != nil {
 			return cli.Exit("Failed to backup: "+err.Error(), 1)
 		}
