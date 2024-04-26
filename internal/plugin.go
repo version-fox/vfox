@@ -30,8 +30,6 @@ import (
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
-	"path/filepath"
-	"regexp"
 	"strings"
 )
 
