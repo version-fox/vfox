@@ -138,6 +138,11 @@ func upgradeCmd(ctx *cli.Context) error {
 	if err := os.Mkdir(tempDir, 0755); err != nil {
 		return cli.Exit("Failed to create directory: "+err.Error(), 1)
 	}
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			fmt.Println("Error removing directory: ", err)
+		}
+	}()
 
 	fmt.Println("Fetching", binURL)
 
@@ -148,11 +153,6 @@ func upgradeCmd(ctx *cli.Context) error {
 	if err := decompressor.Decompress(tempDir); err != nil {
 		return cli.Exit("Failed to extract file: "+err.Error(), 1)
 	}
-	defer func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			fmt.Println("Error removing directory: ", err)
-		}
-	}()
 	tempExePath := filepath.Join(tempDir, exeName)
 	if _, err := os.Stat(tempExePath); err != nil {
 		return cli.Exit("Failed to find valid executable: "+err.Error(), 1)
