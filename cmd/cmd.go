@@ -91,6 +91,7 @@ func newCmd() *cmd {
 		commands.Available,
 		commands.Search,
 		commands.Update,
+		commands.Upgrade,
 		commands.Remove,
 		commands.Add,
 		commands.Activate,
