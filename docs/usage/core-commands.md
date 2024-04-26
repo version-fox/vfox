@@ -53,7 +53,11 @@ vfox i <sdk-name>@<version>
 - `-a, --all`: Install all SDK versions recorded in .tool-versions
 
 ::: tip
-`search` command will retrieve the plugin from the remote repository and add it locally if it is not installed locally.
+You can install multiple SDKs at the same time by separating them with space.
+
+```shell
+vfox install nodejs@20 golang ...
+```
 :::
 
 ## Use

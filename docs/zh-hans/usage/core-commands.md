@@ -55,7 +55,11 @@ vfox i <sdk-name>@<version>
 - `-a, --all`: 安装 .tool-versions 中记录的所有 SDK 版本
 
 ::: tip 自动安装
-如果本地没有安装 SDK，`install`命令会从远端仓库检索插件并安装到本地。
+你可以一次性安装多个 SDK，通过空格分隔。
+
+```shell
+vfox install nodejs@20 golang ...
+```
 :::
 
 ## Use

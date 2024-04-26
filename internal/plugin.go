@@ -20,6 +20,9 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"regexp"
+
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
