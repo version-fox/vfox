@@ -149,9 +149,6 @@ func upgradeCmd(ctx *cli.Context) error {
 		return cli.Exit("Failed to extract file: "+err.Error(), 1)
 	}
 	defer func() {
-		if err := os.RemoveAll(tempFile); err != nil {
-			fmt.Println("Error removing cache file: ", err)
-		}
 		if err := os.RemoveAll(tempDir); err != nil {
 			fmt.Println("Error removing directory: ", err)
 		}
