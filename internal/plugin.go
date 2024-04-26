@@ -531,13 +531,13 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 
 	// wrap Available hook with Cache.
 	if source.HasFunction("Available") {
-		targetHook := source.pluginObj.RawGetString("Available")
+		targetHook := PLUGIN.RawGetString("Available")
 		source.pluginObj.RawSetString("Available", vm.Instance.NewFunction(func(L *lua.LState) int {
-			ctxTable := L.ToTable(1)
+			ctxTable := L.CheckTable(2)
 
 			invokeAvailableHook := func() int {
 				logger.Debugf("Calling the original Available hook. \n")
-				if err := vm.CallFunction(targetHook, ctxTable); err != nil {
+				if err := vm.CallFunction(targetHook, PLUGIN, ctxTable); err != nil {
 					L.RaiseError(err.Error())
 					return 0
 				}
@@ -580,19 +580,19 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 				L.Push(table)
 				return 1
 			} else {
-				if err := vm.CallFunction(targetHook, ctxTable); err != nil {
+				if err := vm.CallFunction(targetHook, PLUGIN, ctxTable); err != nil {
 					L.RaiseError(err.Error())
 					return 0
 				}
 				table := source.vm.ReturnedValue()
 				if table == nil || table.Type() == lua.LTNil {
-					fileCache.Set(cacheKey, nil, manager.Config.Cache.AvailableHookDuration)
+					fileCache.Set(cacheKey, nil, config.Cache.AvailableHookDuration)
 					_ = fileCache.Close()
 				} else {
 					hookResult := AvailableHookResult{}
 					if err = luai.Unmarshal(table, &hookResult); err == nil {
 						if value, err := cache.NewValue(hookResult); err == nil {
-							fileCache.Set(cacheKey, value, manager.Config.Cache.AvailableHookDuration)
+							fileCache.Set(cacheKey, value, config.Cache.AvailableHookDuration)
 							_ = fileCache.Close()
 						}
 					}
