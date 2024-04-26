@@ -513,20 +513,29 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		return nil, err
 	}
 
+	pluginInfo := &LuaPluginInfo{}
+	if err = luai.Unmarshal(PLUGIN, pluginInfo); err != nil {
+		return nil, err
+	}
+
+	source.LuaPluginInfo = pluginInfo
+
+	if !isValidName(source.Name) {
+		return nil, fmt.Errorf("invalid plugin name")
+	}
+
+	if source.Name == "" {
+		return nil, fmt.Errorf("no plugin name provided")
+	}
+
 	// wrap Available hook with Cache.
 	if source.HasFunction("Available") {
 		targetHook := source.pluginObj.RawGetString("Available")
-
 		source.pluginObj.RawSetString("Available", vm.Instance.NewFunction(func(L *lua.LState) int {
 			ctxTable := L.ToTable(1)
-			ctx := &AvailableHookCtx{}
-			if err := luai.Unmarshal(ctxTable, ctx); err != nil {
-				L.RaiseError(err.Error())
-				return 0
-			}
 
 			invokeAvailableHook := func() int {
-
+				logger.Debugf("Calling the original Available hook. \n")
 				if err := vm.CallFunction(targetHook, ctxTable); err != nil {
 					L.RaiseError(err.Error())
 					return 0
@@ -535,17 +544,29 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 				L.Push(table)
 				return 1
 			}
+
+			logger.Debugf("Available hook cache duration: %v\n", config.Cache.AvailableHookDuration)
 			// Cache is disabled
 			if config.Cache.AvailableHookDuration == 0 {
 				return invokeAvailableHook()
 			}
 
+			ctx := &AvailableHookCtx{}
+			if err := luai.Unmarshal(ctxTable, ctx); err != nil {
+				L.RaiseError(err.Error())
+				return 0
+			}
+
 			cacheKey := strings.Join(ctx.Args, "##")
+			if cacheKey == "" {
+				cacheKey = "empty"
+			}
 			fileCache, err := cache.NewFileCache(filepath.Join(pluginDirPath, "available.cache"))
 			if err != nil {
 				return invokeAvailableHook()
 			}
 			cacheValue, ok := fileCache.Get(cacheKey)
+			logger.Debugf("Available hook cache key: %s, hit: %v \n", cacheKey, ok)
 			if ok {
 				hookResult := AvailableHookResult{}
 				if err = cacheValue.Unmarshal(&hookResult); err != nil {
@@ -583,20 +604,6 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 
 	}
 
-	pluginInfo := &LuaPluginInfo{}
-	if err = luai.Unmarshal(PLUGIN, pluginInfo); err != nil {
-		return nil, err
-	}
-
-	source.LuaPluginInfo = pluginInfo
-
-	if !isValidName(source.Name) {
-		return nil, fmt.Errorf("invalid plugin name")
-	}
-
-	if source.Name == "" {
-		return nil, fmt.Errorf("no plugin name provided")
-	}
 	return source, nil
 }
 
