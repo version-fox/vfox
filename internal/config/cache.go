@@ -16,17 +16,53 @@
 
 package config
 
-import "time"
-
-// Cache is the cache configuration
-// -1: never expire
-// 0: never cache
-type Cache struct {
-	AvailableHookDuration time.Duration `yaml:"availableHookDuration"` // Available hook result cache time
-}
+import (
+	"gopkg.in/yaml.v3"
+	"time"
+)
 
 var (
 	EmptyCache = &Cache{
-		AvailableHookDuration: 12 * time.Hour,
+		AvailableHookDuration: CacheDuration(12 * time.Hour),
 	}
 )
+
+// Cache is the cache configuration
+type Cache struct {
+	AvailableHookDuration CacheDuration `yaml:"availableHookDuration"` // Available hook result cache time
+}
+
+// CacheDuration is a duration that represents the cache duration and some special values
+// -1: never expire
+// 0: never cache
+type CacheDuration time.Duration
+
+func (d *CacheDuration) MarshalYAML() (interface{}, error) {
+	switch *d {
+	case -1:
+		return -1, nil
+	case 0:
+		return 0, nil
+	default:
+		return time.Duration(*d).String(), nil
+	}
+}
+
+func (d *CacheDuration) UnmarshalYAML(node *yaml.Node) error {
+	var data any
+	err := node.Decode(&data)
+	if err != nil {
+		return err
+	}
+	switch va := data.(type) {
+	case int:
+		*d = CacheDuration(va)
+	case string:
+		pd, err := time.ParseDuration(va)
+		if err != nil {
+			return err
+		}
+		*d = CacheDuration(pd)
+	}
+	return nil
+}

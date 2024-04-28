@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/util"
 	"reflect"
 	"strings"
@@ -138,7 +139,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 
 	t.Run("Available", func(t *testing.T) {
 		m, plugin, err := factory()
-		m.Config.Cache.AvailableHookDuration = time.Second * 10
+		m.Config.Cache.AvailableHookDuration = config.CacheDuration(time.Second * 10)
 		if err != nil {
 			t.Fatal(err)
 		}

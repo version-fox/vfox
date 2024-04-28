@@ -12,4 +12,4 @@ legacyVersionFile:
   enable: true
 
 cache:
-  availableHookDuration: 1s
+  availableHookDuration: -1

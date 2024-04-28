@@ -586,13 +586,13 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 				}
 				table := source.vm.ReturnedValue()
 				if table == nil || table.Type() == lua.LTNil {
-					fileCache.Set(cacheKey, nil, config.Cache.AvailableHookDuration)
+					fileCache.Set(cacheKey, nil, cache.ExpireTime(config.Cache.AvailableHookDuration))
 					_ = fileCache.Close()
 				} else {
 					hookResult := AvailableHookResult{}
 					if err = luai.Unmarshal(table, &hookResult); err == nil {
 						if value, err := cache.NewValue(hookResult); err == nil {
-							fileCache.Set(cacheKey, value, config.Cache.AvailableHookDuration)
+							fileCache.Set(cacheKey, value, cache.ExpireTime(config.Cache.AvailableHookDuration))
 							_ = fileCache.Close()
 						}
 					}

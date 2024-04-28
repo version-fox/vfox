@@ -25,8 +25,11 @@ import (
 )
 
 const (
-	NeverExpired time.Duration = -1
+	NeverExpired ExpireTime = -1
 )
+
+// ExpireTime in UnixNano
+type ExpireTime int64
 
 // Value CacheValue is a byte slice that can be unmarshaled into any type
 type Value []byte
@@ -67,10 +70,10 @@ func NewFileCache(path string) (*FileCache, error) {
 }
 
 // Set a key value pair with a duration
-func (c *FileCache) Set(key string, value Value, duration time.Duration) {
+func (c *FileCache) Set(key string, value Value, expireTime ExpireTime) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if duration == NeverExpired {
+	if expireTime == NeverExpired {
 		c.items[key] = Item{
 			Val:    value,
 			Expire: int64(NeverExpired),
@@ -78,7 +81,7 @@ func (c *FileCache) Set(key string, value Value, duration time.Duration) {
 	} else {
 		c.items[key] = Item{
 			Val:    value,
-			Expire: time.Now().Add(duration).UnixNano(),
+			Expire: time.Now().Add(time.Duration(expireTime)).UnixNano(),
 		}
 	}
 }
