@@ -153,6 +153,10 @@ end
 
 ## Optional hook functions
 
+::: warning
+You must delete the corresponding `.lua` file if you do not need these hook functions!
+:::
+
 ### PostInstall
 
 This hook function is called after the `PreInstall` function is executed. It is used to execute additional operations,
