@@ -49,7 +49,18 @@ main() {
     exit 1
   fi
 
-  sudo mv "${FILENAME}/vfox" /usr/local/bin
+  sudo mkdir -p /usr/local/bin
+  if [ $? -ne 0 ]; then
+    echo "Failed to create /usr/local/bin directory. Please check your sudo permissions and try again."
+    exit 1
+  fi
+
+  if [ -d "/usr/local/bin" ]; then
+    sudo mv "${FILENAME}/vfox" /usr/local/bin
+  else
+    echo "/usr/local/bin is not a directory. Please make sure it is a valid directory path."
+    exit 1
+  fi
 
   if [ $? -ne 0 ]; then
     echo "Failed to move vfox to /usr/local/bin. Please check your sudo permissions and try again."
