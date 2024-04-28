@@ -7,8 +7,9 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
 
     local vfox_available = io.popen('vfox available')
     for line in vfox_available:lines() do
-        local sdk, yes = line:gsub('%c%[%d+m', ''):match('^(%a+)%s+(%u%u%u?)')
-        if sdk and yes and (yes == 'YES' or yes == 'NO') then
+        local sdk, yes = line:gsub('%c%[%d+m', ''):match('^(.+)%s(%u%u%u?)%s')
+        if (yes == 'YES' or yes == 'NO') and sdk then
+            sdk = sdk:gsub('%s*$', '')
             table.insert(vfox_sdk_table, sdk)
         end
     end
