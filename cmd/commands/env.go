@@ -166,15 +166,25 @@ func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
 	}); err != nil {
 		return nil, err
 	}
-	tvs, err := toolset.NewMultiToolVersions([]string{
-		manager.PathMeta.CurTmpPath,
-		manager.PathMeta.HomePath,
-	})
+
+	curToolVersion, err := toolset.NewToolVersion(manager.PathMeta.CurTmpPath)
 	if err != nil {
 		return nil, err
 	}
+	// If we encounter a .tool-versions file, it is valid for the entire shell session,
+	// unless we encounter the next .tool-versions file or manually switch to the use command.
+	for k, v := range workToolVersion.Record {
+		curToolVersion.Record[k] = v
+	}
+	_ = curToolVersion.Save()
+
+	homeToolVersion, err := toolset.NewToolVersion(manager.PathMeta.HomePath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Add the working directory to the first
-	tvs = append(toolset.MultiToolVersions{workToolVersion}, tvs...)
+	tvs := append(toolset.MultiToolVersions{}, workToolVersion, curToolVersion, homeToolVersion)
 
 	return manager.EnvKeys(tvs)
 }
