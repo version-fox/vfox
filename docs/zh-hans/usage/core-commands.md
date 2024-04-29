@@ -118,7 +118,7 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
-## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+## Cd 
 
 在 `VFOX_HOME` 或 SDK 目录下启动 shell。
 
@@ -133,3 +133,14 @@ vfox cd [options] [<sdk-name>]
 **选项**
 
 - `-p, --plugin`: 在插件目录下启动 shell。
+
+
+## Upgrade <Badge type="tip" text=">= 0.4.2" vertical="middle" />
+
+升级 `vfox` 到最新版本。
+
+**用法**
+
+```shell
+vfox upgrade
+```

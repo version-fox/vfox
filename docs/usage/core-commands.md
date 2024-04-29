@@ -118,7 +118,7 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
-## Cd <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+## Cd 
 
 Launch a shell in the `VFOX_HOME` or SDK directory.
 
@@ -133,3 +133,13 @@ vfox cd [options] [<sdk-name>]
 **Options**
 
 - `-p, --plugin`: Launch a shell in the plugin directory.
+
+## Upgrade <Badge type="tip" text=">= 0.4.2" vertical="middle" />
+
+Upgrade `vfox` to the latest version.
+
+**Usage**
+
+```shell
+vfox upgrade
+```

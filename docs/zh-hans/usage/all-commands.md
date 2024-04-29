@@ -1,7 +1,7 @@
 # 所有命令
 
 ```shell
-vfox - VersionFox, a tool for sdk version management
+vfox - vfox is a tool for runtime version management.
 vfox available      List all available plugins
 vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from offical repository or custom source, `--alias` and `--source` are not supported when adding multiple plugins.
 vfox remove <sdk-name>          Remove a plugin
@@ -15,5 +15,6 @@ vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox config [<key>] [<value>]       Setup, view config
 vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
+vfox upgrade                    Upgrade vfox to the latest version 
 vfox help                      Show this help message
 ```
