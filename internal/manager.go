@@ -315,6 +315,11 @@ func (m *Manager) Update(pluginName string) error {
 
 	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.Green(pluginName), pterm.Blue(tempPlugin.Version))
 
+	// It's probably an old format plugin, just a reminder.
+	if tempPlugin.UpdateUrl != "" && tempPlugin.ManifestUrl != "" {
+		pterm.Printf("%s\n", pterm.LightYellow("This plugin maybe an old format plugin, please update this plugin again!"))
+	}
+
 	return nil
 }
 
