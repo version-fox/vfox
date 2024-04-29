@@ -81,10 +81,8 @@ func installCmd(ctx *cli.Context) error {
 				errorStore.AddAndShow(name, err)
 				continue
 			}
-
-			err = source.Install(version)
-			if errors.Is(err, internal.ErrNoVersionProvided) {
-				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", name))
+			if version == "" {
+				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
 					err := RunSearch(name, []string{})
 					if err != nil {
@@ -92,11 +90,11 @@ func installCmd(ctx *cli.Context) error {
 					}
 					continue
 				}
-			}
-
-			if err != nil {
-				errorStore.AddAndShow(name, err)
-				continue
+			} else {
+				if err = source.Install(version); err != nil {
+					errorStore.AddAndShow(name, err)
+					continue
+				}
 			}
 		}
 	}
