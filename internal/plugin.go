@@ -151,6 +151,7 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
+	logger.Debugf("PreInstallHookCtx: %+v \n", ctxTable)
 	if err = l.CallFunction("PreInstall", ctxTable); err != nil {
 		return nil, err
 	}
@@ -167,6 +168,8 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 		return nil, err
 	}
 
+	logger.Debugf("PreInstallHookResult: %+v \n", result)
+
 	mainSdk, err := result.Info()
 	if err != nil {
 		return nil, err
@@ -182,7 +185,6 @@ func (l *LuaPlugin) PreInstall(version Version) (*Package, error) {
 
 		additionalArr = append(additionalArr, addition.Info())
 	}
-
 	return &Package{
 		Main:      mainSdk,
 		Additions: additionalArr,
@@ -201,6 +203,7 @@ func (l *LuaPlugin) PostInstall(rootPath string, sdks []*Info) error {
 		SdkInfo:  make(map[string]*Info),
 	}
 
+	logger.Debugf("PostInstallHookCtx: %+v \n", ctx)
 	for _, v := range sdks {
 		ctx.SdkInfo[v.Name] = v
 	}
@@ -237,6 +240,8 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 		return nil, err
 	}
 
+	logger.Debugf("EnvKeysHookCtx: %+v \n", ctx)
+
 	if err = l.CallFunction("EnvKeys", ctxTable); err != nil {
 		return nil, err
 	}
@@ -268,6 +273,7 @@ func (l *LuaPlugin) EnvKeys(sdkPackage *Package) (*env.Envs, error) {
 
 	envKeys.Paths = pathSet
 
+	logger.Debugf("EnvKeysHookResult: %+v \n", envKeys)
 	return envKeys, nil
 }
 

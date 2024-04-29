@@ -100,6 +100,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 		if !util.FileExists(oldPath) {
 			return nil, NotFoundError{Msg: fmt.Sprintf("%s not installed", name)}
 		}
+		logger.Debugf("Found old plugin path %s \n", oldPath)
 		// FIXME !!! This snippet will be removed in a later version
 		// rename old plugin path to new plugin path
 		err := os.Mkdir(filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)), 0777)
@@ -160,6 +161,7 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
 		if d.IsDir() {
 		} else if strings.HasSuffix(sdkName, ".lua") {
+			logger.Debugf("Found old plugin: %s \n", path)
 			// FIXME !!! This snippet will be removed in a later version
 			// rename old plugin path to new plugin path
 			newPluginDir := filepath.Join(m.PathMeta.PluginPath, strings.TrimSuffix(sdkName, ".lua"))
@@ -433,6 +435,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if pname == "" {
 		pname = tempPlugin.Name
 		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		logger.Debugf("No plugin name provided, use %s as plugin name, installPath: %s\n", pname, installPath)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
@@ -443,6 +446,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 
 	// set legacy filenames
 	if len(tempPlugin.LegacyFilenames) > 0 {
+		logger.Debugf("Add legacy filenames for %s plugin, %+v \n", pname, tempPlugin.LegacyFilenames)
 		lfr, err := m.loadLegacyFileRecord()
 		if err != nil {
 			return err

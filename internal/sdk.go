@@ -275,7 +275,7 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 }
 
 func (b *Sdk) Use(version Version, scope UseScope) error {
-	logger.Debugf("use sdk version: %s\n", string(version))
+	logger.Debugf("Use SDK version: %s, scope:%v\n", string(version), scope)
 
 	version, err := b.PreUse(version, scope)
 	if err != nil {
@@ -344,6 +344,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		}
 
 		// clear global env
+		logger.Debugf("Clear global env: %s\n", b.Plugin.SdkName)
 		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
@@ -361,6 +362,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
+		logger.Debugf("Load project toolchain versions: %v\n", toolVersion.Record)
 		multiToolVersion = append(multiToolVersion, toolVersion)
 	}
 
