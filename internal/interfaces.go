@@ -98,6 +98,7 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 type PreInstallHookResult struct {
 	Version  string                              `luai:"version"`
 	Url      string                              `luai:"url"`
+	Headers  map[string]string                   `luai:"headers"`
 	Note     string                              `luai:"note"`
 	Sha256   string                              `luai:"sha256"`
 	Sha512   string                              `luai:"sha512"`
@@ -124,6 +125,7 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 		Name:     "",
 		Version:  Version(i.Version),
 		Path:     i.Url,
+		Headers:  i.Headers,
 		Note:     i.Note,
 		Checksum: sum.Checksum(),
 	}, nil

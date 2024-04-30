@@ -138,7 +138,7 @@ func (b *Sdk) moveRemoteFile(info *Info, targetPath string) error {
 	if err != nil {
 		return err
 	}
-	filePath, err := b.Download(u)
+	filePath, err := b.Download(u, info.Headers)
 	if err != nil {
 		return fmt.Errorf("failed to download %s file, err:%w", label, err)
 	}
@@ -551,10 +551,13 @@ func (b *Sdk) VersionPath(version Version) string {
 	return filepath.Join(b.InstallPath, fmt.Sprintf("v-%s", version))
 }
 
-func (b *Sdk) Download(u *url.URL) (string, error) {
+func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", err
+	}
+	for key, value := range headers {
+		req.Header.Add(key, value)
 	}
 	resp, err := b.sdkManager.HttpClient().Do(req)
 	if err != nil {
