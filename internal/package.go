@@ -26,10 +26,11 @@ type Package struct {
 }
 
 type Info struct {
-	Name     string  `luai:"name"`
-	Version  Version `luai:"version"`
-	Path     string  `luai:"path"`
-	Note     string  `luai:"note"`
+	Name     string            `luai:"name"`
+	Version  Version           `luai:"version"`
+	Path     string            `luai:"path"`
+	Headers  map[string]string `luai:"headers"`
+	Note     string            `luai:"note"`
 	Checksum *Checksum
 }
 
