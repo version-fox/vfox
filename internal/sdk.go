@@ -582,7 +582,11 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 		return "", err
 	}
 
-	path := filepath.Join(b.InstallPath, filepath.Base(u.Path))
+	fileName := filepath.Base(u.Path)
+	if !strings.Contains(fileName, ".") && u.Fragment != "" {
+		fileName = strings.Trim(u.Fragment, "#/")
+	}
+	path := filepath.Join(b.InstallPath, fileName)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
