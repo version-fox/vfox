@@ -69,13 +69,14 @@ type PreInstallHookCtx struct {
 }
 
 type PreInstallHookResultAdditionItem struct {
-	Name   string `luai:"name"`
-	Url    string `luai:"url"`
-	Note   string `luai:"note"`
-	Sha256 string `luai:"sha256"`
-	Sha512 string `luai:"sha512"`
-	Sha1   string `luai:"sha1"`
-	Md5    string `luai:"md5"`
+	Name    string            `luai:"name"`
+	Url     string            `luai:"url"`
+	Headers map[string]string `luai:"headers"`
+	Note    string            `luai:"note"`
+	Sha256  string            `luai:"sha256"`
+	Sha512  string            `luai:"sha512"`
+	Sha1    string            `luai:"sha1"`
+	Md5     string            `luai:"md5"`
 }
 
 func (i *PreInstallHookResultAdditionItem) Info() *Info {
@@ -90,6 +91,7 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 		Name:     i.Name,
 		Version:  Version(""),
 		Path:     i.Url,
+		Headers:  i.Headers,
 		Note:     i.Note,
 		Checksum: sum.Checksum(),
 	}
