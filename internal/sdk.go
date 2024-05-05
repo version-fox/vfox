@@ -584,7 +584,7 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 
 	fileName := filepath.Base(u.Path)
 	if !strings.Contains(fileName, ".") && u.Fragment != "" {
-		fileName = strings.Trim(u.Fragment, "#/")
+		fileName = strings.Trim(u.Fragment, "/")
 	}
 	path := filepath.Join(b.InstallPath, fileName)
 
