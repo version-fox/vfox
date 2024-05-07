@@ -71,7 +71,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## Cache Settings <Badge type="tip" text=">= 0.4.1" vertical="middle" />
+## Cache Settings <Badge type="tip" text=">= 0.4.3" vertical="middle" />
 
 `vfox` will cache the results of the `search` command (`available` hook) by default to reduce the number of network requests. The default
 cache time is `12h`.
