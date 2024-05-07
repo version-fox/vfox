@@ -18,6 +18,7 @@ package module
 
 import (
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/module/archiver"
 	"github.com/version-fox/vfox/internal/module/html"
 	"github.com/version-fox/vfox/internal/module/http"
 	"github.com/version-fox/vfox/internal/module/json"
@@ -30,4 +31,5 @@ func Preload(L *lua.LState, config *config.Config) {
 	json.Preload(L)
 	html.Preload(L)
 	string.Preload(L)
+	archiver.Preload(L)
 }

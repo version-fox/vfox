@@ -1,4 +1,4 @@
-package string
+package archiver
 
 import (
 	"github.com/version-fox/vfox/internal/util"

@@ -1,4 +1,4 @@
-package string
+package archiver
 
 import (
 	lua "github.com/yuin/gopher-lua"
