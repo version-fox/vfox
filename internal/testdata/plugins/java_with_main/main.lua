@@ -93,7 +93,7 @@ function PLUGIN:Available(ctx)
     return {
         {
             version = "xxxx",
-            note = "LTS",
+            note = os.time(),
             addition = {
                 {
                     name = "npm",

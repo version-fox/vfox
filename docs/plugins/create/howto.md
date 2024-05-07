@@ -119,6 +119,13 @@ function PLUGIN:Available(ctx)
 end
 ```
 
+::: warning Cache
+
+`vfox` will cache the results of the `Available` hook to reduce the number of network requests. The default cache time is
+`12h`. For details, see [Cache Settings](../../guides/configuration.md#cache-settings).
+
+:::
+
 ### EnvKeys
 
 It is used to return the environment variables that need to be configured when using the SDK.

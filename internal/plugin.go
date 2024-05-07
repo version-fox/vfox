@@ -24,11 +24,13 @@ import (
 	"regexp"
 
 	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
+	"strings"
 )
 
 const (
@@ -441,9 +443,9 @@ func (l *LuaPlugin) ShowNotes() {
 // - The directory contain a main.lua file that defines the plugin object and all hook functions.
 func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 	vm := luai.NewLuaVM()
-
+	config := manager.Config
 	if err := vm.Prepare(&luai.PrepareOptions{
-		Config: manager.Config,
+		Config: config,
 	}); err != nil {
 		return nil, err
 	}
@@ -532,6 +534,83 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 	if source.Name == "" {
 		return nil, fmt.Errorf("no plugin name provided")
 	}
+
+	// wrap Available hook with Cache.
+	if source.HasFunction("Available") {
+		targetHook := PLUGIN.RawGetString("Available")
+		source.pluginObj.RawSetString("Available", vm.Instance.NewFunction(func(L *lua.LState) int {
+			ctxTable := L.CheckTable(2)
+
+			invokeAvailableHook := func() int {
+				logger.Debugf("Calling the original Available hook. \n")
+				if err := vm.CallFunction(targetHook, PLUGIN, ctxTable); err != nil {
+					L.RaiseError(err.Error())
+					return 0
+				}
+				table := source.vm.ReturnedValue()
+				L.Push(table)
+				return 1
+			}
+
+			logger.Debugf("Available hook cache duration: %v\n", config.Cache.AvailableHookDuration)
+			// Cache is disabled
+			if config.Cache.AvailableHookDuration == 0 {
+				return invokeAvailableHook()
+			}
+
+			ctx := &AvailableHookCtx{}
+			if err := luai.Unmarshal(ctxTable, ctx); err != nil {
+				L.RaiseError(err.Error())
+				return 0
+			}
+
+			cacheKey := strings.Join(ctx.Args, "##")
+			if cacheKey == "" {
+				cacheKey = "empty"
+			}
+			fileCache, err := cache.NewFileCache(filepath.Join(pluginDirPath, "available.cache"))
+			if err != nil {
+				return invokeAvailableHook()
+			}
+			cacheValue, ok := fileCache.Get(cacheKey)
+			logger.Debugf("Available hook cache key: %s, hit: %v \n", cacheKey, ok)
+			if ok {
+				hookResult := AvailableHookResult{}
+				if err = cacheValue.Unmarshal(&hookResult); err != nil {
+					return invokeAvailableHook()
+				}
+				table, err := luai.Marshal(L, hookResult)
+				if err != nil {
+					return invokeAvailableHook()
+				}
+				L.Push(table)
+				return 1
+			} else {
+				if err := vm.CallFunction(targetHook, PLUGIN, ctxTable); err != nil {
+					L.RaiseError(err.Error())
+					return 0
+				}
+				table := source.vm.ReturnedValue()
+				if table == nil || table.Type() == lua.LTNil {
+					fileCache.Set(cacheKey, nil, cache.ExpireTime(config.Cache.AvailableHookDuration))
+					_ = fileCache.Close()
+				} else {
+					hookResult := AvailableHookResult{}
+					if err = luai.Unmarshal(table, &hookResult); err == nil {
+						if value, err := cache.NewValue(hookResult); err == nil {
+							fileCache.Set(cacheKey, value, cache.ExpireTime(config.Cache.AvailableHookDuration))
+							_ = fileCache.Close()
+						}
+					}
+				}
+				L.Push(table)
+				return 1
+			}
+
+		}))
+
+	}
+
 	return source, nil
 }
 

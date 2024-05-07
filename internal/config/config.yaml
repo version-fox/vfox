@@ -10,3 +10,6 @@ registry:
 
 legacyVersionFile:
   enable: true
+
+cache:
+  availableHookDuration: -1

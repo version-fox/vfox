@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/util"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	_ "embed"
 
@@ -66,9 +68,10 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 		}
 	})
 
-	testHookFunc(t, func() (*LuaPlugin, error) {
+	testHookFunc(t, func() (*Manager, *LuaPlugin, error) {
 		manager := NewSdkManager()
-		return NewLuaPlugin(pluginPathWithMain, manager)
+		plugin, err := NewLuaPlugin(pluginPathWithMain, manager)
+		return manager, plugin, err
 	})
 
 }
@@ -124,33 +127,50 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			}
 		}
 	})
-	testHookFunc(t, func() (*LuaPlugin, error) {
+	testHookFunc(t, func() (*Manager, *LuaPlugin, error) {
 		manager := NewSdkManager()
-		return NewLuaPlugin(pluginPathWithMetadata, manager)
+		plugin, err := NewLuaPlugin(pluginPathWithMetadata, manager)
+		return manager, plugin, err
 	})
 }
 
-func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
+func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 	t.Helper()
 
 	t.Run("Available", func(t *testing.T) {
-		plugin, err := factory()
+		m, plugin, err := factory()
+		m.Config.Cache.AvailableHookDuration = config.CacheDuration(time.Second * 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		pkgs, err := plugin.Available([]string{})
-		if err != nil {
-			t.Fatal(err)
+		getResult := func() string {
+			pkgs, err := plugin.Available([]string{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := pkgs[0].Main.Note
+			return v
+		}
+		version := getResult()
+		for i := 0; i < 6; i++ {
+			v := getResult()
+			if version != v {
+				t.Errorf("expected version '%s', got '%s'", version, v)
+			}
+			time.Sleep(time.Second)
 		}
 
-		if len(pkgs) != 1 {
-			t.Errorf("expected 1 package, got %d", len(pkgs))
+		time.Sleep(time.Second * 10)
+
+		vv := getResult()
+		if version == vv {
+			t.Errorf("expected version to be different, got '%s'", vv)
 		}
 	})
 
 	t.Run("PreInstall", func(t *testing.T) {
-		plugin, err := factory()
+		_, plugin, err := factory()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +219,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 	})
 
 	t.Run("EnvKeys", func(t *testing.T) {
-		plugin, err := factory()
+		_, plugin, err := factory()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +273,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 	})
 
 	t.Run("PreUse", func(t *testing.T) {
-		plugin, err := factory()
+		_, plugin, err := factory()
 
 		inputVersion := Version("20.0")
 		previousVersion := Version("21.0")
@@ -295,7 +315,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 	})
 
 	t.Run("ParseLegacyFile", func(t *testing.T) {
-		plugin, err := factory()
+		_, plugin, err := factory()
 		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
 			return nil
 		})
@@ -327,7 +347,7 @@ func testHookFunc(t *testing.T, factory func() (*LuaPlugin, error)) {
 	})
 
 	t.Run("PreUninstall", func(t *testing.T) {
-		plugin, err := factory()
+		_, plugin, err := factory()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -28,6 +28,7 @@ type Config struct {
 	Storage           *Storage           `yaml:"storage"`
 	Registry          *Registry          `yaml:"registry"`
 	LegacyVersionFile *LegacyVersionFile `yaml:"legacyVersionFile"`
+	Cache             *Cache             `yaml:"cache"`
 }
 
 const filename = "config.yaml"
@@ -38,6 +39,7 @@ var (
 		Storage:           EmptyStorage,
 		Registry:          EmptyRegistry,
 		LegacyVersionFile: EmptyLegacyVersionFile,
+		Cache:             EmptyCache,
 	}
 )
 
@@ -70,6 +72,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.LegacyVersionFile == nil {
 		config.LegacyVersionFile = EmptyLegacyVersionFile
+	}
+	if config.Cache == nil {
+		config.Cache = EmptyCache
 	}
 	return config, nil
 
