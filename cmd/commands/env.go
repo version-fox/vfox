@@ -22,6 +22,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolset"
 )
@@ -127,27 +128,14 @@ func envFlag(ctx *cli.Context) error {
 	for k, v := range envKeys.Variables {
 		exportEnvs[k] = v
 	}
-	sdkPaths := envKeys.Paths
 
-	// Takes the complement of previousPaths and sdkPaths, and removes the complement from osPaths.
-	previousPaths := env.NewPaths(env.PreviousPaths)
-	for _, pp := range previousPaths.Slice() {
-		if sdkPaths.Contains(pp) {
-			previousPaths.Remove(pp)
-		}
+	// FIXME Optimize to avoid repeated generation
+	// generate shims for current shell
+	if envKeys.Paths.Len() > 0 {
+		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
+		envKeys.Paths.ToBinPaths().GenerateShims(manager.PathMeta.ShellShimsPath)
 	}
-	osPaths := env.NewPaths(env.OsPaths)
-	if previousPaths.Len() != 0 {
-		for _, pp := range previousPaths.Slice() {
-			osPaths.Remove(pp)
-		}
-	}
-	// Set the sdk paths to the new previous paths.
-	newPreviousPathStr := sdkPaths.String()
-	exportEnvs[env.PreviousPathsFlag] = &newPreviousPathStr
 
-	pathStr := sdkPaths.Merge(osPaths).String()
-	exportEnvs["PATH"] = &pathStr
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
 	return nil

@@ -34,6 +34,8 @@ type PathMeta struct {
 	PluginPath       string
 	ExecutablePath   string
 	WorkingDirectory string
+	GlobalShimsPath  string
+	ShellShimsPath   string
 }
 
 func newPathMeta() (*PathMeta, error) {
@@ -63,6 +65,11 @@ func newPathMeta() (*PathMeta, error) {
 		}
 	}
 
+	globalShimsPath := filepath.Join(homePath, "shims")
+	_ = os.MkdirAll(globalShimsPath, 0777)
+	shellShimsPath := filepath.Join(curTmpPath, "shims")
+	_ = os.MkdirAll(shellShimsPath, 0777)
+
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("get current working directory failed: %w", err)
@@ -76,5 +83,7 @@ func newPathMeta() (*PathMeta, error) {
 		PluginPath:       pluginPath,
 		ExecutablePath:   exePath,
 		WorkingDirectory: workingDirectory,
+		GlobalShimsPath:  globalShimsPath,
+		ShellShimsPath:   shellShimsPath,
 	}, nil
 }
