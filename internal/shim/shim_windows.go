@@ -22,6 +22,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 )
@@ -38,17 +39,28 @@ func (s *Shim) Clear() (err error) {
 	filename := filepath.Base(s.BinaryPath)
 	ext := filepath.Ext(filename)
 	shimName := filename[:len(filename)-len(ext)] + ".shim"
-	if err = os.Remove(filepath.Join(s.OutputPath, filename)); err != nil {
-		return
+	shimBinary := filepath.Join(s.OutputPath, filename)
+
+	if util.FileExists(shimBinary) {
+		if err = os.Remove(shimBinary); err != nil {
+			return
+		}
 	}
-	if err = os.Remove(filepath.Join(s.OutputPath, shimName)); err != nil {
-		return
+	shimFile := filepath.Join(s.OutputPath, shimName)
+	if util.FileExists(shimFile) {
+		if err = os.Remove(shimFile); err != nil {
+			return
+		}
 	}
 	return nil
 }
 
 // Generate generates the shim.
 func (s *Shim) Generate() error {
+	if err := s.Clear(); err != nil {
+		logger.Debugf("Clear shim failed: %s", err)
+		return err
+	}
 	filename := filepath.Base(s.BinaryPath)
 	stat, err := os.Stat(s.BinaryPath)
 	if err != nil {

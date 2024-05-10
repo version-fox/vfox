@@ -19,6 +19,7 @@ package commands
 import (
 	"fmt"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/shim"
 	"os"
 	"strings"
 	"text/template"
@@ -78,7 +79,13 @@ func activateCmd(ctx *cli.Context) error {
 	// generate shims for current shell
 	if envKeys.Paths.Len() > 0 {
 		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
-		envKeys.Paths.ToBinPaths().GenerateShims(manager.PathMeta.ShellShimsPath)
+		bins := envKeys.Paths.ToBinPaths()
+		for _, bin := range bins.Slice() {
+			binShim := shim.NewShim(bin, manager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
+		}
 	}
 
 	_ = os.Setenv(env.HookFlag, name)

@@ -29,11 +29,18 @@ import (
 func (s *Shim) Clear() error {
 	name := filepath.Base(s.BinaryPath)
 	targetShim := filepath.Join(s.OutputPath, name)
+	if !util.FileExists(targetShim) {
+		return nil
+	}
 	return os.Remove(targetShim)
 }
 
 // Generate generates the shim.
 func (s *Shim) Generate() error {
+	if err := s.Clear(); err != nil {
+		logger.Debugf("Clear shim failed: %s", err)
+		return err
+	}
 	name := filepath.Base(s.BinaryPath)
 	targetShim := filepath.Join(s.OutputPath, name)
 	logger.Debugf("Create shim from %s to %s", s.BinaryPath, targetShim)

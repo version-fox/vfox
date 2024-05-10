@@ -24,6 +24,7 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
 )
 
@@ -133,7 +134,13 @@ func envFlag(ctx *cli.Context) error {
 	// generate shims for current shell
 	if envKeys.Paths.Len() > 0 {
 		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
-		envKeys.Paths.ToBinPaths().GenerateShims(manager.PathMeta.ShellShimsPath)
+		bins := envKeys.Paths.ToBinPaths()
+		for _, bin := range bins.Slice() {
+			binShim := shim.NewShim(bin, manager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
+		}
 	}
 
 	exportStr := s.Export(exportEnvs)

@@ -19,6 +19,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/shim"
 	"io"
 	"net"
 	"net/http"
@@ -300,7 +301,13 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 
-		keys.Paths.ToBinPaths().GenerateShims(b.sdkManager.PathMeta.GlobalShimsPath)
+		bins := keys.Paths.ToBinPaths()
+		for _, bin := range bins.Slice() {
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
+		}
 
 		// clear global env
 		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
@@ -340,7 +347,12 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 
-		binPaths.GenerateShims(b.sdkManager.PathMeta.GlobalShimsPath)
+		for _, bin := range binPaths.Slice() {
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
+		}
 
 		// clear global env
 		logger.Debugf("Clear global env: %s\n", b.Plugin.SdkName)
@@ -384,7 +396,12 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
 
-	binPaths.GenerateShims(b.sdkManager.PathMeta.ShellShimsPath)
+	for _, bin := range binPaths.Slice() {
+		binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+		if err = binShim.Generate(); err != nil {
+			continue
+		}
+	}
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))
 	if !env.IsHookEnv() {

@@ -17,7 +17,6 @@
 package env
 
 import (
-	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
@@ -32,14 +31,6 @@ const (
 	PreviousPaths
 )
 
-// BinPaths is a slice of bin paths.
-type BinPaths Paths
-
-// GenerateShims generates shims to target dir for the bin paths.
-func (b *BinPaths) GenerateShims(dir string) {
-	logger.Debugf("Generate shims to %s", dir)
-}
-
 // Paths is a slice of PATH.
 type Paths struct {
 	util.Set[string]
@@ -53,7 +44,7 @@ func (p *Paths) Merge(other *Paths) *Paths {
 }
 
 // ToBinPaths returns a BinPaths from Paths which contains only executable files.
-func (p *Paths) ToBinPaths() *BinPaths {
+func (p *Paths) ToBinPaths() *Paths {
 	bins := NewPaths(EmptyPaths)
 	for _, path := range p.Slice() {
 		dir, err := os.ReadDir(path)
@@ -70,7 +61,7 @@ func (p *Paths) ToBinPaths() *BinPaths {
 			}
 		}
 	}
-	return (*BinPaths)(bins)
+	return bins
 }
 
 // NewPaths returns a new Paths.

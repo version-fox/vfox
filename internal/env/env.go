@@ -34,6 +34,6 @@ type Vars map[string]*string
 // Envs is a struct that contains environment variables and PATH.
 type Envs struct {
 	Variables Vars
-	BinPaths  *BinPaths
+	BinPaths  *Paths
 	Paths     *Paths
 }
