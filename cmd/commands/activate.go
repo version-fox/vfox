@@ -91,7 +91,7 @@ func activateCmd(ctx *cli.Context) error {
 	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
 	osPaths := env.NewPaths(env.OsPaths)
-	osPaths.Add(manager.PathMeta.ShellShimsPath)
+	osPaths.AddWithIndex(0, manager.PathMeta.ShellShimsPath)
 	osPathsStr := osPaths.String()
 	exportEnvs["PATH"] = &osPathsStr
 

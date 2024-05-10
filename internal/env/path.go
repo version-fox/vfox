@@ -28,12 +28,11 @@ type PathFrom int
 const (
 	EmptyPaths PathFrom = iota
 	OsPaths
-	PreviousPaths
 )
 
 // Paths is a slice of PATH.
 type Paths struct {
-	util.Set[string]
+	*util.SortedSet[string]
 }
 
 func (p *Paths) Merge(other *Paths) *Paths {
@@ -74,10 +73,6 @@ func NewPaths(from PathFrom) *Paths {
 	switch from {
 	case OsPaths:
 		paths = strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
-	case PreviousPaths:
-		if preStr := os.Getenv(PreviousPathsFlag); preStr != "" {
-			paths = strings.Split(preStr, string(os.PathListSeparator))
-		}
 	default:
 
 	}
