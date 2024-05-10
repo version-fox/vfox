@@ -211,6 +211,22 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if err != nil {
 		return
 	}
+	fmt.Println("Cleaning up the shims...")
+	envKeys, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		return err
+	}
+	for _, p := range envKeys.Paths.ToBinPaths().Slice() {
+		_ = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear()
+	}
+
+	tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+	if err != nil {
+		return err
+	}
+	delete(tv.Record, b.Plugin.SdkName)
+	_ = tv.Save()
+
 	err = os.RemoveAll(path)
 	if err != nil {
 		return
