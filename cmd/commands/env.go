@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
+	"path/filepath"
 )
 
 var Env = &cli.Command{
@@ -130,7 +132,6 @@ func envFlag(ctx *cli.Context) error {
 		exportEnvs[k] = v
 	}
 
-	// FIXME Optimize to avoid repeated generation
 	// generate shims for current shell
 	if envKeys.Paths.Len() > 0 {
 		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
@@ -166,20 +167,45 @@ func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
 	if err != nil {
 		return nil, err
 	}
-	// If we encounter a .tool-versions file, it is valid for the entire shell session,
-	// unless we encounter the next .tool-versions file or manually switch to the use command.
-	for k, v := range workToolVersion.Record {
-		curToolVersion.Record[k] = v
-	}
-	_ = curToolVersion.Save()
+	defer curToolVersion.Save()
 
-	homeToolVersion, err := toolset.NewToolVersion(manager.PathMeta.HomePath)
+	// Add the working directory to the first
+	tvs := toolset.MultiToolVersions{workToolVersion, curToolVersion}
+
+	shellEnvs := &env.Envs{
+		Variables: make(env.Vars),
+		Paths:     env.NewPaths(env.EmptyPaths),
+	}
+	flushCache, err := cache.NewFileCache(filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache"))
 	if err != nil {
 		return nil, err
 	}
+	defer flushCache.Close()
 
-	// Add the working directory to the first
-	tvs := append(toolset.MultiToolVersions{}, workToolVersion, curToolVersion, homeToolVersion)
+	tvs.FilterTools(func(name, version string) bool {
+		if lookupSdk, err := manager.LookupSdk(name); err == nil {
+			vv, ok := flushCache.Get(name)
+			if ok && string(vv) == version {
+				logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
+				return true
+			} else {
+				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+			}
+			if keys, err := lookupSdk.EnvKeys(internal.Version(version)); err == nil {
+				for key, value := range keys.Variables {
+					shellEnvs.Variables[key] = value
+				}
+				shellEnvs.Paths.Merge(keys.Paths)
+				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
 
-	return manager.EnvKeys(tvs)
+				// If we encounter a .tool-versions file, it is valid for the entire shell session,
+				// unless we encounter the next .tool-versions file or manually switch to the use command.
+				curToolVersion.Record[name] = version
+				return true
+			}
+		}
+		return false
+	})
+
+	return shellEnvs, nil
 }

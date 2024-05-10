@@ -38,17 +38,17 @@ func (s *Shim) Clear() error {
 // Generate generates the shim.
 func (s *Shim) Generate() error {
 	if err := s.Clear(); err != nil {
-		logger.Debugf("Clear shim failed: %s", err)
+		logger.Debugf("Clear shim failed: %s\n", err)
 		return err
 	}
 	name := filepath.Base(s.BinaryPath)
 	targetShim := filepath.Join(s.OutputPath, name)
-	logger.Debugf("Create shim from %s to %s", s.BinaryPath, targetShim)
+	logger.Debugf("Create shim from %s to %s\n", s.BinaryPath, targetShim)
 	if util.FileExists(targetShim) {
 		_ = os.Remove(targetShim)
 	}
 	if err := os.Symlink(s.BinaryPath, targetShim); err != nil {
-		logger.Debugf("Create symlink failed: %s", err)
+		logger.Debugf("Create symlink failed: %s\n", err)
 		return err
 	}
 	return nil
