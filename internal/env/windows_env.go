@@ -239,5 +239,5 @@ func (p *Paths) Add(path string) bool {
 	} else {
 		path = filepath.FromSlash(path)
 	}
-	return p.Set.Add(path)
+	return p.SortedSet.Add(path)
 }
