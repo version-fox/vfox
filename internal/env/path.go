@@ -38,18 +38,6 @@ type BinPaths Paths
 // GenerateShims generates shims to target dir for the bin paths.
 func (b *BinPaths) GenerateShims(dir string) {
 	logger.Debugf("Generate shims to %s", dir)
-	for _, p := range b.Slice() {
-		name := filepath.Base(p)
-		targetShim := filepath.Join(dir, name)
-		logger.Debugf("Create shim from %s to %s", p, targetShim)
-		if util.FileExists(targetShim) {
-			_ = os.Remove(targetShim)
-		}
-		if err := util.MkSymlink(p, targetShim); err != nil {
-			logger.Debugf("Create symlink failed: %s", err)
-			continue
-		}
-	}
 }
 
 // Paths is a slice of PATH.
