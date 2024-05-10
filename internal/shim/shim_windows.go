@@ -21,14 +21,28 @@ package shim
 import (
 	_ "embed"
 	"fmt"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 const shimFileContent = `
 path = "%s"
+`
+
+const cmdShimContent = `
+@echo off
+call "%s" %%*
+`
+const ps1ShimContent = `
+param (
+    [Parameter(Position=0, ValueFromRemainingArguments=$true)]
+    $params
+)
+
+& '%s' $params
 `
 
 //go:embed binary/shim.exe
@@ -67,11 +81,22 @@ func (s *Shim) Generate() error {
 		return err
 	}
 	targetPath := filepath.Join(s.OutputPath, filename)
+	ext := filepath.Ext(filename)
+	if ext == ".cmd" {
+		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(cmdShimContent, s.BinaryPath)), stat.Mode()); err != nil {
+			return fmt.Errorf("failed to gnerate shim: %w", err)
+		}
+		return nil
+	} else if ext == ".ps1" {
+		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(ps1ShimContent, s.BinaryPath)), stat.Mode()); err != nil {
+			return fmt.Errorf("failed to gnerate shim: %w", err)
+		}
+		return nil
+	}
 	logger.Debugf("Write shim binary to %s", targetPath)
 	if err = os.WriteFile(targetPath, shim, stat.Mode()); err != nil {
 		return fmt.Errorf("failed to gnerate shim: %w", err)
 	}
-	ext := filepath.Ext(filename)
 	shimName := filename[:len(filename)-len(ext)] + ".shim"
 	shimFile := filepath.Join(s.OutputPath, shimName)
 	logger.Debugf("Write shim file to %s", shimFile)
