@@ -14,26 +14,18 @@
  *    limitations under the License.
  */
 
-package env
+package shim
 
-import (
-	"io"
-)
-
-type Manager interface {
-	Flush() error
-	Load(envs *Envs) error
-	Get(key string) (string, bool)
-	Remove(envs *Envs) error
-	io.Closer
+// Shim is a struct that contains the binary path and output path which is used to generate the shim.
+type Shim struct {
+	BinaryPath string
+	OutputPath string
 }
 
-// Vars is a map of environment variables
-type Vars map[string]*string
-
-// Envs is a struct that contains environment variables and PATH.
-type Envs struct {
-	Variables Vars
-	BinPaths  *Paths
-	Paths     *Paths
+// NewShim creates a new Shim instance.
+func NewShim(binaryPath, outputPath string) *Shim {
+	return &Shim{
+		BinaryPath: binaryPath,
+		OutputPath: outputPath,
+	}
 }

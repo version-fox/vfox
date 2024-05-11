@@ -19,7 +19,10 @@ package util
 import (
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 func FileExists(filename string) bool {
@@ -97,4 +100,30 @@ func ChangeModeIfNot(src string, mode os.FileMode) error {
 		}
 	}
 	return nil
+}
+
+// IsExecutable Check if a file is executable
+func IsExecutable(src string) bool {
+	if runtime.GOOS == "windows" {
+		ext := strings.ToLower(filepath.Ext(src))
+		return ext == ".exe" || ext == ".bat" || ext == ".cmd" || ext == ".ps1"
+	} else {
+		info, err := os.Stat(src)
+		if err != nil {
+			return false
+		}
+		return info.Mode()&0111 != 0
+	}
+}
+
+// MkSymlink Create a symbolic link
+func MkSymlink(oldname, newname string) (err error) {
+	if runtime.GOOS == "windows" {
+		// Create a symbolic link on Windows
+		// https://superuser.com/questions/1020821/how-can-i-create-a-symbolic-link-on-windows-10
+		if err = exec.Command("cmd", "/c", "mklink", "/j", newname, oldname).Run(); err == nil {
+			return nil
+		}
+	}
+	return os.Symlink(oldname, newname)
 }

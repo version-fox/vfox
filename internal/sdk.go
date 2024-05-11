@@ -19,6 +19,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"github.com/version-fox/vfox/internal/shim"
 	"io"
 	"net"
 	"net/http"
@@ -210,6 +211,22 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if err != nil {
 		return
 	}
+	fmt.Println("Cleaning up the shims...")
+	envKeys, err := b.Plugin.EnvKeys(sdkPackage)
+	if err != nil {
+		return err
+	}
+	for _, p := range envKeys.Paths.ToBinPaths().Slice() {
+		_ = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear()
+	}
+
+	tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+	if err != nil {
+		return err
+	}
+	delete(tv.Record, b.Plugin.SdkName)
+	_ = tv.Save()
+
 	err = os.RemoveAll(path)
 	if err != nil {
 		return
@@ -289,9 +306,9 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-		sdkPackage, err := b.GetLocalSdkPackage(version)
+
+		keys, err := b.EnvKeys(version)
 		if err != nil {
-			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
 			return err
 		}
 
@@ -299,16 +316,23 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		keys, err := b.Plugin.EnvKeys(sdkPackage)
-		if err != nil {
-			return fmt.Errorf("plugin [EnvKeys] method error: %w", err)
+
+		bins := keys.Paths.ToBinPaths()
+		for _, bin := range bins.Slice() {
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
 		}
 
 		// clear global env
 		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
-
+		for _, p := range keys.Paths.Slice() {
+			keys.Paths.Remove(p)
+		}
+		keys.Paths.Add(b.sdkManager.PathMeta.GlobalShimsPath)
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
 			return err
 		}
@@ -328,19 +352,22 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	var multiToolVersion toolset.MultiToolVersions
+	envKeys, err := b.EnvKeys(version)
+	if err != nil {
+		return err
+	}
+	binPaths := envKeys.Paths.ToBinPaths()
 	if scope == Global {
-		sdkPackage, err := b.GetLocalSdkPackage(version)
-		if err != nil {
-			pterm.Printf("Failed to get local sdk info, err:%s\n", err.Error())
-			return err
-		}
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		keys, err := b.Plugin.EnvKeys(sdkPackage)
-		if err != nil {
-			return fmt.Errorf("plugin [EnvKeys] method error: %w", err)
+
+		for _, bin := range binPaths.Slice() {
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			if err = binShim.Generate(); err != nil {
+				continue
+			}
 		}
 
 		// clear global env
@@ -349,7 +376,13 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 
-		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
+		// FIXME Need optimization
+		for _, p := range envKeys.Paths.Slice() {
+			envKeys.Paths.Remove(p)
+		}
+		envKeys.Paths.Add(b.sdkManager.PathMeta.GlobalShimsPath)
+
+		if err = b.sdkManager.EnvManager.Load(envKeys); err != nil {
 			return err
 		}
 		err = b.sdkManager.EnvManager.Flush()
@@ -377,6 +410,13 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 
 	if err = multiToolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+
+	for _, bin := range binPaths.Slice() {
+		binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+		if err = binShim.Generate(); err != nil {
+			continue
+		}
 	}
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))

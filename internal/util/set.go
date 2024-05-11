@@ -110,7 +110,20 @@ func (s *SortedSet[T]) Slice() []T {
 	return append([]T{}, s.elements...)
 }
 
-func NewSortedSet[T comparable]() Set[T] {
+func (s *SortedSet[T]) AddWithIndex(index int, v T) bool {
+	if index < 0 || index > len(s.elements) {
+		return false
+	}
+	if s.set.Contains(v) {
+		return false
+	}
+	s.elements = append(s.elements, v)
+	copy(s.elements[index+1:], s.elements[index:])
+	s.elements[index] = v
+	return s.set.Add(v)
+}
+
+func NewSortedSet[T comparable]() *SortedSet[T] {
 	return &SortedSet[T]{
 		set:      MapSet[T]{values: make(map[T]struct{})},
 		elements: make([]T, 0),
