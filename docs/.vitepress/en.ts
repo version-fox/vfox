@@ -59,6 +59,7 @@ function sidebar(): DefaultTheme.Sidebar {
             items: [
                 {text: 'Core', link: '/usage/core-commands'},
                 {text: 'Plugins', link: '/usage/plugins-commands'},
+                {text: 'Shims & PATH', link: '/usage/shims-path'},
                 {text: 'All Commands', link: '/usage/all-commands'},
             ]
         },

@@ -69,7 +69,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## 缓存 <Badge type="tip" text=">= 0.4.3" vertical="middle" />
+## 缓存 <Badge type="tip" text=">= 0.5.0" vertical="middle" />
 
 `vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。
 
