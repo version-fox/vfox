@@ -66,12 +66,8 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (*env.Envs, error) {
-	shellEnvs := &env.Envs{
-		Variables: make(env.Vars),
-		Paths:     env.NewPaths(env.EmptyPaths),
-	}
-
+func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (SdkEnvs, error) {
+	var sdkEnvs SdkEnvs
 	tools := make(map[string]struct{})
 	for _, t := range tvs {
 		for name, version := range t.Record {
@@ -79,17 +75,19 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (*env.Envs, error) {
 				continue
 			}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
-				if ek, err := lookupSdk.EnvKeys(Version(version)); err == nil {
+				v := Version(version)
+				if ek, err := lookupSdk.EnvKeys(v); err == nil {
 					tools[name] = struct{}{}
-					for key, value := range ek.Variables {
-						shellEnvs.Variables[key] = value
-					}
-					shellEnvs.Paths.Merge(ek.Paths)
+
+					sdkEnvs = append(sdkEnvs, &SdkEnv{
+						Sdk: lookupSdk,
+						Env: ek,
+					})
 				}
 			}
 		}
 	}
-	return shellEnvs, nil
+	return sdkEnvs, nil
 }
 
 // LookupSdk lookup sdk by name
@@ -197,7 +195,9 @@ func (m *Manager) Remove(pluginName string) error {
 		return err
 	}
 
-	source.clearCurrentEnvConfig()
+	if err = source.ClearCurrentEnv(); err != nil {
+		return err
+	}
 	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName)
 	pterm.Printf("Removing %s plugin...\n", pPath)
 	err = os.RemoveAll(pPath)

@@ -35,7 +35,6 @@ type PathMeta struct {
 	ExecutablePath   string
 	WorkingDirectory string
 	GlobalShimsPath  string
-	ShellShimsPath   string
 }
 
 func newPathMeta() (*PathMeta, error) {
@@ -67,8 +66,6 @@ func newPathMeta() (*PathMeta, error) {
 
 	globalShimsPath := filepath.Join(homePath, "shims")
 	_ = os.MkdirAll(globalShimsPath, 0777)
-	shellShimsPath := filepath.Join(curTmpPath, "shims")
-	_ = os.MkdirAll(shellShimsPath, 0777)
 
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -84,6 +81,5 @@ func newPathMeta() (*PathMeta, error) {
 		ExecutablePath:   exePath,
 		WorkingDirectory: workingDirectory,
 		GlobalShimsPath:  globalShimsPath,
-		ShellShimsPath:   shellShimsPath,
 	}, nil
 }

@@ -18,8 +18,6 @@ package commands
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/shim"
 	"os"
 	"strings"
 	"text/template"
@@ -64,36 +62,29 @@ func activateCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	envKeys, err := manager.EnvKeys(toolset.MultiToolVersions{
+	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
 		workToolVersion,
 		homeToolVersion,
 	})
 	if err != nil {
 		return err
 	}
+
+	sdkCurrentPaths := sdkEnvs.LinkCurrent(manager.PathMeta.CurTmpPath)
+
+	envKeys := sdkEnvs.ToEnvs()
+
 	exportEnvs := make(env.Vars)
 	for k, v := range envKeys.Variables {
 		exportEnvs[k] = v
 	}
 
-	// generate shims for current shell
-	if envKeys.Paths.Len() > 0 {
-		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
-		bins := envKeys.Paths.ToBinPaths()
-		for _, bin := range bins.Slice() {
-			binShim := shim.NewShim(bin, manager.PathMeta.ShellShimsPath)
-			if err = binShim.Generate(); err != nil {
-				continue
-			}
-		}
-	}
-
 	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
 	osPaths := env.NewPaths(env.OsPaths)
-	osPaths.AddWithIndex(0, manager.PathMeta.ShellShimsPath)
-	osPathsStr := osPaths.String()
-	exportEnvs["PATH"] = &osPathsStr
+	sdkCurrentPaths.Merge(osPaths)
+	pathsStr := sdkCurrentPaths.String()
+	exportEnvs["PATH"] = &pathsStr
 
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)

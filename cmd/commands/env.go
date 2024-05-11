@@ -25,7 +25,6 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
-	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
 	"path/filepath"
 )
@@ -122,34 +121,32 @@ func envFlag(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
-	envKeys, err := aggregateEnvKeys(manager)
+	sdkEnvs, err := aggregateEnvKeys(manager)
 	if err != nil {
 		return err
 	}
+
+	envKeys := sdkEnvs.ToEnvs()
+
+	// link to current directory
+	sdkCurrentPaths := sdkEnvs.LinkCurrent(manager.PathMeta.CurTmpPath)
 
 	exportEnvs := make(env.Vars)
 	for k, v := range envKeys.Variables {
 		exportEnvs[k] = v
 	}
 
-	// generate shims for current shell
-	if envKeys.Paths.Len() > 0 {
-		logger.Debugf("Generate shims for current shell, path: %s\n", manager.PathMeta.ShellShimsPath)
-		bins := envKeys.Paths.ToBinPaths()
-		for _, bin := range bins.Slice() {
-			binShim := shim.NewShim(bin, manager.PathMeta.ShellShimsPath)
-			if err = binShim.Generate(); err != nil {
-				continue
-			}
-		}
-	}
+	osPaths := env.NewPaths(env.OsPaths)
+	sdkCurrentPaths.Merge(osPaths)
+	pathsStr := sdkCurrentPaths.String()
+	exportEnvs["PATH"] = &pathsStr
 
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
 	return nil
 }
 
-func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
+func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
 	if err != nil {
 		return nil, err
@@ -172,15 +169,13 @@ func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
 	// Add the working directory to the first
 	tvs := toolset.MultiToolVersions{workToolVersion, curToolVersion}
 
-	shellEnvs := &env.Envs{
-		Variables: make(env.Vars),
-		Paths:     env.NewPaths(env.EmptyPaths),
-	}
 	flushCache, err := cache.NewFileCache(filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache"))
 	if err != nil {
 		return nil, err
 	}
 	defer flushCache.Close()
+
+	var sdkEnvs []*internal.SdkEnv
 
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
@@ -191,12 +186,13 @@ func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
 			} else {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
 			}
-			if keys, err := lookupSdk.EnvKeys(internal.Version(version)); err == nil {
-				for key, value := range keys.Variables {
-					shellEnvs.Variables[key] = value
-				}
-				shellEnvs.Paths.Merge(keys.Paths)
+			v := internal.Version(version)
+			if keys, err := lookupSdk.EnvKeys(v); err == nil {
 				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
+
+				sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
+					Sdk: lookupSdk, Env: keys,
+				})
 
 				// If we encounter a .tool-versions file, it is valid for the entire shell session,
 				// unless we encounter the next .tool-versions file or manually switch to the use command.
@@ -207,5 +203,5 @@ func aggregateEnvKeys(manager *internal.Manager) (*env.Envs, error) {
 		return false
 	})
 
-	return shellEnvs, nil
+	return sdkEnvs, nil
 }

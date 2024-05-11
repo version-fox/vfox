@@ -42,6 +42,73 @@ import (
 
 type Version string
 
+type SdkEnv struct {
+	Sdk *Sdk
+	Env *env.Envs
+}
+
+func (s *SdkEnv) LinkToTargetPath(targetDir string) (*env.Paths, error) {
+	return s.linkToCurrent(filepath.Join(targetDir, s.Sdk.Plugin.SdkName))
+}
+
+func (s *SdkEnv) LinkToInstallPath() (*env.Paths, error) {
+	return s.linkToCurrent(s.Sdk.InstallPath)
+}
+
+// linkToCurrent link the specified version to the target directory
+func (s *SdkEnv) linkToCurrent(targetDir string) (*env.Paths, error) {
+	paths := env.NewPaths(env.EmptyPaths)
+	for index, p := range s.Env.Paths.Slice() {
+		var tp string
+		if index == 0 {
+			tp = filepath.Join(targetDir, "current")
+		} else {
+			tp = filepath.Join(targetDir, filepath.Base(p))
+		}
+		if util.FileExists(tp) {
+			if err := os.Remove(tp); err != nil {
+				logger.Debugf("Failed to remove symlink %s\n", tp)
+				continue
+			}
+		}
+		_ = os.MkdirAll(targetDir, 0755)
+		if err := util.MkSymlink(p, tp); err != nil {
+			logger.Debugf("Failed to create symlink %s -> %s\n", p, targetDir)
+			continue
+		}
+		paths.Add(tp)
+	}
+	return paths, nil
+}
+
+type SdkEnvs []*SdkEnv
+
+func (d *SdkEnvs) ToEnvs() *env.Envs {
+	envs := &env.Envs{
+		Variables: make(env.Vars),
+		Paths:     env.NewPaths(env.EmptyPaths),
+	}
+	for _, sdkEnv := range *d {
+		for key, value := range sdkEnv.Env.Variables {
+			envs.Variables[key] = value
+		}
+		envs.Paths.Merge(sdkEnv.Env.Paths)
+	}
+
+	return envs
+}
+
+// LinkCurrent link the current sdk to the `current` directory of the target directory
+func (d *SdkEnvs) LinkCurrent(targetDir string) *env.Paths {
+	sdkCurrentPaths := env.NewPaths(env.EmptyPaths)
+	for _, sdkEnv := range *d {
+		if path, err := sdkEnv.LinkToTargetPath(targetDir); err == nil {
+			sdkCurrentPaths.Merge(path)
+		}
+	}
+	return sdkCurrentPaths
+}
+
 type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
@@ -198,9 +265,6 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
-	if b.Current() == version {
-		b.clearEnvConfig(version)
-	}
 	path := b.VersionPath(version)
 	sdkPackage, err := b.GetLocalSdkPackage(version)
 	if err != nil {
@@ -211,13 +275,11 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println("Cleaning up the shims...")
-	envKeys, err := b.Plugin.EnvKeys(sdkPackage)
-	if err != nil {
-		return err
-	}
-	for _, p := range envKeys.Paths.ToBinPaths().Slice() {
-		_ = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear()
+
+	if b.Current() == version {
+		if err = b.ClearCurrentEnv(); err != nil {
+			return err
+		}
 	}
 
 	tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
@@ -319,10 +381,20 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 		bins := keys.Paths.ToBinPaths()
 		for _, bin := range bins.Slice() {
-			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.GlobalShimsPath)
 			if err = binShim.Generate(); err != nil {
 				continue
 			}
+		}
+
+		sdkEnv := SdkEnv{
+			Sdk: b,
+			Env: keys,
+		}
+
+		paths, err := sdkEnv.LinkToInstallPath()
+		if err != nil {
+			return err
 		}
 
 		// clear global env
@@ -332,7 +404,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		for _, p := range keys.Paths.Slice() {
 			keys.Paths.Remove(p)
 		}
-		keys.Paths.Add(b.sdkManager.PathMeta.GlobalShimsPath)
+		keys.Paths.Merge(paths)
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
 			return err
 		}
@@ -357,16 +429,27 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		return err
 	}
 	binPaths := envKeys.Paths.ToBinPaths()
+
+	sdkEnv := SdkEnv{
+		Sdk: b,
+		Env: envKeys,
+	}
+
 	if scope == Global {
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 
+		paths, err := sdkEnv.LinkToInstallPath()
+		if err != nil {
+			return err
+		}
+
 		for _, bin := range binPaths.Slice() {
-			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
+			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.GlobalShimsPath)
 			if err = binShim.Generate(); err != nil {
-				continue
+				return err
 			}
 		}
 
@@ -380,7 +463,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		for _, p := range envKeys.Paths.Slice() {
 			envKeys.Paths.Remove(p)
 		}
-		envKeys.Paths.Add(b.sdkManager.PathMeta.GlobalShimsPath)
+		envKeys.Paths.Merge(paths)
 
 		if err = b.sdkManager.EnvManager.Load(envKeys); err != nil {
 			return err
@@ -412,11 +495,8 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
 
-	for _, bin := range binPaths.Slice() {
-		binShim := shim.NewShim(bin, b.sdkManager.PathMeta.ShellShimsPath)
-		if err = binShim.Generate(); err != nil {
-			continue
-		}
+	if _, err = sdkEnv.LinkToTargetPath(b.sdkManager.PathMeta.CurTmpPath); err != nil {
+		return err
 	}
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))
@@ -503,40 +583,6 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	}
 	envManager := b.sdkManager.EnvManager
 	_ = envManager.Remove(envKV)
-}
-
-// clearCurrentEnvConfig will clear all env config about the current sdk for all places.
-// such as: global, session, project and Windows registry
-func (b *Sdk) clearCurrentEnvConfig() {
-	b.clearEnvConfig(b.Current())
-}
-
-// clearEnvConfig will clear all env config about the current sdk for all places.
-// such as: global, session and Windows registry
-func (b *Sdk) clearEnvConfig(version Version) {
-	if version == "" {
-		return
-	}
-	sdkPackage, err := b.GetLocalSdkPackage(version)
-	if err != nil {
-		return
-	}
-	envKV, err := b.Plugin.EnvKeys(sdkPackage)
-	if err != nil {
-		return
-	}
-	envManager := b.sdkManager.EnvManager
-	_ = envManager.Remove(envKV)
-	_ = envManager.Flush()
-
-	// clear tool versions
-	toolVersion, err := toolset.NewMultiToolVersions([]string{
-		b.sdkManager.PathMeta.CurTmpPath,
-		b.sdkManager.PathMeta.HomePath,
-	})
-	for _, tv := range toolVersion {
-		delete(tv.Record, b.Plugin.SdkName)
-	}
 }
 
 func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
@@ -663,6 +709,43 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 
 func (b *Sdk) label(version Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.SdkName), version)
+}
+
+func (b *Sdk) ClearCurrentEnv() error {
+	current := b.Current()
+	keys, err := b.EnvKeys(current)
+	if err != nil {
+		return err
+	}
+
+	envManager := b.sdkManager.EnvManager
+
+	fmt.Println("Cleaning up the shims...")
+	for _, p := range keys.Paths.ToBinPaths().Slice() {
+		if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+			return err
+		}
+	}
+	fmt.Println("Cleaning up current link...")
+	curPath := filepath.Join(b.InstallPath, "current")
+	if err = os.RemoveAll(curPath); err != nil {
+		return fmt.Errorf("failed to remove current link, err:%w", err)
+	}
+
+	fmt.Println("Cleaning up env config...")
+	keys.Paths.Add(curPath)
+	_ = envManager.Remove(keys)
+	_ = envManager.Flush()
+
+	// clear tool versions
+	toolVersion, err := toolset.NewMultiToolVersions([]string{
+		b.sdkManager.PathMeta.CurTmpPath,
+		b.sdkManager.PathMeta.HomePath,
+	})
+	for _, tv := range toolVersion {
+		delete(tv.Record, b.Plugin.SdkName)
+	}
+	return nil
 }
 
 // NewSdk creates a new SDK instance.

@@ -86,7 +86,9 @@ func (w *windowsEnvManager) Flush() (err error) {
 		_ = w.Remove(&Envs{
 			Variables: Vars{
 				"VERSION_FOX_PATH": nil,
-			}})
+			},
+			Paths: NewPaths(EmptyPaths),
+		})
 	}
 	// user env
 	oldPath, success := w.Get("PATH")
