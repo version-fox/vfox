@@ -31,7 +31,7 @@ func TestCacheDuration_MarshalYAML(t *testing.T) {
 	}{
 		{"Negative", CacheDuration(-1), -1, false},
 		{"Zero", CacheDuration(0), 0, false},
-		{"Positive", CacheDuration(time.Hour), "1h0m0s", false},
+		{"Positive", CacheDuration(time.Hour), "1h", false},
 	}
 
 	for _, tt := range tests {
@@ -57,7 +57,7 @@ func TestCacheDuration_UnmarshalYAML(t *testing.T) {
 	}{
 		{"Negative", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "-1"}, CacheDuration(-1), false},
 		{"Zero", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "0"}, CacheDuration(0), false},
-		{"Positive", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1h0m0s"}, CacheDuration(time.Hour), false},
+		{"Positive", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1h"}, CacheDuration(time.Hour), false},
 	}
 
 	for _, tt := range tests {

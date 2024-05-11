@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/config"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
@@ -31,10 +33,10 @@ var Config = &cli.Command{
 func configCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	config := reflect.ValueOf(manager.Config)
+	conf := reflect.ValueOf(manager.Config)
 
 	if ctx.Bool("list") {
-		configList("", config)
+		configList("", conf)
 		return nil
 	}
 
@@ -46,7 +48,7 @@ func configCmd(ctx *cli.Context) error {
 	keys := strings.Split(args.First(), ".")
 	unset := ctx.Bool("unset")
 	if !unset && args.Len() == 1 {
-		configGet(config, keys)
+		configGet(conf, keys)
 		return nil
 	}
 
@@ -54,7 +56,10 @@ func configCmd(ctx *cli.Context) error {
 	if unset {
 		value = ""
 	}
-	configSet(config, keys, value)
+	err := configSet(conf, keys, value)
+	if err != nil {
+		return err
+	}
 	return manager.Config.SaveConfig(manager.PathMeta.HomePath)
 }
 
@@ -97,7 +102,7 @@ func configGet(v reflect.Value, keys []string) {
 	}
 }
 
-func configSet(v reflect.Value, keys []string, value string) {
+func configSet(v reflect.Value, keys []string, value string) error {
 	key := keys[0]
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -105,12 +110,33 @@ func configSet(v reflect.Value, keys []string, value string) {
 	for i := 0; i < v.NumField(); i++ {
 		if v.Type().Field(i).Tag.Get("yaml") == key {
 			if len(keys) > 1 {
-				configSet(v.Field(i), keys[1:], value)
+				err := configSet(v.Field(i), keys[1:], value)
+				if err != nil {
+					return err
+				}
 			} else {
 				switch v.Field(i).Kind() {
 				case reflect.Bool:
 					parseBool, _ := strconv.ParseBool(value)
 					v.Field(i).SetBool(parseBool)
+				case reflect.Int64:
+					if v.Field(i).Type() == reflect.TypeOf(config.CacheDuration(0)) {
+						if value == "-1" {
+							v.Field(i).SetInt(-1)
+						} else {
+							duration, err := time.ParseDuration(strings.ToLower(value))
+							if err != nil {
+								return err
+							}
+							v.Field(i).SetInt(int64(duration))
+						}
+					} else {
+						atoi, err := strconv.Atoi(value)
+						if err != nil {
+							return err
+						}
+						v.Field(i).SetInt(int64(atoi))
+					}
 				default:
 					v.Field(i).SetString(value)
 				}
@@ -118,4 +144,5 @@ func configSet(v reflect.Value, keys []string, value string) {
 			break
 		}
 	}
+	return nil
 }

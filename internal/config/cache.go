@@ -17,6 +17,7 @@
 package config
 
 import (
+	"fmt"
 	"gopkg.in/yaml.v3"
 	"time"
 )
@@ -37,14 +38,14 @@ type Cache struct {
 // 0: never cache
 type CacheDuration time.Duration
 
-func (d *CacheDuration) MarshalYAML() (interface{}, error) {
-	switch *d {
+func (d CacheDuration) MarshalYAML() (interface{}, error) {
+	switch d {
 	case -1:
 		return -1, nil
 	case 0:
 		return 0, nil
 	default:
-		return time.Duration(*d).String(), nil
+		return d.String(), nil
 	}
 }
 
@@ -65,4 +66,27 @@ func (d *CacheDuration) UnmarshalYAML(node *yaml.Node) error {
 		*d = CacheDuration(pd)
 	}
 	return nil
+}
+
+func (d CacheDuration) String() string {
+	switch d {
+	case -1:
+		return "-1"
+	case 0:
+		return "0"
+	}
+
+	var str string
+	duration := time.Duration(d)
+	if h := int(duration.Hours()); h > 0 {
+		str = fmt.Sprintf("%dh", h)
+	}
+	if m := int(duration.Minutes()) % 60; m > 0 {
+		str = fmt.Sprintf("%s%dm", str, m)
+	}
+	if s := int(duration.Seconds()) % 60; s > 0 {
+		str = fmt.Sprintf("%s%ds", str, s)
+	}
+
+	return str
 }
