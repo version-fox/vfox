@@ -56,6 +56,9 @@ the specific version, download source, and other information. `vfox` will help y
 directory
 in advance. If it is a compressed package such as `tar`, `tar.gz`, `tar.xz`, `zip`, `vfox` will help you to decompress
 it directly.
+By default, `vfox` reads the file name from the URL. If the last item in the URL is not a valid file name, you should
+specify the file name by appending a fragment at the end, so that `vfox` can identify the file format and decompress it.
+For example: `https://example.com/1234567890#/filename.zip`.
 
 if the return value of version is empty, it means that the version is not found, and `vfox` will ask the user whether to perform a search operation.
 
@@ -70,6 +73,10 @@ function PLUGIN:PreInstall(ctx)
         version = "xxx",
         --- remote URL or local file path [optional]
         url = "xxx",
+        --- request headers for remote URL [optional]
+        headers = {
+            ["xxx"] = "xxx",
+        }
         --- note information [optional]
         note = "xxx",
         --- SHA256 checksum [optional]
@@ -79,7 +86,7 @@ function PLUGIN:PreInstall(ctx)
         --- sha1 checksum [optional]
         sha1 = "xxx",
         --- sha512 checksum [optional]
-        sha512 = "xx",
+        sha512 = "xxx",
         --- additional files [optional]
         addition = {
             {
