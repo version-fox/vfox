@@ -19,7 +19,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/shim"
 	"io"
 	"net"
 	"net/http"
@@ -36,6 +35,7 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -669,8 +669,14 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 	}
 
 	fileName := filepath.Base(u.Path)
-	if !strings.Contains(fileName, ".") && u.Fragment != "" {
+	if strings.HasPrefix(u.Fragment, "/") && strings.Contains(u.Fragment, ".") {
 		fileName = strings.Trim(u.Fragment, "/")
+	} else if !strings.Contains(fileName, ".") {
+		finalURL, err := url.Parse(resp.Request.URL.String())
+		if err != nil {
+			return "", err
+		}
+		fileName = filepath.Base(finalURL.Path)
 	}
 	path := filepath.Join(b.InstallPath, fileName)
 
