@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -541,11 +542,16 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		source.pluginObj.RawSetString("Available", vm.Instance.NewFunction(func(L *lua.LState) int {
 			ctxTable := L.CheckTable(2)
 
+			cachePath := filepath.Join(pluginDirPath, "available.cache")
 			invokeAvailableHook := func() int {
 				logger.Debugf("Calling the original Available hook. \n")
 				if err := vm.CallFunction(targetHook, PLUGIN, ctxTable); err != nil {
 					L.RaiseError(err.Error())
 					return 0
+				}
+				if util.FileExists(cachePath) {
+					logger.Debugf("Removing the old cache file: %s \n", cachePath)
+					_ = os.Remove(cachePath)
 				}
 				table := source.vm.ReturnedValue()
 				L.Push(table)
@@ -568,14 +574,14 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 			if cacheKey == "" {
 				cacheKey = "empty"
 			}
-			fileCache, err := cache.NewFileCache(filepath.Join(pluginDirPath, "available.cache"))
+			fileCache, err := cache.NewFileCache(cachePath)
 			if err != nil {
 				return invokeAvailableHook()
 			}
 			cacheValue, ok := fileCache.Get(cacheKey)
 			logger.Debugf("Available hook cache key: %s, hit: %v \n", cacheKey, ok)
 			if ok {
-				hookResult := AvailableHookResult{}
+				var hookResult []map[string]interface{}
 				if err = cacheValue.Unmarshal(&hookResult); err != nil {
 					return invokeAvailableHook()
 				}
@@ -595,7 +601,7 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 					fileCache.Set(cacheKey, nil, cache.ExpireTime(config.Cache.AvailableHookDuration))
 					_ = fileCache.Close()
 				} else {
-					hookResult := AvailableHookResult{}
+					var hookResult []map[string]interface{}
 					if err = luai.Unmarshal(table, &hookResult); err == nil {
 						if value, err := cache.NewValue(hookResult); err == nil {
 							fileCache.Set(cacheKey, value, cache.ExpireTime(config.Cache.AvailableHookDuration))
