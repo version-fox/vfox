@@ -34,7 +34,7 @@ type Config struct {
 const filename = "config.yaml"
 
 var (
-	defaultConfig = &Config{
+	DefaultConfig = &Config{
 		Proxy:             EmptyProxy,
 		Storage:           EmptyStorage,
 		Registry:          EmptyRegistry,
@@ -45,10 +45,10 @@ var (
 
 func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
-		content, err := yaml.Marshal(defaultConfig)
+		content, err := yaml.Marshal(DefaultConfig)
 		if err == nil {
 			_ = os.WriteFile(p, content, 0666)
-			return defaultConfig, nil
+			return DefaultConfig, nil
 		}
 	}
 	_ = util.ChangeModeIfNot(p, 0666)
