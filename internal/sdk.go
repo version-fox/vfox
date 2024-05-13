@@ -30,8 +30,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/version-fox/vfox/internal/shim"
-
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
