@@ -713,35 +713,40 @@ func (b *Sdk) label(version Version) string {
 
 func (b *Sdk) ClearCurrentEnv() error {
 	current := b.Current()
-	keys, err := b.EnvKeys(current)
-	if err != nil {
-		return err
-	}
 
-	envManager := b.sdkManager.EnvManager
-
-	fmt.Println("Cleaning up the shims...")
-	for _, p := range keys.Paths.ToBinPaths().Slice() {
-		if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
-			return err
-		}
-	}
 	fmt.Println("Cleaning up current link...")
 	curPath := filepath.Join(b.InstallPath, "current")
-	if err = os.RemoveAll(curPath); err != nil {
+	if err := os.RemoveAll(curPath); err != nil {
 		return fmt.Errorf("failed to remove current link, err:%w", err)
 	}
 
-	fmt.Println("Cleaning up env config...")
-	keys.Paths.Add(curPath)
-	_ = envManager.Remove(keys)
-	_ = envManager.Flush()
+	if current != "" {
+		keys, err := b.EnvKeys(current)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Cleaning up the shims...")
+		for _, p := range keys.Paths.ToBinPaths().Slice() {
+			if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+				return err
+			}
+		}
+
+		envManager := b.sdkManager.EnvManager
+		fmt.Println("Cleaning up env config...")
+		keys.Paths.Add(curPath)
+		_ = envManager.Remove(keys)
+		_ = envManager.Flush()
+	}
 
 	// clear tool versions
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
 		b.sdkManager.PathMeta.CurTmpPath,
 		b.sdkManager.PathMeta.HomePath,
 	})
+	if err != nil {
+		return err
+	}
 	for _, tv := range toolVersion {
 		delete(tv.Record, b.Plugin.SdkName)
 	}
