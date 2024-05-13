@@ -17,6 +17,8 @@
 package env
 
 import (
+	"fmt"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
@@ -43,12 +45,13 @@ func (p *Paths) Merge(other *Paths) *Paths {
 }
 
 // ToBinPaths returns a BinPaths from Paths which contains only executable files.
-func (p *Paths) ToBinPaths() *Paths {
+func (p *Paths) ToBinPaths() (*Paths, error) {
 	bins := NewPaths(EmptyPaths)
 	for _, path := range p.Slice() {
 		dir, err := os.ReadDir(path)
 		if err != nil {
-			return nil
+			logger.Debugf("Failed to read bin paths:%s: %v", path, err)
+			return nil, fmt.Errorf("failed to read bin paths:%s: %w", path, err)
 		}
 		for _, d := range dir {
 			if d.IsDir() {
@@ -60,7 +63,7 @@ func (p *Paths) ToBinPaths() *Paths {
 			}
 		}
 	}
-	return bins
+	return bins, nil
 }
 
 // NewPaths returns a new Paths.

@@ -379,7 +379,10 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 
-		bins := keys.Paths.ToBinPaths()
+		bins, err := keys.Paths.ToBinPaths()
+		if err != nil {
+			return err
+		}
 		for _, bin := range bins.Slice() {
 			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.GlobalShimsPath)
 			if err = binShim.Generate(); err != nil {
@@ -428,7 +431,10 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	if err != nil {
 		return err
 	}
-	binPaths := envKeys.Paths.ToBinPaths()
+	binPaths, err := envKeys.Paths.ToBinPaths()
+	if err != nil {
+		return err
+	}
 
 	sdkEnv := SdkEnv{
 		Sdk: b,
@@ -732,9 +738,11 @@ func (b *Sdk) ClearCurrentEnv() error {
 			return err
 		}
 		fmt.Println("Cleaning up the shims...")
-		for _, p := range keys.Paths.ToBinPaths().Slice() {
-			if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
-				return err
+		if paths, err := keys.Paths.ToBinPaths(); err == nil {
+			for _, p := range paths.Slice() {
+				if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+					return err
+				}
 			}
 		}
 
