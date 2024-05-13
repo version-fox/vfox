@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"github.com/version-fox/vfox/internal/config"
 	"reflect"
@@ -146,7 +147,7 @@ func configSet(v reflect.Value, keys []string, value any) error {
 					}
 					v.Field(i).Set(reflect.ValueOf(value))
 				default:
-					v.Field(i).SetString(fmt.Sprintf("%v", value))
+					return errors.New("unsupported configuration type")
 				}
 			}
 			break
