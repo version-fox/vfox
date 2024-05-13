@@ -52,9 +52,10 @@ func configCmd(ctx *cli.Context) error {
 		return nil
 	}
 
-	value := args.Get(1)
+	var value any
+	value = args.Get(1)
 	if unset {
-		value = ""
+		value = defaultConfig(keys)
 	}
 	err := configSet(conf, keys, value)
 	if err != nil {
@@ -102,7 +103,7 @@ func configGet(v reflect.Value, keys []string) {
 	}
 }
 
-func configSet(v reflect.Value, keys []string, value string) error {
+func configSet(v reflect.Value, keys []string, value any) error {
 	key := keys[0]
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -117,9 +118,11 @@ func configSet(v reflect.Value, keys []string, value string) error {
 			} else {
 				switch v.Field(i).Kind() {
 				case reflect.Bool:
+					value := fmt.Sprintf("%v", value)
 					parseBool, _ := strconv.ParseBool(value)
 					v.Field(i).SetBool(parseBool)
 				case reflect.Int64:
+					value := fmt.Sprintf("%v", value)
 					if v.Field(i).Type() == reflect.TypeOf(config.CacheDuration(0)) {
 						if value == "-1" {
 							v.Field(i).SetInt(-1)
@@ -137,12 +140,33 @@ func configSet(v reflect.Value, keys []string, value string) error {
 						}
 						v.Field(i).SetInt(int64(atoi))
 					}
+				case reflect.Ptr:
+					if _, ok := value.(string); ok {
+						return fmt.Errorf("key does not contain a section: %v", key)
+					}
+					v.Field(i).Set(reflect.ValueOf(value))
 				default:
-					v.Field(i).SetString(value)
+					v.Field(i).SetString(fmt.Sprintf("%v", value))
 				}
 			}
 			break
 		}
 	}
 	return nil
+}
+
+func defaultConfig(keys []string) any {
+	v := reflect.ValueOf(config.DefaultConfig)
+	for _, key := range keys {
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).Tag.Get("yaml") == key {
+				v = v.Field(i)
+				break
+			}
+		}
+	}
+	return v.Interface()
 }
