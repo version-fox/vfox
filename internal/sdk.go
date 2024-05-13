@@ -19,7 +19,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/shim"
 	"io"
 	"net"
 	"net/http"
@@ -30,6 +29,8 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+
+	"github.com/version-fox/vfox/internal/shim"
 
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
@@ -67,14 +68,14 @@ func (s *SdkEnv) linkToCurrent(targetDir string) (*env.Paths, error) {
 		}
 		if util.FileExists(tp) {
 			if err := os.Remove(tp); err != nil {
-				logger.Debugf("Failed to remove symlink %s\n", tp)
-				continue
+				logger.Errorf("Failed to remove symlink %s\n", tp)
+				return nil, err
 			}
 		}
 		_ = os.MkdirAll(targetDir, 0755)
 		if err := util.MkSymlink(p, tp); err != nil {
-			logger.Debugf("Failed to create symlink %s -> %s\n", p, targetDir)
-			continue
+			logger.Errorf("Failed to create symlink %s -> %s\n", p, tp)
+			return nil, err
 		}
 		paths.Add(tp)
 	}
