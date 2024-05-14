@@ -118,6 +118,8 @@ func configSet(v reflect.Value, keys []string, value any) error {
 				}
 			} else {
 				switch v.Field(i).Kind() {
+				case reflect.String:
+					v.Field(i).SetString(fmt.Sprintf("%v", value))
 				case reflect.Bool:
 					value := fmt.Sprintf("%v", value)
 					parseBool, _ := strconv.ParseBool(value)
