@@ -56,6 +56,8 @@ the specific version, download source, and other information. `vfox` will help y
 directory
 in advance. If it is a compressed package such as `tar`, `tar.gz`, `tar.xz`, `zip`, `vfox` will help you to decompress
 it directly.
+
+
 By default, `vfox` reads the file name from the URL. If the last item in the URL is not a valid file name, you should
 specify the file name by appending a fragment at the end, so that `vfox` can identify the file format and decompress it.
 For example: `https://example.com/1234567890#/filename.zip`.
@@ -76,7 +78,7 @@ function PLUGIN:PreInstall(ctx)
         --- request headers for remote URL [optional]
         headers = {
             ["xxx"] = "xxx",
-        }
+        },
         --- note information [optional]
         note = "xxx",
         --- SHA256 checksum [optional]
@@ -288,6 +290,25 @@ Currently, VersionFox plugin testing is straightforward. You only need to place 
 - PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:Available -> `vfox search <sdk-name>`
 - PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
+  
+In addition, you can use the `--debug` parameter to view more log information, for example:
+
+```shell
+vfox --debug install <sdk-name>@<version>
+vfox --debug use <sdk-name>@<version>
+
+...
+```
+
+
+## Example
+
+Here is an example of a plugin that supports the `Node.js`.
+
+https://github.com/version-fox/vfox-nodejs
+
+You can refer to this plugin to develop your own plugin.
+
 
 ## Publish to the public registry
 

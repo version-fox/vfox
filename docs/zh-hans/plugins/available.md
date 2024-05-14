@@ -18,12 +18,12 @@ axios.get('https://vfox-plugins.lhan.me/index.json').then(res => {
 })
 
 const parseGitHubUrl = (url) => {
-  const regex = /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)/;
+  const regex = /^https:\/\/github\.com\/version-fox\//;
   const match = url.match(regex);
   if (match) {
     return {
       isGitHub: true,
-      url: `https://img.shields.io/github/downloads/${match[1]}/${match[2]}/total?style=social`,
+      url: `https://img.shields.io/badge/official-a`,
     };
   } else {
     return {
@@ -41,7 +41,7 @@ const parseGitHubUrl = (url) => {
 ::: tip 提醒
 这些都是来自社区的 vfox 插件
 
-你可以通过一下命令来快速安装!
+你可以通过以下命令来快速安装!
 
 ```shell
 vfox add <name>

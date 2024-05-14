@@ -51,7 +51,8 @@
 ### PreInstall
 
 返回预安装信息， 例如具体版本号、下载源等信息。 `vfox`会帮你提前将这些文件下载到特定目录下。如果是压缩包如`tar`、`tar.gz`、`tar.xz`、`zip`这四种压缩包， `vfox`会直接帮你解压处理。
-vfox默认从下载链接中获取文件名，如果下载链接最后一项不是有效的文件名，可以通过在链接末尾附加Fragment来指定文件名，以便于vfox识别文件格式并解压。如：`https://example.com/1234567890#/filename.zip`
+
+`vfox`默认从下载链接中获取文件名，如果下载链接最后一项不是有效的文件名，可以通过在链接末尾附加Fragment来指定文件名，以便于`vfox`识别文件格式并解压。 如：`https://example.com/1234567890#/filename.zip`
 
 如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
 
@@ -68,7 +69,7 @@ function PLUGIN:PreInstall(ctx)
         --- 下载链接的请求头 [可选]
         headers = {
             ["xxx"] = "xxx",
-        }
+        },
         --- 备注信息 [可选]
         note = "xxx",
         --- SHA256 checksum [optional]
@@ -266,12 +267,30 @@ end
 
 ## 测试插件
 
-目前，`vfox` 插件测试方法很简陋。您需要将插件放在 `${HOME}/.version-fox/plugins` 目录中，并使用不同的命令验证您的功能是否正常工作。您可以在c插件中使用 `print`/`printTable` 函数来打印日志进行调试。
+目前，`vfox` 插件测试方法很简陋。您需要将插件放在 `${HOME}/.version-fox/plugins` 目录中，并使用不同的命令验证您的功能是否正常工作。
+您可以在插件中使用 `print`/`printTable` 函数来打印日志进行调试。
 
 - PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:Available -> `vfox search <sdk-name>`
 - PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
+
+另外, 你可以通过添加 `--debug` 参数来查看更多的日志信息, 例如:
+
+```shell
+vfox --debug install <sdk-name>@<version>
+vfox --debug use <sdk-name>@<version>
+
+...
+```
+
+
+
+## 插件示例
+
+https://github.com/version-fox/vfox-nodejs
+
+你可以参考这个插件来开发自己的插件。
 
 
 
