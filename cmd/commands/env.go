@@ -136,6 +136,10 @@ func envFlag(ctx *cli.Context) error {
 		exportEnvs[k] = v
 	}
 
+	// No changes, no need to refresh environment.
+	if sdkCurrentPaths.Len() == 0 {
+		return nil
+	}
 	osPaths := env.NewPaths(env.OsPaths)
 	sdkCurrentPaths.Merge(osPaths)
 	pathsStr := sdkCurrentPaths.String()
