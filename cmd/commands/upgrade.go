@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -39,8 +40,8 @@ var Upgrade = &cli.Command{
 	Action: upgradeCmd,
 }
 
-func fetchLatestVersion() (string, error) {
-	resp, err := http.Get("https://github.com/version-fox/vfox/tags")
+func fetchLatestVersion(c *http.Client) (string, error) {
+	resp, err := c.Get("https://github.com/version-fox/vfox/tags")
 	if err != nil {
 		return "", err
 	}
@@ -94,13 +95,13 @@ func generateUrls(currVersion string, tagName string) (string, string) {
 	return binURL, diffURL
 }
 
-func downloadFile(filepath string, url string) error {
+func downloadFile(c *http.Client, filepath string, url string) error {
 	out, err := os.Create(filepath)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	resp, err := http.Get(url)
+	resp, err := c.Get(url)
 	if err != nil {
 		return err
 	}
@@ -110,8 +111,12 @@ func downloadFile(filepath string, url string) error {
 }
 
 func upgradeCmd(ctx *cli.Context) error {
+	manager := internal.NewSdkManager()
+	defer manager.Close()
+	httpClient := manager.HttpClient()
+
 	currVersion := fmt.Sprintf("v%s", ctx.App.Version)
-	latestVersion, err := fetchLatestVersion()
+	latestVersion, err := fetchLatestVersion(httpClient)
 	if err != nil {
 		return cli.Exit("Failed to fetch the latest version: "+err.Error(), 1)
 	}
@@ -146,7 +151,7 @@ func upgradeCmd(ctx *cli.Context) error {
 
 	fmt.Println("Fetching", binURL)
 
-	if err := downloadFile(tempFile, binURL); err != nil {
+	if err := downloadFile(httpClient, tempFile, binURL); err != nil {
 		return cli.Exit("Failed to download file: "+err.Error(), 1)
 	}
 	decompressor := util.NewDecompressor(tempFile)
