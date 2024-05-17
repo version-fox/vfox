@@ -66,7 +66,7 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (SdkEnvs, error) {
+func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location Location) (SdkEnvs, error) {
 	var sdkEnvs SdkEnvs
 	tools := make(map[string]struct{})
 	for _, t := range tvs {
@@ -76,7 +76,7 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (SdkEnvs, error) {
 			}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
 				v := Version(version)
-				if ek, err := lookupSdk.EnvKeys(v); err == nil {
+				if ek, err := lookupSdk.EnvKeys(v, location); err == nil {
 					tools[name] = struct{}{}
 
 					sdkEnvs = append(sdkEnvs, &SdkEnv{

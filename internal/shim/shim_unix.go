@@ -29,7 +29,8 @@ import (
 func (s *Shim) Clear() error {
 	name := filepath.Base(s.BinaryPath)
 	targetShim := filepath.Join(s.OutputPath, name)
-	if !util.FileExists(targetShim) {
+	_, err := os.Readlink(targetShim)
+	if os.IsNotExist(err) {
 		return nil
 	}
 	return os.Remove(targetShim)

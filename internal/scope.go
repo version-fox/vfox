@@ -18,10 +18,18 @@ package internal
 
 type UseScope int
 
+type Location int
+
 const (
 	Global UseScope = iota
 	Project
 	Session
+)
+
+const (
+	OriginalLocation Location = iota
+	GlobalLocation
+	ShellLocation
 )
 
 func (s UseScope) String() string {
@@ -32,6 +40,19 @@ func (s UseScope) String() string {
 		return "project"
 	case Session:
 		return "session"
+	default:
+		return "unknown"
+	}
+}
+
+func (s Location) String() string {
+	switch s {
+	case GlobalLocation:
+		return "global"
+	case ShellLocation:
+		return "shell"
+	case OriginalLocation:
+		return "original"
 	default:
 		return "unknown"
 	}

@@ -65,12 +65,10 @@ func activateCmd(ctx *cli.Context) error {
 	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
 		workToolVersion,
 		homeToolVersion,
-	})
+	}, internal.ShellLocation)
 	if err != nil {
 		return err
 	}
-
-	sdkCurrentPaths := sdkEnvs.LinkCurrent(manager.PathMeta.CurTmpPath)
 
 	envKeys := sdkEnvs.ToEnvs()
 
@@ -82,8 +80,7 @@ func activateCmd(ctx *cli.Context) error {
 	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
 	osPaths := env.NewPaths(env.OsPaths)
-	sdkCurrentPaths.Merge(osPaths)
-	pathsStr := sdkCurrentPaths.String()
+	pathsStr := envKeys.Paths.Merge(osPaths).String()
 	exportEnvs["PATH"] = &pathsStr
 
 	path := manager.PathMeta.ExecutablePath

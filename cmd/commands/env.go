@@ -85,7 +85,7 @@ func outputJSON() error {
 	}
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			if keys, err := lookupSdk.EnvKeys(internal.Version(version)); err == nil {
+			if keys, err := lookupSdk.EnvKeys(internal.Version(version), internal.ShellLocation); err == nil {
 				data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				return true
@@ -126,23 +126,19 @@ func envFlag(ctx *cli.Context) error {
 		return err
 	}
 
-	envKeys := sdkEnvs.ToEnvs()
+	if len(sdkEnvs) == 0 {
+		return nil
+	}
 
-	// link to current directory
-	sdkCurrentPaths := sdkEnvs.LinkCurrent(manager.PathMeta.CurTmpPath)
+	envKeys := sdkEnvs.ToEnvs()
 
 	exportEnvs := make(env.Vars)
 	for k, v := range envKeys.Variables {
 		exportEnvs[k] = v
 	}
 
-	// No changes, no need to refresh environment.
-	if sdkCurrentPaths.Len() == 0 {
-		return nil
-	}
 	osPaths := env.NewPaths(env.OsPaths)
-	sdkCurrentPaths.Merge(osPaths)
-	pathsStr := sdkCurrentPaths.String()
+	pathsStr := envKeys.Paths.Merge(osPaths).String()
 	exportEnvs["PATH"] = &pathsStr
 
 	exportStr := s.Export(exportEnvs)
@@ -191,7 +187,7 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
 			}
 			v := internal.Version(version)
-			if keys, err := lookupSdk.EnvKeys(v); err == nil {
+			if keys, err := lookupSdk.EnvKeys(v, internal.ShellLocation); err == nil {
 				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
 
 				sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
