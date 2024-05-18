@@ -83,12 +83,8 @@ func (l *LocationPackage) Link() (*Package, error) {
 	sourcePackage := l.from
 	targetPackage := l.ConvertLocation()
 	// If the mock path already exists, delete it first.
-	if util.FileExists(mockPath) {
-		logger.Debugf("Removing old package path: %s\n", mockPath)
-		if err := os.RemoveAll(mockPath); err != nil {
-			return nil, err
-		}
-	}
+	logger.Debugf("Removing old package path: %s\n", mockPath)
+	_ = os.RemoveAll(mockPath)
 	hasAddition := len(targetPackage.Additions) != 0
 	if !hasAddition {
 		logger.Debugf("Create symlink %s -> %s\n", sourcePackage.Main.Path, targetPackage.Main.Path)
