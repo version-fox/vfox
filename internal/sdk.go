@@ -261,7 +261,7 @@ func (b *Sdk) Available(args []string) ([]*Package, error) {
 }
 
 func (b *Sdk) ToLinkPackage(version Version, location Location) error {
-	linkPackage, err := b.GetLinkPackage(version, ShellLocation)
+	linkPackage, err := b.GetLinkPackage(version, location)
 	if err != nil {
 		return err
 	}
@@ -271,10 +271,13 @@ func (b *Sdk) ToLinkPackage(version Version, location Location) error {
 
 // GetLinkPackage will make symlink according Location and return the sdk package.
 func (b *Sdk) GetLinkPackage(version Version, location Location) (*LocationPackage, error) {
-	return NewLocationPackage(version, b, location)
+	return newLocationPackage(version, b, location)
 }
 
-func (b *Sdk) EnvKeysWithoutLink(version Version, location Location) (*env.Envs, error) {
+// MockEnvKeys It just simulates to get the environment configuration information,
+// if the corresponding location of the package does not exist, then it will return
+// the empty environment information, without calling the EnvKeys hook.
+func (b *Sdk) MockEnvKeys(version Version, location Location) (*env.Envs, error) {
 	label := b.label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
@@ -284,6 +287,14 @@ func (b *Sdk) EnvKeysWithoutLink(version Version, location Location) (*env.Envs,
 		return nil, err
 	}
 	sdkPackage := linkPackage.ConvertLocation()
+	if !checkPackageValid(sdkPackage) {
+		logger.Debugf("Package is invalid: %v\n", sdkPackage)
+		return &env.Envs{
+			Variables: make(env.Vars),
+			Paths:     env.NewPaths(env.EmptyPaths),
+			BinPaths:  env.NewPaths(env.EmptyPaths),
+		}, nil
+	}
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
 		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
@@ -305,6 +316,7 @@ func (b *Sdk) EnvKeys(version Version, location Location) (*env.Envs, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
 		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
@@ -700,7 +712,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 	}
 
 	if current != "" {
-		envKeys, err := b.EnvKeysWithoutLink(current, GlobalLocation)
+		envKeys, err := b.MockEnvKeys(current, GlobalLocation)
 		if err != nil {
 			return err
 		}
@@ -715,10 +727,11 @@ func (b *Sdk) ClearCurrentEnv() error {
 
 		envManager := b.sdkManager.EnvManager
 		fmt.Println("Cleaning up env config...")
+		envKeys.Paths.Add(filepath.Join(b.InstallPath, "current"))
 		_ = envManager.Remove(envKeys)
 		_ = envManager.Flush()
 
-		envKeys, err = b.EnvKeysWithoutLink(current, OriginalLocation)
+		envKeys, err = b.MockEnvKeys(current, OriginalLocation)
 		if err != nil {
 			return err
 		}

@@ -26,11 +26,30 @@ import (
 )
 
 func FileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
+	fileInfo, err := os.Lstat(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
 		return false
 	}
-	return err == nil
+
+	if fileInfo.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(filename)
+		if err != nil {
+			return false
+		}
+		_, err = os.Stat(target)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return false
+			}
+			return false
+		}
+		return true
+	}
+
+	return true
 }
 
 func CopyFile(src, dst string) error {

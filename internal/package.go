@@ -32,7 +32,7 @@ type LocationPackage struct {
 	location Location
 }
 
-func NewLocationPackage(version Version, sdk *Sdk, location Location) (*LocationPackage, error) {
+func newLocationPackage(version Version, sdk *Sdk, location Location) (*LocationPackage, error) {
 	var mockPath string
 	switch location {
 	case OriginalLocation:
@@ -110,6 +110,19 @@ func (l *LocationPackage) Link() (*Package, error) {
 		}
 	}
 	return targetPackage, nil
+}
+
+// checkPackageValid checks if the package is valid
+func checkPackageValid(p *Package) bool {
+	if !util.FileExists(p.Main.Path) {
+		return false
+	}
+	for _, a := range p.Additions {
+		if !util.FileExists(a.Path) {
+			return false
+		}
+	}
+	return true
 }
 
 type Package struct {
