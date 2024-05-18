@@ -554,6 +554,8 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 		return
 	}
 	envManager := b.sdkManager.EnvManager
+	// Compatible symbolic link paths for v0.5.0-0.5.2
+	envKV.Paths.Add(filepath.Join(b.InstallPath, "current"))
 	_ = envManager.Remove(envKV)
 }
 
