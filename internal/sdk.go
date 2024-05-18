@@ -705,12 +705,6 @@ func (b *Sdk) label(version Version) string {
 func (b *Sdk) ClearCurrentEnv() error {
 	current := b.Current()
 
-	fmt.Println("Cleaning up current link...")
-	curPath := filepath.Join(b.InstallPath, "current")
-	if err := os.RemoveAll(curPath); err != nil {
-		return fmt.Errorf("failed to remove current link, err:%w", err)
-	}
-
 	if current != "" {
 		envKeys, err := b.MockEnvKeys(current, GlobalLocation)
 		if err != nil {
@@ -737,6 +731,12 @@ func (b *Sdk) ClearCurrentEnv() error {
 		}
 		_ = envManager.Remove(envKeys)
 		_ = envManager.Flush()
+	}
+
+	fmt.Println("Cleaning up current link...")
+	curPath := filepath.Join(b.InstallPath, "current")
+	if err := os.RemoveAll(curPath); err != nil {
+		return fmt.Errorf("failed to remove current link, err:%w", err)
 	}
 
 	// clear tool versions

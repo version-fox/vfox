@@ -85,7 +85,7 @@ func outputJSON() error {
 	}
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			if keys, err := lookupSdk.EnvKeys(internal.Version(version), internal.ShellLocation); err == nil {
+			if keys, err := lookupSdk.EnvKeys(internal.Version(version), internal.OriginalLocation); err == nil {
 				data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				return true
