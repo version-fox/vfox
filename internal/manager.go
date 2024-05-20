@@ -594,7 +594,6 @@ func (m *Manager) CleanTmp() {
 	}
 	dir, err := os.ReadDir(m.PathMeta.TempPath)
 	if err == nil {
-		_ = os.RemoveAll(m.PathMeta.CurTmpPath)
 		for _, file := range dir {
 			if !file.IsDir() {
 				continue
