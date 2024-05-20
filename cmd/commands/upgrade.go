@@ -140,9 +140,18 @@ func upgradeCmd(ctx *cli.Context) error {
 	}
 	tempDir := filepath.Join(exeDir, "vfox_upgrade")
 	tempFile = filepath.Join(tempDir, tempFile)
-	if err := os.Mkdir(tempDir, 0755); err != nil {
-		return cli.Exit("Failed to create directory: "+err.Error(), 1)
+
+	// create tempDir if not exist
+	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
+		if err := os.Mkdir(tempDir, 0755); err != nil {
+			return cli.Exit("Failed to create directory: "+err.Error(), 1)
+		}
+	} else if err != nil {
+		return cli.Exit("Error checking directory: "+err.Error(), 1)
+	} else {
+		fmt.Println("Directory already exists")
 	}
+
 	defer func() {
 		if err := os.RemoveAll(tempDir); err != nil {
 			fmt.Println("Error removing directory: ", err)
