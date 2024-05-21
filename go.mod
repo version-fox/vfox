@@ -8,6 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.1
 	github.com/bodgit/sevenzip v1.5.1
 	github.com/lithammer/fuzzysearch v1.1.8
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/pterm/pterm v0.12.79
 	github.com/schollz/progressbar/v3 v3.14.2
 	github.com/ulikunitz/xz v0.5.12
