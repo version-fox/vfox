@@ -42,16 +42,16 @@ func listCmd(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		if len(allSdk) == 0 {
+		if len(allSdk.SdkMap) == 0 {
 			return fmt.Errorf("you don't have any sdk installed yet")
 		}
 		tree := pterm.LeveledList{}
-		for name, s := range allSdk {
+		allSdk.ForEachBySort(func(name string, s *internal.Sdk) {
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
 			for _, version := range s.List() {
 				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})
 			}
-		}
+		})
 		// Generate tree from LeveledList.
 		root := putils.TreeFromLeveledList(tree)
 		root.Text = "All installed sdk versions"

@@ -68,6 +68,28 @@ func (d *SdkEnvs) ToEnvs() *env.Envs {
 	return envs
 }
 
+type AllSdk struct {
+	SdkMap map[string]*Sdk
+}
+
+func (b *AllSdk) ForEachBySort(apply func(name string, sdk *Sdk)) {
+
+	// Sort the keys
+	keys := make([]string, 0, len(b.SdkMap))
+	for key := range b.SdkMap {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		sdk := b.SdkMap[key]
+
+		// Call the function
+		apply(key, sdk)
+	}
+}
+
 type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin

@@ -148,7 +148,7 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 	}
 }
 
-func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
+func (m *Manager) LoadAllSdk() (*AllSdk, error) {
 	dir, err := os.ReadDir(m.PathMeta.PluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("load sdks error: %w", err)
@@ -179,7 +179,9 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 		sdkMap[strings.ToLower(sdkName)] = sdk
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
-	return sdkMap, nil
+	return &AllSdk{
+		SdkMap: sdkMap,
+	}, nil
 }
 
 func (m *Manager) Close() {
