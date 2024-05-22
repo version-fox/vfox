@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -109,7 +110,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	sdk, err := NewSdk(m, pluginPath)
+	sdk, err := NewSdk(m, pluginPath, strings.ToLower(name))
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +149,12 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 	}
 }
 
-func (m *Manager) LoadAllSdk() (*AllSdk, error) {
+func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 	dir, err := os.ReadDir(m.PathMeta.PluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("load sdks error: %w", err)
 	}
-	sdkMap := make(map[string]*Sdk)
+	sdkSlice := make([]*Sdk, 0)
 	for _, d := range dir {
 		sdkName := d.Name()
 		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
@@ -175,13 +176,15 @@ func (m *Manager) LoadAllSdk() (*AllSdk, error) {
 		} else {
 			continue
 		}
-		sdk, _ := NewSdk(m, path)
-		sdkMap[strings.ToLower(sdkName)] = sdk
+		sdk, _ := NewSdk(m, path, strings.ToLower(sdkName))
+		sdkSlice = append(sdkSlice, sdk)
+		sort.Slice(sdkSlice, func(i, j int) bool {
+			return sdkSlice[j].Name > sdkSlice[i].Name
+		})
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
-	return &AllSdk{
-		SdkMap: sdkMap,
-	}, nil
+
+	return sdkSlice, nil
 }
 
 func (m *Manager) Close() {

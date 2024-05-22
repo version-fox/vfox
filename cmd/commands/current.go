@@ -43,14 +43,15 @@ func currentCmd(ctx *cli.Context) error {
 			return err
 		}
 
-		allSdk.ForEachBySort(func(name string, s *internal.Sdk) {
+		for _, s := range allSdk {
+			name := s.Name
 			current := s.Current()
 			if current == "" {
 				pterm.Printf("%s -> N/A \n", name)
 			} else {
 				pterm.Printf("%s -> %s\n", name, pterm.LightGreen("v"+string(current)))
 			}
-		})
+		}
 
 		return nil
 	}

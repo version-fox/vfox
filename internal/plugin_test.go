@@ -372,4 +372,26 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 	})
+
+	t.Run("LoadAllSdk", func(t *testing.T) {
+		s, _, err := factory()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		firstSdkName := ""
+		for i := 0; i < 10; i++ {
+			sdks, err := s.LoadAllSdk()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(sdks) != 0 && firstSdkName == "" {
+				firstSdkName = sdks[0].Name
+			} else if len(sdks) != 0 {
+				if sdks[0].Name != firstSdkName {
+					t.Errorf("expected sdk sort %v", sdks)
+				}
+			}
+		}
+	})
 }

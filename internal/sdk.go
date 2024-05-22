@@ -68,33 +68,12 @@ func (d *SdkEnvs) ToEnvs() *env.Envs {
 	return envs
 }
 
-type AllSdk struct {
-	SdkMap map[string]*Sdk
-}
-
-func (b *AllSdk) ForEachBySort(apply func(name string, sdk *Sdk)) {
-
-	// Sort the keys
-	keys := make([]string, 0, len(b.SdkMap))
-	for key := range b.SdkMap {
-		keys = append(keys, key)
-	}
-
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		sdk := b.SdkMap[key]
-
-		// Call the function
-		apply(key, sdk)
-	}
-}
-
 type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
 	InstallPath string
+	Name        string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -776,12 +755,13 @@ func (b *Sdk) ClearCurrentEnv() error {
 }
 
 // NewSdk creates a new SDK instance.
-func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
+func NewSdk(manager *Manager, pluginPath string, name string) (*Sdk, error) {
 	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
 	}
 	return &Sdk{
+		Name:        name,
 		sdkManager:  manager,
 		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
 		Plugin:      luaPlugin,
