@@ -27,6 +27,7 @@ import (
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
+	"os"
 	"path/filepath"
 )
 
@@ -174,6 +175,7 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 	var (
 		sdkEnvs   []*internal.SdkEnv
 		finalSdks = make(map[string]struct{})
+		cacheLen  = flushCache.Len()
 	)
 
 	for _, tv := range multiToolVersions {
@@ -203,6 +205,18 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 			return nil
 		}); err != nil {
 			return nil, err
+		}
+	}
+
+	// Remove the old cache
+	if cacheLen != len(finalSdks) {
+		for _, sdkname := range flushCache.Keys() {
+			if _, ok := finalSdks[sdkname]; !ok {
+				linkPath := filepath.Join(manager.PathMeta.CurTmpPath, sdkname)
+				logger.Debugf("Remove unused sdk link: %s\n", linkPath)
+				_ = os.Remove(linkPath)
+				flushCache.Remove(sdkname)
+			}
 		}
 	}
 	return sdkEnvs, nil

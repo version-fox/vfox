@@ -40,10 +40,6 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
-var (
-	localSdkPackageCache = make(map[Version]*Package)
-)
-
 type Version string
 
 type SdkEnv struct {
@@ -72,7 +68,8 @@ type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
-	InstallPath string
+	InstallPath          string
+	localSdkPackageCache map[Version]*Package
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -420,11 +417,11 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	var (
-		multiToolVersion toolset.MultiToolVersions
+		toolVersion toolset.ToolVersion
 	)
 
 	if scope == Global {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
@@ -446,7 +443,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 
 		// clear global env
 		logger.Debugf("Clear global env: %s\n", b.Plugin.SdkName)
-		if oldVersion, ok := toolVersion.Get(b.Plugin.SdkName); ok {
+		if oldVersion, ok := tv.Get(b.Plugin.SdkName); ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 
@@ -457,29 +454,28 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
-		multiToolVersion = append(multiToolVersion, toolVersion)
+		toolVersion = tv
 	} else if scope == Project {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		logger.Debugf("Load project toolchain versions: %v\n", toolVersion.Keys())
-		multiToolVersion = append(multiToolVersion, toolVersion)
+		toolVersion = tv
+	} else {
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+		toolVersion = tv
+
 	}
+	toolVersion.Set(b.Plugin.SdkName, string(version))
 
-	// It must also be saved once at the session level.
-	toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
-	if err != nil {
-		return fmt.Errorf("failed to read tool versions, err:%w", err)
-	}
-	multiToolVersion = append(multiToolVersion, toolVersion)
-
-	multiToolVersion.Add(b.Plugin.SdkName, string(version))
-
-	if err = multiToolVersion.Save(); err != nil {
+	if err := toolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
-	if err = b.ToLinkPackage(version, ShellLocation); err != nil {
+
+	if err := b.ToLinkPackage(version, ShellLocation); err != nil {
 		return err
 	}
 
@@ -572,7 +568,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 }
 
 func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
-	p, ok := localSdkPackageCache[version]
+	p, ok := b.localSdkPackageCache[version]
 	if ok {
 		return p, nil
 	}
@@ -610,7 +606,7 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 		Main:      main,
 		Additions: additions,
 	}
-	localSdkPackageCache[version] = p2
+	b.localSdkPackageCache[version] = p2
 	return p2, nil
 }
 
@@ -760,8 +756,9 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
 	}
 	return &Sdk{
-		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
-		Plugin:      luaPlugin,
+		sdkManager:           manager,
+		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
+		Plugin:               luaPlugin,
+		localSdkPackageCache: make(map[Version]*Package),
 	}, nil
 }

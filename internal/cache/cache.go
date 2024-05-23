@@ -101,6 +101,28 @@ func (c *FileCache) Get(key string) (Value, bool) {
 	return item.Val, true
 }
 
+func (c *FileCache) Keys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	keys := make([]string, 0, len(c.items))
+	for k := range c.items {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (c *FileCache) Len() int {
+	return len(c.items)
+}
+
+func (c *FileCache) Clear() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	len := len(c.items)
+	c.items = make(map[string]Item)
+	return len
+}
+
 // Remove a key from the cache
 func (c *FileCache) Remove(key string) {
 	c.mu.Lock()
