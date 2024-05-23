@@ -178,12 +178,12 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		}
 		sdk, _ := NewSdk(m, path, strings.ToLower(sdkName))
 		sdkSlice = append(sdkSlice, sdk)
-		sort.Slice(sdkSlice, func(i, j int) bool {
-			return sdkSlice[j].Name > sdkSlice[i].Name
-		})
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
-
+	// sort by name
+	sort.Slice(sdkSlice, func(i, j int) bool {
+		return sdkSlice[j].Name > sdkSlice[i].Name
+	})
 	return sdkSlice, nil
 }
 
