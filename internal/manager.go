@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mitchellh/go-ps"
 	"github.com/pterm/pterm"
@@ -67,13 +68,13 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location Location) (SdkEnvs, error) {
+func (m *Manager) EnvKeys(tvs []*util.SortedMap[string, string], location Location) (SdkEnvs, error) {
 	var sdkEnvs SdkEnvs
 	tools := make(map[string]struct{})
 	for _, t := range tvs {
-		for name, version := range t.Record {
+		_ = t.ForEach(func(name string, version string) error {
 			if _, ok := tools[name]; ok {
-				continue
+				return nil
 			}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
 				v := Version(version)
@@ -86,7 +87,8 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location Location) (Sdk
 					})
 				}
 			}
-		}
+			return nil
+		})
 	}
 	return sdkEnvs, nil
 }
@@ -216,7 +218,7 @@ func (m *Manager) Remove(pluginName string) error {
 			return err
 		}
 		for _, filename := range source.Plugin.LegacyFilenames {
-			delete(lfr.Record, filename)
+			lfr.Remove(filename)
 		}
 		if err = lfr.Save(); err != nil {
 			return fmt.Errorf("remove legacy filenames failed: %w", err)
@@ -301,10 +303,10 @@ func (m *Manager) Update(pluginName string) error {
 			return err
 		}
 		for _, filename := range sdk.Plugin.LegacyFilenames {
-			delete(lfr.Record, filename)
+			lfr.Remove(filename)
 		}
 		for _, filename := range tempPlugin.LegacyFilenames {
-			lfr.Record[filename] = pluginName
+			lfr.Set(filename, pluginName)
 		}
 		if err = lfr.Save(); err != nil {
 			return fmt.Errorf("update legacy filenames failed: %w", err)
@@ -458,7 +460,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 			return err
 		}
 		for _, filename := range tempPlugin.LegacyFilenames {
-			lfr.Record[filename] = pname
+			lfr.Set(filename, pname)
 		}
 		if err = lfr.Save(); err != nil {
 			return fmt.Errorf("add legacy filenames failed: %w", err)
@@ -654,8 +656,8 @@ func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
 	}
 
 	// There are some legacy files to be parsed.
-	if len(legacyFileRecord.Record) > 0 {
-		for filename, sdkname := range legacyFileRecord.Record {
+	if legacyFileRecord.Len() > 0 {
+		_ = legacyFileRecord.ForEach(func(filename string, sdkname string) error {
 			path := filepath.Join(m.PathMeta.WorkingDirectory, filename)
 			if util.FileExists(path) {
 				logger.Debugf("Parsing legacy file %s \n", path)
@@ -669,10 +671,81 @@ func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
 					}
 				}
 			}
-		}
+			return nil
+		})
 
 	}
 	return nil
+}
+
+func (m *Manager) FindToolVersion() (*util.SortedMap[string, string], error) {
+	path := m.PathMeta.WorkingDirectory
+	legacyFileRecord, err := m.loadLegacyFileRecord()
+	if err != nil {
+		return nil, err
+	}
+	versionMap := util.NewSortedMap[string, string]()
+	for {
+		logger.Debugf("Find tool version in %s \n", pterm.LightBlue(path))
+		file := filepath.Join(path, toolset.ToolVersionFilename)
+		if util.FileExists(file) {
+			logger.Debugf("Parsing tool version file: %s \n", file)
+			wtv, err := toolset.NewFileRecord(file)
+			if err != nil {
+				return nil, err
+			}
+			versionMap = wtv.SortedMap
+		}
+		if m.Config.LegacyVersionFile.Enable {
+			var wg sync.WaitGroup
+			for _, filename := range legacyFileRecord.Keys() {
+				wg.Add(1)
+				go func(fn string) {
+					defer wg.Done()
+					sdkname, _ := legacyFileRecord.Get(fn)
+					legacyFile := filepath.Join(m.PathMeta.WorkingDirectory, fn)
+					if util.FileExists(legacyFile) {
+						logger.Debugf("Parsing legacy file %s \n", legacyFile)
+						if sdk, err := m.LookupSdk(sdkname); err == nil {
+							// The .tool-version in the current directory has the highest priority,
+							// checking to see if the version information in the legacy file exists in the former,
+							//  and updating to the former record (Don’t fall into the file!) if it doesn't.
+							if version, err := sdk.ParseLegacyFile(legacyFile); err == nil && version != "" {
+								logger.Debugf("Found %s@%s in %s \n", sdkname, version, legacyFile)
+								versionMap.Set(sdkname, string(version))
+							}
+						}
+					}
+				}(filename)
+			}
+			wg.Wait()
+		}
+		if versionMap.Len() != 0 {
+			break
+		}
+
+		parent := filepath.Dir(path)
+		if parent == path {
+			logger.Debugf("Reach root directory, stop searching: %s \n", parent)
+
+			if versionMap.Len() == 0 {
+				logger.Debugf("%s \n", pterm.LightRed("Toolchain version not found, use globally version."))
+				file := filepath.Join(m.PathMeta.HomePath, toolset.ToolVersionFilename)
+				if util.FileExists(file) {
+					logger.Debugf("Parsing tool version file: %s \n", file)
+					wtv, err := toolset.NewFileRecord(file)
+					if err != nil {
+						return nil, err
+					}
+					versionMap = wtv.SortedMap
+				}
+			}
+			break
+		}
+		path = parent
+	}
+
+	return versionMap, nil
 }
 
 func NewSdkManager() *Manager {

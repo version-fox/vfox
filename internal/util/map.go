@@ -65,6 +65,16 @@ func (s *SortedMap[K, V]) Len() int {
 	return len(s.keys)
 }
 
+func (s *SortedMap[K, V]) Keys() []K {
+	return s.keys
+}
+
+func (s *SortedMap[K, V]) Merge(sortedMap *SortedMap[K, V]) {
+	for _, k := range sortedMap.keys {
+		s.Set(k, sortedMap.vals[k])
+	}
+}
+
 func (s *SortedMap[K, V]) ForEach(f func(k K, v V) error) error {
 	for _, k := range s.keys {
 		if err := f(k, s.vals[k]); err != nil {

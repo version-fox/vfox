@@ -26,6 +26,7 @@ import (
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/util"
 	"path/filepath"
 )
 
@@ -147,16 +148,9 @@ func envFlag(ctx *cli.Context) error {
 }
 
 func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
-	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
-	if err != nil {
-		return nil, err
-	}
 
-	if err = manager.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
+	toolVersionMap, err := manager.FindToolVersion()
+	if err != nil {
 		return nil, err
 	}
 
@@ -164,10 +158,12 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer curToolVersion.Save()
 
 	// Add the working directory to the first
-	tvs := toolset.MultiToolVersions{workToolVersion, curToolVersion}
+	multiToolVersions := []*util.SortedMap[string, string]{
+		toolVersionMap,
+		curToolVersion.SortedMap,
+	}
 
 	flushCache, err := cache.NewFileCache(filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache"))
 	if err != nil {
@@ -175,33 +171,39 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 	}
 	defer flushCache.Close()
 
-	var sdkEnvs []*internal.SdkEnv
+	var (
+		sdkEnvs   []*internal.SdkEnv
+		finalSdks = make(map[string]struct{})
+	)
 
-	tvs.FilterTools(func(name, version string) bool {
-		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			vv, ok := flushCache.Get(name)
-			if ok && string(vv) == version {
-				logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
-				return true
-			} else {
-				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+	for _, tv := range multiToolVersions {
+		if err = tv.ForEach(func(name string, version string) error {
+			if _, ok := finalSdks[name]; ok {
+				return nil
 			}
-			v := internal.Version(version)
-			if keys, err := lookupSdk.EnvKeys(v, internal.ShellLocation); err == nil {
-				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
+			if lookupSdk, err := manager.LookupSdk(name); err == nil {
+				vv, ok := flushCache.Get(name)
+				if ok && string(vv) == version {
+					logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
+					finalSdks[name] = struct{}{}
+					return nil
+				} else {
+					logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+				}
+				v := internal.Version(version)
+				if keys, err := lookupSdk.EnvKeys(v, internal.ShellLocation); err == nil {
+					flushCache.Set(name, cache.Value(version), cache.NeverExpired)
 
-				sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
-					Sdk: lookupSdk, Env: keys,
-				})
-
-				// If we encounter a .tool-versions file, it is valid for the entire shell session,
-				// unless we encounter the next .tool-versions file or manually switch to the use command.
-				curToolVersion.Record[name] = version
-				return true
+					sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
+						Sdk: lookupSdk, Env: keys,
+					})
+					finalSdks[name] = struct{}{}
+				}
 			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		return false
-	})
-
+	}
 	return sdkEnvs, nil
 }

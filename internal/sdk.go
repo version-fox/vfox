@@ -245,7 +245,7 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if err != nil {
 		return err
 	}
-	delete(tv.Record, b.Plugin.SdkName)
+	tv.Remove(b.Plugin.SdkName)
 	_ = tv.Save()
 
 	err = os.RemoveAll(path)
@@ -398,7 +398,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 
 		// clear global env
-		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+		if oldVersion, ok := toolVersion.Get(b.Plugin.SdkName); ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
@@ -408,7 +408,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
-		toolVersion.Record[b.Plugin.SdkName] = string(version)
+		toolVersion.Set(b.Plugin.SdkName, string(version))
 		if err = toolVersion.Save(); err != nil {
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
 		}
@@ -446,7 +446,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 
 		// clear global env
 		logger.Debugf("Clear global env: %s\n", b.Plugin.SdkName)
-		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+		if oldVersion, ok := toolVersion.Get(b.Plugin.SdkName); ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 
@@ -463,7 +463,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		logger.Debugf("Load project toolchain versions: %v\n", toolVersion.Record)
+		logger.Debugf("Load project toolchain versions: %v\n", toolVersion.Keys())
 		multiToolVersion = append(multiToolVersion, toolVersion)
 	}
 
@@ -748,7 +748,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 		return err
 	}
 	for _, tv := range toolVersion {
-		delete(tv.Record, b.Plugin.SdkName)
+		tv.Remove(b.Plugin.SdkName)
 	}
 	return nil
 }

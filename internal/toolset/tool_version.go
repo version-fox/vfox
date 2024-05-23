@@ -21,28 +21,29 @@ import (
 	"path/filepath"
 )
 
-const filename = ".tool-versions"
+const ToolVersionFilename = ".tool-versions"
 
-type MultiToolVersions []*ToolVersion
+type MultiToolVersions []ToolVersion
 
 // FilterTools filters tools by the given filter function
 // and return the first one you find.
 func (m MultiToolVersions) FilterTools(filter func(name, version string) bool) map[string]string {
 	tools := make(map[string]string)
 	for _, t := range m {
-		for name, version := range t.Record {
+		_ = t.ForEach(func(name string, version string) error {
 			_, ok := tools[name]
 			if !ok && filter(name, version) {
 				tools[name] = version
 			}
-		}
+			return nil
+		})
 	}
 	return tools
 }
 
 func (m MultiToolVersions) Add(name, version string) {
 	for _, t := range m {
-		t.Record[name] = version
+		t.Set(name, version)
 	}
 }
 
@@ -56,19 +57,15 @@ func (m MultiToolVersions) Save() error {
 }
 
 // ToolVersion represents a .tool-versions file
-type ToolVersion struct {
-	*FileRecord
-}
+type ToolVersion = *FileRecord
 
-func NewToolVersion(dirPath string) (*ToolVersion, error) {
-	file := filepath.Join(dirPath, filename)
+func NewToolVersion(dirPath string) (ToolVersion, error) {
+	file := filepath.Join(dirPath, ToolVersionFilename)
 	mapFile, err := NewFileRecord(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read tool versions file %s: %w", file, err)
 	}
-	return &ToolVersion{
-		FileRecord: mapFile,
-	}, nil
+	return mapFile, nil
 }
 
 func NewMultiToolVersions(paths []string) (MultiToolVersions, error) {

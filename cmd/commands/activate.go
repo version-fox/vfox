@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"strings"
 	"text/template"
@@ -46,25 +47,18 @@ func activateCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
-	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
+	toolVersionMap, err := manager.FindToolVersion()
 	if err != nil {
 		return err
 	}
 
-	if err = manager.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
-		return err
-	}
 	homeToolVersion, err := toolset.NewToolVersion(manager.PathMeta.HomePath)
 	if err != nil {
 		return err
 	}
-	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
+	sdkEnvs, err := manager.EnvKeys([]*util.SortedMap[string, string]{
+		toolVersionMap,
+		homeToolVersion.SortedMap,
 	}, internal.ShellLocation)
 	if err != nil {
 		return err
