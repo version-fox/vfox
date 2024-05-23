@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mitchellh/go-ps"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/config"
@@ -583,26 +584,35 @@ func (m *Manager) Available() (RegistryIndex, error) {
 func (m *Manager) CleanTmp() {
 	// once per day
 	cleanFlagPath := filepath.Join(m.PathMeta.TempPath, cleanupFlagFilename)
-	if !util.FileExists(cleanFlagPath) {
-		_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), 0777)
-	} else {
-		if str, err := os.ReadFile(cleanFlagPath); err == nil {
-			if i, err := strconv.ParseInt(string(str), 10, 64); err == nil && !util.IsBeforeToday(i) {
-				return
+	if str, err := os.ReadFile(cleanFlagPath); err == nil {
+		if i, err := strconv.ParseInt(string(str), 10, 64); err == nil && !util.IsBeforeToday(i) {
+			return
+		}
+	}
+	_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), os.ModePerm)
+
+	procExists := make(map[string]struct{})
+	if procList, err := ps.Processes(); err == nil {
+		for _, v := range procList {
+			if v != nil {
+				procExists[strconv.Itoa(v.Pid())] = struct{}{}
 			}
 		}
 	}
+
 	dir, err := os.ReadDir(m.PathMeta.TempPath)
 	if err == nil {
 		for _, file := range dir {
 			if !file.IsDir() {
 				continue
 			}
-			names := strings.SplitN(file.Name(), "-", 2)
-			if len(names) != 2 {
+			timestamp, pid, ok := strings.Cut(file.Name(), "-")
+			if !ok {
 				continue
 			}
-			timestamp := names[0]
+			if _, ok = procExists[pid]; ok {
+				continue
+			}
 			i, err := strconv.ParseInt(timestamp, 10, 64)
 			if err != nil {
 				continue
