@@ -111,6 +111,12 @@ func cleanTmp() error {
 	return nil
 }
 
+type flushCacheItem struct {
+	Version string
+	Path    []string
+	Envs    map[string]*string
+}
+
 func envFlag(ctx *cli.Context) error {
 	shellName := ctx.String("shell")
 	if shellName == "" {
@@ -166,7 +172,8 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 		curToolVersion.SortedMap,
 	}
 
-	flushCache, err := cache.NewFileCache(filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache"))
+	flushCacheFile := filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache")
+	flushCache, err := cache.NewFileCache(flushCacheFile)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +181,7 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 
 	var (
 		sdkEnvs   []*internal.SdkEnv
-		finalSdks = make(map[string]struct{})
+		finalSdks = make(map[string]*flushCacheItem)
 		cacheLen  = flushCache.Len()
 	)
 
@@ -185,21 +192,30 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 			}
 			if lookupSdk, err := manager.LookupSdk(name); err == nil {
 				vv, ok := flushCache.Get(name)
-				if ok && string(vv) == version {
-					logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
-					finalSdks[name] = struct{}{}
-					return nil
+				if ok {
+					item := flushCacheItem{}
+					if err = vv.Unmarshal(&item); err != nil {
+						_ = os.Remove(flushCacheFile)
+						flushCache.Clear()
+					}
+					if item.Version == version {
+						logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
+						finalSdks[name] = &item
+						return nil
+					}
 				} else {
-					logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+					logger.Debugf("No hit cache, name: %s, expected: %s \n", name, version)
 				}
 				v := internal.Version(version)
 				if keys, err := lookupSdk.EnvKeys(v, internal.ShellLocation); err == nil {
-					flushCache.Set(name, cache.Value(version), cache.NeverExpired)
-
-					sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
-						Sdk: lookupSdk, Env: keys,
-					})
-					finalSdks[name] = struct{}{}
+					item := flushCacheItem{
+						Version: version,
+						Path:    keys.Paths.Slice(),
+						Envs:    keys.Variables,
+					}
+					value, _ := cache.NewValue(&item)
+					flushCache.Set(name, value, cache.NeverExpired)
+					finalSdks[name] = &item
 				}
 			}
 			return nil
@@ -211,12 +227,34 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 	// Remove the old cache
 	if cacheLen != len(finalSdks) {
 		for _, sdkname := range flushCache.Keys() {
-			if _, ok := finalSdks[sdkname]; !ok {
+			item, ok := finalSdks[sdkname]
+			// Remove the corresponding environment variable
+			if !ok {
 				linkPath := filepath.Join(manager.PathMeta.CurTmpPath, sdkname)
 				logger.Debugf("Remove unused sdk link: %s\n", linkPath)
 				_ = os.Remove(linkPath)
+				cv, _ := flushCache.Get(sdkname)
+				item = &flushCacheItem{}
+				if err = cv.Unmarshal(&item); err == nil {
+					newEnvs := make(env.Vars)
+					for k, _ := range item.Envs {
+						newEnvs[k] = nil
+					}
+					item.Envs = newEnvs
+					item.Path = make([]string, 0)
+				}
 				flushCache.Remove(sdkname)
 			}
+			paths := env.NewPaths(env.EmptyPaths)
+			for _, p := range item.Path {
+				paths.Add(p)
+			}
+			sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
+				Sdk: nil, Env: &env.Envs{
+					Variables: item.Envs,
+					Paths:     paths,
+				},
+			})
 		}
 	}
 	return sdkEnvs, nil

@@ -66,7 +66,7 @@ func (s *SortedMap[K, V]) Len() int {
 }
 
 func (s *SortedMap[K, V]) Keys() []K {
-	return s.keys
+	return append([]K{}, s.keys...)
 }
 
 func (s *SortedMap[K, V]) Merge(sortedMap *SortedMap[K, V]) {
