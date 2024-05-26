@@ -178,12 +178,13 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		}
 		sdk, _ := NewSdk(m, path)
 		sdkSlice = append(sdkSlice, sdk)
-		sort.Slice(sdkSlice, func(i, j int) bool {
-			return sdkSlice[j].Plugin.SdkName > sdkSlice[i].Plugin.SdkName
-		})
+
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
 
+	sort.Slice(sdkSlice, func(i, j int) bool {
+		return sdkSlice[j].Plugin.SdkName > sdkSlice[i].Plugin.SdkName
+	})
 	return sdkSlice, nil
 }
 
