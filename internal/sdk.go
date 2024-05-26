@@ -73,7 +73,6 @@ type Sdk struct {
 	Plugin     *LuaPlugin
 	// current sdk install path
 	InstallPath string
-	Name        string
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -755,13 +754,12 @@ func (b *Sdk) ClearCurrentEnv() error {
 }
 
 // NewSdk creates a new SDK instance.
-func NewSdk(manager *Manager, pluginPath string, name string) (*Sdk, error) {
+func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
 	}
 	return &Sdk{
-		Name:        name,
 		sdkManager:  manager,
 		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
 		Plugin:      luaPlugin,

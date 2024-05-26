@@ -110,7 +110,7 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
 		}
 	}
-	sdk, err := NewSdk(m, pluginPath, strings.ToLower(name))
+	sdk, err := NewSdk(m, pluginPath)
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +176,10 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		} else {
 			continue
 		}
-		sdk, _ := NewSdk(m, path, strings.ToLower(sdkName))
+		sdk, _ := NewSdk(m, path)
 		sdkSlice = append(sdkSlice, sdk)
 		sort.Slice(sdkSlice, func(i, j int) bool {
-			return sdkSlice[j].Name > sdkSlice[i].Name
+			return sdkSlice[j].Plugin.SdkName > sdkSlice[i].Plugin.SdkName
 		})
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}

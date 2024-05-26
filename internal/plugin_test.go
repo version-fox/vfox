@@ -386,9 +386,9 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 				t.Fatal(err)
 			}
 			if len(sdks) != 0 && firstSdkName == "" {
-				firstSdkName = sdks[0].Name
+				firstSdkName = sdks[0].Plugin.SdkName
 			} else if len(sdks) != 0 {
-				if sdks[0].Name != firstSdkName {
+				if sdks[0].Plugin.SdkName != firstSdkName {
 					t.Errorf("expected sdk sort %v", sdks)
 				}
 			}
