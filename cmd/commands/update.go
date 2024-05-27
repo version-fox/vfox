@@ -50,7 +50,7 @@ func updateCmd(ctx *cli.Context) error {
 				total = len(sdks)
 			)
 			for _, s := range sdks {
-				sdkName := s.Name
+				sdkName := s.Plugin.SdkName
 				index++
 				pterm.Printf("[%s/%d]: Updating %s plugin...\n", pterm.Green(index), total, pterm.Green(sdkName))
 				if err = manager.Update(sdkName); err != nil {

@@ -44,7 +44,7 @@ func currentCmd(ctx *cli.Context) error {
 		}
 
 		for _, s := range allSdk {
-			name := s.Name
+			name := s.Plugin.SdkName
 			current := s.Current()
 			if current == "" {
 				pterm.Printf("%s -> N/A \n", name)
