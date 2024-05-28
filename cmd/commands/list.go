@@ -46,7 +46,9 @@ func listCmd(ctx *cli.Context) error {
 			return fmt.Errorf("you don't have any sdk installed yet")
 		}
 		tree := pterm.LeveledList{}
-		for name, s := range allSdk {
+
+		for _, s := range allSdk {
+			name := s.Plugin.SdkName
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
 			for _, version := range s.List() {
 				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})

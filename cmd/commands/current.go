@@ -42,7 +42,9 @@ func currentCmd(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		for name, s := range allSdk {
+
+		for _, s := range allSdk {
+			name := s.Plugin.SdkName
 			current := s.Current()
 			if current == "" {
 				pterm.Printf("%s -> N/A \n", name)
@@ -50,6 +52,7 @@ func currentCmd(ctx *cli.Context) error {
 				pterm.Printf("%s -> %s\n", name, pterm.LightGreen("v"+string(current)))
 			}
 		}
+
 		return nil
 	}
 	source, err := manager.LookupSdk(sdkName)

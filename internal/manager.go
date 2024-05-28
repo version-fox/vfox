@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -149,12 +150,12 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 	}
 }
 
-func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
+func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 	dir, err := os.ReadDir(m.PathMeta.PluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("load sdks error: %w", err)
 	}
-	sdkMap := make(map[string]*Sdk)
+	sdkSlice := make([]*Sdk, 0)
 	for _, d := range dir {
 		sdkName := d.Name()
 		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
@@ -177,10 +178,15 @@ func (m *Manager) LoadAllSdk() (map[string]*Sdk, error) {
 			continue
 		}
 		sdk, _ := NewSdk(m, path)
-		sdkMap[strings.ToLower(sdkName)] = sdk
+		sdkSlice = append(sdkSlice, sdk)
+
 		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
-	return sdkMap, nil
+
+	sort.Slice(sdkSlice, func(i, j int) bool {
+		return sdkSlice[j].Plugin.SdkName > sdkSlice[i].Plugin.SdkName
+	})
+	return sdkSlice, nil
 }
 
 func (m *Manager) Close() {
