@@ -38,11 +38,9 @@ func TestPathFormat(t *testing.T) {
 		for _, v := range testdata {
 			paths.Add(v.path)
 		}
-		result = paths.Slice()
-		for i, v := range testdata {
-			if result[i] != v.want {
-				t.Errorf("want: %s, got: %s", v.want, result[i])
-			}
+		pathStr := paths.String()
+		if pathStr != "/c/Program Files/Git/bin:/d/b/c" {
+			t.Errorf("want: /c/Program Files/Git/bin:/d/b/c, got: %s", pathStr)
 		}
 
 	} else {
