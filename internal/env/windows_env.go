@@ -224,22 +224,25 @@ func NewEnvManager(vfConfigPath string) (Manager, error) {
 }
 
 func (p *Paths) String() string {
+
 	if os.Getenv(HookFlag) == "bash" {
-		return strings.Join(p.Slice(), ":")
+		pps := p.Slice()
+		paths := make([]string, len(pps))
+		for _, path := range pps {
+			path = filepath.ToSlash(path)
+			// Convert drive letter (e.g., "C:") to "/c"
+			if len(path) > 1 && path[1] == ':' {
+				path = "/" + strings.ToLower(string(path[0])) + path[2:]
+			}
+			paths = append(paths, path)
+		}
+		return strings.Join(paths, ":")
 	} else {
 		return strings.Join(p.Slice(), ";")
 	}
 }
 
 func (p *Paths) Add(path string) bool {
-	if os.Getenv(HookFlag) == "bash" {
-		path = filepath.ToSlash(path)
-		// Convert drive letter (e.g., "C:") to "/c"
-		if len(path) > 1 && path[1] == ':' {
-			path = "/" + strings.ToLower(string(path[0])) + path[2:]
-		}
-	} else {
-		path = filepath.FromSlash(path)
-	}
+	path = filepath.FromSlash(path)
 	return p.SortedSet.Add(path)
 }
