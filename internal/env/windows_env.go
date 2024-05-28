@@ -227,7 +227,7 @@ func (p *Paths) String() string {
 
 	if os.Getenv(HookFlag) == "bash" {
 		pps := p.Slice()
-		paths := make([]string, len(pps))
+		paths := make([]string, 0)
 		for _, path := range pps {
 			path = filepath.ToSlash(path)
 			// Convert drive letter (e.g., "C:") to "/c"
