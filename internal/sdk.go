@@ -599,7 +599,7 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	}
 	main := items[b.Plugin.Name]
 	delete(items, b.Plugin.Name)
-	if main.Path == "" {
+	if main == nil {
 		return nil, errors.New("main sdk not found")
 	}
 	var additions []*Info
