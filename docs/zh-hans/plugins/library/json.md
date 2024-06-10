@@ -1,6 +1,6 @@
 # Json标准库
 
-`vfox`提供的`json`库是基于[gopher-json](https://github.com/layeh/gopher-json)实现的。
+`vfox` 提供的 `json` 库是基于 [gopher-json](https://github.com/layeh/gopher-json) 实现的。
 
 
 **使用**
