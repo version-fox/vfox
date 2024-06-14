@@ -1,7 +1,6 @@
 # JSON Library
 
-Based on [gopher-json](https://github.com/layeh/gopher-json/)
-
+Based on [gopher-json](https://github.com/layeh/gopher-json)
 
 **Usage**
 ```lua
