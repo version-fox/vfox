@@ -122,6 +122,14 @@ Add the following line to the end of your profile and save:
 Invoke-Expression "$(vfox activate pwsh)"
 ```
 
+If Powershell prompts:`cannot be loaded because the execution of scripts is disabled on this system`.**Open PowerShell** with **Run as Administrator**.Then, run this command in PowerShell
+
+```shell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+# After that type Y and press Enter.
+y
+```
+
 :::
 
 ::: details Clink & Cmder
