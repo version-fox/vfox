@@ -123,6 +123,14 @@ Invoke-Item $PROFILE # 打开profile
 Invoke-Expression "$(vfox activate pwsh)"
 ```
 
+如果powershell提示：`在此系统上禁止运行脚本`，那么请你**以管理员身份重新运行powershell**输入如下命令
+
+```shell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+# 之后输入Y，按回车
+y
+```
+
 :::
 
 ::: details Clink & Cmder
