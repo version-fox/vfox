@@ -25,25 +25,27 @@ type zsh struct{}
 var Zsh = zsh{}
 
 const zshHook = `
-{{.EnvContent}}
+if [[ -z "$__VFOX_PID" ]]; then
+  {{.EnvContent}}
 
-export __VFOX_PID=$$;
+  export __VFOX_PID=$$;
 
-_vfox_hook() {
-  trap -- '' SIGINT;
-  eval "$("{{.SelfPath}}" env -s zsh)";
-  trap - SIGINT;
-}
-typeset -ag precmd_functions;
-if [[ -z "${precmd_functions[(r)_vfox_hook]+1}" ]]; then
-  precmd_functions=( _vfox_hook ${precmd_functions[@]} )
+  _vfox_hook() {
+    trap -- '' SIGINT;
+    eval "$("{{.SelfPath}}" env -s zsh)";
+    trap - SIGINT;
+  }
+  typeset -ag precmd_functions;
+  if [[ -z "${precmd_functions[(r)_vfox_hook]+1}" ]]; then
+    precmd_functions=( _vfox_hook ${precmd_functions[@]} )
+  fi
+  typeset -ag chpwd_functions;
+  if [[ -z "${chpwd_functions[(r)_vfox_hook]+1}" ]]; then
+    chpwd_functions=( _vfox_hook ${chpwd_functions[@]} )
+  fi
+
+  trap 'vfox env --cleanup' EXIT
 fi
-typeset -ag chpwd_functions;
-if [[ -z "${chpwd_functions[(r)_vfox_hook]+1}" ]]; then
-  chpwd_functions=( _vfox_hook ${chpwd_functions[@]} )
-fi
-
-trap 'vfox env --cleanup' EXIT
 `
 
 func (z zsh) Activate() (string, error) {
