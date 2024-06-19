@@ -109,18 +109,10 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 打开 PowerShell 配置文件:
 
 ```shell
-New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 
-# 如果它提示未能找到路径，那么你需要强制创建profile。添加"-Force"选项。
-# New-Item -Type File -Path $PROFILE –Force
-
-Invoke-Item $PROFILE # 打开profile
-```
-
-将下面一行添加到你的 $PROFILE 文件末尾并保存:
-
-```shell
-Invoke-Expression "$(vfox activate pwsh)"
+# 创建配置文件: New-Item -Type File -Path $PROFILE -Force
+# 向配置文件添加内容: Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
 
 如果powershell提示：`在此系统上禁止运行脚本`，那么请你**以管理员身份重新运行powershell**输入如下命令

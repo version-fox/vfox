@@ -108,8 +108,8 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 ```shell
 if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 
-# Create profile if it does not exist: New-Item -Type File -Path $PROFILE -Force
-# Add content to profile: Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
+# Create the profile file: New-Item -Type File -Path $PROFILE -Force
+# Add content to profile file: Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
 
 If Powershell prompts:`cannot be loaded because the execution of scripts is disabled on this system`.**Open PowerShell** with **Run as Administrator**.Then, run this command in PowerShell

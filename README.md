@@ -48,11 +48,7 @@ echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 # For PowerShell:
-# 1. Open PowerShell Profile:
-New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error.
-Invoke-Item $PROFILE
-# 2. Add the following line to the end of your $PROFILE and save:
-Invoke-Expression "$(vfox activate pwsh)"
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 
 # For Clink:
 # 1. Install clink: https://github.com/chrisant996/clink/releases
