@@ -103,26 +103,13 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 :::
 
-::: details Powershell
+::: details PowerShell
 
-Open PowerShell Profile:
-
-```shell
-New-Item -Type File -Path $PROFILE # Just ignore the 'file already exists' error.
-
-# If it prompts "Unable to find the path", then you need to forcefully create profile. Add the "-Force" option.
-# New-Item -Type File -Path $PROFILE –Force
-
-Invoke-Item $PROFILE  # open Profile
+```PowerShell
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
 
-Add the following line to the end of your profile and save:
-
-```shell
-Invoke-Expression "$(vfox activate pwsh)"
-```
-
-If Powershell prompts:`cannot be loaded because the execution of scripts is disabled on this system`.**Open PowerShell** with **Run as Administrator**.Then, run this command in PowerShell
+If PowerShell prompts: `cannot be loaded because the execution of scripts is disabled on this system`.**Open PowerShell** with **Run as Administrator**.Then, run this command in PowerShell
 
 ```shell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned

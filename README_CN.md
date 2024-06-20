@@ -43,12 +43,8 @@ echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
-# PowerShell:
-# 1. 打开 PowerShell 配置文件:
-New-Item -Type File -Path $PROFILE # 无需在意 `文件已存在` 错误
-Invoke-Item $PROFILE
-# 2. 将下面一行添加到你的 $PROFILE 文件末尾并保存:
-Invoke-Expression "$(vfox activate pwsh)"
+# 对于 PowerShell
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 
 # Clink:
 # 1. 安装 clink: https://github.com/chrisant996/clink/releases
