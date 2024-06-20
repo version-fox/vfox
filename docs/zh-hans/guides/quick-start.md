@@ -104,22 +104,19 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 :::
 
-::: details Powershell
+::: details PowerShell
 
-打开 PowerShell 配置文件:
+创建 PowerShell 配置:
 
 ```shell
 if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
-
-# 创建配置文件: New-Item -Type File -Path $PROFILE -Force
-# 向配置文件添加内容: Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
 
-如果powershell提示：`在此系统上禁止运行脚本`，那么请你**以管理员身份重新运行powershell**输入如下命令
+如果 PowerShell 提示：`在此系统上禁止运行脚本`，那么请你**以管理员身份重新运行 PowerShell**输入如下命令
 
 ```shell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
-# 之后输入Y，按回车
+# 之后输入 Y，按回车
 y
 ```
 
