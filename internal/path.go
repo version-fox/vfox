@@ -37,6 +37,10 @@ type PathMeta struct {
 	GlobalShimsPath  string
 }
 
+const (
+	HookCurTmpPath = "__VFOX_CURTMPPATH"
+)
+
 func newPathMeta() (*PathMeta, error) {
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -53,10 +57,13 @@ func newPathMeta() (*PathMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	pid := env.GetPid()
-	timestamp := util.GetBeginOfToday()
-	name := fmt.Sprintf("%d-%d", timestamp, pid)
-	curTmpPath := filepath.Join(tmpPath, name)
+	curTmpPath := os.Getenv(HookCurTmpPath)
+	if curTmpPath == "" {
+		pid := env.GetPid()
+		timestamp := util.GetBeginOfToday()
+		name := fmt.Sprintf("%d-%d", timestamp, pid)
+		curTmpPath = filepath.Join(tmpPath, name)
+	}
 	if !util.FileExists(curTmpPath) {
 		err = os.Mkdir(curTmpPath, 0755)
 		if err != nil {

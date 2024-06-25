@@ -82,6 +82,7 @@ func activateCmd(ctx *cli.Context) error {
 	osPaths := env.NewPaths(env.OsPaths)
 	pathsStr := envKeys.Paths.Merge(osPaths).String()
 	exportEnvs["PATH"] = &pathsStr
+	exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
 
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
