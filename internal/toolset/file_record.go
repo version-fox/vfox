@@ -26,26 +26,27 @@ import (
 
 // FileRecord is a file that contains a map of string to string
 type FileRecord struct {
-	Record      map[string]string
-	Path        string
+	*util.SortedMap[string, string]
+	path        string
 	isInitEmpty bool
 }
 
 func (m *FileRecord) Save() error {
-	if m.isInitEmpty && len(m.Record) == 0 {
+	if m.isInitEmpty && m.Len() == 0 {
 		return nil
 	}
-	file, err := os.Create(m.Path)
+	file, err := os.Create(m.path)
 	if err != nil {
-		return fmt.Errorf("failed to create file record %s: %w", m.Path, err)
+		return fmt.Errorf("failed to create file record %s: %w", m.path, err)
 	}
 	defer file.Close()
 
-	for k, v := range m.Record {
-		_, err := fmt.Fprintf(file, "%s %s\n", k, v)
-		if err != nil {
-			return err
-		}
+	err = m.ForEach(func(k string, v string) error {
+		_, err = fmt.Fprintf(file, "%s %s\n", k, v)
+		return err
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -53,7 +54,7 @@ func (m *FileRecord) Save() error {
 // NewFileRecord creates a new FileRecord from a file
 // if the file does not exist, an empty FileRecord is returned
 func NewFileRecord(path string) (*FileRecord, error) {
-	versionsMap := make(map[string]string)
+	versionsMap := util.NewSortedMap[string, string]()
 	if util.FileExists(path) {
 		file, err := os.Open(path)
 		if err != nil {
@@ -65,7 +66,7 @@ func NewFileRecord(path string) (*FileRecord, error) {
 			line := scanner.Text()
 			parts := strings.Split(line, " ")
 			if len(parts) == 2 {
-				versionsMap[parts[0]] = parts[1]
+				versionsMap.Set(parts[0], parts[1])
 			}
 		}
 
@@ -74,8 +75,8 @@ func NewFileRecord(path string) (*FileRecord, error) {
 		}
 	}
 	return &FileRecord{
-		Record:      versionsMap,
-		Path:        path,
-		isInitEmpty: len(versionsMap) == 0,
+		SortedMap:   versionsMap,
+		path:        path,
+		isInitEmpty: versionsMap.Len() == 0,
 	}, nil
 }
