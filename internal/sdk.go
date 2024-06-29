@@ -40,10 +40,6 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
-var (
-	localSdkPackageCache = make(map[Version]*Package)
-)
-
 type Version string
 
 type SdkEnv struct {
@@ -72,7 +68,8 @@ type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
-	InstallPath string
+	InstallPath          string
+	localSdkPackageCache map[Version]*Package
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -572,7 +569,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 }
 
 func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
-	p, ok := localSdkPackageCache[version]
+	p, ok := b.localSdkPackageCache[version]
 	if ok {
 		return p, nil
 	}
@@ -585,11 +582,12 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	for _, d := range dir {
 		if d.IsDir() {
 			split := strings.SplitN(d.Name(), "-", 2)
-			name := split[0]
 			if len(split) != 2 {
 				continue
 			}
+			name := split[0]
 			v := split[1]
+			logger.Debugf("Load SDK package item: name:%s, version: %s \n", name, v)
 			items[name] = &Info{
 				Name:    name,
 				Version: Version(v),
@@ -597,7 +595,10 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 			}
 		}
 	}
-	main := items[b.Plugin.Name]
+	main, ok := items[b.Plugin.Name]
+	if !ok {
+		return nil, errors.New("main sdk not found")
+	}
 	delete(items, b.Plugin.Name)
 	if main.Path == "" {
 		return nil, errors.New("main sdk not found")
@@ -610,7 +611,7 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 		Main:      main,
 		Additions: additions,
 	}
-	localSdkPackageCache[version] = p2
+	b.localSdkPackageCache[version] = p2
 	return p2, nil
 }
 
@@ -760,8 +761,9 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
 	}
 	return &Sdk{
-		sdkManager:  manager,
-		InstallPath: filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
-		Plugin:      luaPlugin,
+		sdkManager:           manager,
+		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
+		Plugin:               luaPlugin,
+		localSdkPackageCache: make(map[Version]*Package),
 	}, nil
 }
