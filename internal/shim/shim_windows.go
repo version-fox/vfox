@@ -84,24 +84,24 @@ func (s *Shim) Generate() error {
 	ext := filepath.Ext(filename)
 	if ext == ".cmd" {
 		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(cmdShimContent, s.BinaryPath)), stat.Mode()); err != nil {
-			return fmt.Errorf("failed to gnerate shim: %w", err)
+			return fmt.Errorf("failed to generate shim: %w", err)
 		}
 		return nil
 	} else if ext == ".ps1" {
 		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(ps1ShimContent, s.BinaryPath)), stat.Mode()); err != nil {
-			return fmt.Errorf("failed to gnerate shim: %w", err)
+			return fmt.Errorf("failed to generate shim: %w", err)
 		}
 		return nil
 	}
 	logger.Debugf("Write shim binary to %s", targetPath)
 	if err = os.WriteFile(targetPath, shim, stat.Mode()); err != nil {
-		return fmt.Errorf("failed to gnerate shim: %w", err)
+		return fmt.Errorf("failed to generate shim: %w", err)
 	}
 	shimName := filename[:len(filename)-len(ext)] + ".shim"
 	shimFile := filepath.Join(s.OutputPath, shimName)
 	logger.Debugf("Write shim file to %s", shimFile)
 	if err = os.WriteFile(shimFile, []byte(fmt.Sprintf(shimFileContent, s.BinaryPath)), stat.Mode()); err != nil {
-		return fmt.Errorf("failed to gnerate shim: %w", err)
+		return fmt.Errorf("failed to generate shim: %w", err)
 	}
 	return nil
 }

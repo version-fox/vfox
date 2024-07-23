@@ -13,7 +13,7 @@ Only one situation will cause this, that is, you have used the SDK globally (`vf
 operate the registry and write the SDK's `PATH` into the user environment variable (for the purpose of, **Shell that does not
 support Hook function** can also use SDK, such as `CMD`).
 
-But because of the existence of the `.tool-versions` mechanism, the `PATH` becomes the sum of `.tool-verions` and the user
+But because of the existence of the `.tool-versions` mechanism, the `PATH` becomes the sum of `.tool-versions` and the user
 environment variable `PATH`.
 
 ::: warning

@@ -18,7 +18,7 @@ But `vfox` has the following advantages:
 
 ## Performance comparison
 
-![performence.png](/performence.png)
+![performance.png](/performance.png)
 
 The above figure is a benchmark test of the two tools' most core functions. It will be found that `vfox`
 is about **5 times** faster than `asdf-vm`!

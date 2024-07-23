@@ -44,8 +44,8 @@ API、配置文件和实现方式（比如，`$PATH`
 
 #### [核心仓库](https://github.com/version-fox/vfox)
 
-![pluigns](https://contrib.rocks/image?repo=version-fox/vfox)
+![plugins](https://contrib.rocks/image?repo=version-fox/vfox)
 
 #### [插件仓库](https://github.com/version-fox/vfox-plugins)
 
-![pluigns](https://contrib.rocks/image?repo=version-fox/vfox-plugins))
+![plugins](https://contrib.rocks/image?repo=version-fox/vfox-plugins))

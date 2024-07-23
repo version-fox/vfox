@@ -471,7 +471,7 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		}
 
 		if err := vm.Instance.DoFile(metadataPath); err != nil {
-			return nil, fmt.Errorf("failed to load meatadata file, %w", err)
+			return nil, fmt.Errorf("failed to load metadata file, %w", err)
 		}
 
 		// load hook func files

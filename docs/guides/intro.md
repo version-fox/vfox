@@ -49,8 +49,8 @@ through a simple plugin interface.
 
 #### [vfox](https://github.com/version-fox/vfox)
 
-![pluigns](https://contrib.rocks/image?repo=version-fox/vfox)
+![plugins](https://contrib.rocks/image?repo=version-fox/vfox)
 
 #### [Public Registry](https://github.com/version-fox/vfox-plugins)
 
-![pluigns](https://contrib.rocks/image?repo=version-fox/vfox-plugins))
+![plugins](https://contrib.rocks/image?repo=version-fox/vfox-plugins))
