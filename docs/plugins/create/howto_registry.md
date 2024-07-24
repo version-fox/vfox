@@ -24,7 +24,7 @@ The registry is mainly divided into two parts:
 
 The repository will automatically retrieve the latest version information of the plugin and verify
 the availability of the plugin through the information in `sources` at regular intervals (every hour),
-and store the obtained `manfiest` information in the `plugins` directory.
+and store the obtained `manifest` information in the `plugins` directory.
 
 ::: tip Registry address
 `vfox` will default to retrieve plugins from [vfox-plugins.lhan.me](https://vfox-plugins.lhan.me).

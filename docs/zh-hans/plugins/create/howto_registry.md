@@ -17,7 +17,7 @@
 - `plugins`: 用于存放插件的`manifest.json`文件, 以插件短名为文件名。例如`nodejs.json`
 - `sources`: 用于存放插件的数据源信息, 以插件短名为文件名。例如`nodejs.json`
 
-仓库将会自动定时(间隔一小时)通过`sources`中的信息检索插件的最新版本信息以及校验插件可用性, 并将获取的`manfiest`信息存放在`plugins`目录下。
+仓库将会自动定时(间隔一小时)通过`sources`中的信息检索插件的最新版本信息以及校验插件可用性, 并将获取的`manifest`信息存放在`plugins`目录下。
 
 
 ::: tip 仓库地址

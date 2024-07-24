@@ -19,7 +19,7 @@
 
 ## 性能对比
 
-![performence.png](/performence.png)
+![performance.png](/performance.png)
 
 上图是对两个工具最核心的功能进行基准测试, 会发现[vfox](https://github.com/version-fox/vfox)大约比`asdf-vm`快**5倍**!
 

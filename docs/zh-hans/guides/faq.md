@@ -13,7 +13,7 @@
 只有一种情况下会出现这种情况, 就是你全局(`vfox use -g`)使用过SDK, 这个时候`vfox`会操作注册表,将SDK的`PATH`写入用户环境变量当中(为的是,
 **不支持Hook功能**的Shell也能使用SDK, 例如`CMD`)。
 
-但是因为`.tool-versions`机制的存在, 所以`PATH`就变成了`.tool-verions` + 用户环境变量`PATH`两部分组成。
+但是因为`.tool-versions`机制的存在, 所以`PATH`就变成了`.tool-versions` + 用户环境变量`PATH`两部分组成。
 
 ::: warning
 同一个SDK**最多重复两条**, 不会无限重复。如果>2次, 请反馈给我们。

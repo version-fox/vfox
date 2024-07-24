@@ -88,7 +88,7 @@ func activateCmd(ctx *cli.Context) error {
 	path = strings.Replace(path, "\\", "/", -1)
 	s := shell.NewShell(name)
 	if s == nil {
-		return fmt.Errorf("unknow target shell %s", name)
+		return fmt.Errorf("unknown target shell %s", name)
 	}
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate()

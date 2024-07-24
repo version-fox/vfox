@@ -116,7 +116,7 @@ func envFlag(ctx *cli.Context) error {
 	}
 	s := shell.NewShell(shellName)
 	if s == nil {
-		return fmt.Errorf("unknow target shell %s", shellName)
+		return fmt.Errorf("unknown target shell %s", shellName)
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
@@ -181,7 +181,7 @@ func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
 			vv, ok := flushCache.Get(name)
 			if ok && string(vv) == version {
-				logger.Debugf("Hit cache, skip flush envrionment, %s@%s\n", name, version)
+				logger.Debugf("Hit cache, skip flush environment, %s@%s\n", name, version)
 				return true
 			} else {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)

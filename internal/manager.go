@@ -345,7 +345,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("fetch manfiest error: %w", err)
+		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
 	var plugin RegistryPluginManifest
 	if err = json.Unmarshal(body, &plugin); err != nil {
@@ -492,7 +492,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
 	ext := filepath.Ext(path)
 	if ext != ".lua" && ext != ".zip" {
-		return nil, fmt.Errorf("unsupported %s type plugin to install, only supoort .lua or .zip", ext)
+		return nil, fmt.Errorf("unsupported %s type plugin to install, only support .lua or .zip", ext)
 	}
 	localPath := path
 	// remote file, download it first to local file.
