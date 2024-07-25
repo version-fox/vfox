@@ -360,14 +360,16 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 func (b *Sdk) Use(version Version, scope UseScope) error {
 	logger.Debugf("Use SDK version: %s, scope:%v\n", string(version), scope)
 
-	version, err := b.PreUse(version, scope)
-	if err != nil {
-		return err
-	}
-
-	label := b.label(version)
 	if !b.CheckExists(version) {
-		return fmt.Errorf("%s is not installed", label)
+		v, err := b.PreUse(version, scope)
+		if err != nil {
+			return err
+		}
+		version = v
+		label := b.label(version)
+		if !b.CheckExists(version) {
+			return fmt.Errorf("%s is not installed", label)
+		}
 	}
 
 	if !env.IsHookEnv() {
