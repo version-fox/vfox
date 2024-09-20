@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"strings"
+
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
@@ -31,7 +33,6 @@ import (
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
-	"strings"
 )
 
 const (
@@ -622,7 +623,7 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 
 func isValidName(name string) bool {
 	// The regular expression means: start with a letter,
-	// followed by any number of letters, digits, or underscores.
-	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+	// followed by any number of letters, digits, underscores, or hyphens.
+	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]*$`)
 	return re.MatchString(name)
 }
