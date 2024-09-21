@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -159,6 +160,24 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 	for _, d := range dir {
 		sdkName := d.Name()
 		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
+
+		// Resolve symbolic link, useful for plugin development
+		dirInfo, err := d.Info()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get directory info: %w", err)
+		}
+		if dirInfo.Mode()&os.ModeSymlink != 0 {
+			resolvedPath, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve symboling link : %w", err)
+			}
+			dirFileInfo, err := os.Lstat(resolvedPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get stat for resolved symbolic link : %w", err)
+			}
+			d = fs.FileInfoToDirEntry(dirFileInfo)
+		}
+
 		if d.IsDir() {
 		} else if strings.HasSuffix(sdkName, ".lua") {
 			logger.Debugf("Found old plugin: %s \n", path)
