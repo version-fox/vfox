@@ -581,17 +581,17 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*Package, error) {
 	}
 	for _, d := range dir {
 		if d.IsDir() {
-			split := strings.SplitN(d.Name(), "-", 2)
-			if len(split) != 2 {
-				continue
-			}
-			name := split[0]
-			v := split[1]
-			logger.Debugf("Load SDK package item: name:%s, version: %s \n", name, v)
-			items[name] = &Info{
-				Name:    name,
-				Version: Version(v),
-				Path:    filepath.Join(versionPath, d.Name()),
+			if strings.HasSuffix(d.Name(), string(version)) {
+				name := strings.TrimSuffix(d.Name(), "-"+string(version))
+				if name == "" {
+					continue
+				}
+				logger.Debugf("Load SDK package item: name:%s, version: %s \n", name, version)
+				items[name] = &Info{
+					Name:    name,
+					Version: Version(version),
+					Path:    filepath.Join(versionPath, d.Name()),
+				}
 			}
 		}
 	}
