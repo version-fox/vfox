@@ -332,6 +332,10 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 	// not want to change the version or not implement the PreUse function.
 	// We can simply fuzzy match the version based on the input version.
 	if newVersion == "" {
+		// Before fuzzy matching, perform exact matching first.
+		if b.CheckExists(version) {
+			return version, nil
+		}
 		installedVersions := make(util.VersionSort, 0, len(installedSdks))
 		for _, sdk := range installedSdks {
 			installedVersions = append(installedVersions, string(sdk.Main.Version))
