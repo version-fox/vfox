@@ -130,11 +130,11 @@ nfpms:
     section: utils
     contents:
       - src: ./completions/bash_autocomplete
-        dst: /usr/share/bash-completions/completions/vfox
+        dst: /usr/share/bash-completion/completions/vfox
         file_info:
           mode: 0644
       - src: ./completions/zsh_autocomplete
-        dst: /usr/share/zsh/vendor-completions/_vfox
+        dst: /usr/share/zsh/site-functions/_vfox
         file_info:
           mode: 0644
       - src: ./LICENSE
