@@ -32,7 +32,7 @@ var Fish Shell = fish{}
 const fishHook = `
 {{.EnvContent}}
 
-set __VFOX_PID %self;
+set -x -g __VFOX_PID %self;
 function __vfox_export_eval --on-event fish_prompt;
 	"{{.SelfPath}}" env -s fish | source;
 
