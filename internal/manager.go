@@ -133,8 +133,11 @@ func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
 				Show(); result {
 
 				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
-				if errors.Is(err, ManifestNotFound) {
-					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
+				if err != nil {
+					if errors.Is(err, ManifestNotFound) {
+						return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
+					}
+					return nil, err
 				}
 
 				if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
