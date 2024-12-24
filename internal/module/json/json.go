@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/yuin/gopher-lua"
+	lua "github.com/yuin/gopher-lua"
 )
 
 // Preload adds json to the given Lua state's package.preload table. After it
@@ -117,7 +117,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 
 		switch key.Type() {
 		case lua.LTNil: // empty table
-			data = []byte(`[]`)
+			data = []byte(`null`)
 		case lua.LTNumber:
 			arr := make([]jsonValue, 0, converted.Len())
 			expectedKey := lua.LNumber(1)
