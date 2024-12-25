@@ -5,15 +5,34 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
         return
     end
 
-    local vfox_available = io.popen('vfox available')
-    for line in vfox_available:lines() do
-        local sdk, yes = line:gsub('%c%[%d+m', ''):match('^(.+)%s(%u%u%u?)%s')
-        if (yes == 'YES' or yes == 'NO') and sdk then
-            sdk = sdk:gsub('%s*$', '')
-            table.insert(vfox_sdk_table, sdk)
+    local current_timestamp = os.time()
+    local file_name = os.getenv('USERPROFILE') .. '\\available.txt'
+    local file_available = io.open(file_name, 'r')
+    if file_available then
+        local file_timestamp = tonumber(file_available:read('*l'))
+        if current_timestamp - file_timestamp <= 24 * 60 * 60 then
+            for line in file_available:lines() do
+                table.insert(vfox_sdk_table, line)
+            end
         end
+        file_available:close()
     end
-    vfox_available:close()
+
+    if #vfox_sdk_table == 0 then
+        file_available = io.open(file_name, 'w')
+        file_available:write(current_timestamp .. '\n')
+        local vfox_available = io.popen('vfox available')
+        for line in vfox_available:lines() do
+            local trim = line:gsub('%c%[%d+m', '')
+            local name = trim:match('^(%S+)')
+            if name and (trim:find('YES') or trim:find('NO')) then
+                table.insert(vfox_sdk_table, name)
+                file_available:write(name .. '\n')
+            end
+        end
+        vfox_available:close()
+        file_available:close()
+    end
 
     local function vfox_ls_func()
         local pre, ls = '', {}
@@ -115,20 +134,24 @@ local vfox_setenv = function(str)
     end
 end
 
-os.setenv('__VFOX_PID', os.getpid())
-local vfox_activate = io.popen('vfox activate clink')
-for line in vfox_activate:lines() do
-    if not vfox_setenv(line) then
-        os.execute(line)
+local vfox_task = coroutine.create(function()
+    local vfox_activate = io.popen('vfox activate clink')
+    for line in vfox_activate:lines() do
+        vfox_setenv(line)
     end
-end
-vfox_activate:close()
+    vfox_activate:close()
+    os.setenv('__VFOX_PID', os.getpid())
+    os.execute('vfox env -c')
+end)
+coroutine.resume(vfox_task)
 
 local vfox_prompt = clink.promptfilter(30)
 function vfox_prompt:filter(prompt)
-    local env = io.popen('vfox env -s clink')
-    for line in env:lines() do
-        vfox_setenv(line)
-    end
-    env:close()
+    clink.promptcoroutine(function()
+        local env = io.popen('vfox env -s clink')
+        for line in env:lines() do
+            vfox_setenv(line)
+        end
+        env:close()
+    end)
 end
