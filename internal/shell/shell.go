@@ -23,7 +23,12 @@ import (
 )
 
 type Shell interface {
+	// Activate generates a shell script to be placed in the shell's configuration file, which will set up initial
+	// environment variables and set a hook to update the environment variables when needed.
 	Activate() (string, error)
+
+	// Export generates a string that can be used by the shell to set or unset the given environment variables. (The
+	// input specifies environment variables to be unset by giving them a nil value.)
 	Export(envs env.Vars) string
 }
 
@@ -39,7 +44,8 @@ func NewShell(name string) Shell {
 		return Fish
 	case "clink":
 		return Clink
+	case "nushell":
+		return Nushell
 	}
 	return nil
-
 }

@@ -30,6 +30,8 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+const Newline = "\r\n"
+
 type windowsEnvManager struct {
 	key registry.Key
 	// $PATH

@@ -129,6 +129,14 @@ y
 3. Restart Clink or Cmder
 :::
 
+::: details Nushell
+
+```shell
+vfox activate nushell | save --append $nu.config-path
+```
+
+:::
+
 ## 3. Add a plugin
 
 **Command**: `vfox add <plugin-name>`
