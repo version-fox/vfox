@@ -3,6 +3,7 @@
 ## What's in the plugin?
 
 The directory structure is as follows:
+
 ```shell
     .
     ├── README.md
@@ -26,7 +27,7 @@ The directory structure is as follows:
 - `metadata.lua` Plugin metadata information. Used to describe the basic information of the plugin, such as the plugin name, version, etc.
 - `README.md` Plugin documentation.
 - `LICENSE` Plugin license.
-- 
+-
 
 ::: warning Plugin template
 To facilitate the development of plugins, we provide a plugin template that you can use directly [vfox-plugin-template](https://github.com/version-fox/vfox-plugin-template) to develop a plugin.
@@ -37,14 +38,14 @@ To facilitate the development of plugins, we provide a plugin template that you 
 The full list of hooks callable from vfox.
 
 | Hook                                            | **Required** | Description                                                                     |
-|:------------------------------------------------|:-------------|:--------------------------------------------------------------------------------|
-| [hooks/available.lua](#available)               | ✅            | List all available versions                                                     |
-| [hooks/pre_install.lua](#preinstall)            | ✅            | Parse version and return pre-installation information                           |
-| [hooks/env_keys.lua](#envkeys)                  | ✅            | Configure environment variables                                                 |
-| [hooks/post_install.lua](#postinstall)          | ❌            | Execute additional operations after install, such as compiling source code, etc |
-| [hooks/pre_use.lua](#preuse)                    | ❌            | An opportunity to change the version before using it                            |
-| [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌            | Custom parser for legacy version files                                          |
-| [hooks/pre_uninstall.lua](#preuninstall)        | ❌            | Perform some operations before uninstalling targeted version                    |
+| :---------------------------------------------- | :----------- | :------------------------------------------------------------------------------ |
+| [hooks/available.lua](#available)               | ✅           | List all available versions                                                     |
+| [hooks/pre_install.lua](#preinstall)            | ✅           | Parse version and return pre-installation information                           |
+| [hooks/env_keys.lua](#envkeys)                  | ✅           | Configure environment variables                                                 |
+| [hooks/post_install.lua](#postinstall)          | ❌           | Execute additional operations after install, such as compiling source code, etc |
+| [hooks/pre_use.lua](#preuse)                    | ❌           | An opportunity to change the version before using it                            |
+| [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌           | Custom parser for legacy version files                                          |
+| [hooks/pre_uninstall.lua](#preuninstall)        | ❌           | Perform some operations before uninstalling targeted version                    |
 
 ## Required hook functions
 
@@ -56,7 +57,6 @@ the specific version, download source, and other information. `vfox` will help y
 directory
 in advance. If it is a compressed package such as `tar`, `tar.gz`, `tar.xz`, `zip`, `vfox` will help you to decompress
 it directly.
-
 
 By default, `vfox` reads the file name from the URL. If the last item in the URL is not a valid file name, you should
 specify the file name by appending a fragment at the end, so that `vfox` can identify the file format and decompress it.
@@ -101,7 +101,6 @@ function PLUGIN:PreInstall(ctx)
     }
 end
 ```
-
 
 ### Available
 
@@ -165,7 +164,6 @@ function PLUGIN:EnvKeys(ctx)
     }
 end
 ```
-
 
 ## Optional hook functions
 
@@ -231,13 +229,13 @@ end
 This hook is used to parse other configuration files to determine the version of the tool. For example, the
 `.nvmrc` file of `nvm`, the `.sdkmanrc` file of `SDKMAN`, etc.
 
-
 ::: danger
 This hook must be used with the `legacyFilenames` configuration item to tell `vfox` which files your plugin can parse.
 :::
 
 **location**: `metadata.lua`
-```lua 
+
+```lua
 --- The list of legacy file names that the current plugin supports parsing, such as: .nvmrc, .node-version, .sdkmanrc
 PLUGIN.legacyFilenames = {
     '.nvmrc',
@@ -246,7 +244,8 @@ PLUGIN.legacyFilenames = {
 ```
 
 **location**: `hooks/parse_legacy_file.lua`
-```lua 
+
+```lua
 function PLUGIN:ParseLegacyFile(ctx)
     local filename = ctx.filename
     local filepath = ctx.filepath
@@ -266,7 +265,8 @@ This is called before the SDK is uninstalled. If the plugin needs to perform som
 uninstalling, it can implement this hook function. For example, cleaning up the cache, deleting configuration files, etc.
 
 **Location**: `hooks/pre_uninstall.lua`
-```lua 
+
+```lua
 function PLUGIN:PreUninstall(ctx)
     local mainSdkInfo = ctx.main
     local mainPath = mainSdkInfo.path
@@ -283,14 +283,14 @@ end
 ## Test Plugin
 
 Currently, VersionFox plugin testing is straightforward. You only need to place the plugin file in the
-`${HOME}/.version-fox/plugins` directory and verify that your features are working using different commands. You can use
+`${HOME}/.version-fox/plugin` directory and verify that your features are working using different commands. You can use
 `print`/`printTable` statements in Lua scripts for printing log.
 
 - PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`
 - PLUGIN:Available -> `vfox search <sdk-name>`
 - PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
-  
+
 In addition, you can use the `--debug` parameter to view more log information, for example:
 
 ```shell
@@ -300,7 +300,6 @@ vfox --debug use <sdk-name>@<version>
 ...
 ```
 
-
 ## Example
 
 Here is an example of a plugin that supports the `Node.js`.
@@ -308,7 +307,6 @@ Here is an example of a plugin that supports the `Node.js`.
 https://github.com/version-fox/vfox-nodejs
 
 You can refer to this plugin to develop your own plugin.
-
 
 ## Publish to the public registry
 

@@ -1,9 +1,9 @@
-
 # 创建插件
 
 ## 插件里有什么
 
 目录结构如下:
+
 ```shell
     .
     ├── README.md
@@ -36,15 +36,15 @@
 
 `vfox`支持的所有钩子函数列表。
 
-| 钩子                                              | **必须** | 描述                   |
-|:------------------------------------------------|:-------|:---------------------|
-| [hooks/available.lua](#available)               | ✅      | 列举所有可用版本             |
-| [hooks/pre_install.lua](#preinstall)            | ✅      | 解析版本号并返回预安装信息,如下载地址等 |
-| [hooks/env_keys.lua](#envkeys)                  | ✅      | 配置环境变量               |
-| [hooks/post_install.lua](#postinstall)          | ❌      | 执行额外的操作, 如编译源码等      |
-| [hooks/pre_use.lua](#preuse)                    | ❌      | 在切换版本之前, 提供修改版本的机会   |
-| [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌      | 自定义解析遗留文件            |
-| [hooks/pre_uninstall.lua](#preuninstall)        | ❌      | 删除之前进行额外操作           |
+| 钩子                                            | **必须** | 描述                                    |
+| :---------------------------------------------- | :------- | :-------------------------------------- |
+| [hooks/available.lua](#available)               | ✅       | 列举所有可用版本                        |
+| [hooks/pre_install.lua](#preinstall)            | ✅       | 解析版本号并返回预安装信息,如下载地址等 |
+| [hooks/env_keys.lua](#envkeys)                  | ✅       | 配置环境变量                            |
+| [hooks/post_install.lua](#postinstall)          | ❌       | 执行额外的操作, 如编译源码等            |
+| [hooks/pre_use.lua](#preuse)                    | ❌       | 在切换版本之前, 提供修改版本的机会      |
+| [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌       | 自定义解析遗留文件                      |
+| [hooks/pre_uninstall.lua](#preuninstall)        | ❌       | 删除之前进行额外操作                    |
 
 ## 必须实现的钩子函数
 
@@ -52,11 +52,12 @@
 
 返回预安装信息， 例如具体版本号、下载源等信息。 `vfox`会帮你提前将这些文件下载到特定目录下。如果是压缩包如`tar`、`tar.gz`、`tar.xz`、`zip`这四种压缩包， `vfox`会直接帮你解压处理。
 
-`vfox`默认从下载链接中获取文件名，如果下载链接最后一项不是有效的文件名，可以通过在链接末尾附加Fragment来指定文件名，以便于`vfox`识别文件格式并解压。 如：`https://example.com/1234567890#/filename.zip`
+`vfox`默认从下载链接中获取文件名，如果下载链接最后一项不是有效的文件名，可以通过在链接末尾附加 Fragment 来指定文件名，以便于`vfox`识别文件格式并解压。 如：`https://example.com/1234567890#/filename.zip`
 
 如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
 
 **位置**: `hooks/pre_install.lua`
+
 ```lua
 function PLUGIN:PreInstall(ctx)
     --- 用户输入
@@ -97,6 +98,7 @@ end
 返回当前可用版本列表。如没有则返回空数组。
 
 **位置**: `hooks/available.lua`
+
 ```lua
 function PLUGIN:Available(ctx)
     --- 用户输入附带的参数, 数组
@@ -124,9 +126,10 @@ end
 
 ### EnvKeys
 
-告诉`vfox`当前SDK需要配置的环境变量有哪些。
+告诉`vfox`当前 SDK 需要配置的环境变量有哪些。
 
 **位置**: `hooks/env_keys.lua`
+
 ```lua
 function PLUGIN:EnvKeys(ctx)
     local mainSdkInfo = ctx.main
@@ -155,19 +158,18 @@ function PLUGIN:EnvKeys(ctx)
 end
 ```
 
-
-
 ## 可选钩子函数
 
 ::: warning
 如果不需要这些钩子函数，请**删除对应的`.lua`文件**!
-::: 
+:::
 
 ### PostInstall
 
 拓展点，在`PreInstall`执行之后调用，用于执行额外的操作， 如编译源码等。根据需要实现。
 
 **位置**: `hooks/post_install.lua`
+
 ```lua
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK 安装目录
@@ -187,6 +189,7 @@ end
 如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。
 
 **位置**: `hooks/pre_use.lua`
+
 ```lua
 function PLUGIN:PreUse(ctx)
     --- 用户输入的版本
@@ -212,6 +215,7 @@ function PLUGIN:PreUse(ctx)
     }
 end
 ```
+
 ### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
 解析其他配置文件，以确定工具的版本。例如，`nvm` 的 `.nvmrc` 文件、`SDKMAN` 的 `.sdkmanrc` 文件等。
@@ -221,7 +225,8 @@ end
 :::
 
 **位置**: `metadata.lua`
-```lua 
+
+```lua
 --- 当前插件支持解析的遗留文件名列表, 例如: .nvmrc, .node-version, .sdkmanrc
 PLUGIN.legacyFilenames = {
     '.nvmrc',
@@ -230,7 +235,8 @@ PLUGIN.legacyFilenames = {
 ```
 
 **位置**: `hooks/parse_legacy_file.lua`
-```lua 
+
+```lua
 function PLUGIN:ParseLegacyFile(ctx)
     --- 文件名
     local filename = ctx.filename
@@ -251,7 +257,8 @@ end
 在卸载 SDK 之前执行的钩子函数。如果插件需要在卸载之前执行一些操作，可以实现这个钩子函数。例如清理缓存、删除配置文件等。
 
 **位置**: `hooks/pre_uninstall.lua`
-```lua 
+
+```lua
 function PLUGIN:PreUninstall(ctx)
     local mainSdkInfo = ctx.main
     local mainPath = mainSdkInfo.path
@@ -267,7 +274,7 @@ end
 
 ## 测试插件
 
-目前，`vfox` 插件测试方法很简陋。您需要将插件放在 `${HOME}/.version-fox/plugins` 目录中，并使用不同的命令验证您的功能是否正常工作。
+目前，`vfox` 插件测试方法很简单。您需要将插件放在 `${HOME}/.version-fox/plugin` 目录中，并使用不同的命令验证您的功能是否正常工作。
 您可以在插件中使用 `print`/`printTable` 函数来打印日志进行调试。
 
 - PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
@@ -284,22 +291,18 @@ vfox --debug use <sdk-name>@<version>
 ...
 ```
 
-
-
 ## 插件示例
 
 https://github.com/version-fox/vfox-nodejs
 
 你可以参考这个插件来开发自己的插件。
 
-
-
 ## 向官方插件存储库提交插件
 
 `vfox`可以允许自定义安装插件，比如:
 
 ```shell
-vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip 
+vfox add --source https://github.com/version-fox/vfox-nodejs/releases/download/v0.0.5/vfox-nodejs_0.0.5.zip
 ```
 
 为了使你的用户更轻松，你可以将插件添加到官方插件存储库中，以列出你的插件并使用较短的命令轻松安装，比如 `vfox add nodejs`。
