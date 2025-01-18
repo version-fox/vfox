@@ -117,7 +117,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 
 		switch key.Type() {
 		case lua.LTNil: // empty table
-			data = []byte(`null`)
+			data = []byte(`[]`)
 		case lua.LTNumber:
 			arr := make([]jsonValue, 0, converted.Len())
 			expectedKey := lua.LNumber(1)
