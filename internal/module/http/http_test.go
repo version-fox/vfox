@@ -17,10 +17,11 @@
 package http
 
 import (
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"runtime"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/util"
 
 	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
@@ -36,10 +37,10 @@ func TestWithConfig(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.get({
-        url = "http://ip.jsontest.com/"
+        url = "https://httpbin.org/json"
     })
 	print(err)
-	assert(err == 'Get "http://ip.jsontest.com/": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
+	assert(err == 'Get "https://httpbin.org/json": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
 	`
 	s := lua.NewState()
 	defer s.Close()
@@ -58,7 +59,7 @@ func TestGetRequest(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.get({
-        url = "http://ip.jsontest.com/"
+        url = "https://httpbin.org/json"
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)
@@ -73,7 +74,7 @@ func TestHeadRequest(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.head({
-        url = "http://ip.jsontest.com/"
+        url = "https://httpbin.org/json"
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)

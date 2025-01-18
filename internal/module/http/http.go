@@ -18,14 +18,15 @@ package http
 
 import (
 	"fmt"
-	"github.com/schollz/progressbar/v3"
-	"github.com/version-fox/vfox/internal/config"
-	lua "github.com/yuin/gopher-lua"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/config"
+	lua "github.com/yuin/gopher-lua"
 )
 
 type Module struct {
@@ -41,7 +42,7 @@ type Module struct {
 // local http = require("http")
 //
 //	http.get({
-//	    url = "http://ip.jsontest.com/"
+//	    url = "https://httpbin.org/json"
 //	}) return (response, error)
 //
 //	response : {
