@@ -55,6 +55,9 @@ if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force
 #    Or Install cmder: https://github.com/cmderdev/cmder/releases
 # 2. Find script path: clink info | findstr scripts
 # 3. copy internal/shell/clink_vfox.lua to script path
+
+# For Nushell:
+vfox activate nushell | save --append $nu.config-path
 ```
 
 > Remember to restart your shell to apply the changes.

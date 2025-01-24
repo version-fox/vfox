@@ -126,7 +126,7 @@ func envFlag(ctx *cli.Context) error {
 		return err
 	}
 
-	if len(sdkEnvs) == 0 {
+	if len(sdkEnvs) == 0 && shellName != "nushell" {
 		return nil
 	}
 

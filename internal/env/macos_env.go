@@ -24,6 +24,8 @@ import (
 	"strings"
 )
 
+const Newline = "\n"
+
 type macosEnvManager struct {
 	envMap        map[string]string
 	deletedEnvMap map[string]struct{}
