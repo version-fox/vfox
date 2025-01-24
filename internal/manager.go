@@ -706,7 +706,7 @@ func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
 func NewSdkManager() *Manager {
 	meta, err := newPathMeta()
 	if err != nil {
-		panic("Init path meta error")
+		panic("Init path meta error " + err.Error())
 	}
 	return newSdkManager(meta)
 }
