@@ -6,7 +6,7 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
     end
 
     local current_timestamp = os.time()
-    local file_name = os.getenv('USERPROFILE') .. '\\available.txt'
+    local file_name = os.getenv('USERPROFILE') .. '\\vfox_available.txt'
     local file_available = io.open(file_name, 'r')
     if file_available then
         local file_timestamp = tonumber(file_available:read('*l'))
@@ -135,13 +135,17 @@ local vfox_setenv = function(str)
 end
 
 local vfox_task = coroutine.create(function()
+    os.setenv('__VFOX_PID', os.getpid())
     local vfox_activate = io.popen('vfox activate clink')
     for line in vfox_activate:lines() do
         vfox_setenv(line)
     end
     vfox_activate:close()
-    os.setenv('__VFOX_PID', os.getpid())
-    os.execute('vfox env -c')
+
+    local cleanup = coroutine.create(function()
+        os.execute('vfox env -c')
+    end)
+    coroutine.resume(cleanup)
 end)
 coroutine.resume(vfox_task)
 
