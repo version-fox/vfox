@@ -22,10 +22,15 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 )
 
+type ActivateConfig struct {
+	SelfPath string
+	Args     []string
+}
+
 type Shell interface {
 	// Activate generates a shell script to be placed in the shell's configuration file, which will set up initial
 	// environment variables and set a hook to update the environment variables when needed.
-	Activate() (string, error)
+	Activate(config ActivateConfig) (string, error)
 
 	// Export generates a string that can be used by the shell to set or unset the given environment variables. (The
 	// input specifies environment variables to be unset by giving them a nil value.)

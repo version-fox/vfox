@@ -50,7 +50,7 @@ type bash struct{}
 
 var Bash = bash{}
 
-func (b bash) Activate() (string, error) {
+func (b bash) Activate(config ActivateConfig) (string, error) {
 	return bashHook, nil
 }
 

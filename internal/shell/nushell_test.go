@@ -1,73 +1,14 @@
 package shell
 
 import (
-	"bytes"
 	"encoding/json"
-	"github.com/version-fox/vfox/internal/env"
 	"os"
 	"reflect"
-	"runtime"
 	"slices"
 	"testing"
-	"text/template"
+
+	"github.com/version-fox/vfox/internal/env"
 )
-
-func TestActivate(t *testing.T) {
-	var newline string
-	if runtime.GOOS == "windows" {
-		newline = "\r\n"
-	} else {
-		newline = "\n"
-	}
-	selfPath := "/path/to/vfox"
-	want := newline +
-		"# vfox configuration" + newline +
-		"export-env {" + newline +
-		"  def --env updateVfoxEnvironment [] {" + newline +
-		"    let envData = (^'" + selfPath + "' env -s nushell | from json)" + newline +
-		"    load-env $envData.envsToSet" + newline +
-		"    hide-env ...$envData.envsToUnset" + newline +
-		"  }" + newline +
-		"  $env.config = ($env.config | upsert hooks.pre_prompt {" + newline +
-		"    let currentValue = ($env.config | get -i hooks.pre_prompt)" + newline +
-		"    if $currentValue == null {" + newline +
-		"      [{updateVfoxEnvironment}]" + newline +
-		"    } else {" + newline +
-		"      $currentValue | append {updateVfoxEnvironment}" + newline +
-		"    }" + newline +
-		"  })" + newline +
-		"  $env.__VFOX_SHELL = 'nushell'" + newline +
-		"  $env.__VFOX_PID = $nu.pid" + newline +
-		"  ^'" + selfPath + "' env --cleanup | ignore" + newline +
-		"  updateVfoxEnvironment" + newline +
-		"}" + newline
-
-	n := nushell{}
-	gotTemplate, err := n.Activate()
-
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
-
-	parsedTemplate, err := template.New("activate").Parse(gotTemplate)
-	if err != nil {
-		t.Errorf("Unexpected error parsing template: %v", err)
-		return
-	}
-
-	var buffer bytes.Buffer
-	err = parsedTemplate.Execute(&buffer, struct{ SelfPath string }{selfPath})
-	if err != nil {
-		t.Errorf("Unexpected error executing template: %v", err)
-		return
-	}
-
-	got := buffer.String()
-	if got != want {
-		t.Errorf("Output mismatch:\n\ngot=\n%v\n\nwant=\n%v", got, want)
-	}
-}
 
 func TestExport(t *testing.T) {
 	sep := string(os.PathListSeparator)

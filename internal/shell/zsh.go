@@ -48,7 +48,7 @@ if [[ -z "$__VFOX_PID" ]]; then
 fi
 `
 
-func (z zsh) Activate() (string, error) {
+func (z zsh) Activate(config ActivateConfig) (string, error) {
 	return zshHook, nil
 }
 

@@ -19,14 +19,12 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolset"
-	"path/filepath"
 )
 
 var Env = &cli.Command{
@@ -47,6 +45,10 @@ var Env = &cli.Command{
 			Aliases: []string{"j"},
 			Usage:   "output json format",
 		},
+		&cli.BoolFlag{
+			Name:  "full",
+			Usage: "output full env",
+		},
 	},
 	Action:   envCmd,
 	Category: CategorySDK,
@@ -57,8 +59,10 @@ func envCmd(ctx *cli.Context) error {
 		return outputJSON()
 	} else if ctx.IsSet("cleanup") {
 		return cleanTmp()
+	} else if ctx.IsSet("full") {
+		return envFlag(ctx, "full")
 	} else {
-		return envFlag(ctx)
+		return envFlag(ctx, "cwd")
 	}
 }
 
@@ -109,7 +113,7 @@ func cleanTmp() error {
 	return nil
 }
 
-func envFlag(ctx *cli.Context) error {
+func envFlag(ctx *cli.Context, mode string) error {
 	shellName := ctx.String("shell")
 	if shellName == "" {
 		return cli.Exit("shell name is required", 1)
@@ -120,13 +124,19 @@ func envFlag(ctx *cli.Context) error {
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
+	var sdkEnvs internal.SdkEnvs
+	var err error
+	if mode == "full" {
+		sdkEnvs, err = manager.FullEnvKeys()
+	} else {
+		sdkEnvs, err = manager.AggregateEnvKeys()
+	}
 
-	sdkEnvs, err := aggregateEnvKeys(manager)
 	if err != nil {
 		return err
 	}
 
-	if len(sdkEnvs) == 0 && shellName != "nushell" {
+	if len(sdkEnvs) == 0 {
 		return nil
 	}
 
@@ -144,64 +154,4 @@ func envFlag(ctx *cli.Context) error {
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
 	return nil
-}
-
-func aggregateEnvKeys(manager *internal.Manager) (internal.SdkEnvs, error) {
-	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = manager.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
-		return nil, err
-	}
-
-	curToolVersion, err := toolset.NewToolVersion(manager.PathMeta.CurTmpPath)
-	if err != nil {
-		return nil, err
-	}
-	defer curToolVersion.Save()
-
-	// Add the working directory to the first
-	tvs := toolset.MultiToolVersions{workToolVersion, curToolVersion}
-
-	flushCache, err := cache.NewFileCache(filepath.Join(manager.PathMeta.CurTmpPath, "flush_env.cache"))
-	if err != nil {
-		return nil, err
-	}
-	defer flushCache.Close()
-
-	var sdkEnvs []*internal.SdkEnv
-
-	tvs.FilterTools(func(name, version string) bool {
-		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			vv, ok := flushCache.Get(name)
-			if ok && string(vv) == version {
-				logger.Debugf("Hit cache, skip flush environment, %s@%s\n", name, version)
-				return true
-			} else {
-				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
-			}
-			v := internal.Version(version)
-			if keys, err := lookupSdk.EnvKeys(v, internal.ShellLocation); err == nil {
-				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
-
-				sdkEnvs = append(sdkEnvs, &internal.SdkEnv{
-					Sdk: lookupSdk, Env: keys,
-				})
-
-				// If we encounter a .tool-versions file, it is valid for the entire shell session,
-				// unless we encounter the next .tool-versions file or manually switch to the use command.
-				curToolVersion.Record[name] = version
-				return true
-			}
-		}
-		return false
-	})
-
-	return sdkEnvs, nil
 }
