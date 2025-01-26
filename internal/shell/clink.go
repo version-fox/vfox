@@ -31,7 +31,7 @@ type clink struct{}
 
 var Clink = clink{}
 
-func (b clink) Activate() (string, error) {
+func (b clink) Activate(config ActivateConfig) (string, error) {
 	return clinkHook, nil
 }
 

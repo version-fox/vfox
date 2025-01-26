@@ -22,8 +22,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/version-fox/vfox/internal/toolset"
-
 	"github.com/version-fox/vfox/internal"
 
 	"github.com/urfave/cli/v2"
@@ -46,26 +44,7 @@ func activateCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
-	workToolVersion, err := toolset.NewToolVersion(manager.PathMeta.WorkingDirectory)
-	if err != nil {
-		return err
-	}
-
-	if err = manager.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
-		return err
-	}
-	homeToolVersion, err := toolset.NewToolVersion(manager.PathMeta.HomePath)
-	if err != nil {
-		return err
-	}
-	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
-	}, internal.ShellLocation)
+	sdkEnvs, err := manager.FullEnvKeys()
 	if err != nil {
 		return err
 	}
@@ -91,7 +70,12 @@ func activateCmd(ctx *cli.Context) error {
 		return fmt.Errorf("unknown target shell %s", name)
 	}
 	exportStr := s.Export(exportEnvs)
-	str, err := s.Activate()
+	str, err := s.Activate(
+		shell.ActivateConfig{
+			SelfPath: path,
+			Args:     ctx.Args().Tail(),
+		},
+	)
 	if err != nil {
 		return err
 	}

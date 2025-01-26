@@ -9,10 +9,11 @@
 [![GitHub Release](https://img.shields.io/github/v/release/version-fox/vfox?display_name=tag&style=for-the-badge)](https://github.com/version-fox/vfox/releases)
 [![Discord](https://img.shields.io/discord/1191981003204477019?style=for-the-badge&logo=discord)](https://discord.gg/85c8ptYgb7)
 
-[[English]](./README.md)  [[中文文档]](./README_CN.md)
+[[English]](./README.md) [[中文文档]](./README_CN.md)
 
 If you **switch between development projects which expect different environments**, specifically different runtime versions or ambient libraries,
 or **you are tired of all kinds of cumbersome environment configurations**, `vfox` is the ideal choice for you.
+
 ## Introduction
 
 **`vfox` is a cross-platform version manager(similar to `nvm`, `fvm`, `sdkman`, `asdf-vm`, etc.), extendable via plugins**. It allows you to quickly install
@@ -57,13 +58,14 @@ if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force
 # 3. copy internal/shell/clink_vfox.lua to script path
 
 # For Nushell:
-vfox activate nushell | save --append $nu.config-path
+vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > Remember to restart your shell to apply the changes.
 
 #### 3. Add an SDK plugin
-```bash 
+
+```bash
 $ vfox add nodejs
 ```
 
@@ -93,8 +95,8 @@ Our future plans and high priority features and enhancements are:
   - Introducing plugin templates to facilitate multi-file plugin development.
   - Establishing a global registry (similar to `NPM Registry` or `Scoop Main Bucket`) to provide a unified entry point for plugin distribution.
   - Decomposing the existing plugin repository into individual repositories, one for each plugin.
-- [X] Allowing the switching of registry addresses.
-- [X] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
+- [x] Allowing the switching of registry addresses.
+- [x] Plugin capabilities: Parsing legacy configuration files, such as `.nvmrc`, `.node-version`, `.sdkmanrc`, etc.
 - [ ] Plugin capabilities: Allowing plugins to load installed runtimes and provide information about the runtime.
 
 ## Available Plugins
@@ -126,7 +128,6 @@ Plugin Contributions, please go to [Public Registry](https://github.com/version-
 
 ## Thanks
 
-
 > Thanks JetBrains for the free open source license. :)
 
 <a href="https://www.jetbrains.com/?from=gev" target="_blank">
@@ -139,4 +140,3 @@ Plugin Contributions, please go to [Public Registry](https://github.com/version-
 
 [Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li
 and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
-

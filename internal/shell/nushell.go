@@ -3,38 +3,46 @@ package shell
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/version-fox/vfox/internal/env"
+	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/version-fox/vfox/internal/env"
 )
 
 type nushell struct{}
 
 var Nushell = nushell{}
 
-const nushellConfig = env.Newline +
-	"# vfox configuration" + env.Newline +
-	"export-env {" + env.Newline +
-	"  def --env updateVfoxEnvironment [] {" + env.Newline +
-	"    let envData = (^'{{.SelfPath}}' env -s nushell | from json)" + env.Newline +
-	"    load-env $envData.envsToSet" + env.Newline +
-	"    hide-env ...$envData.envsToUnset" + env.Newline +
-	"  }" + env.Newline +
-	"  $env.config = ($env.config | upsert hooks.pre_prompt {" + env.Newline +
-	"    let currentValue = ($env.config | get -i hooks.pre_prompt)" + env.Newline +
-	"    if $currentValue == null {" + env.Newline +
-	"      [{updateVfoxEnvironment}]" + env.Newline +
-	"    } else {" + env.Newline +
-	"      $currentValue | append {updateVfoxEnvironment}" + env.Newline +
-	"    }" + env.Newline +
-	"  })" + env.Newline +
-	"  $env.__VFOX_SHELL = 'nushell'" + env.Newline +
-	"  $env.__VFOX_PID = $nu.pid" + env.Newline +
-	"  ^'{{.SelfPath}}' env --cleanup | ignore" + env.Newline +
-	"  updateVfoxEnvironment" + env.Newline +
-	"}" + env.Newline
+const nushellConfig = `
+# vfox configuration
+# this make sure this configuration is up to date when you open a new shell
+^'{{.SelfPath}}' activate nushell $nu.default-config-dir | ignore
 
-// Activate implements shell.Activate by returning a script to be placed in the Nushell configuration file. This script
-// does the following:
+export-env {
+  def --env updateVfoxEnvironment [] {
+    let envData = (^'{{.SelfPath}}' env -s nushell --full | from json)
+    load-env $envData.envsToSet
+    hide-env ...$envData.envsToUnset
+  }
+  $env.config = ($env.config | upsert hooks.pre_prompt {
+    let currentValue = ($env.config | get -i hooks.pre_prompt)
+    if $currentValue == null {
+      [{updateVfoxEnvironment}]
+    } else {
+      $currentValue | append {updateVfoxEnvironment}
+    }
+  })
+  $env.__VFOX_SHELL = 'nushell'
+  $env.__VFOX_PID = $nu.pid
+  ^'{{.SelfPath}}' env --cleanup | ignore
+  updateVfoxEnvironment
+}
+`
+
+// We create a `vfox.nu“ in the `$nu.default-config-dir“
+// Activate implements shell.Activate will generate a script to the `vfox.nu` file.
+// This script does the following:
 //
 // 1. Sets up a [pre_prompt hook] to update the environment variables when needed.
 // 2. Initializes the __VFOX_SHELL and __VFOX_PID environment variables.
@@ -42,8 +50,22 @@ const nushellConfig = env.Newline +
 // 4. Updates the environment variables.
 //
 // [pre_prompt hook]: https://www.nushell.sh/book/hooks.html
-func (n nushell) Activate() (string, error) {
-	return nushellConfig, nil
+func (n nushell) Activate(config ActivateConfig) (string, error) {
+	if len(config.Args) == 0 {
+		return "", fmt.Errorf("config path is required")
+	}
+
+	// write file to config
+	targetPath := filepath.Join(config.Args[0], "vfox.nu")
+
+	nushellConfig := strings.ReplaceAll(nushellConfig, "\n", env.Newline)
+	nushellConfig = strings.ReplaceAll(nushellConfig, "{{.SelfPath}}", config.SelfPath)
+
+	if err := os.WriteFile(targetPath, []byte(nushellConfig), 0755); err != nil {
+		return "", fmt.Errorf("failed to write file: %s", err)
+	}
+
+	return `source ($nu.default-config-dir | path join "vfox.nu")` + env.Newline, nil
 }
 
 // nushellExportData is used to create a JSON representation of the environment variables to be set and unset.

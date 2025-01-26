@@ -59,7 +59,7 @@ Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action 
 }
 `
 
-func (sh pwsh) Activate() (string, error) {
+func (sh pwsh) Activate(config ActivateConfig) (string, error) {
 	return hook, nil
 }
 

@@ -132,7 +132,7 @@ y
 ::: details Nushell
 
 ```shell
-vfox activate nushell | save --append $nu.config-path
+vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
 :::

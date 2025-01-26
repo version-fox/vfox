@@ -62,7 +62,7 @@ function cleanup_on_exit --on-process-exit %self
 end;
 `
 
-func (sh fish) Activate() (string, error) {
+func (sh fish) Activate(config ActivateConfig) (string, error) {
 	return fishHook, nil
 }
 
