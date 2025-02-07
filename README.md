@@ -138,5 +138,5 @@ Plugin Contributions, please go to [Public Registry](https://github.com/version-
 
 ## COPYRIGHT
 
-[Apache 2.0 license](./LICENSE) - Copyright (C) 2024 Han Li
+[Apache 2.0 license](./LICENSE) - Copyright (C) 2025 Han Li
 and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
