@@ -134,28 +134,27 @@ local vfox_setenv = function(str)
     end
 end
 
+local vfox_filter = function() end
 local vfox_task = coroutine.create(function()
     os.setenv('__VFOX_PID', os.getpid())
+    os.setenv('__VFOX_CURTMPPATH', nil)
     local vfox_activate = io.popen('vfox activate clink')
     for line in vfox_activate:lines() do
         vfox_setenv(line)
     end
     vfox_activate:close()
-
-    local cleanup = coroutine.create(function()
-        os.execute('vfox env -c')
-    end)
-    coroutine.resume(cleanup)
-end)
-coroutine.resume(vfox_task)
-
-local vfox_prompt = clink.promptfilter(30)
-function vfox_prompt:filter(prompt)
-    clink.promptcoroutine(function()
+    os.execute('vfox env -c')
+    vfox_filter = function()
         local env = io.popen('vfox env -s clink')
         for line in env:lines() do
             vfox_setenv(line)
         end
         env:close()
-    end)
+    end
+end)
+clink.runcoroutineuntilcomplete(vfox_task)
+
+local vfox_prompt = clink.promptfilter(30)
+function vfox_prompt:filter()
+    clink.promptcoroutine(vfox_filter)
 end
