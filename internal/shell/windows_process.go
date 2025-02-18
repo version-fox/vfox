@@ -22,16 +22,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-
-	"github.com/StackExchange/wmi"
-	"github.com/version-fox/vfox/internal/env"
+	"strings"
 )
-
-type Win32_Process struct {
-	ExecutablePath string
-	CommandLine    string
-	ProcessId      uint32
-}
 
 type windowsProcess struct{}
 
@@ -42,44 +34,26 @@ func GetProcess() Process {
 }
 
 func (w windowsProcess) Open(pid int) error {
-	// Check if shell has hooks configured
-	if !env.IsHookEnv() {
-		return handleNoHookFallback(pid)
+	// On Windows, os.FindProcess does not actually find the process.
+	// So, we use this workaround to get the parent process name.
+	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/NH", "/FO", "CSV")
+	output, err := cmd.Output()
+	if err != nil {
+		return err
 	}
-
-	// Query WMI for process info
-	var processes []Win32_Process
-	query := fmt.Sprintf("SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %d", pid)
-	if err := wmi.Query(query, &processes); err != nil {
-		return fmt.Errorf("WMI query failed: %w", err)
+	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "ExecutablePath", "/format:list")
+	output, err = cmd.Output()
+	if err != nil {
+		return err
 	}
-
-	if len(processes) == 0 {
-		return fmt.Errorf("process with PID %d not found", pid)
+	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
+	command := exec.Command(path)
+	command.Env = os.Environ()
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
-
-	// Get executable path
-	path := processes[0].ExecutablePath
-	if path == "" {
-		return fmt.Errorf("executable path not found for PID %d", pid)
-	}
-
-	// Launch new shell process with proper environment
-	cmd := exec.Command(path)
-	cmd.Env = os.Environ()
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to launch shell: %w", err)
-	}
-
-	return nil
-}
-
-func handleNoHookFallback(pid int) error {
-	// Fall back to global scope if no hooks
-	fmt.Println("Warning: The current shell lacks hook support. Switching to global scope.")
 	return nil
 }
