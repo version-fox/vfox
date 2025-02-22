@@ -70,7 +70,7 @@ type Manager struct {
 	Config     *config.Config
 }
 
-func (m *Manager) FullEnvKeys() (SdkEnvs, error) {
+func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
 	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,11 @@ func (m *Manager) FullEnvKeys() (SdkEnvs, error) {
 	}, ShellLocation)
 }
 
-func (m *Manager) AggregateEnvKeys() (SdkEnvs, error) {
+type SessionEnvOptions struct {
+	WithGlobalEnv bool
+}
+
+func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
 	if err != nil {
 		return nil, err
@@ -121,6 +125,14 @@ func (m *Manager) AggregateEnvKeys() (SdkEnvs, error) {
 		return nil, err
 	}
 	defer flushCache.Close()
+
+	if opt.WithGlobalEnv {
+		homeToolVersion, err := toolset.NewToolVersion(m.PathMeta.HomePath)
+		if err != nil {
+			return nil, err
+		}
+		tvs = append(toolset.MultiToolVersions{homeToolVersion}, tvs...)
+	}
 
 	var sdkEnvs []*SdkEnv
 
