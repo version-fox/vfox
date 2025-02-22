@@ -131,6 +131,8 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Here we need to add the global environment to the beginning of the slice,
+		// so that the global environment has the lower priority than the current environment.
 		tvs = append(toolset.MultiToolVersions{homeToolVersion}, tvs...)
 	}
 
