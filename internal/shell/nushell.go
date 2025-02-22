@@ -22,7 +22,7 @@ const nushellConfig = `
 export-env {
   def --env updateVfoxEnvironment [] {
     let envData = (^'{{.SelfPath}}' env -s nushell --full | from json)
-	if ($envData | is-empty) {
+    if ($envData | is-empty) {
       return
     }
     load-env $envData.envsToSet
