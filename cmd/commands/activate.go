@@ -44,23 +44,15 @@ func activateCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
-	sdkEnvs, err := manager.FullEnvKeys()
+	sdkEnvs, err := manager.GlobalEnvKeys()
 	if err != nil {
 		return err
 	}
 
-	envKeys := sdkEnvs.ToEnvs()
-
-	exportEnvs := make(env.Vars)
-	for k, v := range envKeys.Variables {
-		exportEnvs[k] = v
-	}
+	exportEnvs := sdkEnvs.ToExportEnvs()
 
 	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
-	osPaths := env.NewPaths(env.OsPaths)
-	pathsStr := envKeys.Paths.Merge(osPaths).String()
-	exportEnvs["PATH"] = &pathsStr
 	exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
 
 	path := manager.PathMeta.ExecutablePath

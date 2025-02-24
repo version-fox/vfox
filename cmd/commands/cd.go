@@ -2,11 +2,12 @@ package commands
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
-	"os"
 )
 
 var Cd = &cli.Command{

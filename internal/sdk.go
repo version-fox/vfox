@@ -64,6 +64,21 @@ func (d *SdkEnvs) ToEnvs() *env.Envs {
 	return envs
 }
 
+func (d *SdkEnvs) ToExportEnvs() env.Vars {
+	envKeys := d.ToEnvs()
+
+	exportEnvs := make(env.Vars)
+	for k, v := range envKeys.Variables {
+		exportEnvs[k] = v
+	}
+
+	osPaths := env.NewPaths(env.OsPaths)
+	pathsStr := envKeys.Paths.Merge(osPaths).String()
+	exportEnvs["PATH"] = &pathsStr
+
+	return exportEnvs
+}
+
 type Sdk struct {
 	sdkManager *Manager
 	Plugin     *LuaPlugin

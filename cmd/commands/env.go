@@ -127,9 +127,13 @@ func envFlag(ctx *cli.Context, mode string) error {
 	var sdkEnvs internal.SdkEnvs
 	var err error
 	if mode == "full" {
-		sdkEnvs, err = manager.FullEnvKeys()
+		sdkEnvs, err = manager.SessionEnvKeys(internal.SessionEnvOptions{
+			WithGlobalEnv: true,
+		})
 	} else {
-		sdkEnvs, err = manager.AggregateEnvKeys()
+		sdkEnvs, err = manager.SessionEnvKeys(internal.SessionEnvOptions{
+			WithGlobalEnv: false,
+		})
 	}
 
 	if err != nil {
@@ -140,16 +144,7 @@ func envFlag(ctx *cli.Context, mode string) error {
 		return nil
 	}
 
-	envKeys := sdkEnvs.ToEnvs()
-
-	exportEnvs := make(env.Vars)
-	for k, v := range envKeys.Variables {
-		exportEnvs[k] = v
-	}
-
-	osPaths := env.NewPaths(env.OsPaths)
-	pathsStr := envKeys.Paths.Merge(osPaths).String()
-	exportEnvs["PATH"] = &pathsStr
+	exportEnvs := sdkEnvs.ToExportEnvs()
 
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
