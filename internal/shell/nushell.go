@@ -96,18 +96,10 @@ func (n nushell) Export(envs env.Vars) string {
 	}
 
 	for key, value := range envs {
-		if key == "PATH" { // Convert from string to list.
-			if value == nil {
-				value = new(string)
-			}
-			pathEntries := filepath.SplitList(*value)
-			exportData.EnvsToSet[key] = pathEntries
+		if strings.ToLower(key) == "path" {
+			n.addPathToExportData(&exportData, value)
 		} else {
-			if value == nil {
-				exportData.EnvsToUnset = append(exportData.EnvsToUnset, key)
-			} else {
-				exportData.EnvsToSet[key] = *value
-			}
+			n.addEnvVarToExportData(&exportData, key, value)
 		}
 	}
 
@@ -118,4 +110,28 @@ func (n nushell) Export(envs env.Vars) string {
 	}
 
 	return string(exportJson)
+}
+
+// addEnvVarToExportData adds an environment variable to the export data. If the value of the environment variable is
+// nil, it is added as an environment variable to be unset. Otherwise, it is added as an environment variable to be set.
+func (n nushell) addEnvVarToExportData(exportData *nushellExportData, envName string, value *string) {
+	if value == nil {
+		exportData.EnvsToUnset = append(exportData.EnvsToUnset, envName)
+	} else {
+		exportData.EnvsToSet[envName] = *value
+	}
+}
+
+// addPathToExportData adds the PATH environment variable to the export data. Since Nushell stores the PATH as a list,
+// it is first converted from a string to a list.
+//
+// Note: Because of the Nushell issue described at https://github.com/nushell/nushell/issues/15170, the PATH needs to be
+// set as "Path" on Windows but as "PATH" on other platforms. This is the reason for using the OS-specific
+// env.PathVarName constant here.
+func (n nushell) addPathToExportData(exportData *nushellExportData, path *string) {
+	if path == nil {
+		path = new(string)
+	}
+	pathEntries := filepath.SplitList(*path)
+	exportData.EnvsToSet[env.PathVarName] = pathEntries
 }

@@ -25,6 +25,7 @@ import (
 )
 
 const Newline = "\n"
+const PathVarName = "PATH"
 
 type macosEnvManager struct {
 	envMap        map[string]string
