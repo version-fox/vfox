@@ -155,7 +155,7 @@ func installAll() error {
 		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s installing...\033[K", index, count, "Plugin", plugin))
 		pluginsResult[plugin] = false
 		if err := manager.Add(plugin, "", ""); err != nil {
-			if errors.Is(err, internal.ManifestNotFound) {
+			if errors.Is(err, internal.ErrOfManifestNotFound) {
 				errorStr = fmt.Sprintf("%s\n[%s] not found in remote registry, please check the name", errorStr, plugin)
 			} else {
 				errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
