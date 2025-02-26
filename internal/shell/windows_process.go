@@ -53,8 +53,6 @@ func (w windowsProcess) Open(pid int) error {
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	fmt.Println(path)
-	fmt.Println(command.String())
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
