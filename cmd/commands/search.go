@@ -26,7 +26,7 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/util"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var Search = &cli.Command{
@@ -77,7 +77,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		installedVersions.Add(string(version))
 	}
 
-	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
+	_, height, _ := term.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText:          "Please select a version of " + sdkName + " to install",
 		Filter:           true,
