@@ -22,7 +22,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+
+	"golang.org/x/sys/windows"
 )
 
 type windowsProcess struct{}
@@ -34,19 +35,19 @@ func GetProcess() Process {
 }
 
 func (w windowsProcess) Open(pid int) error {
-	// On Windows, os.FindProcess does not actually find the process.
-	// So, we use this workaround to get the parent process name.
-	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/NH", "/FO", "CSV")
-	output, err := cmd.Output()
+	hProcess, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, uint32(pid))
 	if err != nil {
 		return err
 	}
-	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "ExecutablePath", "/format:list")
-	output, err = cmd.Output()
-	if err != nil {
+	defer windows.CloseHandle(hProcess)
+
+	var exePath [windows.MAX_PATH]uint16
+	size := uint32(len(exePath))
+	if err := windows.QueryFullProcessImageName(hProcess, 0, &exePath[0], &size); err != nil {
 		return err
 	}
-	path := strings.TrimPrefix(strings.TrimSpace(string(output)), "ExecutablePath=")
+
+	path := windows.UTF16ToString(exePath[:size])
 	command := exec.Command(path)
 	command.Env = os.Environ()
 	command.Stdin = os.Stdin
