@@ -39,6 +39,12 @@ type PathMeta struct {
 
 const (
 	HookCurTmpPath = "__VFOX_CURTMPPATH"
+
+	HOME_DIR = ".version-fox"
+
+	PLUGIN_DIR = "plugin"
+	CACHE_DIR  = "cache"
+	TEMP_DIR   = "temp"
 )
 
 func newPathMeta() (*PathMeta, error) {
@@ -46,13 +52,17 @@ func newPathMeta() (*PathMeta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
-	pluginPath := filepath.Join(userHomeDir, ".version-fox", "plugin")
-	homePath := filepath.Join(userHomeDir, ".version-fox")
-	sdkCachePath := filepath.Join(userHomeDir, ".version-fox", "cache")
-	tmpPath := filepath.Join(userHomeDir, ".version-fox", "temp")
+
+	homePath := getVfoxHomeDir(userHomeDir)
+	pluginPath := getVfoxPluginDir(homePath)
+	sdkCachePath := getVfoxCacheDir(homePath)
+	tmpPath := getVfoxTempDir(homePath)
+
+	_ = os.MkdirAll(homePath, 0755)
 	_ = os.MkdirAll(sdkCachePath, 0755)
 	_ = os.MkdirAll(pluginPath, 0755)
 	_ = os.MkdirAll(tmpPath, 0755)
+
 	exePath, err := os.Executable()
 	if err != nil {
 		return nil, err
@@ -89,4 +99,36 @@ func newPathMeta() (*PathMeta, error) {
 		WorkingDirectory: workingDirectory,
 		GlobalShimsPath:  globalShimsPath,
 	}, nil
+}
+
+func getVfoxHomeDir(UserHome string) string {
+	vfoxHomeDir := env.GetVfoxHome()
+	if len(vfoxHomeDir) != 0 {
+		return vfoxHomeDir
+	}
+	return filepath.Join(UserHome, HOME_DIR)
+}
+
+func getVfoxPluginDir(vfoxHome string) string {
+	vfoxPluginDir := env.GetVfoxPlugin()
+	if len(vfoxPluginDir) != 0 {
+		return vfoxPluginDir
+	}
+	return filepath.Join(vfoxHome, PLUGIN_DIR)
+}
+
+func getVfoxCacheDir(vfoxHome string) string {
+	vfoxCacheDir := env.GetVfoxCache()
+	if len(vfoxCacheDir) != 0 {
+		return vfoxCacheDir
+	}
+	return filepath.Join(vfoxHome, CACHE_DIR)
+}
+
+func getVfoxTempDir(vfoxHome string) string {
+	vfoxTempDir := env.GetVfoxTemp()
+	if len(vfoxTempDir) != 0 {
+		return vfoxTempDir
+	}
+	return filepath.Join(vfoxHome, TEMP_DIR)
 }
