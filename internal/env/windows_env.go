@@ -31,6 +31,7 @@ import (
 )
 
 const Newline = "\r\n"
+const PathVarName = "Path"
 
 type windowsEnvManager struct {
 	key registry.Key

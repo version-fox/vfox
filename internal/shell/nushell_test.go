@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -12,6 +13,13 @@ import (
 
 func TestExport(t *testing.T) {
 	sep := string(os.PathListSeparator)
+
+	var pathVarName string
+	if runtime.GOOS == "windows" {
+		pathVarName = "Path"
+	} else {
+		pathVarName = "PATH"
+	}
 
 	tests := []struct {
 		name string
@@ -69,7 +77,7 @@ func TestExport(t *testing.T) {
 			"PathEnv",
 			env.Vars{"PATH": newString("/path1" + sep + "/path2")},
 			nushellExportData{
-				EnvsToSet:   map[string]any{"PATH": []any{"/path1", "/path2"}},
+				EnvsToSet:   map[string]any{pathVarName: []any{"/path1", "/path2"}},
 				EnvsToUnset: make([]string, 0),
 			},
 		},
@@ -81,7 +89,7 @@ func TestExport(t *testing.T) {
 				"BAZ":  nil,
 			},
 			nushellExportData{
-				EnvsToSet:   map[string]any{"PATH": []any{"/path1", "/path2", "/path3"}, "FOO": "bar"},
+				EnvsToSet:   map[string]any{pathVarName: []any{"/path1", "/path2", "/path3"}, "FOO": "bar"},
 				EnvsToUnset: []string{"BAZ"},
 			},
 		},
