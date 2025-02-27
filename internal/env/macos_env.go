@@ -54,7 +54,7 @@ func (m *macosEnvManager) Load(envs *Envs) error {
 	return nil
 }
 func (m *macosEnvManager) Remove(envs *Envs) error {
-	for k, _ := range envs.Variables {
+	for k := range envs.Variables {
 		if k == "PATH" {
 			return fmt.Errorf("can not remove PATH variable")
 		}
@@ -78,7 +78,7 @@ func (m *macosEnvManager) Remove(envs *Envs) error {
 }
 
 func (m *macosEnvManager) Flush() error {
-	for k, _ := range m.deletedEnvMap {
+	for k := range m.deletedEnvMap {
 		if err := os.Unsetenv(k); err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (m *macosEnvManager) Get(key string) (string, bool) {
 
 func (m *macosEnvManager) pathEnvValue() string {
 	var pathValues []string
-	for k, _ := range m.pathMap {
+	for k := range m.pathMap {
 		pathValues = append(pathValues, k)
 	}
 	pathValues = append(pathValues, "$PATH")
