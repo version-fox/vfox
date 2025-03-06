@@ -89,11 +89,11 @@ func TestDownloadFile(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local err = http.download_file({
-        url = "https://vfox-plugins.lhan.me/index.json"
+        url = "https://version-fox.github.io/vfox-plugins/index.json"
     }, "index.json")
 	assert(err == nil, [[must be nil]] )
 	local err = http.download_file({
-        url = "https://vfox-plugins.lhan.me/xxx.json"
+        url = "https://version-fox.github.io/vfox-plugins/xxx.json"
     }, "xxx.json")
 	assert(err == "file not found")
 	`
