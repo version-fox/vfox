@@ -24,7 +24,7 @@
 - 在您切换项目时, 帮您**自动切换**运行时版本
 - 支持现有配置文件 `.node-version`、`.nvmrc`、`.sdkmanrc`，以方便迁移
 - 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
-- **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](https://vfox.lhan.me/zh-hans/misc/vs-asdf.html)。
+- **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](https://vfox.dev/zh-hans/misc/vs-asdf.html)。
 
 ## 演示
 
@@ -32,9 +32,9 @@
 
 ## 快速入门
 
-> 详细的安装指南请参见 [快速入门](https://vfox.lhan.me/zh-hans/guides/quick-start.html)
+> 详细的安装指南请参见 [快速入门](https://vfox.dev/zh-hans/guides/quick-start.html)
 
-#### 1.选择一个适合你的[安装方式](https://vfox.lhan.me/zh-hans/guides/quick-start.html#_1-%E5%AE%89%E8%A3%85vfox)。
+#### 1.选择一个适合你的[安装方式](https://vfox.dev/zh-hans/guides/quick-start.html#_1-%E5%AE%89%E8%A3%85vfox)。
 
 #### 2. ⚠️ **挂载vfox到你的 Shell (从下面选择一条适合你 shell 的命令)** ⚠️
 
@@ -76,13 +76,13 @@ $ node -v
 
 ## 完整文档
 
-请浏览 [vfox.lhan.me](https://vfox.lhan.me) 查看完整文档。
+请浏览 [vfox.dev](https://vfox.dev) 查看完整文档。
 
 ## 目前支持的插件
 
 > 如果您已经安装了 `vfox`，您可以使用 `vfox available` 命令查看所有可用的插件。
 
-请看 [可用插件列表](https://vfox.lhan.me/zh-hans/plugins/available.html)
+请看 [可用插件列表](https://vfox.dev/zh-hans/plugins/available.html)
 
 ## 路线图
 
