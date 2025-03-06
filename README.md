@@ -29,7 +29,7 @@ and switch between different environment you need via the command line.
 - support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
 - shell completion available for common shells (Bash, ZSH, Powershell, Clink)
 - **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
-  see [Comparison with asdf](https://vfox.lhan.me/misc/vs-asdf.html)
+  see [Comparison with asdf](https://vfox.dev/misc/vs-asdf.html)
 
 ## Demo
 
@@ -37,9 +37,9 @@ and switch between different environment you need via the command line.
 
 ## Quickstart
 
-> For detailed installation instructions, see [Quick Start](https://vfox.lhan.me/guides/quick-start.html)
+> For detailed installation instructions, see [Quick Start](https://vfox.dev/guides/quick-start.html)
 
-#### 1. Choose an [installation](https://vfox.lhan.me/guides/quick-start.html#_1-installation) that works for you.
+#### 1. Choose an [installation](https://vfox.dev/guides/quick-start.html#_1-installation) that works for you.
 
 #### 2. ⚠️ **_Hook `vfox` into your shell_ (pick one that works for your shell)** ⚠️
 
@@ -85,7 +85,7 @@ $ node -v
 
 ## Full Documentation
 
-See [vfox.lhan.me](https://vfox.lhan.me) for full documentation.
+See [vfox.dev](https://vfox.dev) for full documentation.
 
 ## Roadmap
 
@@ -103,7 +103,7 @@ Our future plans and high priority features and enhancements are:
 
 > If you have installed `vfox`, you can view all available plugins with the `vfox available` command.
 
-For more details, see the [Available Plugins](https://vfox.lhan.me/plugins/available.html).
+For more details, see the [Available Plugins](https://vfox.dev/plugins/available.html).
 
 ## Contributors
 
