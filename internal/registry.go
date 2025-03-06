@@ -17,7 +17,7 @@
 package internal
 
 const (
-	pluginRegistryAddress = "https://vfox-plugins.lhan.me"
+	pluginRegistryAddress = "https://version-fox.github.io/vfox-plugins"
 )
 
 // RegistryIndex is the index of the registry
