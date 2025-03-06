@@ -56,13 +56,13 @@ storage:
 
 ## Plugin Registry Address
 
-`vfox` will default to retrieve plugins from [vfox-plugins.lhan.me](https://vfox-plugins.lhan.me).
+`vfox` will default to retrieve plugins from [vfox-plugins.lhan.me](https://plugins.vfox.dev).
 
 If you want to use **your own registry or third-party mirror registry**, please configure it following:
 
 ```yaml
 registry:
-  address: "https://vfox-plugins.lhan.me"
+  address: "https://plugins.vfox.dev"
 ```
 
 ::: tip Available Mirrors

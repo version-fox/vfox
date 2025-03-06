@@ -21,7 +21,7 @@
 
 
 ::: tip 仓库地址
-`vfox`默认将会从[vfox-plugins.lhan.me](https://vfox-plugins.lhan.me)检索插件。
+`vfox`默认将会从[vfox-plugins.lhan.me](https://plugins.vfox.dev)检索插件。
 
 如果你想使用**自己的索引仓库或第三方镜像仓库**, 请按照[插件注册表地址](../../guides/configuration.md#插件注册表地址)进行配置。
 :::
