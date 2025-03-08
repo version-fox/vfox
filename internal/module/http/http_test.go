@@ -27,6 +27,8 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
+const jsonUrl = `https://httpbin.org/ip`
+
 func TestWithConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skip on windows, the proxy won't error on windows.")
@@ -37,13 +39,15 @@ func TestWithConfig(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.get({
-        url = "https://httpbin.org/json"
+        url = jsonUrl
     })
 	print(err)
-	assert(err == 'Get "https://httpbin.org/json": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
+	assert(err == 'Get "'.. jsonUrl .. '": proxyconnect tcp: dial tcp 127.0.0.1:80: connect: connection refused')
 	`
 	s := lua.NewState()
 	defer s.Close()
+
+	s.SetGlobal("jsonUrl", lua.LString(jsonUrl))
 
 	s.PreloadModule("http", NewModule(&config.Proxy{
 		Enable: true,
@@ -59,7 +63,7 @@ func TestGetRequest(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.get({
-        url = "https://httpbin.org/json"
+        url = jsonUrl
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)
@@ -74,7 +78,7 @@ func TestHeadRequest(t *testing.T) {
 	assert(type(http) == "table")
 	assert(type(http.get) == "function")
 	local resp, err = http.head({
-        url = "https://httpbin.org/json"
+        url = jsonUrl
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)
@@ -107,6 +111,8 @@ func TestDownloadFile(t *testing.T) {
 func eval(str string, t *testing.T) {
 	s := lua.NewState()
 	defer s.Close()
+
+	s.SetGlobal("jsonUrl", lua.LString(jsonUrl))
 
 	s.PreloadModule("http", NewModule(config.EmptyProxy))
 	if err := s.DoString(str); err != nil {
