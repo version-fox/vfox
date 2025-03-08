@@ -58,7 +58,7 @@ func fetchLatestVersion(c *http.Client) (string, error) {
 	matches := re.FindAllStringSubmatch(string(body), -1)
 
 	if len(matches) == 0 {
-		return "", fmt.Errorf("Failed to fetch the version.")
+		return "", fmt.Errorf("failed to fetch the version")
 	}
 
 	latestVersion := matches[0][1]
