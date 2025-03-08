@@ -49,9 +49,14 @@ func activateCmd(ctx *cli.Context) error {
 		return err
 	}
 
+	// Note: This step must be the first.
+	// the Paths will handle the path format of GitBash which is different from other shells.
+	// So we need to set the env.HookFlag first to let the Paths know
+	// which shell we are using.
+	_ = os.Setenv(env.HookFlag, name)
+
 	exportEnvs := sdkEnvs.ToExportEnvs()
 
-	_ = os.Setenv(env.HookFlag, name)
 	exportEnvs[env.HookFlag] = &name
 	exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
 
