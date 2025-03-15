@@ -32,7 +32,7 @@ assert(resp.content_length ~= 0)
 
 --- 下载文件, vfox >= 0.4.0
 err = http.download_file({
-    url = "https://plugins.vfox.dev/index.json",
+    url = "https://version-fox.github.io/vfox-plugins/index.json",
     headers = {}
 }, "/usr/local/file")
 assert(err == nil, [[must be nil]] )

@@ -27,7 +27,7 @@ the availability of the plugin through the information in `sources` at regular i
 and store the obtained `manifest` information in the `plugins` directory.
 
 ::: tip Registry address
-`vfox` will default to retrieve plugins from [vfox-plugins.lhan.me](https://plugins.vfox.dev).
+`vfox` will default to retrieve plugins from [plugins registry](https://version-fox.github.io/vfox-plugins).
 
 If you want to use **your own registry or third-party mirror registry**, please configure it according to
 the [plugin registry address](../../guides/configuration.md#plugin-registry-address).

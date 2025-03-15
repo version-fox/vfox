@@ -12,7 +12,7 @@ import axios from 'axios'
 const info = ref({})
 const success = ref(false)
 
-axios.get('https://plugins.vfox.dev/index.json').then(res => {
+axios.get('https://version-fox.github.io/vfox-plugins/index.json').then(res => {
     info.value = res.data
     success.value = true
 })

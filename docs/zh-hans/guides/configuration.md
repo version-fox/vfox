@@ -53,13 +53,13 @@ storage:
 
 ## 插件注册表地址
 
-`vfox`默认从[vfox-plugins.lhan.me](https://plugins.vfox.dev)检索插件。
+`vfox`默认从[插件仓库](https://version-fox.github.io/vfox-plugins)检索插件。
 
 如果你想要使用自己的索引仓库或第三方镜像仓库,可以按照以下方式配置:
 
 ```yaml
 registry:
-  address: "https://plugins.vfox.dev"
+  address: "https://version-fox.github.io/vfox-plugins"
 ```
 
 ::: tip 可用镜像
