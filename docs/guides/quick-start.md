@@ -137,6 +137,8 @@ vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 
 :::
 
+Afterward, open a new terminal.
+
 ## 3. Add a plugin
 
 **Command**: `vfox add <plugin-name>`
