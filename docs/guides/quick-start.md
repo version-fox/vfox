@@ -126,6 +126,9 @@ y
    clink info | findstr scripts
    ```
 2. Copy [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) to the scripts directory
+   ::: tip
+   The `clink_vfox.lua` script only needs to be placed in one of the directories, not in each directory.
+   :::
 3. Restart Clink or Cmder
 :::
 

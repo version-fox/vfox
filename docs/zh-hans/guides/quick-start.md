@@ -129,6 +129,9 @@ y
    clink info | findstr scripts
    ```
 2. 复制 [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) 到脚本目录下
+   ::: tip 注意
+   `clink_vfox.lua`脚本只需放置在其中一个目录中，无需放入每个目录。
+   :::
 3. 重启 Clink 或 Cmder
 
 :::
