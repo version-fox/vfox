@@ -22,6 +22,11 @@ import (
 )
 
 const (
+	HomeFromEnv   = "VFOX_HOME"
+	PluginFromEnv = "VFOX_PLUGIN"
+	CacheFromEnv  = "VFOX_CACHE"
+	TempFromEnv   = "VFOX_TEMP"
+
 	HookFlag = "__VFOX_SHELL"
 	PidFlag  = "__VFOX_PID"
 )
@@ -36,4 +41,20 @@ func GetPid() int {
 		return p
 	}
 	return os.Getppid()
+}
+
+func GetVfoxHome() string {
+	return os.Getenv(HomeFromEnv)
+}
+
+func GetVfoxPlugin() string {
+	return os.Getenv(PluginFromEnv)
+}
+
+func GetVfoxCache() string {
+	return os.Getenv(CacheFromEnv)
+}
+
+func GetVfoxTemp() string {
+	return os.Getenv(TempFromEnv)
 }
