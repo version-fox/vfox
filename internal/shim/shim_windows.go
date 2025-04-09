@@ -42,7 +42,7 @@ param (
     $params
 )
 
-& '%s' $params
+& '%s' @params
 `
 
 //go:embed binary/shim.exe
