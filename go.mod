@@ -1,6 +1,7 @@
 module github.com/version-fox/vfox
 
 go 1.21.7
+toolchain go1.24.1
 
 require (
 	atomicgo.dev/cursor v0.2.0
@@ -14,8 +15,8 @@ require (
 	github.com/ulikunitz/xz v0.5.12
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/yuin/gopher-lua v1.1.1
-	golang.org/x/crypto v0.27.0
-	golang.org/x/sys v0.25.0
+	golang.org/x/crypto v0.35.0
+	golang.org/x/sys v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -41,6 +42,6 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/term v0.24.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 )
