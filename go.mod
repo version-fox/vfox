@@ -1,7 +1,8 @@
 module github.com/version-fox/vfox
 
-go 1.21.7
-toolchain go1.24.1
+go 1.23.0
+
+toolchain go1.24.2
 
 require (
 	atomicgo.dev/cursor v0.2.0

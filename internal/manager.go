@@ -97,7 +97,31 @@ type SessionEnvOptions struct {
 	WithGlobalEnv bool
 }
 
+// SessionEnvKeys returns the environment variables that need to be set and/or unset by the shell. This is determined by
+// the contents of any .tool-versions files in the following locations, in the following order of precedence:
+//
+//  1. Current working directory (in this directory, any legacy version files are also considered)
+//  2. vfox home directory (only if the WithGlobalEnv option is set to true)
+//  3. Current session's vfox temp directory
+//
+// The function maintains environment state through two mechanisms:
+//   - Updates the .tool-versions file in the current session's temp directory to track active SDK versions
+//   - Uses a "flush_env.cache" file in the current session's temp directory to prevent redundant environment variable updates
+//
+// Parameters:
+//   - opt: SessionEnvOptions controlling whether global environment variables should be included
+//
+// Returns:
+//   - SdkEnvs: A slice of SDK environment configurations that need to be applied
+//   - error: Any error encountered during processing
+//
+// The returned environment configurations remain valid for the entire shell session until one of the following
+// conditions is met:
+//   - A new .tool-versions file is encountered
+//   - The environment is explicitly modified via the `use` command
 func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
+	tvs := toolset.MultiToolVersions{}
+
 	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
 	if err != nil {
 		return nil, err
@@ -111,30 +135,30 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 		return nil, err
 	}
 
-	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.CurTmpPath)
-	if err != nil {
-		return nil, err
-	}
-	defer curToolVersion.Save()
-
-	// Add the working directory to the first
-	tvs := toolset.MultiToolVersions{workToolVersion, curToolVersion}
-
-	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.CurTmpPath, "flush_env.cache"))
-	if err != nil {
-		return nil, err
-	}
-	defer flushCache.Close()
+	tvs = append(tvs, workToolVersion)
 
 	if opt.WithGlobalEnv {
 		homeToolVersion, err := toolset.NewToolVersion(m.PathMeta.HomePath)
 		if err != nil {
 			return nil, err
 		}
-		// Here we need to add the global environment to the beginning of the slice,
-		// so that the global environment has the lower priority than the current environment.
-		tvs = append(toolset.MultiToolVersions{homeToolVersion}, tvs...)
+
+		tvs = append(tvs, homeToolVersion)
 	}
+
+	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.CurTmpPath)
+	if err != nil {
+		return nil, err
+	}
+	defer curToolVersion.Save()
+
+	tvs = append(tvs, curToolVersion)
+
+	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.CurTmpPath, "flush_env.cache"))
+	if err != nil {
+		return nil, err
+	}
+	defer flushCache.Close()
 
 	var sdkEnvs []*SdkEnv
 
@@ -155,8 +179,6 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 					Sdk: lookupSdk, Env: keys,
 				})
 
-				// If we encounter a .tool-versions file, it is valid for the entire shell session,
-				// unless we encounter the next .tool-versions file or manually switch to the use command.
 				curToolVersion.Record[name] = version
 				return true
 			}
