@@ -35,7 +35,7 @@ func GetProcess() Process {
 }
 
 func (w windowsProcess) Open(pid int) error {
-	hProcess, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, uint32(pid))
+	hProcess, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, uint32(pid))
 	if err != nil {
 		return err
 	}
