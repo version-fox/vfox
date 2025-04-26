@@ -1,10 +1,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
@@ -23,19 +24,19 @@ var Cd = &cli.Command{
 	Action: cdCmd,
 }
 
-func cdCmd(ctx *cli.Context) error {
+func cdCmd(ctx context.Context, cmd *cli.Command) error {
 	var dir string
 
 	manager := internal.NewSdkManager()
-	if ctx.Args().Len() == 0 {
+	if cmd.Args().Len() == 0 {
 		dir = manager.PathMeta.HomePath
 	} else {
-		sdkName := ctx.Args().First()
+		sdkName := cmd.Args().First()
 		sdk, err := manager.LookupSdk(sdkName)
 		if err != nil {
 			return err
 		}
-		if ctx.Bool("plugin") {
+		if cmd.Bool("plugin") {
 			dir = sdk.Plugin.Path
 		} else {
 			current := sdk.Current()

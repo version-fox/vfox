@@ -33,7 +33,7 @@ import (
 
 	"github.com/mitchellh/go-ps"
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
