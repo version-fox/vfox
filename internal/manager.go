@@ -31,8 +31,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/go-ps"
 	"github.com/pterm/pterm"
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
@@ -740,11 +740,10 @@ func (m *Manager) CleanTmp() {
 	_ = os.WriteFile(cleanFlagPath, []byte(strconv.FormatInt(util.GetBeginOfToday(), 10)), os.ModePerm)
 
 	procExists := make(map[string]struct{})
-	if procList, err := ps.Processes(); err == nil {
+
+	if procList, err := process.Pids(); err == nil {
 		for _, v := range procList {
-			if v != nil {
-				procExists[strconv.Itoa(v.Pid())] = struct{}{}
-			}
+			procExists[strconv.FormatInt(int64(v), 10)] = struct{}{}
 		}
 	}
 

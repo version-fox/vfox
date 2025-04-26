@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/version-fox/vfox/internal/env"
 )
 
@@ -59,14 +60,21 @@ func NewShell(name string) Shell {
 }
 
 func Open(pid int) error {
-	utils := GetProcessUtils()
-
-	process_path, err := utils.GetPath(pid)
+	p, err := process.NewProcess(int32(pid))
 	if err != nil {
 		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 
-	command := exec.Command(process_path)
+	cmdSlice, err := p.CmdlineSlice()
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	if len(cmdSlice) == 0 {
+		return fmt.Errorf("open a new shell failed, err: cannot find the command of the process: %d", pid)
+	}
+
+	command := exec.Command(cmdSlice[0], cmdSlice[1:]...)
 	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
