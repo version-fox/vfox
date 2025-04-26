@@ -40,9 +40,9 @@ type testStruct struct {
 }
 
 type testStructTag struct {
-	Field1 string `luai:"field1"`
-	Field2 int    `luai:"field2"`
-	Field3 bool   `luai:"field3"`
+	Field1 string `json:"field1"`
+	Field2 int    `json:"field2"`
+	Field3 bool   `json:"field3"`
 }
 
 type complexStruct struct {
@@ -64,9 +64,9 @@ func TestExample(t *testing.T) {
 		defer L.Close()
 
 		output := struct {
-			Field1  string  `luai:"field1"`
-			Field2  *string `luai:"field2"`
-			AString string  `luai:"a_string"`
+			Field1  string  `json:"field1"`
+			Field2  *string `json:"field2"`
+			AString string  `json:"a_string"`
 		}{}
 
 		if err := L.Instance.DoString(`
@@ -325,7 +325,7 @@ func TestEncodeFunc(t *testing.T) {
 	t.Run("EncodeFunc", func(t *testing.T) {
 		testdata := struct {
 			Func1 func(*lua.LState) int
-			Func2 func(*lua.LState) int `luai:"f2"`
+			Func2 func(*lua.LState) int `json:"f2"`
 		}{
 			Func1: lua.LGFunction(func(L *lua.LState) int {
 				L.Push(lua.LString("hello, world"))

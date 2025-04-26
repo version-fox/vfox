@@ -256,7 +256,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 
 			for i := 0; i < reflected.NumField(); i++ {
 				fieldTypeField := reflected.Type().Field(i)
-				tag := fieldTypeField.Tag.Get("luai")
+				tag := fieldTypeField.Tag.Get("json")
 				if tag != "" {
 					tagMap[tag] = i
 				}

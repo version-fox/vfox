@@ -18,10 +18,11 @@ package internal
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 // LocationPackage represents a package that needs to be linked
@@ -139,11 +140,11 @@ func (p *Package) Clone() *Package {
 }
 
 type Info struct {
-	Name     string            `luai:"name"`
-	Version  Version           `luai:"version"`
-	Path     string            `luai:"path"`
-	Headers  map[string]string `luai:"headers"`
-	Note     string            `luai:"note"`
+	Name     string            `json:"name"`
+	Version  Version           `json:"version"`
+	Path     string            `json:"path"`
+	Headers  map[string]string `json:"headers"`
+	Note     string            `json:"note"`
 	Checksum *Checksum
 }
 

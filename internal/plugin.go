@@ -61,6 +61,14 @@ var (
 	}
 )
 
+type Plugin interface {
+	Available(args []string) ([]*Package, error)
+	PreInstall(version Version) (*Package, error)
+	PostInstall(rootPath string, sdks []*Info) error
+	EnvKeys(sdkPackage *Package) (*env.Envs, error)
+	Label(version string) string
+}
+
 type LuaPlugin struct {
 	vm        *luai.LuaVM
 	pluginObj *lua.LTable
