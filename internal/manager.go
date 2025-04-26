@@ -745,6 +745,8 @@ func (m *Manager) CleanTmp() {
 		for _, v := range procList {
 			procExists[fmt.Sprintf("%d", v)] = struct{}{}
 		}
+	} else {
+		return
 	}
 
 	dir, err := os.ReadDir(m.PathMeta.TempPath)
