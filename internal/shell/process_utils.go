@@ -16,8 +16,6 @@
 
 package shell
 
-// ProcessUtils 定义了获取进程可执行文件路径的接口
 type ProcessUtils interface {
-	// GetPath 返回指定进程ID的可执行文件路径
 	GetPath(pid int) (string, error)
 }
