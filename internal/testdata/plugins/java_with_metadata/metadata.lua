@@ -3,7 +3,7 @@ PLUGIN = {}
 
 --- !!! MUST BE SET !!!
 --- Plugin name
-PLUGIN.name = "java"
+PLUGIN.name = "java_with_metadata"
 --- Plugin version
 PLUGIN.version = "0.0.1"
 -- Repository URL

@@ -80,6 +80,7 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 }
 
 type Sdk struct {
+	Name       string
 	sdkManager *Manager
 	Plugin     *LuaPlugin
 	// current sdk install path
@@ -257,7 +258,7 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	if err != nil {
 		return err
 	}
-	delete(tv.Record, b.Plugin.SdkName)
+	delete(tv.Record, b.Name)
 	_ = tv.Save()
 
 	err = os.RemoveAll(path)
@@ -414,7 +415,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		}
 
 		// clear global env
-		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
@@ -424,7 +425,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err != nil {
 			return err
 		}
-		toolVersion.Record[b.Plugin.SdkName] = string(version)
+		toolVersion.Record[b.Name] = string(version)
 		if err = toolVersion.Save(); err != nil {
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
 		}
@@ -461,8 +462,8 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		}
 
 		// clear global env
-		logger.Debugf("Clear global env: %s\n", b.Plugin.SdkName)
-		if oldVersion, ok := toolVersion.Record[b.Plugin.SdkName]; ok {
+		logger.Debugf("Clear global env: %s\n", b.Name)
+		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
 			b.clearGlobalEnv(Version(oldVersion))
 		}
 
@@ -490,7 +491,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	}
 	multiToolVersion = append(multiToolVersion, toolVersion)
 
-	multiToolVersion.Add(b.Plugin.SdkName, string(version))
+	multiToolVersion.Add(b.Name, string(version))
 
 	if err = multiToolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
@@ -550,12 +551,12 @@ func (b *Sdk) Current() Version {
 		return ""
 	}
 	current := toolVersion.FilterTools(func(name, version string) bool {
-		return name == b.Plugin.SdkName && b.CheckExists(Version(version))
+		return name == b.Name && b.CheckExists(Version(version))
 	})
 	if len(current) == 0 {
 		return ""
 	}
-	return Version(current[b.Plugin.SdkName])
+	return Version(current[b.Name])
 }
 
 func (b *Sdk) ParseLegacyFile(path string) (Version, error) {
@@ -719,7 +720,7 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 }
 
 func (b *Sdk) label(version Version) string {
-	return fmt.Sprintf("%s@%s", strings.ToLower(b.Plugin.SdkName), version)
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Name), version)
 }
 
 func (b *Sdk) ClearCurrentEnv() error {
@@ -768,20 +769,22 @@ func (b *Sdk) ClearCurrentEnv() error {
 		return err
 	}
 	for _, tv := range toolVersion {
-		delete(tv.Record, b.Plugin.SdkName)
+		delete(tv.Record, b.Name)
 	}
 	return nil
 }
 
 // NewSdk creates a new SDK instance.
 func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
+	sdkName := filepath.Base(pluginPath)
 	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
 	}
 	return &Sdk{
+		Name:                 sdkName,
 		sdkManager:           manager,
-		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(luaPlugin.SdkName)),
+		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
 		Plugin:               luaPlugin,
 		localSdkPackageCache: make(map[Version]*Package),
 	}, nil

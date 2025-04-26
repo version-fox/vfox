@@ -16,7 +16,7 @@ RUNTIME = {
 
 PLUGIN = {
     --- Plugin name
-    name = "java",
+    name = "java_with_main",
     --- Plugin author
     author = "Lihan",
     --- Plugin version

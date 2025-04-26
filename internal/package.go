@@ -41,7 +41,7 @@ func newLocationPackage(version Version, sdk *Sdk, location Location) (*Location
 	case GlobalLocation:
 		mockPath = filepath.Join(sdk.InstallPath, "current")
 	case ShellLocation:
-		mockPath = filepath.Join(sdk.sdkManager.PathMeta.CurTmpPath, sdk.Plugin.SdkName)
+		mockPath = filepath.Join(sdk.sdkManager.PathMeta.CurTmpPath, sdk.Name)
 	default:
 		return nil, fmt.Errorf("unknown location: %s", location)
 	}
