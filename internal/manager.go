@@ -743,7 +743,7 @@ func (m *Manager) CleanTmp() {
 
 	if procList, err := process.Pids(); err == nil {
 		for _, v := range procList {
-			procExists[strconv.FormatInt(int64(v), 10)] = struct{}{}
+			procExists[fmt.Sprintf("%d", v)] = struct{}{}
 		}
 	}
 

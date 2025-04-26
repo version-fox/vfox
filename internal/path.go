@@ -47,6 +47,13 @@ const (
 	TEMP_DIR   = "temp"
 )
 
+func newTempPath() string {
+	pid := env.GetPid()
+	timestamp := util.GetBeginOfToday()
+	name := fmt.Sprintf("%d-%d", timestamp, pid)
+	return name
+}
+
 func newPathMeta() (*PathMeta, error) {
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -69,9 +76,7 @@ func newPathMeta() (*PathMeta, error) {
 	}
 	curTmpPath := os.Getenv(HookCurTmpPath)
 	if curTmpPath == "" {
-		pid := env.GetPid()
-		timestamp := util.GetBeginOfToday()
-		name := fmt.Sprintf("%d-%d", timestamp, pid)
+		name := newTempPath()
 		curTmpPath = filepath.Join(tmpPath, name)
 	}
 	if !util.FileExists(curTmpPath) {
