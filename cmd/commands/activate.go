@@ -88,5 +88,5 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 		SelfPath:   path,
 		EnvContent: exportStr,
 	}
-	return hookTemplate.Execute(cmd.Writer, tmpCtx)
+	return hookTemplate.Execute(cmd.Root().Writer, tmpCtx)
 }

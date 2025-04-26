@@ -116,7 +116,7 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 	httpClient := manager.HttpClient()
 
-	currVersion := fmt.Sprintf("v%s", cmd.Version)
+	currVersion := fmt.Sprintf("v%s", cmd.Root().Version)
 	latestVersion, err := fetchLatestVersion(httpClient)
 	if err != nil {
 		return cli.Exit("Failed to fetch the latest version: "+err.Error(), 1)

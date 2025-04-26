@@ -45,7 +45,7 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 
 	args := cmd.Args()
 	if args.Len() == 0 {
-		return cmd.Run(ctx, []string{"CMD", "config", "-h"})
+		return cmd.Root().Run(ctx, []string{"CMD", "config", "-h"})
 	}
 
 	keys := strings.Split(args.First(), ".")
