@@ -428,7 +428,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 		if err = toolVersion.Save(); err != nil {
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
 		}
-		return shell.GetProcess().Open(os.Getppid())
+		return shell.Open(os.Getppid())
 	} else {
 		return b.useInHook(version, scope)
 	}
@@ -501,7 +501,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))
 	if !env.IsHookEnv() {
-		return shell.GetProcess().Open(os.Getppid())
+		return shell.Open(os.Getppid())
 	}
 	return nil
 }

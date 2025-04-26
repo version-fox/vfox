@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  *    Copyright 2025 Han Li and contributors
  *
@@ -16,6 +18,26 @@
 
 package shell
 
-type Process interface {
-	Open(pid int) error
+import (
+	"fmt"
+	"os"
+	"os/exec"
+)
+
+func Open(pid int) error {
+	utils := GetProcessUtils()
+
+	process_path, err := utils.GetPath(pid)
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	command := exec.Command(process_path)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+	return nil
 }
