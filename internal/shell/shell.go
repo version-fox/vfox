@@ -77,7 +77,7 @@ func Open(pid int) error {
 	}
 
 	// dev case
-	if cmdSlice[0] == "go" && cmdSlice[1] == "run" {
+	if len(cmdSlice) > 1 && cmdSlice[0] == "go" && cmdSlice[1] == "run" {
 		return fmt.Errorf("You are running the command in development mode, please use the binary file instead")
 	}
 
