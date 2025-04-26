@@ -17,6 +17,9 @@
 package shell
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
@@ -51,6 +54,24 @@ func NewShell(name string) Shell {
 		return Clink
 	case "nushell":
 		return Nushell
+	}
+	return nil
+}
+
+func Open(pid int) error {
+	utils := GetProcessUtils()
+
+	process_path, err := utils.GetPath(pid)
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	command := exec.Command(process_path)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 	return nil
 }
