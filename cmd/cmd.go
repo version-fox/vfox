@@ -49,10 +49,6 @@ func newCmd() *cmd {
 		Name:    "version",
 		Aliases: []string{"v", "V"},
 		Usage:   "print version",
-		Action: func(ctx context.Context, command *cli.Command, b bool) error {
-			println(version)
-			return nil
-		},
 	}
 
 	app := &cli.Command{

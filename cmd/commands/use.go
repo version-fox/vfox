@@ -24,6 +24,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/logger"
 
 	"github.com/urfave/cli/v3"
 )
@@ -73,10 +74,13 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 
 	scope := internal.Session
 	if cmd.IsSet("global") {
+		logger.Debug("use global")
 		scope = internal.Global
 	} else if cmd.IsSet("project") {
+		logger.Debug("use project")
 		scope = internal.Project
 	} else {
+		logger.Debug("use session")
 		scope = internal.Session
 	}
 	manager := internal.NewSdkManager()
