@@ -26,5 +26,6 @@ func (m macosProcessPath) GetPath(pid int) (string, error) {
 	if len(outCommand) == 0 {
 		return "", fmt.Errorf("process not found")
 	}
-	return outCommand[0], nil
+	name := outCommand[0]
+	return name, nil
 }

@@ -67,6 +67,7 @@ func Open(pid int) error {
 	}
 
 	command := exec.Command(process_path)
+	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
