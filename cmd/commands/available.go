@@ -17,10 +17,11 @@
 package commands
 
 import (
+	"context"
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -31,7 +32,7 @@ var Available = &cli.Command{
 	Category: CategoryPlugin,
 }
 
-func availableCmd(ctx *cli.Context) error {
+func availableCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	//categoryName := ctx.Args().First()

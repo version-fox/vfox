@@ -17,10 +17,11 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
@@ -54,15 +55,15 @@ var Env = &cli.Command{
 	Category: CategorySDK,
 }
 
-func envCmd(ctx *cli.Context) error {
-	if ctx.IsSet("json") {
+func envCmd(ctx context.Context, command *cli.Command) error {
+	if command.IsSet("json") {
 		return outputJSON()
-	} else if ctx.IsSet("cleanup") {
+	} else if command.IsSet("cleanup") {
 		return cleanTmp()
-	} else if ctx.IsSet("full") {
-		return envFlag(ctx, "full")
+	} else if command.IsSet("full") {
+		return envFlag(command, "full")
 	} else {
-		return envFlag(ctx, "cwd")
+		return envFlag(command, "cwd")
 	}
 }
 
@@ -113,8 +114,8 @@ func cleanTmp() error {
 	return nil
 }
 
-func envFlag(ctx *cli.Context, mode string) error {
-	shellName := ctx.String("shell")
+func envFlag(command *cli.Command, mode string) error {
+	shellName := command.String("shell")
 	if shellName == "" {
 		return cli.Exit("shell name is required", 1)
 	}

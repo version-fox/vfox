@@ -1,15 +1,17 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/config"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/config"
+
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -31,23 +33,23 @@ var Config = &cli.Command{
 	Action: configCmd,
 }
 
-func configCmd(ctx *cli.Context) error {
+func configCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	conf := reflect.ValueOf(manager.Config)
 
-	if ctx.Bool("list") {
+	if cmd.Bool("list") {
 		configList("", conf)
 		return nil
 	}
 
-	args := ctx.Args()
+	args := cmd.Args()
 	if args.Len() == 0 {
-		return ctx.App.Run([]string{"CMD", "config", "-h"})
+		return cmd.Run(ctx, []string{"CMD", "config", "-h"})
 	}
 
 	keys := strings.Split(args.First(), ".")
-	unset := ctx.Bool("unset")
+	unset := cmd.Bool("unset")
 	if !unset && args.Len() == 1 {
 		configGet(conf, keys)
 		return nil

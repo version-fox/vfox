@@ -17,12 +17,13 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -34,8 +35,8 @@ var Uninstall = &cli.Command{
 	Category: CategorySDK,
 }
 
-func uninstallCmd(ctx *cli.Context) error {
-	sdkArg := ctx.Args().First()
+func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
+	sdkArg := cmd.Args().First()
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}

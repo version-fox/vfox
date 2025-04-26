@@ -17,9 +17,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -42,8 +44,8 @@ var Add = &cli.Command{
 }
 
 // addCmd is the command to add a plugin of sdk
-func addCmd(ctx *cli.Context) error {
-	args := ctx.Args()
+func addCmd(ctx context.Context, command *cli.Command) error {
+	args := command.Args()
 
 	manager := internal.NewSdkManager()
 	defer manager.Close()
@@ -58,8 +60,8 @@ func addCmd(ctx *cli.Context) error {
 		}
 		return nil
 	} else {
-		source := ctx.String("source")
-		alias := ctx.String("alias")
+		source := command.String("source")
+		alias := command.String("alias")
 		return manager.Add(args.First(), source, alias)
 	}
 }

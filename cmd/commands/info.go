@@ -17,10 +17,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -31,10 +32,10 @@ var Info = &cli.Command{
 	Category: CategoryPlugin,
 }
 
-func infoCmd(ctx *cli.Context) error {
+func infoCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	args := ctx.Args().First()
+	args := cmd.Args().First()
 	if args == "" {
 		return cli.Exit("invalid arguments", 1)
 	}

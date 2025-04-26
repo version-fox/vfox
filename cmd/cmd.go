@@ -17,10 +17,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/cmd/commands"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/logger"
@@ -31,12 +32,12 @@ func Execute(args []string) {
 }
 
 type cmd struct {
-	app     *cli.App
+	app     *cli.Command
 	version string
 }
 
 func (c *cmd) Execute(args []string) {
-	if err := c.app.Run(args); err != nil {
+	if err := c.app.Run(context.Background(), args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -48,32 +49,30 @@ func newCmd() *cmd {
 		Name:    "version",
 		Aliases: []string{"v", "V"},
 		Usage:   "print version",
-		Action: func(ctx *cli.Context, b bool) error {
+		Action: func(ctx context.Context, command *cli.Command, b bool) error {
 			println(version)
 			return nil
 		},
 	}
 
-	app := &cli.App{}
-	app.EnableBashCompletion = true
-	app.Name = "vfox"
-	app.Usage = "vfox is a tool for runtime version management."
-	app.UsageText = "vfox [command] [command options]"
-	app.Copyright = "Copyright 2025 Han Li. All rights reserved."
-	app.Version = version
-	app.Description = "vfox is a cross-platform version manager, extendable via plugins. It allows you to quickly install and switch between different environment you need via the command line."
-	app.Suggest = true
-	app.BashComplete = func(ctx *cli.Context) {
-		for _, command := range ctx.App.Commands {
-			_, _ = fmt.Fprintln(ctx.App.Writer, command.Name)
-		}
+	app := &cli.Command{
+		Name:                  "vfox",
+		Usage:                 "vfox is a tool for runtime version management.",
+		UsageText:             "vfox [command] [command options]",
+		Copyright:             "Copyright 2025 Han Li. All rights reserved.",
+		Version:               version,
+		Description:           "vfox is a cross-platform version manager, extendable via plugins. It allows you to quickly install and switch between different environment you need via the command line.",
+		Suggest:               true,
+		EnableShellCompletion: true,
 	}
 
 	debugFlags := &cli.BoolFlag{
 		Name:  "debug",
 		Usage: "show debug information",
-		Action: func(ctx *cli.Context, b bool) error {
-			logger.SetLevel(logger.DebugLevel)
+		Action: func(ctx context.Context, command *cli.Command, b bool) error {
+			if b {
+				logger.SetLevel(logger.DebugLevel)
+			}
 			return nil
 		},
 	}

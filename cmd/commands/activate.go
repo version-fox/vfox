@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -24,7 +25,7 @@ import (
 
 	"github.com/version-fox/vfox/internal"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
 )
@@ -36,8 +37,8 @@ var Activate = &cli.Command{
 	Category: CategorySDK,
 }
 
-func activateCmd(ctx *cli.Context) error {
-	name := ctx.Args().First()
+func activateCmd(ctx context.Context, cmd *cli.Command) error {
+	name := cmd.Args().First()
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
@@ -70,7 +71,7 @@ func activateCmd(ctx *cli.Context) error {
 	str, err := s.Activate(
 		shell.ActivateConfig{
 			SelfPath: path,
-			Args:     ctx.Args().Tail(),
+			Args:     cmd.Args().Tail(),
 		},
 	)
 	if err != nil {
@@ -87,5 +88,5 @@ func activateCmd(ctx *cli.Context) error {
 		SelfPath:   path,
 		EnvContent: exportStr,
 	}
-	return hookTemplate.Execute(ctx.App.Writer, tmpCtx)
+	return hookTemplate.Execute(cmd.Writer, tmpCtx)
 }
