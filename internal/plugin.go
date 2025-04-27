@@ -61,13 +61,32 @@ var (
 	}
 )
 
+type Plugin interface {
+	Available(args []string) ([]*Package, error)
+	PreInstall(version Version) (*Package, error)
+	PostInstall(rootPath string, sdks []*Info) error
+	PreUninstall(p *Package) error
+	PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*Package) (Version, error)
+	EnvKeys(sdkPackage *Package) (*env.Envs, error)
+	Label(version string) string
+	ParseLegacyFile(path string, installedVersions func() []Version) (Version, error)
+	Close()
+}
+
+type PluginInfo struct {
+	Plugin
+
+	// // plugin filename, this is also alias name, sdk-name
+	// SdkName string
+	// // plugin source path
+	// Path string
+}
+
 type LuaPlugin struct {
 	vm        *luai.LuaVM
 	pluginObj *lua.LTable
 	// plugin source path
 	Path string
-	// plugin filename, this is also alias name, sdk-name
-	SdkName string
 	*LuaPluginInfo
 }
 
@@ -515,7 +534,6 @@ func NewLuaPlugin(pluginDirPath string, manager *Manager) (*LuaPlugin, error) {
 		vm:        vm,
 		pluginObj: PLUGIN,
 		Path:      pluginDirPath,
-		SdkName:   filepath.Base(pluginDirPath),
 	}
 
 	if err = source.Validate(); err != nil {

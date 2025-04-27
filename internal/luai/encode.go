@@ -43,7 +43,7 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			}
 
 			fieldType := reflected.Type().Field(i)
-			tag := fieldType.Tag.Get("luai")
+			tag := fieldType.Tag.Get("json")
 			if tag == "" {
 				tag = fieldType.Name
 			}

@@ -1,12 +1,13 @@
 package internal
 
 import (
-	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/util"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
 
@@ -39,15 +40,11 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 			t.Fatalf("expected plugin to be set, got nil")
 		}
 
-		if plugin.SdkName != "java_with_main" {
-			t.Errorf("expected filename 'java', got '%s'", plugin.SdkName)
-		}
-
 		if plugin.Path != pluginPathWithMain {
 			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMain, plugin.Path)
 		}
 
-		if plugin.Name != "java" {
+		if plugin.Name != "java_with_main" {
 			t.Errorf("expected name 'java', got '%s'", plugin.Name)
 		}
 
@@ -90,16 +87,12 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			t.Fatalf("expected plugin to be set, got nil")
 		}
 
-		if plugin.SdkName != "java_with_metadata" {
-			t.Errorf("expected filename 'java', got '%s'", plugin.SdkName)
+		if plugin.Name != "java_with_metadata" {
+			t.Errorf("expected filename 'java', got '%s'", plugin.Name)
 		}
 
 		if plugin.Path != pluginPathWithMetadata {
 			t.Errorf("expected filepath '%s', got '%s'", pluginPathWithMetadata, plugin.Path)
-		}
-
-		if plugin.Name != "java" {
-			t.Errorf("expected name 'java', got '%s'", plugin.Name)
 		}
 
 		if plugin.Version != "0.0.1" {
@@ -386,9 +379,9 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 				t.Fatal(err)
 			}
 			if len(sdks) != 0 && firstSdkName == "" {
-				firstSdkName = sdks[0].Plugin.SdkName
+				firstSdkName = sdks[0].Name
 			} else if len(sdks) != 0 {
-				if sdks[0].Plugin.SdkName != firstSdkName {
+				if sdks[0].Name != firstSdkName {
 					t.Errorf("expected sdk sort %v", sdks)
 				}
 			}

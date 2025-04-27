@@ -23,10 +23,10 @@ import (
 )
 
 type LuaCheckSum struct {
-	Sha256 string `luai:"sha256"`
-	Sha512 string `luai:"sha512"`
-	Sha1   string `luai:"sha1"`
-	Md5    string `luai:"md5"`
+	Sha256 string `json:"sha256"`
+	Sha512 string `json:"sha512"`
+	Sha1   string `json:"sha1"`
+	Md5    string `json:"md5"`
 }
 
 func (c *LuaCheckSum) Checksum() *Checksum {
@@ -52,31 +52,31 @@ func (c *LuaCheckSum) Checksum() *Checksum {
 }
 
 type AvailableHookCtx struct {
-	Args []string `luai:"args"`
+	Args []string `json:"args"`
 }
 
 type AvailableHookResultItem struct {
-	Version string `luai:"version"`
-	Note    string `luai:"note"`
+	Version string `json:"version"`
+	Note    string `json:"note"`
 
-	Addition []*Info `luai:"addition"`
+	Addition []*Info `json:"addition"`
 }
 
 type AvailableHookResult = []*AvailableHookResultItem
 
 type PreInstallHookCtx struct {
-	Version string `luai:"version"`
+	Version string `json:"version"`
 }
 
 type PreInstallHookResultAdditionItem struct {
-	Name    string            `luai:"name"`
-	Url     string            `luai:"url"`
-	Headers map[string]string `luai:"headers"`
-	Note    string            `luai:"note"`
-	Sha256  string            `luai:"sha256"`
-	Sha512  string            `luai:"sha512"`
-	Sha1    string            `luai:"sha1"`
-	Md5     string            `luai:"md5"`
+	Name    string            `json:"name"`
+	Url     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+	Note    string            `json:"note"`
+	Sha256  string            `json:"sha256"`
+	Sha512  string            `json:"sha512"`
+	Sha1    string            `json:"sha1"`
+	Md5     string            `json:"md5"`
 }
 
 func (i *PreInstallHookResultAdditionItem) Info() *Info {
@@ -98,15 +98,15 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 }
 
 type PreInstallHookResult struct {
-	Version  string                              `luai:"version"`
-	Url      string                              `luai:"url"`
-	Headers  map[string]string                   `luai:"headers"`
-	Note     string                              `luai:"note"`
-	Sha256   string                              `luai:"sha256"`
-	Sha512   string                              `luai:"sha512"`
-	Sha1     string                              `luai:"sha1"`
-	Md5      string                              `luai:"md5"`
-	Addition []*PreInstallHookResultAdditionItem `luai:"addition"`
+	Version  string                              `json:"version"`
+	Url      string                              `json:"url"`
+	Headers  map[string]string                   `json:"headers"`
+	Note     string                              `json:"note"`
+	Sha256   string                              `json:"sha256"`
+	Sha512   string                              `json:"sha512"`
+	Sha1     string                              `json:"sha1"`
+	Md5      string                              `json:"md5"`
+	Addition []*PreInstallHookResultAdditionItem `json:"addition"`
 }
 
 var ErrNoVersionProvided = errors.New("no version number provided")
@@ -134,66 +134,66 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 }
 
 type PreUseHookCtx struct {
-	Cwd             string           `luai:"cwd"`
-	Scope           string           `luai:"scope"`
-	Version         string           `luai:"version"`
-	PreviousVersion string           `luai:"previousVersion"`
-	InstalledSdks   map[string]*Info `luai:"installedSdks"`
+	Cwd             string           `json:"cwd"`
+	Scope           string           `json:"scope"`
+	Version         string           `json:"version"`
+	PreviousVersion string           `json:"previousVersion"`
+	InstalledSdks   map[string]*Info `json:"installedSdks"`
 }
 
 type PreUseHookResult struct {
-	Version string `luai:"version"`
+	Version string `json:"version"`
 }
 
 type PostInstallHookCtx struct {
-	RootPath string           `luai:"rootPath"`
-	SdkInfo  map[string]*Info `luai:"sdkInfo"`
+	RootPath string           `json:"rootPath"`
+	SdkInfo  map[string]*Info `json:"sdkInfo"`
 }
 
 type EnvKeysHookCtx struct {
-	Main *Info `luai:"main"`
+	Main *Info `json:"main"`
 	// TODO Will be deprecated in future versions
-	Path    string           `luai:"path"`
-	SdkInfo map[string]*Info `luai:"sdkInfo"`
+	Path    string           `json:"path"`
+	SdkInfo map[string]*Info `json:"sdkInfo"`
 }
 
 type EnvKeysHookResultItem struct {
-	Key   string `luai:"key"`
-	Value string `luai:"value"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type ParseLegacyFileHookCtx struct {
-	Filepath             string         `luai:"filepath"`
-	Filename             string         `luai:"filename"`
-	GetInstalledVersions lua.LGFunction `luai:"getInstalledVersions"`
+	Filepath             string         `json:"filepath"`
+	Filename             string         `json:"filename"`
+	GetInstalledVersions lua.LGFunction `json:"getInstalledVersions"`
 }
 
 type ParseLegacyFileResult struct {
-	Version string `luai:"version"`
+	Version string `json:"version"`
 }
 
 type PreUninstallHookCtx struct {
-	Main    *Info            `luai:"main"`
-	SdkInfo map[string]*Info `luai:"sdkInfo"`
+	Main    *Info            `json:"main"`
+	SdkInfo map[string]*Info `json:"sdkInfo"`
 }
 
 type LuaPluginInfo struct {
-	Name              string   `luai:"name"`
-	Version           string   `luai:"version"`
-	Description       string   `luai:"description"`
-	UpdateUrl         string   `luai:"updateUrl"`
-	ManifestUrl       string   `luai:"manifestUrl"`
-	Homepage          string   `luai:"homepage"`
-	License           string   `luai:"license"`
-	MinRuntimeVersion string   `luai:"minRuntimeVersion"`
-	Notes             []string `luai:"notes"`
-	LegacyFilenames   []string `luai:"legacyFilenames"`
+	Name              string   `json:"name"`
+	Version           string   `json:"version"`
+	Description       string   `json:"description"`
+	UpdateUrl         string   `json:"updateUrl"`
+	ManifestUrl       string   `json:"manifestUrl"`
+	Homepage          string   `json:"homepage"`
+	License           string   `json:"license"`
+	MinRuntimeVersion string   `json:"minRuntimeVersion"`
+	Notes             []string `json:"notes"`
+	LegacyFilenames   []string `json:"legacyFilenames"`
 }
 
 // LuaRuntime represents the runtime information of the Lua environment.
 type LuaRuntime struct {
-	OsType        string `luai:"osType"`
-	ArchType      string `luai:"archType"`
-	Version       string `luai:"version"`
-	PluginDirPath string `luai:"pluginDirPath"`
+	OsType        string `json:"osType"`
+	ArchType      string `json:"archType"`
+	Version       string `json:"version"`
+	PluginDirPath string `json:"pluginDirPath"`
 }

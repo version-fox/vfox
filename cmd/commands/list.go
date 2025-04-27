@@ -48,7 +48,7 @@ func listCmd(ctx *cli.Context) error {
 		tree := pterm.LeveledList{}
 
 		for _, s := range allSdk {
-			name := s.Plugin.SdkName
+			name := s.Name
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
 			for _, version := range s.List() {
 				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})

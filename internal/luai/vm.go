@@ -18,10 +18,11 @@ package luai
 
 import (
 	_ "embed"
+	"strings"
+
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/module"
 	lua "github.com/yuin/gopher-lua"
-	"strings"
 )
 
 //go:embed fixtures/preload.lua

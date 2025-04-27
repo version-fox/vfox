@@ -326,7 +326,7 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 	}
 
 	sort.Slice(sdkSlice, func(i, j int) bool {
-		return sdkSlice[j].Plugin.SdkName > sdkSlice[i].Plugin.SdkName
+		return sdkSlice[j].Name > sdkSlice[i].Name
 	})
 	return sdkSlice, nil
 }
