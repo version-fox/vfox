@@ -17,9 +17,14 @@
 package shell
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 )
 
 type ActivateConfig struct {
@@ -51,6 +56,39 @@ func NewShell(name string) Shell {
 		return Clink
 	case "nushell":
 		return Nushell
+	}
+	return nil
+}
+
+func Open(pid int) error {
+	logger.Debugf("open a new shell: %d\n", pid)
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	cmdSlice, err := p.CmdlineSlice()
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+
+	if len(cmdSlice) == 0 {
+		return fmt.Errorf("open a new shell failed, err: cannot find the command of the process: %d", pid)
+	}
+
+	// dev case
+	if len(cmdSlice) > 1 && cmdSlice[0] == "go" && cmdSlice[1] == "run" {
+		return fmt.Errorf("You are running the command in development mode, please use the binary file instead")
+	}
+
+	logger.Debugf("open a new shell: %s\n", strings.Join(cmdSlice, " "))
+	command := exec.Command(cmdSlice[0], cmdSlice[1:]...)
+	command.Env = os.Environ()
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 	return nil
 }

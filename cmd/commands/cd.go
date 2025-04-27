@@ -55,5 +55,5 @@ func cdCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return shell.GetProcess().Open(env.GetPid())
+	return shell.Open(env.GetPid())
 }

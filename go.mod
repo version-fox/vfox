@@ -10,9 +10,9 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/bodgit/sevenzip v1.5.1
 	github.com/lithammer/fuzzysearch v1.1.8
-	github.com/mitchellh/go-ps v1.0.0
 	github.com/pterm/pterm v0.12.79
 	github.com/schollz/progressbar/v3 v3.14.2
+	github.com/shirou/gopsutil/v4 v4.25.3
 	github.com/ulikunitz/xz v0.5.12
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/yuin/gopher-lua v1.1.1
@@ -29,18 +29,25 @@ require (
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/ebitengine/purego v0.8.2 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
+	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.12 // indirect
+	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
