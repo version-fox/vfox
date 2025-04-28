@@ -379,6 +379,14 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 	return newVersion, nil
 }
 
+type VersionNotExistsError struct {
+	Label string
+}
+
+func (e *VersionNotExistsError) Error() string {
+	return fmt.Sprintf("%s is not installed", e.Label)
+}
+
 func (b *Sdk) Use(version Version, scope UseScope) error {
 	logger.Debugf("Use SDK version: %s, scope:%v\n", string(version), scope)
 
@@ -389,7 +397,9 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 	label := b.label(version)
 	if !b.CheckExists(version) {
-		return fmt.Errorf("%s is not installed", label)
+		return &VersionNotExistsError{
+			Label: label,
+		}
 	}
 
 	if !env.IsHookEnv() {
