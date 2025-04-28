@@ -22,14 +22,14 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type LuaCheckSum struct {
+type CheckSum struct {
 	Sha256 string `json:"sha256"`
 	Sha512 string `json:"sha512"`
 	Sha1   string `json:"sha1"`
 	Md5    string `json:"md5"`
 }
 
-func (c *LuaCheckSum) Checksum() *Checksum {
+func (c *CheckSum) Checksum() *Checksum {
 	checksum := &Checksum{}
 
 	if c.Sha256 != "" {
@@ -80,7 +80,7 @@ type PreInstallHookResultAdditionItem struct {
 }
 
 func (i *PreInstallHookResultAdditionItem) Info() *Info {
-	sum := LuaCheckSum{
+	sum := CheckSum{
 		Sha256: i.Sha256,
 		Sha512: i.Sha512,
 		Sha1:   i.Sha1,
@@ -116,7 +116,7 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 		return nil, ErrNoVersionProvided
 	}
 
-	sum := LuaCheckSum{
+	sum := CheckSum{
 		Sha256: i.Sha256,
 		Sha512: i.Sha512,
 		Sha1:   i.Sha1,
@@ -177,7 +177,7 @@ type PreUninstallHookCtx struct {
 	SdkInfo map[string]*Info `json:"sdkInfo"`
 }
 
-type LuaPluginInfo struct {
+type PluginInfo struct {
 	Name              string   `json:"name"`
 	Version           string   `json:"version"`
 	Description       string   `json:"description"`
@@ -190,8 +190,8 @@ type LuaPluginInfo struct {
 	LegacyFilenames   []string `json:"legacyFilenames"`
 }
 
-// LuaRuntime represents the runtime information of the Lua environment.
-type LuaRuntime struct {
+// RuntimeInfo represents the runtime information of the current exec environment.
+type RuntimeInfo struct {
 	OsType        string `json:"osType"`
 	ArchType      string `json:"archType"`
 	Version       string `json:"version"`

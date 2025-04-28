@@ -82,7 +82,7 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 type Sdk struct {
 	Name       string
 	sdkManager *Manager
-	Plugin     *LuaPlugin
+	Plugin     *Plugin
 	// current sdk install path
 	InstallPath          string
 	localSdkPackageCache map[Version]*Package
@@ -785,7 +785,7 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 		Name:                 sdkName,
 		sdkManager:           manager,
 		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
-		Plugin:               luaPlugin,
+		Plugin:               FromLuaPlugin(luaPlugin),
 		localSdkPackageCache: make(map[Version]*Package),
 	}, nil
 }
