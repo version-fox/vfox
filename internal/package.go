@@ -22,12 +22,13 @@ import (
 	"path/filepath"
 
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/pluginsys"
 	"github.com/version-fox/vfox/internal/util"
 )
 
 // LocationPackage represents a package that needs to be linked
 type LocationPackage struct {
-	from     *Package
+	from     *pluginsys.Package
 	sdk      *Sdk
 	toPath   string
 	location Location
@@ -57,7 +58,7 @@ func newLocationPackage(version Version, sdk *Sdk, location Location) (*Location
 	}, nil
 }
 
-func (l *LocationPackage) ConvertLocation() *Package {
+func (l *LocationPackage) ConvertLocation() *pluginsys.Package {
 	if l.location == OriginalLocation {
 		return l.from
 	}
@@ -76,7 +77,7 @@ func (l *LocationPackage) ConvertLocation() *Package {
 	return clone
 }
 
-func (l *LocationPackage) Link() (*Package, error) {
+func (l *LocationPackage) Link() (*pluginsys.Package, error) {
 	if l.location == OriginalLocation {
 		return l.from, nil
 	}
@@ -110,7 +111,7 @@ func (l *LocationPackage) Link() (*Package, error) {
 }
 
 // checkPackageValid checks if the package is valid
-func checkPackageValid(p *Package) bool {
+func checkPackageValid(p *pluginsys.Package) bool {
 	if !util.FileExists(p.Main.Path) {
 		return false
 	}
@@ -120,56 +121,4 @@ func checkPackageValid(p *Package) bool {
 		}
 	}
 	return true
-}
-
-type Package struct {
-	Main      *Info
-	Additions []*Info
-}
-
-func (p *Package) Clone() *Package {
-	main := p.Main.Clone()
-	additions := make([]*Info, len(p.Additions))
-	for i, a := range p.Additions {
-		additions[i] = a.Clone()
-	}
-	return &Package{
-		Main:      main,
-		Additions: additions,
-	}
-}
-
-type Info struct {
-	Name     string            `json:"name"`
-	Version  Version           `json:"version"`
-	Path     string            `json:"path"`
-	Headers  map[string]string `json:"headers"`
-	Note     string            `json:"note"`
-	Checksum *Checksum
-}
-
-func (i *Info) Clone() *Info {
-	headers := make(map[string]string, len(i.Headers))
-	for k, v := range i.Headers {
-		headers[k] = v
-	}
-	return &Info{
-		Name:     i.Name,
-		Version:  i.Version,
-		Path:     i.Path,
-		Headers:  headers,
-		Note:     i.Note,
-		Checksum: i.Checksum,
-	}
-}
-
-func (i *Info) label() string {
-	return i.Name + "@" + string(i.Version)
-}
-
-func (i *Info) storagePath(parentDir string) string {
-	if i.Version == "" {
-		return filepath.Join(parentDir, i.Name)
-	}
-	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }

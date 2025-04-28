@@ -65,15 +65,16 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 	return table
 }
 
-func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
+func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) (*lua.LTable, error) {
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, args...); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	return vm.ReturnedValue(), nil
 }
 
 func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {

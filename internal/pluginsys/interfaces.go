@@ -14,11 +14,14 @@
  *    limitations under the License.
  */
 
-package internal
+package pluginsys
 
 import (
 	"errors"
+	"path/filepath"
 
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -29,8 +32,8 @@ type CheckSum struct {
 	Md5    string `json:"md5"`
 }
 
-func (c *CheckSum) Checksum() *Checksum {
-	checksum := &Checksum{}
+func (c *CheckSum) Checksum() *util.Checksum {
+	checksum := &util.Checksum{}
 
 	if c.Sha256 != "" {
 		checksum.Value = c.Sha256
@@ -45,10 +48,45 @@ func (c *CheckSum) Checksum() *Checksum {
 		checksum.Value = c.Sha512
 		checksum.Type = "sha512"
 	} else {
-		return NoneChecksum
+		return util.NoneChecksum
 	}
 
 	return checksum
+}
+
+type Info struct {
+	Name     string            `json:"name"`
+	Version  string            `json:"version"`
+	Path     string            `json:"path"`
+	Headers  map[string]string `json:"headers"`
+	Note     string            `json:"note"`
+	Checksum *util.Checksum
+}
+
+func (i *Info) Clone() *Info {
+	headers := make(map[string]string, len(i.Headers))
+	for k, v := range i.Headers {
+		headers[k] = v
+	}
+	return &Info{
+		Name:     i.Name,
+		Version:  i.Version,
+		Path:     i.Path,
+		Headers:  headers,
+		Note:     i.Note,
+		Checksum: i.Checksum,
+	}
+}
+
+func (i *Info) Label() string {
+	return i.Name + "@" + string(i.Version)
+}
+
+func (i *Info) StoragePath(parentDir string) string {
+	if i.Version == "" {
+		return filepath.Join(parentDir, i.Name)
+	}
+	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }
 
 type AvailableHookCtx struct {
@@ -63,6 +101,39 @@ type AvailableHookResultItem struct {
 }
 
 type AvailableHookResult = []*AvailableHookResultItem
+
+func CreatePackages(sdkName string, hookResult []*AvailableHookResultItem) []*Package {
+	var result []*Package
+	for _, item := range hookResult {
+		mainSdk := &Info{
+			Name:    sdkName,
+			Version: item.Version,
+			Note:    item.Note,
+		}
+
+		var additionalArr []*Info
+
+		for i, addition := range item.Addition {
+			if addition.Name == "" {
+				logger.Errorf("[Available] additional file %d no name provided", i+1)
+			}
+
+			additionalArr = append(additionalArr, &Info{
+				Name:    addition.Name,
+				Version: addition.Version,
+				Path:    addition.Path,
+				Note:    addition.Note,
+			})
+		}
+
+		result = append(result, &Package{
+			Main:      mainSdk,
+			Additions: additionalArr,
+		})
+	}
+
+	return result
+}
 
 type PreInstallHookCtx struct {
 	Version string `json:"version"`
@@ -89,7 +160,7 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 
 	return &Info{
 		Name:     i.Name,
-		Version:  Version(""),
+		Version:  "",
 		Path:     i.Url,
 		Headers:  i.Headers,
 		Note:     i.Note,
@@ -125,7 +196,7 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 
 	return &Info{
 		Name:     "",
-		Version:  Version(i.Version),
+		Version:  i.Version,
 		Path:     i.Url,
 		Headers:  i.Headers,
 		Note:     i.Note,
@@ -196,4 +267,21 @@ type RuntimeInfo struct {
 	ArchType      string `json:"archType"`
 	Version       string `json:"version"`
 	PluginDirPath string `json:"pluginDirPath"`
+}
+
+type Package struct {
+	Main      *Info
+	Additions []*Info
+}
+
+func (p *Package) Clone() *Package {
+	main := p.Main.Clone()
+	additions := make([]*Info, len(p.Additions))
+	for i, a := range p.Additions {
+		additions[i] = a.Clone()
+	}
+	return &Package{
+		Main:      main,
+		Additions: additions,
+	}
 }
