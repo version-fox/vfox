@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
@@ -381,16 +380,19 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) error {
 	return nil
 }
 
-// ShowNotes prints the notes of the plugin.
-func (l *LuaPlugin) ShowNotes() {
-	// print some notes if there are
-	if len(l.Notes) != 0 {
-		fmt.Println(pterm.Yellow("Notes:"))
-		fmt.Println("======")
-		for _, note := range l.Notes {
-			fmt.Println("  ", note)
-		}
+func IsLuaPluginDir(pluginDirPath string) bool {
+	metadataPath := filepath.Join(pluginDirPath, "metadata.lua")
+	if util.FileExists(metadataPath) {
+		return true
 	}
+
+	// legacy lua plugin
+	hookPath := filepath.Join(pluginDirPath, "main.lua")
+	if util.FileExists(hookPath) {
+		return true
+	}
+
+	return false
 }
 
 // NewLuaPlugin creates a new LuaPlugin instance from the specified directory path.

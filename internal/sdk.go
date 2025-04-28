@@ -777,15 +777,15 @@ func (b *Sdk) ClearCurrentEnv() error {
 // NewSdk creates a new SDK instance.
 func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 	sdkName := filepath.Base(pluginPath)
-	luaPlugin, err := NewLuaPlugin(pluginPath, manager)
+	plugin, err := CreatePluginFromPath(pluginPath, manager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create lua plugin: %w", err)
+		return nil, fmt.Errorf("failed to create plugin: %w", err)
 	}
 	return &Sdk{
 		Name:                 sdkName,
 		sdkManager:           manager,
 		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
-		Plugin:               FromLuaPlugin(luaPlugin),
+		Plugin:               plugin,
 		localSdkPackageCache: make(map[Version]*Package),
 	}, nil
 }

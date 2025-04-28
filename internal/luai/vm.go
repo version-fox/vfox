@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/module"
+	"github.com/version-fox/vfox/internal/luai/module"
 	lua "github.com/yuin/gopher-lua"
 )
 

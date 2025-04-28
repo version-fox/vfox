@@ -18,8 +18,11 @@ package internal
 
 import (
 	_ "embed"
+	"errors"
+	"fmt"
 	"regexp"
 
+	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/env"
 )
 
@@ -64,6 +67,32 @@ type Plugin struct {
 	Label           func(version string) string
 	ParseLegacyFile func(path string, installedVersions func() []Version) (Version, error)
 	Close           func()
+}
+
+// ShowNotes prints the notes of the plugin.
+func (l *Plugin) ShowNotes() {
+	// print some notes if there are
+	if len(l.Notes) != 0 {
+		fmt.Println(pterm.Yellow("Notes:"))
+		fmt.Println("======")
+		for _, note := range l.Notes {
+			fmt.Println("  ", note)
+		}
+	}
+}
+
+var ErrPluginNotFound = errors.New("plugin not found")
+
+func CreatePluginFromPath(tempInstallPath string, manager *Manager) (*Plugin, error) {
+	if IsLuaPluginDir(tempInstallPath) {
+		luaPlugin, err := NewLuaPlugin(tempInstallPath, manager)
+		if err != nil {
+			return nil, err
+		}
+		return FromLuaPlugin(luaPlugin), nil
+	}
+
+	return nil, ErrPluginNotFound
 }
 
 func FromLuaPlugin(source *LuaPlugin) *Plugin {
