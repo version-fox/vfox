@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package internal
+package util
 
 import (
 	"crypto/md5"
@@ -22,8 +22,9 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
-	"github.com/pterm/pterm"
 	"os"
+
+	"github.com/pterm/pterm"
 )
 
 type Checksum struct {
@@ -31,7 +32,7 @@ type Checksum struct {
 	Type  string
 }
 
-func (c *Checksum) verify(path string) bool {
+func (c *Checksum) Verify(path string) bool {
 	fileData, err := os.ReadFile(path)
 	if err != nil {
 		return false

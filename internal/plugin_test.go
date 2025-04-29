@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/pluginsys"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
@@ -114,8 +115,8 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			t.Errorf("expected legacy filenames '.node-version', '.nvmrc', got '%s'", plugin.LegacyFilenames)
 		}
 
-		for _, hf := range HookFuncMap {
-			if !plugin.HasFunction(hf.Name) && hf.Required {
+		for _, hf := range pluginsys.HookFuncMap {
+			if !plugin.innerPlugin.HasFunction(hf.Name) && hf.Required {
 				t.Errorf("expected to have function %s", hf.Name)
 			}
 		}
@@ -217,14 +218,14 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 
-		keys, err := plugin.EnvKeys(&Package{
-			Main: &Info{
+		keys, err := plugin.EnvKeys(&pluginsys.Package{
+			Main: &pluginsys.Info{
 				Name:    "java",
 				Version: "1.0.0",
 				Path:    "/path/to/java",
 				Note:    "xxxx",
 			},
-			Additions: []*Info{
+			Additions: []*pluginsys.Info{
 				{
 					Name:    "sdk-name",
 					Version: "9.0.0",
@@ -345,14 +346,14 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 
-		err = plugin.PreUninstall(&Package{
-			Main: &Info{
+		err = plugin.PreUninstall(&pluginsys.Package{
+			Main: &pluginsys.Info{
 				Name:    "java",
 				Version: "1.0.0",
 				Path:    "/path/to/java",
 				Note:    "xxxx",
 			},
-			Additions: []*Info{
+			Additions: []*pluginsys.Info{
 				{
 					Name:    "sdk-name",
 					Version: "9.0.0",

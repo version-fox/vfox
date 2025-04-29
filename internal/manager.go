@@ -138,9 +138,9 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	tvs = append(tvs, workToolVersion)
 
 	if opt.WithGlobalEnv {
-		homeToolVersion, err := toolset.NewToolVersion(m.PathMeta.HomePath)
-		if err != nil {
-			return nil, err
+		homeToolVersion, herr := toolset.NewToolVersion(m.PathMeta.HomePath)
+		if herr != nil {
+			return nil, herr
 		}
 
 		tvs = append(tvs, homeToolVersion)
@@ -675,7 +675,7 @@ func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
 	// validate the plugin
 	fmt.Printf("Validating %s ...\n", localPath)
 
-	plugin, err := NewLuaPlugin(tempInstallPath, m)
+	plugin, err := CreatePluginFromPath(tempInstallPath, m)
 	if err != nil {
 		return nil, fmt.Errorf("validate plugin failed: %w", err)
 	}
