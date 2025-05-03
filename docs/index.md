@@ -31,7 +31,7 @@ features:
     details: "Simple API, making it easy to add support for new tools!"
     icon: 🔌
   - title: "Shells"
-    details: "Supports Powershell, Bash, ZSH, Fish and Clink, with autocomplete feature."
+    details: "Supports Powershell, Bash, ZSH, Fish, Clink, and Nushell, with autocomplete feature."
     icon: 🐚
   - title: Backwards Compatible
     details: "Support for existing version files .nvmrc, .node-version, .sdkmanrc for smooth migration!"
