@@ -46,11 +46,14 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 # 对于 PowerShell
 if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 
-# Clink:
+# 对于 Clink:
 # 1. 安装 clink: https://github.com/chrisant996/clink/releases
 #    或者安装 cmder: https://github.com/cmderdev/cmder/releases
 # 2. 找到脚本路径: clink info | findstr scripts
 # 3. 复制 internal/shell/clink_vfox.lua 到脚本路径
+
+# 对于 Nushell:
+vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > 请记住重启你的 Shell 以应用更改。

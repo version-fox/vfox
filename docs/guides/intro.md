@@ -38,6 +38,7 @@ through a simple plugin interface.
 | CMD        | ✅       | Only Support `Global` Scope. Not Recommend!!!                                    |
 | Clink      | ✅       |                                                                                  |
 | Cmder      | ✅       |                                                                                  |
+| Nushell    | ✅       |                                                                                  |
 
 
 
