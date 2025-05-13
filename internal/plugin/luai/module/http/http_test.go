@@ -27,7 +27,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const jsonUrl = `https://httpbin.org/ip`
+const jsonUrl = `https://httpbingo.org/ip`
 
 func TestWithConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
