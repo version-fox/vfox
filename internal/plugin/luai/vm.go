@@ -68,7 +68,15 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 	return table
 }
 
-func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) (*lua.LTable, error) {
+func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...lua.LValue) (*lua.LTable, error) {
+	function := pluginObj.RawGetString(funcName)
+
+	// In Lua, when a function is called with colon syntax (object:method()),
+	// the object itself is implicitly passed as the first argument.
+	// Here, pluginObj represents the Lua table instance of the plugin,
+	// and it's being passed as the first argument to the Lua function to simulate this behavior.
+	args := append([]lua.LValue{pluginObj}, _args...)
+
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,

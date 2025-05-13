@@ -92,7 +92,6 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 	return hookResult, nil
 }
 
-// PreUse
 func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
@@ -158,7 +157,7 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.Par
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTable, error) {
 	logger.Debugf("CallFunction: %s\n", funcName)
 
-	table, err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), append([]lua.LValue{l.pluginObj}, args...)...)
+	table, err := l.vm.CallFunction(l.pluginObj, funcName, args...)
 
 	return table, err
 }

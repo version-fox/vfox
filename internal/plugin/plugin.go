@@ -356,15 +356,15 @@ func IsLuaPluginDir(pluginDirPath string) bool {
 // - The directory must contain a metadata.lua file and a hooks directory that includes all must be implemented hook functions.
 // - The directory contain a main.lua file that defines the plugin object and all hook functions.
 func NewLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*PluginWrapper, error) {
-	plugin2, err := luai.CreateLuaPlugin(pluginDirPath, config, runtimeVersion)
+	plugin, err := luai.CreateLuaPlugin(pluginDirPath, config, runtimeVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	source := &PluginWrapper{
-		impl:       plugin2,
+		impl:       plugin,
 		Path:       pluginDirPath,
-		PluginInfo: plugin2.PluginInfo,
+		PluginInfo: plugin.PluginInfo,
 		config:     *config,
 	}
 
@@ -373,7 +373,7 @@ func NewLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion st
 	}
 
 	if !isValidName(source.Name) {
-		return nil, fmt.Errorf("invalid plugin name")
+		return nil, fmt.Errorf("invalid plugin name [%s]", source.Name)
 	}
 
 	if source.Name == "" {
