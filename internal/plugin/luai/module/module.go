@@ -18,11 +18,11 @@ package module
 
 import (
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/luai/module/archiver"
-	"github.com/version-fox/vfox/internal/luai/module/html"
-	"github.com/version-fox/vfox/internal/luai/module/http"
-	"github.com/version-fox/vfox/internal/luai/module/json"
-	"github.com/version-fox/vfox/internal/luai/module/string"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/html"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/json"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/string"
 	lua "github.com/yuin/gopher-lua"
 )
 

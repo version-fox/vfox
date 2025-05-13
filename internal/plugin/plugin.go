@@ -25,7 +25,7 @@ import (
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/luai"
+	"github.com/version-fox/vfox/internal/plugin/luai"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
