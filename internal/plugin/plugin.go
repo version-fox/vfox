@@ -74,6 +74,10 @@ func (l *PluginWrapper) ShowNotes() {
 	}
 }
 
+func (l *PluginWrapper) HasFunction(name string) bool {
+	return l.impl.HasFunction(name)
+}
+
 func (l *PluginWrapper) validate() error {
 	for _, hf := range base.HookFuncMap {
 		if hf.Required {

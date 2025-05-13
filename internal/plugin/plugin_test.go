@@ -1,4 +1,4 @@
-package internal
+package plugin_test
 
 import (
 	"reflect"
@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
@@ -26,13 +28,13 @@ func setupSuite(tb testing.TB) func(tb testing.TB) {
 	}
 }
 
-func TestNewLuaPluginWithMain(t *testing.T) {
+func TestNewPluginWithMain(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
 	t.Run("NewLuaPlugin", func(t *testing.T) {
-		manager := NewSdkManager()
-		plugin, err := NewLuaPlugin(pluginPathWithMain, manager)
+		manager := internal.NewSdkManager()
+		plugin, err := plugin.NewLuaPlugin(pluginPathWithMain, manager.Config, internal.RuntimeVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,9 +68,9 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 		}
 	})
 
-	testHookFunc(t, func() (*Manager, *PluginWrapper, error) {
-		manager := NewSdkManager()
-		plugin, err := NewLuaPlugin(pluginPathWithMain, manager)
+	testHookFunc(t, func() (*internal.Manager, *plugin.PluginWrapper, error) {
+		manager := internal.NewSdkManager()
+		plugin, err := plugin.NewLuaPlugin(pluginPathWithMain, manager.Config, internal.RuntimeVersion)
 		return manager, plugin, err
 	})
 
@@ -78,8 +80,8 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 	t.Run("NewLuaPlugin", func(t *testing.T) {
-		manager := NewSdkManager()
-		plugin, err := NewLuaPlugin(pluginPathWithMetadata, manager)
+		manager := internal.NewSdkManager()
+		plugin, err := plugin.NewLuaPlugin(pluginPathWithMain, manager.Config, internal.RuntimeVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,19 +118,19 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 		}
 
 		for _, hf := range base.HookFuncMap {
-			if !plugin.impl.HasFunction(hf.Name) && hf.Required {
+			if !plugin.HasFunction(hf.Name) && hf.Required {
 				t.Errorf("expected to have function %s", hf.Name)
 			}
 		}
 	})
-	testHookFunc(t, func() (*Manager, *PluginWrapper, error) {
-		manager := NewSdkManager()
-		plugin, err := NewLuaPlugin(pluginPathWithMetadata, manager)
+	testHookFunc(t, func() (*internal.Manager, *plugin.PluginWrapper, error) {
+		manager := internal.NewSdkManager()
+		plugin, err := plugin.NewLuaPlugin(pluginPathWithMetadata, manager.Config, internal.RuntimeVersion)
 		return manager, plugin, err
 	})
 }
 
-func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)) {
+func testHookFunc(t *testing.T, factory func() (*internal.Manager, *plugin.PluginWrapper, error)) {
 	t.Helper()
 
 	t.Run("Available", func(t *testing.T) {
@@ -310,6 +312,12 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 
 	t.Run("ParseLegacyFile", func(t *testing.T) {
 		_, plugin, err := factory()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if plugin == nil {
+			t.Fatal("factory returned nil plugin without error")
+		}
 		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []base.Version {
 			return nil
 		})

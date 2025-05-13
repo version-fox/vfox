@@ -20,8 +20,7 @@ var (
 )
 
 const (
-	LuaPluginObjKey = "PLUGIN"
-	OsType          = "OS_TYPE"
-	ArchType        = "ARCH_TYPE"
-	Runtime         = "RUNTIME"
+	OsType   = "OS_TYPE"
+	ArchType = "ARCH_TYPE"
+	Runtime  = "RUNTIME"
 )
