@@ -143,6 +143,19 @@ func TestInvalidPluginName(t *testing.T) {
 	}
 }
 
+func TestMissingRequiredHook(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+	_, err := plugin.NewLuaPlugin("testdata/plugins/missing_required_hook", internal.NewSdkManager().Config, internal.RuntimeVersion)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	t.Logf("error: %s", err.Error())
+	if !strings.Contains(err.Error(), "[EnvKeys] function not found") {
+		t.Errorf("expected error to contain '[EnvKeys] function not found', got '%s'", err.Error())
+	}
+}
+
 func testHookFunc(t *testing.T, factory func() (*internal.Manager, *plugin.PluginWrapper, error)) {
 	t.Helper()
 
