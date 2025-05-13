@@ -631,7 +631,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 //
 //	1.only support .lua or .zip file type plugin.
 //	2.install plugin to temp dir first, then validate the plugin, if success, return *LuaPlugin
-func (m *Manager) installPluginToTemp(path string) (*LuaPlugin, error) {
+func (m *Manager) installPluginToTemp(path string) (*PluginWrapper, error) {
 	ext := filepath.Ext(path)
 	if ext != ".lua" && ext != ".zip" {
 		return nil, fmt.Errorf("unsupported %s type plugin to install, only support .lua or .zip", ext)

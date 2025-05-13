@@ -1,4 +1,4 @@
-package pluginsys
+package base
 
 type HookFunc struct {
 	Name     string

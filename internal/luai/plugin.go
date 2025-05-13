@@ -10,7 +10,7 @@ import (
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/pluginsys"
+	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -19,22 +19,22 @@ const (
 	luaPluginObjKey = "PLUGIN"
 )
 
-type LuaPlugin2 struct {
+type LuaPlugin struct {
 	vm        *LuaVM
 	pluginObj *lua.LTable
 
-	*pluginsys.PluginInfo
+	*base.PluginInfo
 }
 
-func (l *LuaPlugin2) HasFunction(name string) bool {
+func (l *LuaPlugin) HasFunction(name string) bool {
 	return l.pluginObj.RawGetString(name) != lua.LNil
 }
 
-func (l *LuaPlugin2) Close() {
+func (l *LuaPlugin) Close() {
 	l.vm.Close()
 }
 
-func (l *LuaPlugin2) Available(ctx *pluginsys.AvailableHookCtx) (*pluginsys.AvailableHookResult, error) {
+func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) (*base.AvailableHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -48,7 +48,7 @@ func (l *LuaPlugin2) Available(ctx *pluginsys.AvailableHookCtx) (*pluginsys.Avai
 		return nil, errors.New("no result provided")
 	}
 
-	hookResult := pluginsys.AvailableHookResult{}
+	hookResult := base.AvailableHookResult{}
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -56,7 +56,7 @@ func (l *LuaPlugin2) Available(ctx *pluginsys.AvailableHookCtx) (*pluginsys.Avai
 
 	return &hookResult, nil
 }
-func (l *LuaPlugin2) PreInstall(ctx *pluginsys.PreInstallHookCtx) (*pluginsys.PreInstallHookResult, error) {
+func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -69,7 +69,7 @@ func (l *LuaPlugin2) PreInstall(ctx *pluginsys.PreInstallHookCtx) (*pluginsys.Pr
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, errors.New("no result provided")
 	}
-	hookResult := pluginsys.PreInstallHookResult{}
+	hookResult := base.PreInstallHookResult{}
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -77,7 +77,7 @@ func (l *LuaPlugin2) PreInstall(ctx *pluginsys.PreInstallHookCtx) (*pluginsys.Pr
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin2) EnvKeys(ctx *pluginsys.EnvKeysHookCtx) ([]*pluginsys.EnvKeysHookResultItem, error) {
+func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResultItem, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -91,7 +91,7 @@ func (l *LuaPlugin2) EnvKeys(ctx *pluginsys.EnvKeysHookCtx) ([]*pluginsys.EnvKey
 		return nil, fmt.Errorf("no environment variables provided")
 	}
 
-	var hookResult []*pluginsys.EnvKeysHookResultItem
+	var hookResult []*base.EnvKeysHookResultItem
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -100,7 +100,7 @@ func (l *LuaPlugin2) EnvKeys(ctx *pluginsys.EnvKeysHookCtx) ([]*pluginsys.EnvKey
 }
 
 // PreUse
-func (l *LuaPlugin2) PreUse(ctx *pluginsys.PreUseHookCtx) (*pluginsys.PreUseHookResult, error) {
+func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -113,7 +113,7 @@ func (l *LuaPlugin2) PreUse(ctx *pluginsys.PreUseHookCtx) (*pluginsys.PreUseHook
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, errors.New("no result provided")
 	}
-	hookResult := pluginsys.PreUseHookResult{}
+	hookResult := base.PreUseHookResult{}
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -121,7 +121,7 @@ func (l *LuaPlugin2) PreUse(ctx *pluginsys.PreUseHookCtx) (*pluginsys.PreUseHook
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin2) PreUninstall(ctx *pluginsys.PreUninstallHookCtx) error {
+func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -131,7 +131,7 @@ func (l *LuaPlugin2) PreUninstall(ctx *pluginsys.PreUninstallHookCtx) error {
 	return err
 }
 
-func (l *LuaPlugin2) PostInstall(ctx *pluginsys.PostInstallHookCtx) error {
+func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -141,7 +141,7 @@ func (l *LuaPlugin2) PostInstall(ctx *pluginsys.PostInstallHookCtx) error {
 	return err
 }
 
-func (l *LuaPlugin2) ParseLegacyFile(ctx *pluginsys.ParseLegacyFileHookCtx) (*pluginsys.ParseLegacyFileResult, error) {
+func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.ParseLegacyFileResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -154,7 +154,7 @@ func (l *LuaPlugin2) ParseLegacyFile(ctx *pluginsys.ParseLegacyFileHookCtx) (*pl
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, errors.New("no result provided")
 	}
-	hookResult := pluginsys.ParseLegacyFileResult{}
+	hookResult := base.ParseLegacyFileResult{}
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -162,7 +162,7 @@ func (l *LuaPlugin2) ParseLegacyFile(ctx *pluginsys.ParseLegacyFileHookCtx) (*pl
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin2) CallFunction(funcName string, args ...lua.LValue) (*lua.LTable, error) {
+func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTable, error) {
 	logger.Debugf("CallFunction: %s\n", funcName)
 
 	table, err := l.vm.CallFunction(l.pluginObj.RawGetString(funcName), append([]lua.LValue{l.pluginObj}, args...)...)
@@ -170,7 +170,7 @@ func (l *LuaPlugin2) CallFunction(funcName string, args ...lua.LValue) (*lua.LTa
 	return table, err
 }
 
-func NewLuaPlugin2(pluginDirPath string, config *config.Config, runtimeVersion string) (*LuaPlugin2, error) {
+func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*LuaPlugin, error) {
 	vm := NewLuaVM()
 	if err := vm.Prepare(&PrepareOptions{
 		Config: config,
@@ -202,7 +202,7 @@ func NewLuaPlugin2(pluginDirPath string, config *config.Config, runtimeVersion s
 		}
 
 		// load hook func files
-		for _, hf := range pluginsys.HookFuncMap {
+		for _, hf := range base.HookFuncMap {
 			hp := filepath.Join(pluginDirPath, "hooks", hf.Filename+".lua")
 
 			if !hf.Required && !util.FileExists(hp) {
@@ -216,10 +216,10 @@ func NewLuaPlugin2(pluginDirPath string, config *config.Config, runtimeVersion s
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(pluginsys.OsType, lua.LString(util.GetOSType()))
-	vm.Instance.SetGlobal(pluginsys.ArchType, lua.LString(util.GetArchType()))
+	vm.Instance.SetGlobal(base.OsType, lua.LString(util.GetOSType()))
+	vm.Instance.SetGlobal(base.ArchType, lua.LString(util.GetArchType()))
 
-	r, err := Marshal(vm.Instance, pluginsys.RuntimeInfo{
+	r, err := Marshal(vm.Instance, base.RuntimeInfo{
 		OsType:        string(util.GetOSType()),
 		ArchType:      string(util.GetArchType()),
 		Version:       runtimeVersion,
@@ -229,23 +229,24 @@ func NewLuaPlugin2(pluginDirPath string, config *config.Config, runtimeVersion s
 		return nil, err
 	}
 
-	vm.Instance.SetGlobal(pluginsys.Runtime, r)
+	vm.Instance.SetGlobal(base.Runtime, r)
 	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
 		return nil, fmt.Errorf("plugin object not found")
 	}
 	PLUGIN := pluginObj.(*lua.LTable)
-	pluginInfo := &pluginsys.PluginInfo{}
+	pluginInfo := &base.PluginInfo{}
 	if err = Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, err
 	}
 
-	source := &LuaPlugin2{
+	source := &LuaPlugin{
 		vm:        vm,
 		pluginObj: PLUGIN,
 
 		PluginInfo: pluginInfo,
 	}
+
 	// wrap Available hook with Cache.
 	if source.HasFunction("Available") {
 		targetHook := PLUGIN.RawGetString("Available")
@@ -274,7 +275,7 @@ func NewLuaPlugin2(pluginDirPath string, config *config.Config, runtimeVersion s
 				return invokeAvailableHook()
 			}
 
-			ctx := &pluginsys.AvailableHookCtx{}
+			ctx := &base.AvailableHookCtx{}
 			if err := Unmarshal(ctxTable, ctx); err != nil {
 				L.RaiseError(err.Error())
 				return 0

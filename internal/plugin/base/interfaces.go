@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package pluginsys
+package base
 
 import (
 	"errors"
@@ -284,4 +284,19 @@ func (p *Package) Clone() *Package {
 		Main:      main,
 		Additions: additions,
 	}
+}
+
+type Plugin interface {
+	Available(ctx *AvailableHookCtx) (*AvailableHookResult, error)
+
+	PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, error)
+	PostInstall(ctx *PostInstallHookCtx) error
+	PreUninstall(ctx *PreUninstallHookCtx) error
+	PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error)
+
+	ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error)
+	EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
+
+	HasFunction(name string) bool
+	Close()
 }

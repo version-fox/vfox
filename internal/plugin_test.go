@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/pluginsys"
+	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
@@ -66,7 +66,7 @@ func TestNewLuaPluginWithMain(t *testing.T) {
 		}
 	})
 
-	testHookFunc(t, func() (*Manager, *LuaPlugin, error) {
+	testHookFunc(t, func() (*Manager, *PluginWrapper, error) {
 		manager := NewSdkManager()
 		plugin, err := NewLuaPlugin(pluginPathWithMain, manager)
 		return manager, plugin, err
@@ -115,20 +115,20 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 			t.Errorf("expected legacy filenames '.node-version', '.nvmrc', got '%s'", plugin.LegacyFilenames)
 		}
 
-		for _, hf := range pluginsys.HookFuncMap {
-			if !plugin.innerPlugin.HasFunction(hf.Name) && hf.Required {
+		for _, hf := range base.HookFuncMap {
+			if !plugin.impl.HasFunction(hf.Name) && hf.Required {
 				t.Errorf("expected to have function %s", hf.Name)
 			}
 		}
 	})
-	testHookFunc(t, func() (*Manager, *LuaPlugin, error) {
+	testHookFunc(t, func() (*Manager, *PluginWrapper, error) {
 		manager := NewSdkManager()
 		plugin, err := NewLuaPlugin(pluginPathWithMetadata, manager)
 		return manager, plugin, err
 	})
 }
 
-func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
+func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)) {
 	t.Helper()
 
 	t.Run("Available", func(t *testing.T) {
@@ -218,14 +218,14 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 
-		keys, err := plugin.EnvKeys(&pluginsys.Package{
-			Main: &pluginsys.Info{
+		keys, err := plugin.EnvKeys(&base.Package{
+			Main: &base.Info{
 				Name:    "java",
 				Version: "1.0.0",
 				Path:    "/path/to/java",
 				Note:    "xxxx",
 			},
-			Additions: []*pluginsys.Info{
+			Additions: []*base.Info{
 				{
 					Name:    "sdk-name",
 					Version: "9.0.0",
@@ -346,14 +346,14 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *LuaPlugin, error)) {
 			t.Fatal(err)
 		}
 
-		err = plugin.PreUninstall(&pluginsys.Package{
-			Main: &pluginsys.Info{
+		err = plugin.PreUninstall(&base.Package{
+			Main: &base.Info{
 				Name:    "java",
 				Version: "1.0.0",
 				Path:    "/path/to/java",
 				Note:    "xxxx",
 			},
-			Additions: []*pluginsys.Info{
+			Additions: []*base.Info{
 				{
 					Name:    "sdk-name",
 					Version: "9.0.0",

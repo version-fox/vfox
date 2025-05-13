@@ -34,7 +34,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/pluginsys"
+	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
@@ -83,10 +83,10 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 type Sdk struct {
 	Name       string
 	sdkManager *Manager
-	Plugin     *LuaPlugin
+	Plugin     *PluginWrapper
 	// current sdk install path
 	InstallPath          string
-	localSdkPackageCache map[Version]*pluginsys.Package
+	localSdkPackageCache map[Version]*base.Package
 }
 
 func (b *Sdk) Install(version Version) error {
@@ -131,12 +131,12 @@ func (b *Sdk) Install(version Version) error {
 			_ = os.RemoveAll(newDirPath)
 		}
 	}()
-	var installedSdkInfos []*pluginsys.Info
+	var installedSdkInfos []*base.Info
 	path, err := b.preInstallSdk(mainSdk, newDirPath)
 	if err != nil {
 		return err
 	}
-	installedSdkInfos = append(installedSdkInfos, &pluginsys.Info{
+	installedSdkInfos = append(installedSdkInfos, &base.Info{
 		Name:    mainSdk.Name,
 		Version: mainSdk.Version,
 		Note:    mainSdk.Note,
@@ -149,7 +149,7 @@ func (b *Sdk) Install(version Version) error {
 			if err != nil {
 				return err
 			}
-			installedSdkInfos = append(installedSdkInfos, &pluginsys.Info{
+			installedSdkInfos = append(installedSdkInfos, &base.Info{
 				Name:    oSdk.Name,
 				Version: oSdk.Version,
 				Path:    path,
@@ -166,7 +166,7 @@ func (b *Sdk) Install(version Version) error {
 	return nil
 }
 
-func (b *Sdk) moveLocalFile(info *pluginsys.Info, targetPath string) error {
+func (b *Sdk) moveLocalFile(info *base.Info, targetPath string) error {
 	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
 	if err := util.MoveFiles(info.Path, targetPath); err != nil {
 		return fmt.Errorf("failed to move file, err:%w", err)
@@ -174,7 +174,7 @@ func (b *Sdk) moveLocalFile(info *pluginsys.Info, targetPath string) error {
 	return nil
 }
 
-func (b *Sdk) moveRemoteFile(info *pluginsys.Info, targetPath string) error {
+func (b *Sdk) moveRemoteFile(info *base.Info, targetPath string) error {
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
@@ -210,7 +210,7 @@ func (b *Sdk) moveRemoteFile(info *pluginsys.Info, targetPath string) error {
 	}
 	return nil
 }
-func (b *Sdk) preInstallSdk(info *pluginsys.Info, sdkDestPath string) (string, error) {
+func (b *Sdk) preInstallSdk(info *base.Info, sdkDestPath string) (string, error) {
 	pterm.Printf("Preinstalling %s...\n", info.Label())
 	path := info.StoragePath(sdkDestPath)
 	if !util.FileExists(path) {
@@ -271,7 +271,7 @@ func (b *Sdk) Uninstall(version Version) (err error) {
 	return
 }
 
-func (b *Sdk) Available(args []string) ([]*pluginsys.Package, error) {
+func (b *Sdk) Available(args []string) ([]*base.Package, error) {
 	return b.Plugin.Available(args)
 }
 
@@ -539,8 +539,8 @@ func (b *Sdk) List() []Version {
 	return versions
 }
 
-func (b *Sdk) getLocalSdkPackages() []*pluginsys.Package {
-	var infos []*pluginsys.Package
+func (b *Sdk) getLocalSdkPackages() []*base.Package {
+	var infos []*base.Package
 	for _, version := range b.List() {
 		info, err := b.GetLocalSdkPackage(version)
 		if err != nil {
@@ -600,13 +600,13 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	_ = envManager.Remove(envKV)
 }
 
-func (b *Sdk) GetLocalSdkPackage(version Version) (*pluginsys.Package, error) {
+func (b *Sdk) GetLocalSdkPackage(version Version) (*base.Package, error) {
 	p, ok := b.localSdkPackageCache[version]
 	if ok {
 		return p, nil
 	}
 	versionPath := b.VersionPath(version)
-	items := make(map[string]*pluginsys.Info)
+	items := make(map[string]*base.Info)
 	dir, err := os.ReadDir(versionPath)
 	if err != nil {
 		return nil, err
@@ -619,7 +619,7 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*pluginsys.Package, error) {
 					continue
 				}
 				logger.Debugf("Load SDK package item: name:%s, version: %s \n", name, version)
-				items[name] = &pluginsys.Info{
+				items[name] = &base.Info{
 					Name:    name,
 					Version: string(version),
 					Path:    filepath.Join(versionPath, d.Name()),
@@ -635,11 +635,11 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*pluginsys.Package, error) {
 	if main.Path == "" {
 		return nil, errors.New("main sdk not found")
 	}
-	var additions []*pluginsys.Info
+	var additions []*base.Info
 	for _, v := range items {
 		additions = append(additions, v)
 	}
-	p2 := &pluginsys.Package{
+	p2 := &base.Package{
 		Main:      main,
 		Additions: additions,
 	}
@@ -798,6 +798,6 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 		sdkManager:           manager,
 		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
 		Plugin:               plugin,
-		localSdkPackageCache: make(map[Version]*pluginsys.Package),
+		localSdkPackageCache: make(map[Version]*base.Package),
 	}, nil
 }

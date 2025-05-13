@@ -22,13 +22,13 @@ import (
 	"path/filepath"
 
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/pluginsys"
+	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 )
 
 // LocationPackage represents a package that needs to be linked
 type LocationPackage struct {
-	from     *pluginsys.Package
+	from     *base.Package
 	sdk      *Sdk
 	toPath   string
 	location Location
@@ -58,7 +58,7 @@ func newLocationPackage(version Version, sdk *Sdk, location Location) (*Location
 	}, nil
 }
 
-func (l *LocationPackage) ConvertLocation() *pluginsys.Package {
+func (l *LocationPackage) ConvertLocation() *base.Package {
 	if l.location == OriginalLocation {
 		return l.from
 	}
@@ -77,7 +77,7 @@ func (l *LocationPackage) ConvertLocation() *pluginsys.Package {
 	return clone
 }
 
-func (l *LocationPackage) Link() (*pluginsys.Package, error) {
+func (l *LocationPackage) Link() (*base.Package, error) {
 	if l.location == OriginalLocation {
 		return l.from, nil
 	}
@@ -111,7 +111,7 @@ func (l *LocationPackage) Link() (*pluginsys.Package, error) {
 }
 
 // checkPackageValid checks if the package is valid
-func checkPackageValid(p *pluginsys.Package) bool {
+func checkPackageValid(p *base.Package) bool {
 	if !util.FileExists(p.Main.Path) {
 		return false
 	}
