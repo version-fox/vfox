@@ -67,7 +67,7 @@ func TestGetRequest(t *testing.T) {
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)
-	assert(resp.headers['Content-Type'] == 'application/json')
+	assert(resp.headers['Content-Type'] == 'application/json; charset=utf-8')
 	`
 	eval(str, t)
 }
