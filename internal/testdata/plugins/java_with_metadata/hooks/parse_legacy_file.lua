@@ -4,6 +4,15 @@ function PLUGIN:ParseLegacyFile(ctx)
     printTable(ctx)
     local filename = ctx.filename
     local filepath = ctx.filepath
+
+    installed = ctx.getInstalledVersions()
+    if #installed > 0 then
+        print("Installed: " .. installed[1])
+        return {
+            version = "check-installed"
+        }
+    end
+
     if filename == ".node-version" then
         return {
             version = "14.17.0"

@@ -97,6 +97,166 @@ func TestExample(t *testing.T) {
 	})
 }
 
+func TestMarshalGoFunctions2(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	L := NewLuaVM()
+	L.Prepare(nil)
+	defer L.Close()
+
+	// Test case 1: Function with no parameters and no return values
+	t.Run("NoParamsNoReturn", func(t *testing.T) {
+		var called bool
+		goFunc := func() {
+			called = true
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`testFunc()`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		if !called {
+			t.Errorf("Go function was not called")
+		}
+	})
+
+	// Test case 2: Function with parameters and no return values
+	t.Run("WithParamsNoReturn", func(t *testing.T) {
+		var receivedInt int
+		var receivedString string
+		goFunc := func(a int, b string) {
+			receivedInt = a
+			receivedString = b
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`testFunc(123, "hello")`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		if receivedInt != 123 {
+			t.Errorf("Expected int 123, got %d", receivedInt)
+		}
+		if receivedString != "hello" {
+			t.Errorf("Expected string 'hello', got '%s'", receivedString)
+		}
+	})
+
+	// Test case 3: Function with no parameters and return values
+	t.Run("NoParamsWithReturn", func(t *testing.T) {
+		goFunc := func() (int, string) {
+			return 42, "world"
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`a, b = testFunc()`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		valA := L.Instance.GetGlobal("a")
+		valB := L.Instance.GetGlobal("b")
+		if valA.Type() != lua.LTNumber || lua.LVAsNumber(valA) != 42 {
+			t.Errorf("Expected return value a to be 42, got %v", valA)
+		}
+		if valB.Type() != lua.LTString || lua.LVAsString(valB) != "world" {
+			t.Errorf("Expected return value b to be 'world', got %v", valB)
+		}
+	})
+
+	// Test case 4: Function with parameters and return values
+	t.Run("WithParamsWithReturn", func(t *testing.T) {
+		goFunc := func(x int, y int) int {
+			return x + y
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`sum = testFunc(10, 20)`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		sumVal := L.Instance.GetGlobal("sum")
+		if sumVal.Type() != lua.LTNumber || lua.LVAsNumber(sumVal) != 30 {
+			t.Errorf("Expected sum to be 30, got %v", sumVal)
+		}
+	})
+
+	// Test case 5: Function with variadic parameters
+	t.Run("VariadicParams", func(t *testing.T) {
+		goFunc := func(prefix string, numbers ...int) string {
+			sum := 0
+			for _, n := range numbers {
+				sum += n
+			}
+			return fmt.Sprintf("%s%d", prefix, sum)
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`res = testFunc("Sum: ", 1, 2, 3, 4, 5)`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		resVal := L.Instance.GetGlobal("res")
+		if resVal.Type() != lua.LTString || lua.LVAsString(resVal) != "Sum: 15" {
+			t.Errorf("Expected result 'Sum: 15', got '%s'", resVal)
+		}
+	})
+
+	// Test case 6: Function with struct parameter and return value
+	t.Run("StructParamReturn", func(t *testing.T) {
+		type MyStruct struct {
+			Name  string
+			Value int
+		}
+		goFunc := func(s MyStruct) MyStruct {
+			return MyStruct{Name: s.Name + "_processed", Value: s.Value * 2}
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		// Marshal the input struct for Lua
+		inputStruct := MyStruct{Name: "input", Value: 10}
+		luaInput, err := Marshal(L.Instance, inputStruct)
+		if err != nil {
+			t.Fatalf("Failed to marshal input struct: %v", err)
+		}
+		L.Instance.SetGlobal("inputData", luaInput)
+
+		if err := L.Instance.DoString(`outputData = testFunc(inputData)
+			printTable(outputData)
+		`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+
+		outputDataLua := L.Instance.GetGlobal("outputData")
+		var outputStruct MyStruct
+		if err := Unmarshal(outputDataLua, &outputStruct); err != nil {
+			t.Fatalf("Failed to unmarshal output struct: %v", err)
+		}
+
+		if outputStruct.Name != "input_processed" {
+			t.Errorf("Expected Name 'input_processed', got '%s'", outputStruct.Name)
+		}
+		if outputStruct.Value != 20 {
+			t.Errorf("Expected Value 20, got %d", outputStruct.Value)
+		}
+	})
+
+}
+
 func TestCases(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
@@ -351,4 +511,161 @@ func TestEncodeFunc(t *testing.T) {
 			t.Errorf("map test failed: %v", err)
 		}
 	})
+}
+
+func TestMarshalGoFunctions(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	L := NewLuaVM()
+	defer L.Close()
+
+	// Test case 1: Function with no parameters and no return values
+	t.Run("NoParamsNoReturn", func(t *testing.T) {
+		var called bool
+		goFunc := func() {
+			called = true
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`testFunc()`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		if !called {
+			t.Errorf("Go function was not called")
+		}
+	})
+
+	// Test case 2: Function with parameters and no return values
+	t.Run("WithParamsNoReturn", func(t *testing.T) {
+		var receivedInt int
+		var receivedString string
+		goFunc := func(a int, b string) {
+			receivedInt = a
+			receivedString = b
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`testFunc(123, "hello")`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		if receivedInt != 123 {
+			t.Errorf("Expected int 123, got %d", receivedInt)
+		}
+		if receivedString != "hello" {
+			t.Errorf("Expected string 'hello', got '%s'", receivedString)
+		}
+	})
+
+	// Test case 3: Function with no parameters and return values
+	t.Run("NoParamsWithReturn", func(t *testing.T) {
+		goFunc := func() (int, string) {
+			return 42, "world"
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`a, b = testFunc()`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		valA := L.Instance.GetGlobal("a")
+		valB := L.Instance.GetGlobal("b")
+		if valA.Type() != lua.LTNumber || lua.LVAsNumber(valA) != 42 {
+			t.Errorf("Expected return value a to be 42, got %v", valA)
+		}
+		if valB.Type() != lua.LTString || lua.LVAsString(valB) != "world" {
+			t.Errorf("Expected return value b to be 'world', got %v", valB)
+		}
+	})
+
+	// Test case 4: Function with parameters and return values
+	t.Run("WithParamsWithReturn", func(t *testing.T) {
+		goFunc := func(x int, y int) int {
+			return x + y
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`sum = testFunc(10, 20)`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		sumVal := L.Instance.GetGlobal("sum")
+		if sumVal.Type() != lua.LTNumber || lua.LVAsNumber(sumVal) != 30 {
+			t.Errorf("Expected sum to be 30, got %v", sumVal)
+		}
+	})
+
+	// Test case 5: Function with variadic parameters
+	t.Run("VariadicParams", func(t *testing.T) {
+		goFunc := func(prefix string, numbers ...int) string {
+			sum := 0
+			for _, n := range numbers {
+				sum += n
+			}
+			return fmt.Sprintf("%s%d", prefix, sum)
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		if err := L.Instance.DoString(`res = testFunc("Sum: ", 1, 2, 3, 4, 5)`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+		resVal := L.Instance.GetGlobal("res")
+		if resVal.Type() != lua.LTString || lua.LVAsString(resVal) != "Sum: 15" {
+			t.Errorf("Expected result 'Sum: 15', got '%s'", resVal)
+		}
+	})
+
+	// Test case 6: Function with struct parameter and return value
+	t.Run("StructParamReturn", func(t *testing.T) {
+		type MyStruct struct {
+			Name  string
+			Value int
+		}
+		goFunc := func(s MyStruct) MyStruct {
+			return MyStruct{Name: s.Name + "_processed", Value: s.Value * 2}
+		}
+		luaFunc, err := Marshal(L.Instance, goFunc)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+		L.Instance.SetGlobal("testFunc", luaFunc)
+		// Marshal the input struct for Lua
+		inputStruct := MyStruct{Name: "input", Value: 10}
+		luaInput, err := Marshal(L.Instance, inputStruct)
+		if err != nil {
+			t.Fatalf("Failed to marshal input struct: %v", err)
+		}
+		L.Instance.SetGlobal("inputData", luaInput)
+
+		if err := L.Instance.DoString(`outputData = testFunc(inputData)`); err != nil {
+			t.Fatalf("Lua execution failed: %v", err)
+		}
+
+		outputDataLua := L.Instance.GetGlobal("outputData")
+		var outputStruct MyStruct
+		if err := Unmarshal(outputDataLua, &outputStruct); err != nil {
+			t.Fatalf("Failed to unmarshal output struct: %v", err)
+		}
+
+		if outputStruct.Name != "input_processed" {
+			t.Errorf("Expected Name 'input_processed', got '%s'", outputStruct.Name)
+		}
+		if outputStruct.Value != 20 {
+			t.Errorf("Expected Value 20, got %d", outputStruct.Value)
+		}
+	})
+
 }

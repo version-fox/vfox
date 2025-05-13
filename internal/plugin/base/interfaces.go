@@ -22,7 +22,6 @@ import (
 
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
-	lua "github.com/yuin/gopher-lua"
 )
 
 type CheckSum struct {
@@ -234,9 +233,9 @@ type EnvKeysHookResultItem struct {
 }
 
 type ParseLegacyFileHookCtx struct {
-	Filepath             string         `json:"filepath"`
-	Filename             string         `json:"filename"`
-	GetInstalledVersions lua.LGFunction `json:"getInstalledVersions"`
+	Filepath             string          `json:"filepath"`
+	Filename             string          `json:"filename"`
+	GetInstalledVersions func() []string `json:"getInstalledVersions"`
 }
 
 type ParseLegacyFileResult struct {

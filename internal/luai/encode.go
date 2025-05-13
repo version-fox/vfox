@@ -18,6 +18,7 @@ package luai
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	lua "github.com/yuin/gopher-lua"
@@ -116,12 +117,93 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		}
 		return table, nil
 	case reflect.Func:
-		if reflected.Type().ConvertibleTo(reflect.TypeOf(lua.LGFunction(nil))) {
+		goFuncType := reflected.Type()
+		// If it's already an LGFunction, use it directly
+		if goFuncType.ConvertibleTo(reflect.TypeOf(lua.LGFunction(nil))) {
 			lf := reflected.Convert(reflect.TypeOf(lua.LGFunction(nil))).Interface().(lua.LGFunction)
 			return state.NewFunction(lf), nil
-		} else {
-			return nil, errors.New("marshal: unsupported function type " + reflected.Type().String())
 		}
+
+		// Generic Go function wrapper
+		luaFunc := func(L *lua.LState) int {
+			numIn := goFuncType.NumIn()
+			actualNumArgs := L.GetTop()
+			isVariadic := goFuncType.IsVariadic()
+
+			expectedMinArgs := numIn
+			if isVariadic {
+				expectedMinArgs = numIn - 1
+			}
+
+			if actualNumArgs < expectedMinArgs {
+				L.RaiseError(fmt.Sprintf("expected at least %d arguments for %s, got %d", expectedMinArgs, goFuncType.String(), actualNumArgs))
+				return 0 // Should not reach here due to RaiseError
+			}
+			if !isVariadic && actualNumArgs != numIn {
+				L.RaiseError(fmt.Sprintf("expected %d arguments for %s, got %d", numIn, goFuncType.String(), actualNumArgs))
+				return 0 // Should not reach here due to RaiseError
+			}
+
+			goArgs := make([]reflect.Value, numIn)
+			for i := 0; i < numIn; i++ {
+				goArgType := goFuncType.In(i)
+
+				if isVariadic && i == numIn-1 { // Last argument of a variadic function
+					sliceElementType := goArgType.Elem()
+					variadicLen := actualNumArgs - (numIn - 1)
+					if variadicLen < 0 {
+						variadicLen = 0
+					}
+					variadicSlice := reflect.MakeSlice(goArgType, variadicLen, variadicLen)
+					for j := 0; j < variadicLen; j++ {
+						luaVariadicArg := L.CheckAny(i + 1 + j)
+						elemPtr := reflect.New(sliceElementType)
+						err := Unmarshal(luaVariadicArg, elemPtr.Interface()) // Unmarshal is in the same package
+						if err != nil {
+							L.Push(lua.LNil)
+							L.Push(lua.LString(fmt.Sprintf("error unmarshaling variadic argument %d (item %d): %s", i+1, j+1, err.Error())))
+							return 2
+						}
+						variadicSlice.Index(j).Set(elemPtr.Elem())
+					}
+					goArgs[i] = variadicSlice
+					break // All arguments processed for variadic function
+				} else {
+					luaArg := L.CheckAny(i + 1)
+					goArgPtr := reflect.New(goArgType)
+					err := Unmarshal(luaArg, goArgPtr.Interface())
+					if err != nil {
+						L.Push(lua.LNil)
+						L.Push(lua.LString(fmt.Sprintf("error unmarshaling argument %d: %s", i+1, err.Error())))
+						return 2
+					}
+					goArgs[i] = goArgPtr.Elem()
+				}
+			}
+
+			var results []reflect.Value
+			if isVariadic {
+				results = reflected.CallSlice(goArgs)
+			} else {
+				results = reflected.Call(goArgs)
+			}
+
+			if len(results) == 0 {
+				return 0
+			}
+
+			for _, result := range results {
+				luaResult, err := Marshal(L, result.Interface())
+				if err != nil {
+					L.Push(lua.LNil)
+					L.Push(lua.LString(fmt.Sprintf("error marshaling result: %s", err.Error())))
+					return 2
+				}
+				L.Push(luaResult)
+			}
+			return len(results)
+		}
+		return state.NewFunction(luaFunc), nil
 	default:
 		return nil, errors.New("marshal: unsupported type " + reflected.Kind().String() + " for reflected ")
 	}

@@ -320,6 +320,17 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 		if version != "14.17.0" {
 			t.Errorf("expected version '14.17.0', got '%s'", version)
 		}
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
+			return []Version{"test"}
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if version != "check-installed" {
+			t.Errorf("expected version 'check-installed', got '%s'", version)
+		}
+
 		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
 			return nil
 		})

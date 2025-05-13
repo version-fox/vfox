@@ -26,7 +26,6 @@ import (
 	"github.com/version-fox/vfox/internal/luai"
 	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
-	lua "github.com/yuin/gopher-lua"
 
 	_ "embed"
 	"errors"
@@ -246,16 +245,14 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 	ctx := base.ParseLegacyFileHookCtx{
 		Filepath: path,
 		Filename: filename,
-		GetInstalledVersions: func(L *lua.LState) int {
+		GetInstalledVersions: func() []string {
 			versions := installedVersions()
 			logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
-			table, err := luai.Marshal(L, versions)
-			if err != nil {
-				L.RaiseError(err.Error())
-				return 0
+			strVersions := make([]string, len(versions))
+			for i, v := range versions {
+				strVersions[i] = string(v)
 			}
-			L.Push(table)
-			return 1
+			return strVersions
 		},
 	}
 

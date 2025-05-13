@@ -48,7 +48,10 @@ func (vm *LuaVM) Prepare(options *PrepareOptions) error {
 	if err := vm.Instance.DoString(preloadScript); err != nil {
 		return err
 	}
-	module.Preload(vm.Instance, options.Config)
+
+	if options != nil {
+		module.Preload(vm.Instance, options.Config)
+	}
 
 	return nil
 }
