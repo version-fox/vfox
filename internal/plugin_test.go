@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
@@ -169,7 +169,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 			t.Fatal(err)
 		}
 
-		pkg, err := plugin.PreInstall(Version("9.0.0"))
+		pkg, err := plugin.PreInstall(base.Version("9.0.0"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -269,8 +269,8 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 	t.Run("PreUse", func(t *testing.T) {
 		_, plugin, err := factory()
 
-		inputVersion := Version("20.0")
-		previousVersion := Version("21.0")
+		inputVersion := base.Version("20.0")
+		previousVersion := base.Version("21.0")
 		cwd := "/home/user"
 
 		if err != nil {
@@ -280,7 +280,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 		if err != nil {
 			t.Fatal(err)
 		}
-		version, err := plugin.PreUse(inputVersion, previousVersion, Global, cwd, pkgs)
+		version, err := plugin.PreUse(inputVersion, previousVersion, base.Global, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +289,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 			t.Errorf("expected version '9.9.9', got '%s'", version)
 		}
 
-		version, err = plugin.PreUse(inputVersion, previousVersion, Project, cwd, pkgs)
+		version, err = plugin.PreUse(inputVersion, previousVersion, base.Project, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -298,7 +298,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 			t.Errorf("expected version '10.0.0', got '%s'", version)
 		}
 
-		version, err = plugin.PreUse(inputVersion, previousVersion, Session, cwd, pkgs)
+		version, err = plugin.PreUse(inputVersion, previousVersion, base.Session, cwd, pkgs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 
 	t.Run("ParseLegacyFile", func(t *testing.T) {
 		_, plugin, err := factory()
-		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
+		version, err := plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []base.Version {
 			return nil
 		})
 		if err != nil {
@@ -320,8 +320,8 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 		if version != "14.17.0" {
 			t.Errorf("expected version '14.17.0', got '%s'", version)
 		}
-		version, err = plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []Version {
-			return []Version{"test"}
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.node-version", func() []base.Version {
+			return []base.Version{"test"}
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -331,7 +331,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 			t.Errorf("expected version 'check-installed', got '%s'", version)
 		}
 
-		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []base.Version {
 			return nil
 		})
 		if err != nil {
@@ -342,7 +342,7 @@ func testHookFunc(t *testing.T, factory func() (*Manager, *PluginWrapper, error)
 			t.Errorf("expected version '0.0.1', got '%s'", version)
 		}
 		plugin.LegacyFilenames = []string{}
-		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []Version {
+		version, err = plugin.ParseLegacyFile("/path/to/legacy/.nvmrc", func() []base.Version {
 			return nil
 		})
 		if err != nil && version != "" {

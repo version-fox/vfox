@@ -14,17 +14,18 @@
  *    limitations under the License.
  */
 
-package internal
+package plugin
 
 import (
 	"fmt"
 	"path/filepath"
 
 	"github.com/pterm/pterm"
+	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/luai"
-	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 
 	_ "embed"
@@ -34,9 +35,9 @@ import (
 
 var ErrPluginNotFound = errors.New("plugin not found")
 
-func CreatePluginFromPath(tempInstallPath string, manager *Manager) (*PluginWrapper, error) {
+func CreatePluginFromPath(tempInstallPath string, config *config.Config, runtimeVersion string) (*PluginWrapper, error) {
 	if IsLuaPluginDir(tempInstallPath) {
-		luaPlugin, err := NewLuaPlugin(tempInstallPath, manager)
+		luaPlugin, err := NewLuaPlugin(tempInstallPath, config, runtimeVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -103,9 +104,9 @@ func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
 	return base.CreatePackages(l.Name, *result), nil
 }
 
-func (l *PluginWrapper) PreInstall(version Version) (*base.Package, error) {
+func (l *PluginWrapper) PreInstall(version base.Version) (*base.Package, error) {
 	ctx := base.PreInstallHookCtx{
-		Version: string(version),
+		Version: version,
 	}
 
 	result, err := l.impl.PreInstall(&ctx)
@@ -203,7 +204,7 @@ func (l *PluginWrapper) Label(version string) string {
 	return fmt.Sprintf("%s@%s", l.Name, version)
 }
 
-func (l *PluginWrapper) PreUse(version Version, previousVersion Version, scope UseScope, cwd string, installedSdks []*base.Package) (Version, error) {
+func (l *PluginWrapper) PreUse(version base.Version, previousVersion base.Version, scope base.UseScope, cwd string, installedSdks []*base.Package) (base.Version, error) {
 	if !l.impl.HasFunction("PreUse") {
 		logger.Debug("plugin does not have PreUse function")
 		return "", nil
@@ -229,10 +230,10 @@ func (l *PluginWrapper) PreUse(version Version, previousVersion Version, scope U
 		return "", err
 	}
 
-	return Version(result.Version), nil
+	return result.Version, nil
 }
 
-func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []Version) (Version, error) {
+func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []base.Version) (base.Version, error) {
 	if len(l.LegacyFilenames) == 0 {
 		return "", nil
 	}
@@ -245,14 +246,10 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 	ctx := base.ParseLegacyFileHookCtx{
 		Filepath: path,
 		Filename: filename,
-		GetInstalledVersions: func() []string {
+		GetInstalledVersions: func() []base.Version {
 			versions := installedVersions()
 			logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
-			strVersions := make([]string, len(versions))
-			for i, v := range versions {
-				strVersions[i] = string(v)
-			}
-			return strVersions
+			return versions
 		},
 	}
 
@@ -263,7 +260,7 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 		return "", err
 	}
 
-	return Version(result.Version), nil
+	return result.Version, nil
 
 }
 
@@ -306,9 +303,8 @@ func IsLuaPluginDir(pluginDirPath string) bool {
 // The plugin directory must meet one of the following conditions:
 // - The directory must contain a metadata.lua file and a hooks directory that includes all must be implemented hook functions.
 // - The directory contain a main.lua file that defines the plugin object and all hook functions.
-func NewLuaPlugin(pluginDirPath string, manager *Manager) (*PluginWrapper, error) {
-	config := manager.Config
-	plugin2, err := luai.CreateLuaPlugin(pluginDirPath, config, RuntimeVersion)
+func NewLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*PluginWrapper, error) {
+	plugin2, err := luai.CreateLuaPlugin(pluginDirPath, config, runtimeVersion)
 	if err != nil {
 		return nil, err
 	}

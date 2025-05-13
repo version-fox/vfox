@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/plugin/base"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -31,17 +31,17 @@ type LocationPackage struct {
 	from     *base.Package
 	sdk      *Sdk
 	toPath   string
-	location Location
+	location base.Location
 }
 
-func newLocationPackage(version Version, sdk *Sdk, location Location) (*LocationPackage, error) {
+func newLocationPackage(version base.Version, sdk *Sdk, location base.Location) (*LocationPackage, error) {
 	var mockPath string
 	switch location {
-	case OriginalLocation:
+	case base.OriginalLocation:
 		mockPath = ""
-	case GlobalLocation:
+	case base.GlobalLocation:
 		mockPath = filepath.Join(sdk.InstallPath, "current")
-	case ShellLocation:
+	case base.ShellLocation:
 		mockPath = filepath.Join(sdk.sdkManager.PathMeta.CurTmpPath, sdk.Name)
 	default:
 		return nil, fmt.Errorf("unknown location: %s", location)
@@ -59,7 +59,7 @@ func newLocationPackage(version Version, sdk *Sdk, location Location) (*Location
 }
 
 func (l *LocationPackage) ConvertLocation() *base.Package {
-	if l.location == OriginalLocation {
+	if l.location == base.OriginalLocation {
 		return l.from
 	}
 	clone := l.from.Clone()
@@ -78,7 +78,7 @@ func (l *LocationPackage) ConvertLocation() *base.Package {
 }
 
 func (l *LocationPackage) Link() (*base.Package, error) {
-	if l.location == OriginalLocation {
+	if l.location == base.OriginalLocation {
 		return l.from, nil
 	}
 	mockPath := l.toPath

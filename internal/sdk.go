@@ -1,7 +1,7 @@
 /*
  *    Copyright 2025 Han Li and contributors
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    Licensed under the Apache License, base.Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
@@ -32,16 +32,15 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/plugin/base"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/shim"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
-
-type Version string
 
 type SdkEnv struct {
 	Sdk *Sdk
@@ -83,13 +82,13 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 type Sdk struct {
 	Name       string
 	sdkManager *Manager
-	Plugin     *PluginWrapper
+	Plugin     *plugin.PluginWrapper
 	// current sdk install path
 	InstallPath          string
-	localSdkPackageCache map[Version]*base.Package
+	localSdkPackageCache map[base.Version]*base.Package
 }
 
-func (b *Sdk) Install(version Version) error {
+func (b *Sdk) Install(version base.Version) error {
 	label := b.label(version)
 	if b.CheckExists(version) {
 		return fmt.Errorf("%s is already installed", label)
@@ -103,7 +102,7 @@ func (b *Sdk) Install(version Version) error {
 	}
 	mainSdk := installInfo.Main
 
-	sdkVersion := Version(mainSdk.Version)
+	sdkVersion := base.Version(mainSdk.Version)
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
 	label = b.label(sdkVersion)
@@ -234,7 +233,7 @@ func (b *Sdk) preInstallSdk(info *base.Info, sdkDestPath string) (string, error)
 	}
 }
 
-func (b *Sdk) Uninstall(version Version) (err error) {
+func (b *Sdk) Uninstall(version base.Version) (err error) {
 	label := b.label(version)
 	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
@@ -275,7 +274,7 @@ func (b *Sdk) Available(args []string) ([]*base.Package, error) {
 	return b.Plugin.Available(args)
 }
 
-func (b *Sdk) ToLinkPackage(version Version, location Location) error {
+func (b *Sdk) ToLinkPackage(version base.Version, location base.Location) error {
 	linkPackage, err := b.GetLinkPackage(version, location)
 	if err != nil {
 		return err
@@ -284,15 +283,15 @@ func (b *Sdk) ToLinkPackage(version Version, location Location) error {
 	return err
 }
 
-// GetLinkPackage will make symlink according Location and return the sdk package.
-func (b *Sdk) GetLinkPackage(version Version, location Location) (*LocationPackage, error) {
+// GetLinkPackage will make symlink according base.Location and return the sdk package.
+func (b *Sdk) GetLinkPackage(version base.Version, location base.Location) (*LocationPackage, error) {
 	return newLocationPackage(version, b, location)
 }
 
 // MockEnvKeys It just simulates to get the environment configuration information,
 // if the corresponding location of the package does not exist, then it will return
 // the empty environment information, without calling the EnvKeys hook.
-func (b *Sdk) MockEnvKeys(version Version, location Location) (*env.Envs, error) {
+func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
 	label := b.label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
@@ -317,8 +316,8 @@ func (b *Sdk) MockEnvKeys(version Version, location Location) (*env.Envs, error)
 	return keys, nil
 }
 
-// EnvKeys will make symlink according Location.
-func (b *Sdk) EnvKeys(version Version, location Location) (*env.Envs, error) {
+// EnvKeys will make symlink according base.Location.
+func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
 	label := b.label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
@@ -339,7 +338,7 @@ func (b *Sdk) EnvKeys(version Version, location Location) (*env.Envs, error) {
 	return keys, nil
 }
 
-func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
+func (b *Sdk) PreUse(version base.Version, scope base.UseScope) (base.Version, error) {
 	installedSdks := b.getLocalSdkPackages()
 	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
 	if err != nil {
@@ -363,11 +362,11 @@ func (b *Sdk) PreUse(version Version, scope UseScope) (Version, error) {
 		prefix := version + "."
 		for _, v := range installedVersions {
 			if version == v {
-				newVersion = Version(v)
+				newVersion = base.Version(v)
 				break
 			}
 			if strings.HasPrefix(v, prefix) {
-				newVersion = Version(v)
+				newVersion = base.Version(v)
 				break
 			}
 		}
@@ -387,7 +386,7 @@ func (e *VersionNotExistsError) Error() string {
 	return fmt.Sprintf("%s is not installed", e.Label)
 }
 
-func (b *Sdk) Use(version Version, scope UseScope) error {
+func (b *Sdk) Use(version base.Version, scope base.UseScope) error {
 	logger.Debugf("Use SDK version: %s, scope:%v\n", string(version), scope)
 
 	version, err := b.PreUse(version, scope)
@@ -405,7 +404,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	if !env.IsHookEnv() {
 		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
 
-		keys, err := b.EnvKeys(version, GlobalLocation)
+		keys, err := b.EnvKeys(version, base.GlobalLocation)
 		if err != nil {
 			return err
 		}
@@ -428,7 +427,7 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 
 		// clear global env
 		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
-			b.clearGlobalEnv(Version(oldVersion))
+			b.clearGlobalEnv(base.Version(oldVersion))
 		}
 		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
 			return err
@@ -447,18 +446,18 @@ func (b *Sdk) Use(version Version, scope UseScope) error {
 	}
 }
 
-func (b *Sdk) useInHook(version Version, scope UseScope) error {
+func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 	var (
 		multiToolVersion toolset.MultiToolVersions
 	)
 
-	if scope == Global {
+	if scope == base.Global {
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
 
-		envKeys, err := b.EnvKeys(version, GlobalLocation)
+		envKeys, err := b.EnvKeys(version, base.GlobalLocation)
 		if err != nil {
 			return err
 		}
@@ -476,7 +475,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 		// clear global env
 		logger.Debugf("Clear global env: %s\n", b.Name)
 		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
-			b.clearGlobalEnv(Version(oldVersion))
+			b.clearGlobalEnv(base.Version(oldVersion))
 		}
 
 		if err = b.sdkManager.EnvManager.Load(envKeys); err != nil {
@@ -487,7 +486,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 			return err
 		}
 		multiToolVersion = append(multiToolVersion, toolVersion)
-	} else if scope == Project {
+	} else if scope == base.Project {
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
@@ -508,7 +507,7 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	if err = multiToolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
-	if err = b.ToLinkPackage(version, ShellLocation); err != nil {
+	if err = b.ToLinkPackage(version, base.ShellLocation); err != nil {
 		return err
 	}
 
@@ -519,18 +518,18 @@ func (b *Sdk) useInHook(version Version, scope UseScope) error {
 	return nil
 }
 
-func (b *Sdk) List() []Version {
+func (b *Sdk) List() []base.Version {
 	if !util.FileExists(b.InstallPath) {
-		return make([]Version, 0)
+		return make([]base.Version, 0)
 	}
-	var versions []Version
+	var versions []base.Version
 	dir, err := os.ReadDir(b.InstallPath)
 	if err != nil {
 		return nil
 	}
 	for _, d := range dir {
 		if d.IsDir() && strings.HasPrefix(d.Name(), "v-") {
-			versions = append(versions, Version(strings.TrimPrefix(d.Name(), "v-")))
+			versions = append(versions, base.Version(strings.TrimPrefix(d.Name(), "v-")))
 		}
 	}
 	sort.Slice(versions, func(i, j int) bool {
@@ -553,7 +552,7 @@ func (b *Sdk) getLocalSdkPackages() []*base.Package {
 
 // Current returns the current version of the SDK.
 // Lookup priority is: project > session > global
-func (b *Sdk) Current() Version {
+func (b *Sdk) Current() base.Version {
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
 		b.sdkManager.PathMeta.WorkingDirectory,
 		b.sdkManager.PathMeta.CurTmpPath,
@@ -563,16 +562,16 @@ func (b *Sdk) Current() Version {
 		return ""
 	}
 	current := toolVersion.FilterTools(func(name, version string) bool {
-		return name == b.Name && b.CheckExists(Version(version))
+		return name == b.Name && b.CheckExists(base.Version(version))
 	})
 	if len(current) == 0 {
 		return ""
 	}
-	return Version(current[b.Name])
+	return base.Version(current[b.Name])
 }
 
-func (b *Sdk) ParseLegacyFile(path string) (Version, error) {
-	return b.Plugin.ParseLegacyFile(path, func() []Version {
+func (b *Sdk) ParseLegacyFile(path string) (base.Version, error) {
+	return b.Plugin.ParseLegacyFile(path, func() []base.Version {
 		return b.List()
 	})
 }
@@ -582,11 +581,11 @@ func (b *Sdk) Close() {
 }
 
 // clearGlobalEnv Mainly used to clear record from Windows registry
-func (b *Sdk) clearGlobalEnv(version Version) {
+func (b *Sdk) clearGlobalEnv(version base.Version) {
 	if version == "" {
 		return
 	}
-	sdkPackage, err := b.GetLinkPackage(version, GlobalLocation)
+	sdkPackage, err := b.GetLinkPackage(version, base.GlobalLocation)
 	if err != nil {
 		return
 	}
@@ -600,7 +599,7 @@ func (b *Sdk) clearGlobalEnv(version Version) {
 	_ = envManager.Remove(envKV)
 }
 
-func (b *Sdk) GetLocalSdkPackage(version Version) (*base.Package, error) {
+func (b *Sdk) GetLocalSdkPackage(version base.Version) (*base.Package, error) {
 	p, ok := b.localSdkPackageCache[version]
 	if ok {
 		return p, nil
@@ -647,11 +646,11 @@ func (b *Sdk) GetLocalSdkPackage(version Version) (*base.Package, error) {
 	return p2, nil
 }
 
-func (b *Sdk) CheckExists(version Version) bool {
+func (b *Sdk) CheckExists(version base.Version) bool {
 	return util.FileExists(b.VersionPath(version))
 }
 
-func (b *Sdk) VersionPath(version Version) string {
+func (b *Sdk) VersionPath(version base.Version) string {
 	return filepath.Join(b.InstallPath, fmt.Sprintf("v-%s", version))
 }
 
@@ -731,7 +730,7 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 	return path, nil
 }
 
-func (b *Sdk) label(version Version) string {
+func (b *Sdk) label(version base.Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Name), version)
 }
 
@@ -739,7 +738,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 	current := b.Current()
 
 	if current != "" {
-		envKeys, err := b.MockEnvKeys(current, GlobalLocation)
+		envKeys, err := b.MockEnvKeys(current, base.GlobalLocation)
 		if err != nil {
 			return err
 		}
@@ -758,7 +757,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 		_ = envManager.Remove(envKeys)
 		_ = envManager.Flush()
 
-		envKeys, err = b.MockEnvKeys(current, OriginalLocation)
+		envKeys, err = b.MockEnvKeys(current, base.OriginalLocation)
 		if err != nil {
 			return err
 		}
@@ -789,7 +788,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 // NewSdk creates a new SDK instance.
 func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 	sdkName := filepath.Base(pluginPath)
-	plugin, err := CreatePluginFromPath(pluginPath, manager)
+	plugin, err := plugin.CreatePluginFromPath(pluginPath, manager.Config, RuntimeVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin: %w", err)
 	}
@@ -798,6 +797,6 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 		sdkManager:           manager,
 		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
 		Plugin:               plugin,
-		localSdkPackageCache: make(map[Version]*base.Package),
+		localSdkPackageCache: make(map[base.Version]*base.Package),
 	}, nil
 }

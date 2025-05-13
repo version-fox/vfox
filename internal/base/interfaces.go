@@ -24,6 +24,8 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
+type Version string
+
 type CheckSum struct {
 	Sha256 string `json:"sha256"`
 	Sha512 string `json:"sha512"`
@@ -135,7 +137,7 @@ func CreatePackages(sdkName string, hookResult []*AvailableHookResultItem) []*Pa
 }
 
 type PreInstallHookCtx struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }
 
 type PreInstallHookResultAdditionItem struct {
@@ -212,7 +214,7 @@ type PreUseHookCtx struct {
 }
 
 type PreUseHookResult struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }
 
 type PostInstallHookCtx struct {
@@ -233,13 +235,13 @@ type EnvKeysHookResultItem struct {
 }
 
 type ParseLegacyFileHookCtx struct {
-	Filepath             string          `json:"filepath"`
-	Filename             string          `json:"filename"`
-	GetInstalledVersions func() []string `json:"getInstalledVersions"`
+	Filepath             string           `json:"filepath"`
+	Filename             string           `json:"filename"`
+	GetInstalledVersions func() []Version `json:"getInstalledVersions"`
 }
 
 type ParseLegacyFileResult struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }
 
 type PreUninstallHookCtx struct {

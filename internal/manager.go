@@ -34,10 +34,12 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/urfave/cli/v2"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -90,7 +92,7 @@ func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
 	return m.EnvKeys(toolset.MultiToolVersions{
 		workToolVersion,
 		homeToolVersion,
-	}, ShellLocation)
+	}, base.ShellLocation)
 }
 
 type SessionEnvOptions struct {
@@ -171,8 +173,8 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 			} else {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
 			}
-			v := Version(version)
-			if keys, err := lookupSdk.EnvKeys(v, ShellLocation); err == nil {
+			v := base.Version(version)
+			if keys, err := lookupSdk.EnvKeys(v, base.ShellLocation); err == nil {
 				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
 
 				sdkEnvs = append(sdkEnvs, &SdkEnv{
@@ -189,7 +191,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	return sdkEnvs, nil
 }
 
-func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location Location) (SdkEnvs, error) {
+func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location base.Location) (SdkEnvs, error) {
 	var sdkEnvs SdkEnvs
 	tools := make(map[string]struct{})
 	for _, t := range tvs {
@@ -198,7 +200,7 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location Location) (Sdk
 				continue
 			}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
-				v := Version(version)
+				v := base.Version(version)
 				if ek, err := lookupSdk.EnvKeys(v, location); err == nil {
 					tools[name] = struct{}{}
 
@@ -631,7 +633,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 //
 //	1.only support .lua or .zip file type plugin.
 //	2.install plugin to temp dir first, then validate the plugin, if success, return *LuaPlugin
-func (m *Manager) installPluginToTemp(path string) (*PluginWrapper, error) {
+func (m *Manager) installPluginToTemp(path string) (*plugin.PluginWrapper, error) {
 	ext := filepath.Ext(path)
 	if ext != ".lua" && ext != ".zip" {
 		return nil, fmt.Errorf("unsupported %s type plugin to install, only support .lua or .zip", ext)
@@ -675,7 +677,7 @@ func (m *Manager) installPluginToTemp(path string) (*PluginWrapper, error) {
 	// validate the plugin
 	fmt.Printf("Validating %s ...\n", localPath)
 
-	plugin, err := CreatePluginFromPath(tempInstallPath, m)
+	plugin, err := plugin.CreatePluginFromPath(tempInstallPath, m.Config, RuntimeVersion)
 	if err != nil {
 		return nil, fmt.Errorf("validate plugin failed: %w", err)
 	}

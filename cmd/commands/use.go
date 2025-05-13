@@ -23,6 +23,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
 
 	"github.com/urfave/cli/v2"
 )
@@ -59,7 +60,7 @@ func useCmd(ctx *cli.Context) error {
 	}
 	var (
 		name    string
-		version internal.Version
+		version base.Version
 	)
 	argArr := strings.Split(sdkArg, "@")
 	if len(argArr) <= 1 {
@@ -67,16 +68,16 @@ func useCmd(ctx *cli.Context) error {
 		version = ""
 	} else {
 		name = argArr[0]
-		version = internal.Version(argArr[1])
+		version = base.Version(argArr[1])
 	}
 
-	scope := internal.Session
+	scope := base.Session
 	if ctx.IsSet("global") {
-		scope = internal.Global
+		scope = base.Global
 	} else if ctx.IsSet("project") {
-		scope = internal.Project
+		scope = base.Project
 	} else {
-		scope = internal.Session
+		scope = base.Session
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
@@ -106,7 +107,7 @@ func useCmd(ctx *cli.Context) error {
 			},
 		}
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-		version = internal.Version(result)
+		version = base.Version(result)
 	}
 
 	return source.Use(version, scope)

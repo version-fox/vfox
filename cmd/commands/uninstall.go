@@ -24,6 +24,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
 )
 
 var Uninstall = &cli.Command{
@@ -48,7 +49,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	}
 
 	name := strings.ToLower(argArr[0])
-	version := internal.Version(argArr[1])
+	version := base.Version(argArr[1])
 
 	source, err := manager.LookupSdk(name)
 	if err != nil {
@@ -66,7 +67,7 @@ func uninstallCmd(ctx *cli.Context) error {
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, internal.Global)
+		return source.Use(firstVersion, base.Global)
 	}
 	return nil
 }
