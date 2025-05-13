@@ -81,7 +81,7 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 	defer teardownSuite(t)
 	t.Run("NewLuaPlugin", func(t *testing.T) {
 		manager := internal.NewSdkManager()
-		plugin, err := plugin.NewLuaPlugin(pluginPathWithMain, manager.Config, internal.RuntimeVersion)
+		plugin, err := plugin.NewLuaPlugin(pluginPathWithMetadata, manager.Config, internal.RuntimeVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,6 +128,19 @@ func TestNewLuaPluginWithMetadataAndHooks(t *testing.T) {
 		plugin, err := plugin.NewLuaPlugin(pluginPathWithMetadata, manager.Config, internal.RuntimeVersion)
 		return manager, plugin, err
 	})
+}
+
+func TestInvalidPluginName(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+	_, err := plugin.NewLuaPlugin("testdata/plugins/invalid_name", internal.NewSdkManager().Config, internal.RuntimeVersion)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	t.Logf("error: %s", err.Error())
+	if !strings.Contains(err.Error(), "invalid plugin name") {
+		t.Errorf("expected error to contain 'invalid plugin name', got '%s'", err.Error())
+	}
 }
 
 func testHookFunc(t *testing.T, factory func() (*internal.Manager, *plugin.PluginWrapper, error)) {
