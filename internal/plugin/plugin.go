@@ -19,9 +19,11 @@ package plugin
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
@@ -55,7 +57,8 @@ func isValidName(name string) bool {
 }
 
 type PluginWrapper struct {
-	impl base.Plugin
+	impl   base.Plugin
+	config config.Config
 
 	// plugin source path
 	Path string
@@ -92,8 +95,8 @@ func (l *PluginWrapper) validate() error {
 func (l *PluginWrapper) Close() {
 	l.impl.Close()
 }
-
-func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
+func (l *PluginWrapper) invokeAvailable(args []string) ([]*base.Package, error) {
+	logger.Debug("Calling Available hook")
 	ctx := base.AvailableHookCtx{
 		Args: args,
 	}
@@ -106,6 +109,51 @@ func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
 	}
 
 	return base.CreatePackages(l.Name, *result), nil
+}
+
+func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
+	cachePath := filepath.Join(l.Path, ".available.cache")
+	cacheDuration := l.config.Cache.AvailableHookDuration
+	logger.Debugf("Available hook cache duration: %v\n", cacheDuration)
+
+	// Cache is disabled
+	if cacheDuration == 0 {
+		return l.invokeAvailable(args)
+	}
+
+	cacheKey := strings.Join(args, "##")
+	if cacheKey == "" {
+		cacheKey = "empty"
+	}
+
+	fileCache, err := cache.NewFileCache(cachePath)
+	if err == nil {
+		cacheValue, ok := fileCache.Get(cacheKey)
+		logger.Debugf("Available hook cache key: %s, hit: %+v \n", cacheKey, ok)
+		if ok {
+			var hookResult []*base.Package
+			if err = cacheValue.Unmarshal(&hookResult); err == nil {
+				return hookResult, nil
+			}
+		}
+	}
+
+	result, err := l.invokeAvailable(args)
+	if err != nil {
+		return result, err
+	}
+
+	if result == nil {
+		fileCache.Set(cacheKey, nil, cache.ExpireTime(cacheDuration))
+	}
+
+	if value, err := cache.NewValue(result); err == nil {
+		logger.Debugf("Available hook cache set\n")
+		fileCache.Set(cacheKey, value, cache.ExpireTime(cacheDuration))
+		_ = fileCache.Close()
+	}
+
+	return result, nil
 }
 
 func (l *PluginWrapper) PreInstall(version base.Version) (*base.Package, error) {
@@ -317,6 +365,7 @@ func NewLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion st
 		impl:       plugin2,
 		Path:       pluginDirPath,
 		PluginInfo: plugin2.PluginInfo,
+		config:     *config,
 	}
 
 	if err = source.validate(); err != nil {
