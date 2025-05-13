@@ -1,7 +1,7 @@
 /*
  *    Copyright 2025 Han Li and contributors
  *
- *    Licensed under the Apache License, base.Version 2.0 (the "License");
+ *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
@@ -89,7 +89,7 @@ type Sdk struct {
 }
 
 func (b *Sdk) Install(version base.Version) error {
-	label := b.label(version)
+	label := b.Label(version)
 	if b.CheckExists(version) {
 		return fmt.Errorf("%s is already installed", label)
 	}
@@ -105,7 +105,7 @@ func (b *Sdk) Install(version base.Version) error {
 	sdkVersion := base.Version(mainSdk.Version)
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
-	label = b.label(sdkVersion)
+	label = b.Label(sdkVersion)
 	if b.CheckExists(sdkVersion) {
 		return fmt.Errorf("%s is already installed", label)
 	}
@@ -234,7 +234,7 @@ func (b *Sdk) preInstallSdk(info *base.Info, sdkDestPath string) (string, error)
 }
 
 func (b *Sdk) Uninstall(version base.Version) (err error) {
-	label := b.label(version)
+	label := b.Label(version)
 	if !b.CheckExists(version) {
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
@@ -292,7 +292,7 @@ func (b *Sdk) GetLinkPackage(version base.Version, location base.Location) (*Loc
 // if the corresponding location of the package does not exist, then it will return
 // the empty environment information, without calling the EnvKeys hook.
 func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
-	label := b.label(version)
+	label := b.Label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
@@ -318,7 +318,7 @@ func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.En
 
 // EnvKeys will make symlink according base.Location.
 func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
-	label := b.label(version)
+	label := b.Label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
@@ -394,7 +394,7 @@ func (b *Sdk) Use(version base.Version, scope base.UseScope) error {
 		return err
 	}
 
-	label := b.label(version)
+	label := b.Label(version)
 	if !b.CheckExists(version) {
 		return &VersionNotExistsError{
 			Label: label,
@@ -511,7 +511,7 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 		return err
 	}
 
-	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.label(version)))
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	if !env.IsHookEnv() {
 		return shell.Open(os.Getppid())
 	}
@@ -730,7 +730,7 @@ func (b *Sdk) Download(u *url.URL, headers map[string]string) (string, error) {
 	return path, nil
 }
 
-func (b *Sdk) label(version base.Version) string {
+func (b *Sdk) Label(version base.Version) string {
 	return fmt.Sprintf("%s@%s", strings.ToLower(b.Name), version)
 }
 

@@ -82,13 +82,22 @@ func (l *PluginWrapper) HasFunction(name string) bool {
 }
 
 func (l *PluginWrapper) validate() error {
+	if l.Name == "" {
+		return fmt.Errorf("no plugin name provided")
+	}
+
+	if !isValidName(l.Name) {
+		return fmt.Errorf("invalid plugin name [%s]", l.Name)
+	}
+
 	for _, hf := range base.HookFuncMap {
 		if hf.Required {
-			if !l.impl.HasFunction(hf.Name) {
+			if !l.HasFunction(hf.Name) {
 				return fmt.Errorf("[%s] function not found", hf.Name)
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -120,7 +129,7 @@ func (l *PluginWrapper) invokeAvailable(args []string) ([]*base.Package, error) 
 
 		for i, addition := range item.Addition {
 			if addition.Name == "" {
-				logger.Errorf("[Available] additional file %d no name provided", i+1)
+				logger.Errorf("[Available] additional %d no name provided", i+1)
 			}
 
 			additionalArr = append(additionalArr, &base.Info{
@@ -222,7 +231,7 @@ func (l *PluginWrapper) PreInstall(version base.Version) (*base.Package, error) 
 }
 
 func (l *PluginWrapper) PostInstall(rootPath string, sdks []*base.Info) error {
-	if !l.impl.HasFunction("PostInstall") {
+	if !l.HasFunction("PostInstall") {
 		return nil
 	}
 
@@ -281,12 +290,8 @@ func (l *PluginWrapper) EnvKeys(sdkPackage *base.Package) (*env.Envs, error) {
 	return envKeys, nil
 }
 
-func (l *PluginWrapper) Label(version string) string {
-	return fmt.Sprintf("%s@%s", l.Name, version)
-}
-
 func (l *PluginWrapper) PreUse(version base.Version, previousVersion base.Version, scope base.UseScope, cwd string, installedSdks []*base.Package) (base.Version, error) {
-	if !l.impl.HasFunction("PreUse") {
+	if !l.HasFunction("PreUse") {
 		logger.Debug("plugin does not have PreUse function")
 		return "", nil
 	}
@@ -318,7 +323,7 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 	if len(l.LegacyFilenames) == 0 {
 		return "", nil
 	}
-	if !l.impl.HasFunction("ParseLegacyFile") {
+	if !l.HasFunction("ParseLegacyFile") {
 		return "", nil
 	}
 
@@ -345,9 +350,8 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 
 }
 
-// PreUninstall executes the PreUninstall hook function.
 func (l *PluginWrapper) PreUninstall(p *base.Package) error {
-	if !l.impl.HasFunction("PreUninstall") {
+	if !l.HasFunction("PreUninstall") {
 		logger.Debug("plugin does not have PreUninstall function")
 		return nil
 	}
@@ -399,14 +403,6 @@ func NewLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion st
 
 	if err = source.validate(); err != nil {
 		return nil, err
-	}
-
-	if !isValidName(source.Name) {
-		return nil, fmt.Errorf("invalid plugin name [%s]", source.Name)
-	}
-
-	if source.Name == "" {
-		return nil, fmt.Errorf("no plugin name provided")
 	}
 
 	return source, nil
