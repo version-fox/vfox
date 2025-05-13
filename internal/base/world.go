@@ -20,7 +20,8 @@ var (
 )
 
 const (
-	OsType   = "OS_TYPE"
-	ArchType = "ARCH_TYPE"
-	Runtime  = "RUNTIME"
+	PluginObjKey = "PLUGIN"
+	OsType       = "OS_TYPE"
+	ArchType     = "ARCH_TYPE"
+	Runtime      = "RUNTIME"
 )
