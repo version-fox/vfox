@@ -27,7 +27,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const jsonUrl = `https://httpbingo.org/ip`
+const jsonUrl = `https://version-fox.github.io/vfox-plugins/index.json`
 
 func TestWithConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
