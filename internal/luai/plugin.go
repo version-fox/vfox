@@ -15,10 +15,6 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const (
-	luaPluginObjKey = "PLUGIN"
-)
-
 type LuaPlugin struct {
 	vm        *LuaVM
 	pluginObj *lua.LTable
@@ -230,7 +226,7 @@ func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion
 	}
 
 	vm.Instance.SetGlobal(base.Runtime, r)
-	pluginObj := vm.Instance.GetGlobal(luaPluginObjKey)
+	pluginObj := vm.Instance.GetGlobal(base.LuaPluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
 		return nil, fmt.Errorf("plugin object not found")
 	}

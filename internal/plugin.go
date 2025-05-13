@@ -33,13 +33,6 @@ import (
 	"regexp"
 )
 
-const (
-	luaPluginObjKey = "PLUGIN"
-	osType          = "OS_TYPE"
-	archType        = "ARCH_TYPE"
-	runtime         = "RUNTIME"
-)
-
 var ErrPluginNotFound = errors.New("plugin not found")
 
 func CreatePluginFromPath(tempInstallPath string, manager *Manager) (*PluginWrapper, error) {
