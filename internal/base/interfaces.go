@@ -20,7 +20,6 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 )
 
@@ -101,43 +100,8 @@ type AvailableHookResultItem struct {
 	Addition []*Info `json:"addition"`
 }
 
-type AvailableHookResult = []*AvailableHookResultItem
-
-func CreatePackages(sdkName string, hookResult []*AvailableHookResultItem) []*Package {
-	var result []*Package
-	for _, item := range hookResult {
-		mainSdk := &Info{
-			Name:    sdkName,
-			Version: item.Version,
-			Note:    item.Note,
-		}
-
-		var additionalArr []*Info
-
-		for i, addition := range item.Addition {
-			if addition.Name == "" {
-				logger.Errorf("[Available] additional file %d no name provided", i+1)
-			}
-
-			additionalArr = append(additionalArr, &Info{
-				Name:    addition.Name,
-				Version: addition.Version,
-				Path:    addition.Path,
-				Note:    addition.Note,
-			})
-		}
-
-		result = append(result, &Package{
-			Main:      mainSdk,
-			Additions: additionalArr,
-		})
-	}
-
-	return result
-}
-
 type PreInstallHookCtx struct {
-	Version Version `json:"version"`
+	Version string `json:"version"`
 }
 
 type PreInstallHookResultAdditionItem struct {
@@ -288,7 +252,7 @@ func (p *Package) Clone() *Package {
 }
 
 type Plugin interface {
-	Available(ctx *AvailableHookCtx) (*AvailableHookResult, error)
+	Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem, error)
 
 	PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, error)
 	PostInstall(ctx *PostInstallHookCtx) error

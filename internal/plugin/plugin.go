@@ -100,15 +100,44 @@ func (l *PluginWrapper) invokeAvailable(args []string) ([]*base.Package, error) 
 	ctx := base.AvailableHookCtx{
 		Args: args,
 	}
-	result, err := l.impl.Available(&ctx)
+	hookResult, err := l.impl.Available(&ctx)
 	if err != nil {
 		return nil, err
 	}
-	if result == nil {
+	if hookResult == nil {
 		return []*base.Package{}, nil
 	}
 
-	return base.CreatePackages(l.Name, *result), nil
+	var result []*base.Package
+	for _, item := range hookResult {
+		mainSdk := &base.Info{
+			Name:    l.Name,
+			Version: item.Version,
+			Note:    item.Note,
+		}
+
+		var additionalArr []*base.Info
+
+		for i, addition := range item.Addition {
+			if addition.Name == "" {
+				logger.Errorf("[Available] additional file %d no name provided", i+1)
+			}
+
+			additionalArr = append(additionalArr, &base.Info{
+				Name:    addition.Name,
+				Version: addition.Version,
+				Path:    addition.Path,
+				Note:    addition.Note,
+			})
+		}
+
+		result = append(result, &base.Package{
+			Main:      mainSdk,
+			Additions: additionalArr,
+		})
+	}
+
+	return result, nil
 }
 
 func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
@@ -158,7 +187,7 @@ func (l *PluginWrapper) Available(args []string) ([]*base.Package, error) {
 
 func (l *PluginWrapper) PreInstall(version base.Version) (*base.Package, error) {
 	ctx := base.PreInstallHookCtx{
-		Version: version,
+		Version: string(version),
 	}
 
 	result, err := l.impl.PreInstall(&ctx)

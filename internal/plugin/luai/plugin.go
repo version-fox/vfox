@@ -27,7 +27,7 @@ func (l *LuaPlugin) Close() {
 	l.vm.Close()
 }
 
-func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) (*base.AvailableHookResult, error) {
+func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHookResultItem, error) {
 	L := l.vm.Instance
 	ctxTable, err := Marshal(L, ctx)
 	if err != nil {
@@ -41,13 +41,13 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) (*base.AvailableHookRe
 		return nil, errors.New("no result provided")
 	}
 
-	hookResult := base.AvailableHookResult{}
+	hookResult := []*base.AvailableHookResultItem{}
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
 
-	return &hookResult, nil
+	return hookResult, nil
 }
 func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHookResult, error) {
 	L := l.vm.Instance

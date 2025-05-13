@@ -88,13 +88,6 @@ func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...l
 	return vm.ReturnedValue(), nil
 }
 
-func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {
-	if value := table.RawGetString(key); value.Type() != lua.LTNil {
-		return value.String()
-	}
-	return ""
-}
-
 func (vm *LuaVM) Close() {
 	vm.Instance.Close()
 }
