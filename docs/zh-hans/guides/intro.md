@@ -34,6 +34,7 @@ API、配置文件和实现方式（比如，`$PATH`
 | CMD        | ✅       | 仅支持`Global`作用域,不推荐使用!!!                                                         |
 | Clink      | ✅       |                                                                                 |
 | Cmder      | ✅       |                                                                                 |
+| Nushell    | ✅       |                                                                                 |
 
 
 

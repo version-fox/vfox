@@ -131,6 +131,12 @@ y
 2. 复制 [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) 到脚本目录下，`clink_vfox.lua`脚本只需放置在其中一个目录中，无需放入每个目录。
 3. 重启 Clink 或 Cmder
 
+::: details Nushell
+
+```shell
+vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
+```
+
 :::
 
 然后，打开一个新终端。
@@ -145,7 +151,7 @@ y
 你可以使用 `vfox available` 命令查看所有可用插件。
 :::
 
-```bash 
+```bash
 $ vfox add nodejs
 ```
 
