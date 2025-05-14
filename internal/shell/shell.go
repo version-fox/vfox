@@ -81,8 +81,8 @@ func Open(pid int) error {
 		return fmt.Errorf("You are running the command in development mode, please use the binary file instead")
 	}
 
-	logger.Debugf("open a new shell: %s\n", strings.Join(cmdSlice, " "))
-	command := exec.Command(cmdSlice[0], cmdSlice[1:]...)
+	logger.Debugf("open a new shell: %s\n", cmdSlice[0])
+	command := exec.Command(cmdSlice[0])
 	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout

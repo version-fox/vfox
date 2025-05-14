@@ -2,8 +2,6 @@ module github.com/version-fox/vfox
 
 go 1.23.0
 
-toolchain go1.24.2
-
 require (
 	atomicgo.dev/cursor v0.2.0
 	atomicgo.dev/keyboard v0.2.9
