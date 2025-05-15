@@ -89,10 +89,18 @@ func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.EnvKeys(toolset.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
-	}, base.ShellLocation)
+
+	return m.EnvKeysWithScope(
+		[]*toolset.ToolVersionWithScope{
+			{
+				ToolVersion: workToolVersion,
+				Location:    base.ShellLocation,
+			},
+			{
+				ToolVersion: homeToolVersion,
+				Location:    base.GlobalLocation,
+			},
+		})
 }
 
 type SessionEnvOptions struct {
@@ -188,6 +196,30 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 		return false
 	})
 
+	return sdkEnvs, nil
+}
+
+func (m *Manager) EnvKeysWithScope(tvs []*toolset.ToolVersionWithScope) (SdkEnvs, error) {
+	var sdkEnvs SdkEnvs
+	tools := make(map[string]struct{})
+	for _, t := range tvs {
+		for name, version := range t.Record {
+			if _, ok := tools[name]; ok {
+				continue
+			}
+			if lookupSdk, err := m.LookupSdk(name); err == nil {
+				v := base.Version(version)
+				if ek, err := lookupSdk.EnvKeys(v, t.Location); err == nil {
+					tools[name] = struct{}{}
+
+					sdkEnvs = append(sdkEnvs, &SdkEnv{
+						Sdk: lookupSdk,
+						Env: ek,
+					})
+				}
+			}
+		}
+	}
 	return sdkEnvs, nil
 }
 

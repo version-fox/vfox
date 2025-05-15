@@ -18,10 +18,16 @@ package toolset
 
 import (
 	"fmt"
+	"github.com/version-fox/vfox/internal/base"
 	"path/filepath"
 )
 
 const filename = ".tool-versions"
+
+type ToolVersionWithScope struct {
+	*ToolVersion
+	base.Location
+}
 
 type MultiToolVersions []*ToolVersion
 
