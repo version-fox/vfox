@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/module"
+	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -48,7 +48,10 @@ func (vm *LuaVM) Prepare(options *PrepareOptions) error {
 	if err := vm.Instance.DoString(preloadScript); err != nil {
 		return err
 	}
-	module.Preload(vm.Instance, options.Config)
+
+	if options != nil {
+		module.Preload(vm.Instance, options.Config)
+	}
 
 	return nil
 }
@@ -65,22 +68,24 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 	return table
 }
 
-func (vm *LuaVM) CallFunction(function lua.LValue, args ...lua.LValue) error {
+func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...lua.LValue) (*lua.LTable, error) {
+	function := pluginObj.RawGetString(funcName)
+
+	// In Lua, when a function is called with colon syntax (object:method()),
+	// the object itself is implicitly passed as the first argument.
+	// Here, pluginObj represents the Lua table instance of the plugin,
+	// and it's being passed as the first argument to the Lua function to simulate this behavior.
+	args := append([]lua.LValue{pluginObj}, _args...)
+
 	if err := vm.Instance.CallByParam(lua.P{
 		Fn:      function.(*lua.LFunction),
 		NRet:    1,
 		Protect: true,
 	}, args...); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
-}
 
-func (vm *LuaVM) GetTableString(table *lua.LTable, key string) string {
-	if value := table.RawGetString(key); value.Type() != lua.LTNil {
-		return value.String()
-	}
-	return ""
+	return vm.ReturnedValue(), nil
 }
 
 func (vm *LuaVM) Close() {

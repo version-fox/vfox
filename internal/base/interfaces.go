@@ -14,23 +14,26 @@
  *    limitations under the License.
  */
 
-package internal
+package base
 
 import (
 	"errors"
+	"path/filepath"
 
-	lua "github.com/yuin/gopher-lua"
+	"github.com/version-fox/vfox/internal/util"
 )
 
-type LuaCheckSum struct {
+type Version string
+
+type CheckSum struct {
 	Sha256 string `json:"sha256"`
 	Sha512 string `json:"sha512"`
 	Sha1   string `json:"sha1"`
 	Md5    string `json:"md5"`
 }
 
-func (c *LuaCheckSum) Checksum() *Checksum {
-	checksum := &Checksum{}
+func (c *CheckSum) Checksum() *util.Checksum {
+	checksum := &util.Checksum{}
 
 	if c.Sha256 != "" {
 		checksum.Value = c.Sha256
@@ -45,10 +48,45 @@ func (c *LuaCheckSum) Checksum() *Checksum {
 		checksum.Value = c.Sha512
 		checksum.Type = "sha512"
 	} else {
-		return NoneChecksum
+		return util.NoneChecksum
 	}
 
 	return checksum
+}
+
+type Info struct {
+	Name     string            `json:"name"`
+	Version  string            `json:"version"`
+	Path     string            `json:"path"`
+	Headers  map[string]string `json:"headers"`
+	Note     string            `json:"note"`
+	Checksum *util.Checksum
+}
+
+func (i *Info) Clone() *Info {
+	headers := make(map[string]string, len(i.Headers))
+	for k, v := range i.Headers {
+		headers[k] = v
+	}
+	return &Info{
+		Name:     i.Name,
+		Version:  i.Version,
+		Path:     i.Path,
+		Headers:  headers,
+		Note:     i.Note,
+		Checksum: i.Checksum,
+	}
+}
+
+func (i *Info) Label() string {
+	return i.Name + "@" + string(i.Version)
+}
+
+func (i *Info) StoragePath(parentDir string) string {
+	if i.Version == "" {
+		return filepath.Join(parentDir, i.Name)
+	}
+	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }
 
 type AvailableHookCtx struct {
@@ -61,8 +99,6 @@ type AvailableHookResultItem struct {
 
 	Addition []*Info `json:"addition"`
 }
-
-type AvailableHookResult = []*AvailableHookResultItem
 
 type PreInstallHookCtx struct {
 	Version string `json:"version"`
@@ -80,7 +116,7 @@ type PreInstallHookResultAdditionItem struct {
 }
 
 func (i *PreInstallHookResultAdditionItem) Info() *Info {
-	sum := LuaCheckSum{
+	sum := CheckSum{
 		Sha256: i.Sha256,
 		Sha512: i.Sha512,
 		Sha1:   i.Sha1,
@@ -89,7 +125,7 @@ func (i *PreInstallHookResultAdditionItem) Info() *Info {
 
 	return &Info{
 		Name:     i.Name,
-		Version:  Version(""),
+		Version:  "",
 		Path:     i.Url,
 		Headers:  i.Headers,
 		Note:     i.Note,
@@ -116,7 +152,7 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 		return nil, ErrNoVersionProvided
 	}
 
-	sum := LuaCheckSum{
+	sum := CheckSum{
 		Sha256: i.Sha256,
 		Sha512: i.Sha512,
 		Sha1:   i.Sha1,
@@ -125,7 +161,7 @@ func (i *PreInstallHookResult) Info() (*Info, error) {
 
 	return &Info{
 		Name:     "",
-		Version:  Version(i.Version),
+		Version:  i.Version,
 		Path:     i.Url,
 		Headers:  i.Headers,
 		Note:     i.Note,
@@ -142,7 +178,7 @@ type PreUseHookCtx struct {
 }
 
 type PreUseHookResult struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }
 
 type PostInstallHookCtx struct {
@@ -163,13 +199,13 @@ type EnvKeysHookResultItem struct {
 }
 
 type ParseLegacyFileHookCtx struct {
-	Filepath             string         `json:"filepath"`
-	Filename             string         `json:"filename"`
-	GetInstalledVersions lua.LGFunction `json:"getInstalledVersions"`
+	Filepath             string           `json:"filepath"`
+	Filename             string           `json:"filename"`
+	GetInstalledVersions func() []Version `json:"getInstalledVersions"`
 }
 
 type ParseLegacyFileResult struct {
-	Version string `json:"version"`
+	Version Version `json:"version"`
 }
 
 type PreUninstallHookCtx struct {
@@ -177,7 +213,7 @@ type PreUninstallHookCtx struct {
 	SdkInfo map[string]*Info `json:"sdkInfo"`
 }
 
-type LuaPluginInfo struct {
+type PluginInfo struct {
 	Name              string   `json:"name"`
 	Version           string   `json:"version"`
 	Description       string   `json:"description"`
@@ -190,10 +226,42 @@ type LuaPluginInfo struct {
 	LegacyFilenames   []string `json:"legacyFilenames"`
 }
 
-// LuaRuntime represents the runtime information of the Lua environment.
-type LuaRuntime struct {
+// RuntimeInfo represents the runtime information of the current exec environment.
+type RuntimeInfo struct {
 	OsType        string `json:"osType"`
 	ArchType      string `json:"archType"`
 	Version       string `json:"version"`
 	PluginDirPath string `json:"pluginDirPath"`
+}
+
+type Package struct {
+	Main      *Info
+	Additions []*Info
+}
+
+func (p *Package) Clone() *Package {
+	main := p.Main.Clone()
+	additions := make([]*Info, len(p.Additions))
+	for i, a := range p.Additions {
+		additions[i] = a.Clone()
+	}
+	return &Package{
+		Main:      main,
+		Additions: additions,
+	}
+}
+
+type Plugin interface {
+	Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem, error)
+
+	PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, error)
+	PostInstall(ctx *PostInstallHookCtx) error
+	PreUninstall(ctx *PreUninstallHookCtx) error
+	PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error)
+
+	ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error)
+	EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
+
+	HasFunction(name string) bool
+	Close()
 }

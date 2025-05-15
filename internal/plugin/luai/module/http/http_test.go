@@ -27,7 +27,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const jsonUrl = `https://httpbin.org/ip`
+const jsonUrl = `https://version-fox.github.io/vfox-plugins/index.json`
 
 func TestWithConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -67,7 +67,7 @@ func TestGetRequest(t *testing.T) {
     })
 	assert(err == nil)
 	assert(resp.status_code == 200)
-	assert(resp.headers['Content-Type'] == 'application/json')
+	assert(resp.headers['Content-Type'] == 'application/json; charset=utf-8')
 	`
 	eval(str, t)
 }

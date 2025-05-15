@@ -25,6 +25,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -68,10 +69,10 @@ func installCmd(ctx *cli.Context) error {
 			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
 			var name string
-			var version internal.Version
+			var version base.Version
 			if argsLen == 2 {
 				name = strings.ToLower(argArr[0])
-				version = internal.Version(argArr[1])
+				version = base.Version(argArr[1])
 			} else {
 				name = strings.ToLower(argArr[0])
 				version = ""
@@ -174,7 +175,7 @@ func installAll() error {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
 		}
-		err = lookupSdk.Install(internal.Version(version))
+		err = lookupSdk.Install(base.Version(version))
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
@@ -212,7 +213,7 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 			plugins = append(plugins, name)
 			return true
 		}
-		if !lookupSdk.CheckExists(internal.Version(version)) {
+		if !lookupSdk.CheckExists(base.Version(version)) {
 			return true
 		}
 		return false

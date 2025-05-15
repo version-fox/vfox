@@ -16,7 +16,7 @@ RUNTIME = {
 
 PLUGIN = {
     --- Plugin name
-    name = "java_with_main",
+    name = "missing_required_hook",
     --- Plugin author
     author = "Lihan",
     --- Plugin version
@@ -90,6 +90,8 @@ end
 --- @param ctx table Empty table used as context, for future extension
 --- @return table Descriptions of available versions and accompanying tool descriptions
 function PLUGIN:Available(ctx)
+    printTable(ctx.args)
+
     return {
         {
             version = "xxxx",
@@ -100,34 +102,6 @@ function PLUGIN:Available(ctx)
                     version = "8.8.8",
                 }
             }
-        }
-    }
-end
-
---- Each SDK may have different environment variable configurations.
---- This allows plugins to define custom environment variables (including PATH settings)
---- Note: Be sure to distinguish between environment variable settings for different platforms!
---- @param ctx table Context information
---- @field ctx.path string SDK installation directory
-function PLUGIN:EnvKeys(ctx)
-    --- this variable is same as ctx.sdkInfo['plugin-name'].path
-    local mainPath = ctx.path
-    local sdkInfo = ctx.sdkInfo['sdk-name']
-    local path = sdkInfo.path
-    local version = sdkInfo.version
-    local name = sdkInfo.name
-    return {
-        {
-            key = "JAVA_HOME",
-            value = mainPath
-        },
-        {
-            key = "PATH",
-            value = mainPath .. "/bin"
-        },
-        {
-            key = "PATH",
-            value = mainPath .. "/bin2"
         }
     }
 end
@@ -177,6 +151,15 @@ function PLUGIN:ParseLegacyFile(ctx)
     printTable(ctx)
     local filename = ctx.filename
     local filepath = ctx.filepath
+
+    installed = ctx.getInstalledVersions()
+    if #installed > 0 then
+        print("Installed: " .. installed[1])
+        return {
+            version = "check-installed"
+        }
+    end
+
     if filename == ".node-version" then
         return {
             version = "14.17.0"

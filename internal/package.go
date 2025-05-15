@@ -21,26 +21,27 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/util"
 )
 
 // LocationPackage represents a package that needs to be linked
 type LocationPackage struct {
-	from     *Package
+	from     *base.Package
 	sdk      *Sdk
 	toPath   string
-	location Location
+	location base.Location
 }
 
-func newLocationPackage(version Version, sdk *Sdk, location Location) (*LocationPackage, error) {
+func newLocationPackage(version base.Version, sdk *Sdk, location base.Location) (*LocationPackage, error) {
 	var mockPath string
 	switch location {
-	case OriginalLocation:
+	case base.OriginalLocation:
 		mockPath = ""
-	case GlobalLocation:
+	case base.GlobalLocation:
 		mockPath = filepath.Join(sdk.InstallPath, "current")
-	case ShellLocation:
+	case base.ShellLocation:
 		mockPath = filepath.Join(sdk.sdkManager.PathMeta.CurTmpPath, sdk.Name)
 	default:
 		return nil, fmt.Errorf("unknown location: %s", location)
@@ -57,8 +58,8 @@ func newLocationPackage(version Version, sdk *Sdk, location Location) (*Location
 	}, nil
 }
 
-func (l *LocationPackage) ConvertLocation() *Package {
-	if l.location == OriginalLocation {
+func (l *LocationPackage) ConvertLocation() *base.Package {
+	if l.location == base.OriginalLocation {
 		return l.from
 	}
 	clone := l.from.Clone()
@@ -76,8 +77,8 @@ func (l *LocationPackage) ConvertLocation() *Package {
 	return clone
 }
 
-func (l *LocationPackage) Link() (*Package, error) {
-	if l.location == OriginalLocation {
+func (l *LocationPackage) Link() (*base.Package, error) {
+	if l.location == base.OriginalLocation {
 		return l.from, nil
 	}
 	mockPath := l.toPath
@@ -110,7 +111,7 @@ func (l *LocationPackage) Link() (*Package, error) {
 }
 
 // checkPackageValid checks if the package is valid
-func checkPackageValid(p *Package) bool {
+func checkPackageValid(p *base.Package) bool {
 	if !util.FileExists(p.Main.Path) {
 		return false
 	}
@@ -120,56 +121,4 @@ func checkPackageValid(p *Package) bool {
 		}
 	}
 	return true
-}
-
-type Package struct {
-	Main      *Info
-	Additions []*Info
-}
-
-func (p *Package) Clone() *Package {
-	main := p.Main.Clone()
-	additions := make([]*Info, len(p.Additions))
-	for i, a := range p.Additions {
-		additions[i] = a.Clone()
-	}
-	return &Package{
-		Main:      main,
-		Additions: additions,
-	}
-}
-
-type Info struct {
-	Name     string            `json:"name"`
-	Version  Version           `json:"version"`
-	Path     string            `json:"path"`
-	Headers  map[string]string `json:"headers"`
-	Note     string            `json:"note"`
-	Checksum *Checksum
-}
-
-func (i *Info) Clone() *Info {
-	headers := make(map[string]string, len(i.Headers))
-	for k, v := range i.Headers {
-		headers[k] = v
-	}
-	return &Info{
-		Name:     i.Name,
-		Version:  i.Version,
-		Path:     i.Path,
-		Headers:  headers,
-		Note:     i.Note,
-		Checksum: i.Checksum,
-	}
-}
-
-func (i *Info) label() string {
-	return i.Name + "@" + string(i.Version)
-}
-
-func (i *Info) storagePath(parentDir string) string {
-	if i.Version == "" {
-		return filepath.Join(parentDir, i.Name)
-	}
-	return filepath.Join(parentDir, i.Name+"-"+string(i.Version))
 }

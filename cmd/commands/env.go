@@ -22,6 +22,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
 	"github.com/version-fox/vfox/internal/toolset"
@@ -89,7 +90,7 @@ func outputJSON() error {
 	}
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			if keys, err := lookupSdk.EnvKeys(internal.Version(version), internal.OriginalLocation); err == nil {
+			if keys, err := lookupSdk.EnvKeys(base.Version(version), base.OriginalLocation); err == nil {
 				data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				return true

@@ -24,6 +24,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/printer"
 	"github.com/version-fox/vfox/internal/util"
 	"golang.org/x/crypto/ssh/terminal"
@@ -106,7 +107,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	if version == nil {
 		return nil
 	}
-	return source.Install(internal.Version(version.Key))
+	return source.Install(base.Version(version.Key))
 }
 
 func searchCmd(ctx *cli.Context) error {

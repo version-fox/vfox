@@ -14,46 +14,22 @@
  *    limitations under the License.
  */
 
-package internal
+package module
 
-type UseScope int
-
-type Location int
-
-const (
-	Global UseScope = iota
-	Project
-	Session
+import (
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/html"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/json"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/string"
+	lua "github.com/yuin/gopher-lua"
 )
 
-const (
-	OriginalLocation Location = iota
-	GlobalLocation
-	ShellLocation
-)
-
-func (s UseScope) String() string {
-	switch s {
-	case Global:
-		return "global"
-	case Project:
-		return "project"
-	case Session:
-		return "session"
-	default:
-		return "unknown"
-	}
-}
-
-func (s Location) String() string {
-	switch s {
-	case GlobalLocation:
-		return "global"
-	case ShellLocation:
-		return "shell"
-	case OriginalLocation:
-		return "original"
-	default:
-		return "unknown"
-	}
+func Preload(L *lua.LState, config *config.Config) {
+	L.PreloadModule("http", http.NewModule(config.Proxy))
+	json.Preload(L)
+	html.Preload(L)
+	string.Preload(L)
+	archiver.Preload(L)
 }
