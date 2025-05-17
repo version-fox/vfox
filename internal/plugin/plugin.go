@@ -110,11 +110,12 @@ func (l *PluginWrapper) invokeAvailable(args []string) ([]*base.Package, error) 
 		Args: args,
 	}
 	hookResult, err := l.impl.Available(&ctx)
+	if l.isNoResultProvided(err) {
+		return []*base.Package{}, nil
+	}
+
 	if err != nil {
 		return nil, err
-	}
-	if hookResult == nil {
-		return []*base.Package{}, nil
 	}
 
 	var result []*base.Package
@@ -200,11 +201,11 @@ func (l *PluginWrapper) PreInstall(version base.Version) (*base.Package, error) 
 	}
 
 	result, err := l.impl.PreInstall(&ctx)
+	if l.isNoResultProvided(err) {
+		return &base.Package{}, nil
+	}
 	if err != nil {
 		return nil, err
-	}
-	if result == nil {
-		return &base.Package{}, nil
 	}
 
 	mainSdk, err := result.Info()
@@ -264,11 +265,11 @@ func (l *PluginWrapper) EnvKeys(sdkPackage *base.Package) (*env.Envs, error) {
 
 	logger.Debugf("EnvKeysHookCtx: %+v \n", ctx)
 	items, err := l.impl.EnvKeys(ctx)
+	if l.isNoResultProvided(err) {
+		return nil, fmt.Errorf("no environment variables provided")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no environment variables provided")
 	}
 
 	envKeys := &env.Envs{
@@ -312,6 +313,11 @@ func (l *PluginWrapper) PreUse(version base.Version, previousVersion base.Versio
 	logger.Debugf("PreUseHookCtx: %+v \n", ctx)
 
 	result, err := l.impl.PreUse(&ctx)
+
+	if l.isNoResultProvided(err) {
+		return "", nil
+	}
+
 	if err != nil {
 		return "", err
 	}
@@ -367,6 +373,10 @@ func (l *PluginWrapper) PreUninstall(p *base.Package) error {
 	}
 
 	return l.impl.PreUninstall(ctx)
+}
+
+func (l *PluginWrapper) isNoResultProvided(err error) bool {
+	return errors.Is(err, base.ErrNoResultProvide)
 }
 
 func IsLuaPluginDir(pluginDirPath string) bool {

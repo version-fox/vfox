@@ -38,10 +38,10 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, errors.New("no result provided")
+		return nil, base.ErrNoResultProvide
 	}
 
-	hookResult := []*base.AvailableHookResultItem{}
+	var hookResult []*base.AvailableHookResultItem
 	err = Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -60,7 +60,7 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, errors.New("no result provided")
+		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.PreInstallHookResult{}
 	err = Unmarshal(table, &hookResult)
@@ -81,7 +81,7 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
-		return nil, fmt.Errorf("no environment variables provided")
+		return nil, base.ErrNoResultProvide
 	}
 
 	var hookResult []*base.EnvKeysHookResultItem
@@ -103,7 +103,7 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, errors.New("no result provided")
+		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.PreUseHookResult{}
 	err = Unmarshal(table, &hookResult)
@@ -144,7 +144,7 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.Par
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, errors.New("no result provided")
+		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.ParseLegacyFileResult{}
 	err = Unmarshal(table, &hookResult)

@@ -251,6 +251,8 @@ func (p *Package) Clone() *Package {
 	}
 }
 
+var ErrNoResultProvide = errors.New("no result provided")
+
 type Plugin interface {
 	Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem, error)
 
