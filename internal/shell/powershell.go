@@ -30,7 +30,12 @@ type pwsh struct{}
 var Pwsh Shell = pwsh{}
 
 const hook = `
+
+# All environment variables must be set in global scope
+# DO NOT PUT IN MODULE
 {{.EnvContent}}
+
+$env:__VFOX_PID = $pid;
 
 # remove any existing dynamic module of vfox
 if ($null -ne (Get-Module -Name "version-fox")) {
@@ -45,7 +50,6 @@ New-Module -Name "version-fox" -ScriptBlock {
     #>
     & '{{.SelfPath}}' env --cleanup 2>$null | Out-Null;
 
-    $env:__VFOX_PID = $pid;
     $originalPrompt = $function:prompt;
     $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [Text.UTF8Encoding]::UTF8;
 
@@ -70,7 +74,6 @@ New-Module -Name "version-fox" -ScriptBlock {
     # perform cleanup on removal so a new initialization in current session works
     $ExecutionContext.SessionState.Module.OnRemove += {
         $function:prompt = $originalPrompt
-        Remove-Item -Path Env:__VFOX_PID
         Unregister-Event -SubscriptionId $subscription.Id
     }
 } | Import-Module -Global
