@@ -30,6 +30,8 @@ type pwsh struct{}
 var Pwsh Shell = pwsh{}
 
 const hook = `
+{{.EnvContent}}
+
 # remove any existing dynamic module of vfox
 if ($null -ne (Get-Module -Name "version-fox")) {
     Remove-Module -Name "version-fox" -Force
@@ -37,7 +39,6 @@ if ($null -ne (Get-Module -Name "version-fox")) {
 
 # create a new module to override the prompt function
 New-Module -Name "version-fox" -ScriptBlock {
-    {{.EnvContent}}
 
     <#
     Due to a bug in PowerShell, we have to cleanup first when the shell open.
