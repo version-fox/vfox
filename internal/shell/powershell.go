@@ -31,8 +31,10 @@ var Pwsh Shell = pwsh{}
 
 const hook = `
 
-# All environment variables must be set in global scope
-# DO NOT PUT IN MODULE
+<#
+All environment variables must be set in global scope
+DO NOT PUT IN MODULE.
+#>
 {{.EnvContent}}
 
 $env:__VFOX_PID = $pid;
