@@ -23,12 +23,12 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
-	"github.com/bodgit/sevenzip"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/bodgit/sevenzip"
 	"github.com/ulikunitz/xz"
 )
 
@@ -294,6 +294,10 @@ func findRootFolderInZip(zipFilePath string) string {
 	for _, f := range r.File {
 		normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
 
+		if strings.HasPrefix(normalizedPath, ".DS_Store") || strings.HasPrefix(normalizedPath, "__MACOSX") {
+			continue
+		}
+
 		currentFirstElement := strings.Split(normalizedPath, "/")[0]
 
 		if firstElement != "" && firstElement != currentFirstElement {
@@ -319,6 +323,11 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	defer rc.Close()
 
 	normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
+
+	if strings.HasPrefix(normalizedPath, ".DS_Store") || strings.HasPrefix(normalizedPath, "__MACOSX") {
+		return nil
+	}
+
 	// Split the file name into a slice
 	parts := strings.Split(normalizedPath, "/")
 	if len(parts) > 1 && rootFolderInZip != "" {
@@ -404,6 +413,10 @@ func findRootFolderIn7Zip(zipFilePath string) string {
 
 		normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
 
+		if strings.HasPrefix(normalizedPath, ".DS_Store") || strings.HasPrefix(normalizedPath, "__MACOSX") {
+			continue
+		}
+
 		currentFirstElement := strings.Split(normalizedPath, "/")[0]
 
 		if firstElement != "" && firstElement != currentFirstElement {
@@ -442,6 +455,11 @@ func (s *SevenZipDecompressor) extractFile(f *sevenzip.File, dest string, rootFo
 	defer rc.Close()
 
 	normalizedPath := strings.ReplaceAll(f.Name, "\\", "/")
+
+	if strings.HasPrefix(normalizedPath, ".DS_Store") || strings.HasPrefix(normalizedPath, "__MACOSX") {
+		return nil
+	}
+
 	// Split the file name into a slice
 	parts := strings.Split(normalizedPath, "/")
 	if len(parts) > 1 && rootFolderInZip != "" {
