@@ -68,8 +68,16 @@ sudo yum install vfox
 
 ::: details 手动安装
 
+默认情况下，它会安装在当前用户的 `${HOME}/.local/bin` 目录下:
+
 ```shell
-$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
+$ bash -c "$(curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh)" -- -d
+```
+
+可以使用 `-b` 参数覆盖安装目录。例如，安装在 `/usr/local/bin`：
+
+```shell
+$ sudo bash -c "$(curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh)" -- -d -b /usr/local/bin
 ```
 
 :::
