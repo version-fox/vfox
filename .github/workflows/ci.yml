@@ -29,5 +29,10 @@ jobs:
       - name: Test and coverage
         run: |
           go test ./... -coverprofile=coverage.out -covermode=atomic
+      - name: E2E Test - Path Command
+        run: |
+          chmod +x test/e2e_path_test.sh
+          ./test/e2e_path_test.sh
+        shell: bash
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
