@@ -98,6 +98,7 @@ func newCmd() *cmd {
 		commands.Env,
 		commands.Config,
 		commands.Cd,
+		commands.Path,
 	}
 
 	return &cmd{app: app, version: version}
