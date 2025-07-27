@@ -337,39 +337,37 @@ func TestPathCmdWithMockedSDK(t *testing.T) {
 		// This test simulates what happens when an SDK exists and we construct the path
 		// Using the specific etcd@3.6.0 example that should return ~/.version-fox/cache/etcd/v-3.6.0/etcd-3.6.0
 		testCases := []struct {
-			sdkName      string
-			version      string
-			versionPath  string
-			expectedPath string
+			sdkName string
+			version string
 		}{
 			{
-				sdkName:      "etcd",
-				version:      "3.6.0",
-				versionPath:  "/home/user/.version-fox/cache/etcd/v-3.6.0",
-				expectedPath: "/home/user/.version-fox/cache/etcd/v-3.6.0/etcd-3.6.0",
+				sdkName: "etcd",
+				version: "3.6.0",
 			},
 			{
-				sdkName:      "nodejs",
-				version:      "18.0.0",
-				versionPath:  "/home/user/.version-fox/cache/nodejs/v-18.0.0",
-				expectedPath: "/home/user/.version-fox/cache/nodejs/v-18.0.0/nodejs-18.0.0",
+				sdkName: "nodejs",
+				version: "18.0.0",
 			},
 			{
-				sdkName:      "python",
-				version:      "3.9.0",
-				versionPath:  "/home/user/.version-fox/cache/python/v-3.9.0",
-				expectedPath: "/home/user/.version-fox/cache/python/v-3.9.0/python-3.9.0",
+				sdkName: "python",
+				version: "3.9.0",
 			},
 		}
 
 		for _, tc := range testCases {
 			t.Run(fmt.Sprintf("%s@%s", tc.sdkName, tc.version), func(t *testing.T) {
+				// Build paths using filepath.Join for cross-platform compatibility
+				// Create a base path that works on all platforms
+				basePath := filepath.Join("home", "user", ".version-fox", "cache")
+				versionPath := filepath.Join(basePath, tc.sdkName, fmt.Sprintf("v-%s", tc.version))
+				expectedPath := filepath.Join(versionPath, fmt.Sprintf("%s-%s", tc.sdkName, tc.version))
+				
 				// This simulates the path construction logic from pathCmd:
 				// filepath.Join(sdk.VersionPath(version), fmt.Sprintf("%s-%s", name, version))
-				actualPath := filepath.Join(tc.versionPath, fmt.Sprintf("%s-%s", tc.sdkName, tc.version))
+				actualPath := filepath.Join(versionPath, fmt.Sprintf("%s-%s", tc.sdkName, tc.version))
 
-				if actualPath != tc.expectedPath {
-					t.Errorf("Expected path '%s', got '%s'", tc.expectedPath, actualPath)
+				if actualPath != expectedPath {
+					t.Errorf("Expected path '%s', got '%s'", expectedPath, actualPath)
 				}
 
 				// Verify the path contains the expected components
@@ -386,11 +384,15 @@ func TestPathCmdWithMockedSDK(t *testing.T) {
 				if !strings.HasSuffix(actualPath, expectedFinalComponent) {
 					t.Errorf("Expected path to end with '%s'", expectedFinalComponent)
 				}
+				
+				// Verify the version directory format
+				expectedVersionDir := fmt.Sprintf("v-%s", tc.version)
+				if !strings.Contains(actualPath, expectedVersionDir) {
+					t.Errorf("Expected path to contain version directory '%s'", expectedVersionDir)
+				}
 			})
 		}
-	})
-
-	// Test case: Test the specific etcd@3.6.0 case mentioned in requirements
+	})	// Test case: Test the specific etcd@3.6.0 case mentioned in requirements
 	t.Run("Specific etcd@3.6.0 path format test", func(t *testing.T) {
 		// Test the exact case: vfox path etcd@3.6.0 should return ~/.version-fox/cache/etcd/v-3.6.0/etcd-3.6.0
 		sdkName := "etcd"
@@ -416,15 +418,22 @@ func TestPathCmdWithMockedSDK(t *testing.T) {
 			t.Errorf("Expected version '%s', got '%s'", version, parsedVersion)
 		}
 
-		// Test path construction logic
+		// Test path construction logic using cross-platform approach
 		homeDir, _ := os.UserHomeDir()
 		expectedVersionPath := filepath.Join(homeDir, ".version-fox", "cache", sdkName, fmt.Sprintf("v-%s", version))
 		expectedFinalPath := filepath.Join(expectedVersionPath, fmt.Sprintf("%s-%s", sdkName, version))
 
-		// Verify the expected path format
-		expectedSuffix := "/.version-fox/cache/etcd/v-3.6.0/etcd-3.6.0"
-		if !strings.HasSuffix(expectedFinalPath, expectedSuffix) {
-			t.Errorf("Expected path to end with '%s', got '%s'", expectedSuffix, expectedFinalPath)
+		// Verify the expected path components (cross-platform compatible)
+		pathComponents := []string{".version-fox", "cache", "etcd", "v-3.6.0", "etcd-3.6.0"}
+		for _, component := range pathComponents {
+			if !strings.Contains(expectedFinalPath, component) {
+				t.Errorf("Expected path to contain component '%s', got '%s'", component, expectedFinalPath)
+			}
+		}
+
+		// Verify the final component
+		if !strings.HasSuffix(expectedFinalPath, "etcd-3.6.0") {
+			t.Errorf("Expected path to end with 'etcd-3.6.0', got '%s'", expectedFinalPath)
 		}
 
 		t.Logf("Expected path format for etcd@3.6.0: %s", expectedFinalPath)
