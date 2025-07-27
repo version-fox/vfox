@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/urfave/cli/v2"
@@ -46,6 +47,11 @@ func pathCmd(ctx *cli.Context) error {
 	name := strings.ToLower(argArr[0])
 	version := base.Version(argArr[1])
 
+	// Check for empty SDK name or version
+	if name == "" || string(version) == "" {
+		return cli.Exit("invalid arguments, expected format: <sdk>@<version>", 1)
+	}
+
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
@@ -56,7 +62,7 @@ func pathCmd(ctx *cli.Context) error {
 	}
 
 	if sdk.CheckExists(version) {
-		fmt.Println(sdk.VersionPath(version))
+		fmt.Println(filepath.Join(sdk.VersionPath(version), fmt.Sprintf("%s-%s", name, version)))
 	} else {
 		fmt.Println("notfound")
 	}
