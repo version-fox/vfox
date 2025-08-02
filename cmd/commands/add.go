@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
@@ -58,8 +59,13 @@ func addCmd(ctx *cli.Context) error {
 		}
 		return nil
 	} else {
+		sdkName := args.First()
 		source := ctx.String("source")
 		alias := ctx.String("alias")
-		return manager.Add(args.First(), source, alias)
+		err := manager.Add(sdkName, source, alias)
+		if err == nil {
+			pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", sdkName)))
+		}
+		return err
 	}
 }

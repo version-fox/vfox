@@ -624,7 +624,6 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	tempPlugin.ShowNotes()
 
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
-	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
 }
 
