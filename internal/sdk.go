@@ -161,7 +161,7 @@ func (b *Sdk) Install(version base.Version) error {
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
-	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
+	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
 
