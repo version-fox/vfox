@@ -242,33 +242,35 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	return sdk, nil
 }
 
-func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
+func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (*Sdk, error) {
 	source, err := m.LookupSdk(name)
 	if err != nil {
 		if errors.As(err, &NotFoundError{}) {
-			fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
-			if result, _ := pterm.DefaultInteractiveConfirm.
-				WithTextStyle(&pterm.ThemeDefault.DefaultText).
-				WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-				WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-				WithDefaultText("Please confirm").
-				Show(); result {
-
-				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
-				if err != nil {
-					if errors.Is(err, ManifestNotFound) {
-						return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
-					}
-					return nil, err
-				}
-
-				if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
-					return nil, err
-				}
-				return m.LookupSdk(manifest.Name)
+			if autoConfirm {
+				fmt.Printf("[%s] not added yet, automatically proceeding with installation.\n", pterm.LightBlue(name))
 			} else {
-				return nil, cli.Exit("", 1)
+				fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
+				result, _ := pterm.DefaultInteractiveConfirm.
+					WithTextStyle(&pterm.ThemeDefault.DefaultText).
+					WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+					WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+					WithDefaultText("Please confirm").
+					Show()
+				if !result {
+					return nil, cli.Exit("", 1)
+				}
 			}
+			manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
+			if err != nil {
+				if errors.Is(err, ManifestNotFound) {
+					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
+				}
+				return nil, err
+			}
+			if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
+				return nil, err
+			}
+			return m.LookupSdk(manifest.Name)
 		}
 		return nil, fmt.Errorf("%s not supported, error: %w", name, err)
 	} else {

@@ -40,7 +40,7 @@ var Search = &cli.Command{
 func RunSearch(sdkName string, availableArgs []string) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	source, err := manager.LookupSdkWithInstall(sdkName)
+	source, err := manager.LookupSdkWithInstall(sdkName, false)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
 	}

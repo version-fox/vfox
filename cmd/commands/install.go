@@ -40,6 +40,11 @@ var Install = &cli.Command{
 			Aliases: []string{"a"},
 			Usage:   "Install all SDK versions recorded in .tool-versions",
 		},
+		&cli.BoolFlag{
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage:   "Automatically answers \"yes\" to all prompts during the installation process.",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -49,6 +54,8 @@ func installCmd(ctx *cli.Context) error {
 	if ctx.Bool("all") {
 		return installAll()
 	}
+
+	yes := ctx.Bool("yes")
 
 	args := ctx.Args()
 	if args.First() == "" {
@@ -77,7 +84,7 @@ func installCmd(ctx *cli.Context) error {
 				name = strings.ToLower(argArr[0])
 				version = ""
 			}
-			source, err := manager.LookupSdkWithInstall(name)
+			source, err := manager.LookupSdkWithInstall(name, yes)
 			if err != nil {
 				errorStore.AddAndShow(name, err)
 				continue
