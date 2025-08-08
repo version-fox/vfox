@@ -67,8 +67,16 @@ sudo yum install vfox
 
 ::: details Manual Installation
 
+By default, it installs on the `${HOME}/.local/bin` directory for the current user:
+
 ```shell
-$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
+$ bash -c "$(curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh)" -- -d
+```
+
+It is possible to override the installation directory with the `-b` parameter. For example, to install in `/usr/local/bin`:
+
+```shell
+$ sudo bash -c "$(curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh)" -- -d -b /usr/local/bin
 ```
 
 :::
@@ -149,7 +157,7 @@ After you have installed [vfox](https://github.com/version-fox/vfox), you still 
 If you don't know which plugin to add, you can use the `vfox available` command to see all available plugins.
 :::
 
-```bash 
+```bash
 $ vfox add nodejs
 ```
 
@@ -178,7 +186,7 @@ runtime, depending on the plugin's implementation.
 If you **don't know the specific version **, you can use `vfox search nodejs` to see all available versions.
 :::
 
-::: tip 
+::: tip
 `install` and `search` commands will check if the plugin is already added locally. If not, they will **automatically
 add the plugin**.
 :::
@@ -200,7 +208,7 @@ $ vfox use -g nodejs
 
 ::: tip
 
-`Global` is managed in the `$HOME/.version-fox/.tool-versions` file. 
+`Global` is managed in the `$HOME/.version-fox/.tool-versions` file.
 
 The contents of the `.tool-versions` file as follows:
 
@@ -233,12 +241,12 @@ For **Windows** users:
 $ vfox use -p nodejs
 ```
 
-`vfox` will **automatically detect whether there is a `.tool-versions` file** in the directory when you enter a directory. 
+`vfox` will **automatically detect whether there is a `.tool-versions` file** in the directory when you enter a directory.
 If it exists, `vfox` will **automatically switch to the version specified by the project**.
 
 ::: tip
-`Project` is managed in the `$PWD/.tool-versions` file (current working directory). 
-::: 
+`Project` is managed in the `$PWD/.tool-versions` file (current working directory).
+:::
 
 ::: warning Default scope
 
@@ -259,13 +267,13 @@ $ vfox use -s nodejs
 
 The session scope takes effect only for the current shell session. In other words, the versions are not shared between.
 
-The main purpose of this scope is to meet **temporary needs**. 
+The main purpose of this scope is to meet **temporary needs**.
 When you close the current terminal, `vfox` will **automatically switch back to the `Global`/`Project` version**.
 
 
 ::: tip
 
-`Session` is managed in the `$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` file (temporary directory). 
+`Session` is managed in the `$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` file (temporary directory).
 
 :::
 
@@ -285,5 +293,5 @@ That completes the Getting Started guide for `vfox`🎉 You can now manage `node
 similar
 steps for each type of tool in your project!
 
-`vfox` has many more commands to become familiar with, you can see them all by running `vfox --help` or `vfox`. 
+`vfox` has many more commands to become familiar with, you can see them all by running `vfox --help` or `vfox`.
 
