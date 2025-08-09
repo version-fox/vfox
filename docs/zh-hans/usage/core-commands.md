@@ -53,6 +53,7 @@ vfox i <sdk-name>@<version>
 **选项**
 
 - `-a, --all`: 安装 .tool-versions 中记录的所有 SDK 版本
+- `-y, --yes`: 直接安装，跳过确认提示
 
 ::: tip 自动安装
 你可以一次性安装多个 SDK，通过空格分隔。
@@ -60,6 +61,15 @@ vfox i <sdk-name>@<version>
 ```shell
 vfox install nodejs@20 golang ...
 ```
+
+::: tip
+直接安装，跳过确认提示
+
+```shell
+vfox install --yes nodejs@20
+vfox install --yes --all
+```
+
 :::
 
 ## Use
