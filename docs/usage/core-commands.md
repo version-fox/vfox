@@ -60,6 +60,8 @@ You can install multiple SDKs at the same time by separating them with space.
 vfox install nodejs@20 golang ...
 ```
 
+:::
+
 ::: tip
 Quick installation, skip interactive prompts​​
 

@@ -62,6 +62,8 @@ vfox i <sdk-name>@<version>
 vfox install nodejs@20 golang ...
 ```
 
+:::
+
 ::: tip
 直接安装，跳过确认提示
 
