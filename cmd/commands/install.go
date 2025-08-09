@@ -43,7 +43,7 @@ var Install = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "yes",
 			Aliases: []string{"y"},
-			Usage:   "Automatically answers \"yes\" to all prompts during the installation process.",
+			Usage:   "Quick installation, skip interactive prompts",
 		},
 	},
 	Action:   installCmd,
