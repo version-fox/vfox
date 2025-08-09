@@ -51,11 +51,11 @@ var Install = &cli.Command{
 }
 
 func installCmd(ctx *cli.Context) error {
-	if ctx.Bool("all") {
-		return installAll()
-	}
-
 	yes := ctx.Bool("yes")
+
+	if ctx.Bool("all") {
+		return installAll(yes)
+	}
 
 	args := ctx.Args()
 	if args.First() == "" {
@@ -118,7 +118,7 @@ func installCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func installAll() error {
+func installAll(autoConfirm bool) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
@@ -134,10 +134,13 @@ func installAll() error {
 	fmt.Println("Install the following plugins and SDKs:")
 	printPlugin(plugins, nil)
 	printSdk(sdks, nil)
-	if result, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultValue(true).
-		Show("Do you want to install these plugins and SDKs?"); !result {
-		return nil
+
+	if !autoConfirm {
+		if result, _ := pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true).
+			Show("Do you want to install these plugins and SDKs?"); !result {
+			return nil
+		}
 	}
 
 	var (
