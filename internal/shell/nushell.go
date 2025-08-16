@@ -33,7 +33,7 @@ export-env {
 
   # Add a pre_prompt hook that calls the above "updateVfoxEnvironment" function.
   $env.config = ($env.config | upsert hooks.pre_prompt {
-    let currentValue = ($env.config | get -i hooks.pre_prompt)
+    let currentValue = ($env.config | get -o hooks.pre_prompt)
     if $currentValue == null {
       [{updateVfoxEnvironment}]
     } else {
