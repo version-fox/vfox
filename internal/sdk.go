@@ -253,14 +253,14 @@ func (b *Sdk) Uninstall(version base.Version) (err error) {
 		if err = b.ClearCurrentEnv(); err != nil {
 			return err
 		}
-	}
 
-	tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
-	if err != nil {
-		return err
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		if err != nil {
+			return err
+		}
+		delete(tv.Record, b.Name)
+		_ = tv.Save()
 	}
-	delete(tv.Record, b.Name)
-	_ = tv.Save()
 
 	err = os.RemoveAll(path)
 	if err != nil {
