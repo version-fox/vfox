@@ -91,7 +91,8 @@ type Sdk struct {
 func (b *Sdk) Install(version base.Version) error {
 	label := b.Label(version)
 	if b.CheckExists(version) {
-		return fmt.Errorf("%s is already installed", label)
+		fmt.Printf("%s is already installed\n", label)
+		return nil
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
@@ -107,7 +108,8 @@ func (b *Sdk) Install(version base.Version) error {
 	// for example, latest is resolved to a specific version number.
 	label = b.Label(sdkVersion)
 	if b.CheckExists(sdkVersion) {
-		return fmt.Errorf("%s is already installed", label)
+		fmt.Printf("%s is already installed\n", label)
+		return nil
 	}
 	success := false
 	newDirPath := b.VersionPath(sdkVersion)
