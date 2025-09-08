@@ -303,8 +303,7 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 			d = fs.FileInfoToDirEntry(dirFileInfo)
 		}
 
-		if d.IsDir() {
-		} else if strings.HasSuffix(sdkName, ".lua") {
+		if !d.IsDir() {
 			logger.Debugf("Found old plugin: %s \n", path)
 			// FIXME !!! This snippet will be removed in a later version
 			// rename old plugin path to new plugin path
@@ -321,7 +320,12 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		} else {
 			continue
 		}
-		sdk, _ := NewSdk(m, path)
+
+		sdk, err := NewSdk(m, path)
+		if err != nil {
+			return nil, err
+		}
+
 		sdkSlice = append(sdkSlice, sdk)
 
 		m.openSdks[strings.ToLower(sdkName)] = sdk
