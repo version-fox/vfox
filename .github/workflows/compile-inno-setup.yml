@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Get version-fox version
         id: version-fox-version
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: NO_NEED
           result-encoding: string
