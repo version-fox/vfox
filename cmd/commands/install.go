@@ -26,6 +26,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -84,12 +85,17 @@ func installCmd(ctx *cli.Context) error {
 				name = strings.ToLower(argArr[0])
 				version = ""
 			}
-			source, err := manager.LookupSdkWithInstall(name, yes)
+
+			sdk, err := manager.LookupSdkWithInstall(name, yes)
+
 			if err != nil {
 				errorStore.AddAndShow(name, err)
 				continue
 			}
-			if version == "" {
+
+			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
+			logger.Debugf("resolved version: %s\n", resolvedVersion)
+			if resolvedVersion == "" {
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
 					err := RunSearch(name, []string{})
@@ -99,7 +105,7 @@ func installCmd(ctx *cli.Context) error {
 					continue
 				}
 			} else {
-				if err = source.Install(version); err != nil {
+				if err = sdk.Install(resolvedVersion); err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}

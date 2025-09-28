@@ -91,7 +91,8 @@ type Sdk struct {
 func (b *Sdk) Install(version base.Version) error {
 	label := b.Label(version)
 	if b.CheckExists(version) {
-		return fmt.Errorf("%s is already installed", label)
+		fmt.Printf("%s is already installed\n", label)
+		return nil
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
@@ -107,7 +108,8 @@ func (b *Sdk) Install(version base.Version) error {
 	// for example, latest is resolved to a specific version number.
 	label = b.Label(sdkVersion)
 	if b.CheckExists(sdkVersion) {
-		return fmt.Errorf("%s is already installed", label)
+		fmt.Printf("%s is already installed\n", label)
+		return nil
 	}
 	success := false
 	newDirPath := b.VersionPath(sdkVersion)
@@ -161,7 +163,7 @@ func (b *Sdk) Install(version base.Version) error {
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
-	pterm.Printf("Please use %s to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
+	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
 	return nil
 }
 
@@ -253,14 +255,14 @@ func (b *Sdk) Uninstall(version base.Version) (err error) {
 		if err = b.ClearCurrentEnv(); err != nil {
 			return err
 		}
-	}
 
-	tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
-	if err != nil {
-		return err
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		if err != nil {
+			return err
+		}
+		delete(tv.Record, b.Name)
+		_ = tv.Save()
 	}
-	delete(tv.Record, b.Name)
-	_ = tv.Save()
 
 	err = os.RemoveAll(path)
 	if err != nil {

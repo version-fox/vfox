@@ -343,6 +343,7 @@ func (l *PluginWrapper) ParseLegacyFile(path string, installedVersions func() []
 			logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
 			return versions
 		},
+		Strategy: l.config.LegacyVersionFile.Strategy,
 	}
 
 	logger.Debugf("ParseLegacyFile: %+v \n", ctx)
