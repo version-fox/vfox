@@ -36,6 +36,6 @@ type LegacyVersionFile struct {
 }
 
 var EmptyLegacyVersionFile = &LegacyVersionFile{
-	Enable:   false,
+	Enable:   true,
 	Strategy: DefaultStrategy,
 }

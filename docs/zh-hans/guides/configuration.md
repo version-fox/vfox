@@ -10,12 +10,24 @@
 
 插件 **支持** 读取其他版本管理器的配置文件, 例如: Nodejs 的`nvm`的`.nvmrc`文件, Java 的`SDKMAN`的`.sdkmanrc`文件等。
 
-此能力**默认是关闭的**, 如果你想开启, 请按照以下方式配置:
+此能力**默认是开启的**。相关配置选项如下:
 
 ```yaml
 legacyVersionFile:
   enable: true
+  strategy: "specified" # 解析策略
 ```
+
+- `enable`: 是否启用 legacy version file 解析功能
+- `strategy`: 解析策略，详见下方策略选项说明
+
+### 策略选项
+
+`vfox` 支持以下三种解析策略：
+
+- `latest_installed`: 使用最新安装的版本
+- `latest_available`: 使用最新可用的版本
+- `specified`: 使用 legacy file 中指定的版本（默认）
 
 ::: warning
 
@@ -23,6 +35,8 @@ legacyVersionFile:
    `vfox` **优先加载**`.tool-versions`文件.
 2. 开启此功能可能会导致`vfox`刷新环境变量时略微变慢, **请根据自己的需求开启**。
    :::
+
+如果你想禁用此功能，可以使用命令：`vfox config legacyVersionFile.enable false`
 
 ## 代理设置
 
@@ -74,19 +88,19 @@ registry:
 `vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。
 
 ::: warning 特殊值
+
 - `-1`: 永不过期
 - `0`: 不进行缓存
-:::
+  :::
+
 ```yaml
 cache:
   availableHookDuration: 12h # s 秒, m 分钟, h 小时
 ```
 
-
 ::: tip 缓存文件路径
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
-
 
 ## Config 命令 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
 
