@@ -321,7 +321,12 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		} else {
 			continue
 		}
-		sdk, _ := NewSdk(m, path)
+
+		sdk, err := NewSdk(m, path)
+		if err != nil {
+			return nil, err
+		}
+
 		sdkSlice = append(sdkSlice, sdk)
 
 		m.openSdks[strings.ToLower(sdkName)] = sdk
