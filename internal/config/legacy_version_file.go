@@ -24,7 +24,6 @@ const (
 )
 
 // LegacyVersionFile represents whether to enable the ability to parse legacy version files,
-// Disable by default.
 type LegacyVersionFile struct {
 	Enable bool `yaml:"enable"`
 	// Support three strategies:
@@ -36,6 +35,6 @@ type LegacyVersionFile struct {
 }
 
 var EmptyLegacyVersionFile = &LegacyVersionFile{
-	Enable:   false,
+	Enable:   true,
 	Strategy: DefaultStrategy,
 }

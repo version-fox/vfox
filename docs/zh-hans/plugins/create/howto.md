@@ -224,6 +224,10 @@ end
 该钩子函数必须配合 `legacyFilenames` 配置项使用, 告诉`vfox` 你的插件支持解析哪些文件。
 :::
 
+::: tip 策略配置
+在实现此钩子函数时，你可以通过 `ctx.strategy` 获取用户配置的解析策略。详细的策略配置请参考[配置文档](../../guides/configuration.md#兼容版本文件)。
+:::
+
 **位置**: `metadata.lua`
 
 ```lua
@@ -242,6 +246,8 @@ function PLUGIN:ParseLegacyFile(ctx)
     local filename = ctx.filename
     --- 文件路径
     local filepath = ctx.filepath
+    --- 解析策略 (latest_installed, latest_available, specified)
+    local strategy = ctx.strategy
     --- 获取当前插件已安装的版本列表
     local versions = ctx:getInstalledVersions()
 

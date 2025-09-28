@@ -233,6 +233,10 @@ This hook is used to parse other configuration files to determine the version of
 This hook must be used with the `legacyFilenames` configuration item to tell `vfox` which files your plugin can parse.
 :::
 
+::: tip Strategy Configuration
+When implementing this hook function, you can access the user-configured parsing strategy through `ctx.strategy`. For detailed strategy configuration, please refer to the [Configuration Documentation](../../guides/configuration.md#legacy-version-file).
+:::
+
 **location**: `metadata.lua`
 
 ```lua
@@ -249,6 +253,8 @@ PLUGIN.legacyFilenames = {
 function PLUGIN:ParseLegacyFile(ctx)
     local filename = ctx.filename
     local filepath = ctx.filepath
+    --- Parsing strategy (latest_installed, latest_available, specified)
+    local strategy = ctx.strategy
     --- Get the list of versions of the current plugin installed
     local versions = ctx:getInstalledVersions()
 
