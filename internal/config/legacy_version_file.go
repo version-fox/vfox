@@ -16,12 +16,26 @@
 
 package config
 
+const (
+	LatestInstalledStrategy = "latest_installed"
+	LatestAvailableStrategy = "latest_available"
+	SpecifiedStrategy       = "specified"
+	DefaultStrategy         = SpecifiedStrategy
+)
+
 // LegacyVersionFile represents whether to enable the ability to parse legacy version files,
 // Disable by default.
 type LegacyVersionFile struct {
 	Enable bool `yaml:"enable"`
+	// Support three strategies:
+	// 1. latest_installed: use the latest installed version
+	// 2. latest_available: use the latest available version
+	// 3. specified: use the specified version in the legacy file
+	// default: specified
+	Strategy string `yaml:"strategy"`
 }
 
 var EmptyLegacyVersionFile = &LegacyVersionFile{
-	Enable: false,
+	Enable:   false,
+	Strategy: DefaultStrategy,
 }
