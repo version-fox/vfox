@@ -34,7 +34,8 @@ legacyVersionFile:
 1. 如果目录里同时存在`.tool-versions`和其他版本管理器的配置文件(`.nvmrc`, `.sdkmanrc`等),
    `vfox` **优先加载**`.tool-versions`文件.
 2. 开启此功能可能会导致`vfox`刷新环境变量时略微变慢, **请根据自己的需求开启**。
-   :::
+
+:::
 
 如果你想禁用此功能，可以使用命令：`vfox config legacyVersionFile.enable false`
 

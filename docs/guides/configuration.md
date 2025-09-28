@@ -37,7 +37,8 @@ legacyVersionFile:
    directory, `vfox` **priority read** the `.tool-versions` file.
 2. Enabling this feature may cause `vfox` to refresh environment variables slightly slower, **please enable it according
    to your needs**.
-   :::
+
+:::
 
 If you want to disable this feature, you can use the command: `vfox config legacyVersionFile.enable false`
 
@@ -91,15 +92,15 @@ registry:
 cache time is `12h`.
 
 ::: warning Special Value
+
 - `-1`: Never expire
 - `0`: Do not cache
-:::
+  :::
 
 ```yaml
 cache:
   availableHookDuration: 12h # s second, m minute, h hour
 ```
-
 
 ::: tip Cache File Path
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
