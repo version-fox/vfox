@@ -202,6 +202,12 @@ type ParseLegacyFileHookCtx struct {
 	Filepath             string           `json:"filepath"`
 	Filename             string           `json:"filename"`
 	GetInstalledVersions func() []Version `json:"getInstalledVersions"`
+	// Support three strategies:
+	// 1. latest_installed: use the latest installed version
+	// 2. latest_available: use the latest available version
+	// 3. specified: use the specified version in the legacy file
+	// default: specified
+	Strategy string `json:"strategy"`
 }
 
 type ParseLegacyFileResult struct {
