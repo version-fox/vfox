@@ -78,7 +78,7 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
     local vfox_install = clink.argmatcher():nofiles():addarg({
         onadvance = function() return 0 end,
         vfox_sdk_func,
-    }):addflags('--all', '-a', '--help', '-h')
+    }):addflags('--all', '-a', '--yes', '-y', '--help', '-h')
 
     vfox:addarg(
         'add' .. clink.argmatcher():nofiles():addarg({

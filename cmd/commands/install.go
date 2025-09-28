@@ -41,14 +41,21 @@ var Install = &cli.Command{
 			Aliases: []string{"a"},
 			Usage:   "Install all SDK versions recorded in .tool-versions",
 		},
+		&cli.BoolFlag{
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage:   "Quick installation, skip interactive prompts",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
 }
 
 func installCmd(ctx *cli.Context) error {
+	yes := ctx.Bool("yes")
+
 	if ctx.Bool("all") {
-		return installAll()
+		return installAll(yes)
 	}
 
 	args := ctx.Args()
@@ -78,7 +85,9 @@ func installCmd(ctx *cli.Context) error {
 				name = strings.ToLower(argArr[0])
 				version = ""
 			}
-			sdk, err := manager.LookupSdkWithInstall(name)
+
+			sdk, err := manager.LookupSdkWithInstall(name, yes)
+
 			if err != nil {
 				errorStore.AddAndShow(name, err)
 				continue
@@ -115,7 +124,7 @@ func installCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func installAll() error {
+func installAll(autoConfirm bool) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
@@ -131,10 +140,13 @@ func installAll() error {
 	fmt.Println("Install the following plugins and SDKs:")
 	printPlugin(plugins, nil)
 	printSdk(sdks, nil)
-	if result, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultValue(true).
-		Show("Do you want to install these plugins and SDKs?"); !result {
-		return nil
+
+	if !autoConfirm {
+		if result, _ := pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true).
+			Show("Do you want to install these plugins and SDKs?"); !result {
+			return nil
+		}
 	}
 
 	var (
