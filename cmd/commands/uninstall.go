@@ -50,13 +50,14 @@ func uninstallCmd(ctx *cli.Context) error {
 
 	name := strings.ToLower(argArr[0])
 	version := base.Version(argArr[1])
+	resolvedVersion := manager.ResolveVersion(name, version)
 
 	source, err := manager.LookupSdk(name)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
 	cv := source.Current()
-	if err = source.Uninstall(version); err != nil {
+	if err = source.Uninstall(resolvedVersion); err != nil {
 		return err
 	}
 	remainVersion := source.List()
