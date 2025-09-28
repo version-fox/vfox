@@ -17,9 +17,10 @@
 package config_test
 
 import (
-	"github.com/version-fox/vfox/internal/config"
 	"os"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/config"
 )
 
 func TestNewConfig(t *testing.T) {
@@ -58,8 +59,8 @@ func TestConfigWithEmpty(t *testing.T) {
 	if c.Storage.SdkPath != "" {
 		t.Fatal("proxy url must be empty")
 	}
-	if c.LegacyVersionFile.Enable != false {
-		t.Fatal("legacy version file enable must be false")
+	if c.LegacyVersionFile.Enable != true {
+		t.Fatal("legacy version file enable must be true")
 	}
 	if c.Registry.Address != "" {
 		t.Fatal("registry address must be empty")
