@@ -240,7 +240,7 @@ func (m *Module) luaMap() map[string]lua.LGFunction {
 	}
 }
 
-func NewModule(proxy *config.Proxy) lua.LGFunction {
+func createModule(proxy *config.Proxy) lua.LGFunction {
 	return func(L *lua.LState) int {
 		client := &http.Client{}
 		if proxy.Enable {
@@ -260,4 +260,8 @@ func NewModule(proxy *config.Proxy) lua.LGFunction {
 		L.Push(t)
 		return 1
 	}
+}
+
+func Preload(L *lua.LState, proxy *config.Proxy) {
+	L.PreloadModule("http", createModule(proxy))
 }

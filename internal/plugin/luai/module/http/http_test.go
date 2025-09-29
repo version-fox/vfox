@@ -49,10 +49,11 @@ func TestWithConfig(t *testing.T) {
 
 	s.SetGlobal("jsonUrl", lua.LString(jsonUrl))
 
-	s.PreloadModule("http", NewModule(&config.Proxy{
+	Preload(s, &config.Proxy{
 		Enable: true,
 		Url:    "http://127.0.0.1",
-	}))
+	})
+
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}
@@ -113,8 +114,8 @@ func eval(str string, t *testing.T) {
 	defer s.Close()
 
 	s.SetGlobal("jsonUrl", lua.LString(jsonUrl))
+	Preload(s, config.EmptyProxy)
 
-	s.PreloadModule("http", NewModule(config.EmptyProxy))
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}

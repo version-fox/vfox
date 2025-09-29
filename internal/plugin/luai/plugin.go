@@ -8,6 +8,7 @@ import (
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -164,7 +165,7 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTab
 
 func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*LuaPlugin, error) {
 	vm := NewLuaVM()
-	if err := vm.Prepare(&PrepareOptions{
+	if err := vm.Prepare(&module.PreloadOptions{
 		Config: config,
 	}); err != nil {
 		return nil, err

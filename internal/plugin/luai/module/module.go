@@ -26,8 +26,12 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-func Preload(L *lua.LState, config *config.Config) {
-	L.PreloadModule("http", http.NewModule(config.Proxy))
+type PreloadOptions struct {
+	Config *config.Config
+}
+
+func Preload(L *lua.LState, options *PreloadOptions) {
+	http.Preload(L, options.Config.Proxy)
 	json.Preload(L)
 	html.Preload(L)
 	string.Preload(L)
