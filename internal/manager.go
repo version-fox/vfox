@@ -73,18 +73,11 @@ type Manager struct {
 }
 
 func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
-	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+	workToolVersion, err := m.WorkspaceToolVersion()
 	if err != nil {
 		return nil, err
 	}
 
-	if err = m.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
-		return nil, err
-	}
 	homeToolVersion, err := toolset.NewToolVersion(m.PathMeta.HomePath)
 	if err != nil {
 		return nil, err
@@ -93,6 +86,24 @@ func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
 		workToolVersion,
 		homeToolVersion,
 	}, base.ShellLocation)
+}
+
+func (m *Manager) WorkspaceToolVersion() (*toolset.ToolVersion, error) {
+	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.parseLegacyFile(m.PathMeta.WorkingDirectory, func(sdkname, version string) {
+		logger.Debugf("parse legacy file: %s@%s\n", sdkname, version)
+		if _, ok := workToolVersion.Record[sdkname]; !ok {
+			workToolVersion.Record[sdkname] = version
+		}
+	}); err != nil {
+		return nil, err
+	}
+
+	return workToolVersion, nil
 }
 
 type SessionEnvOptions struct {
@@ -124,19 +135,10 @@ type SessionEnvOptions struct {
 func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	tvs := toolset.MultiToolVersions{}
 
-	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+	workToolVersion, err := m.WorkspaceToolVersion()
 	if err != nil {
 		return nil, err
 	}
-
-	if err = m.ParseLegacyFile(func(sdkname, version string) {
-		if _, ok := workToolVersion.Record[sdkname]; !ok {
-			workToolVersion.Record[sdkname] = version
-		}
-	}); err != nil {
-		return nil, err
-	}
-
 	tvs = append(tvs, workToolVersion)
 
 	if opt.WithGlobalEnv {
@@ -217,6 +219,10 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location base.Location)
 
 // LookupSdk lookup sdk by name
 func (m *Manager) LookupSdk(name string) (*Sdk, error) {
+	if sdk, ok := m.openSdks[name]; ok {
+		return sdk, nil
+	}
+
 	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name))
 	if !util.FileExists(pluginPath) {
 		oldPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
@@ -242,33 +248,52 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 	return sdk, nil
 }
 
-func (m *Manager) LookupSdkWithInstall(name string) (*Sdk, error) {
+func (m *Manager) ResolveVersion(sdkName string, version base.Version) base.Version {
+	if version == "" {
+		// when version is empty, try to get version from workspace tool
+		workspaceTool, err := m.WorkspaceToolVersion()
+		if err != nil {
+			logger.Errorf("Failed to get workspace tool version: %v", err)
+			return version
+		}
+
+		logger.Debugf("workspace tool version: %+v\n", workspaceTool)
+		if v, ok := workspaceTool.Record[sdkName]; ok {
+			return base.Version(v)
+		}
+	}
+	return version
+}
+
+func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (*Sdk, error) {
 	source, err := m.LookupSdk(name)
 	if err != nil {
 		if errors.As(err, &NotFoundError{}) {
-			fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
-			if result, _ := pterm.DefaultInteractiveConfirm.
-				WithTextStyle(&pterm.ThemeDefault.DefaultText).
-				WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-				WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-				WithDefaultText("Please confirm").
-				Show(); result {
-
-				manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
-				if err != nil {
-					if errors.Is(err, ManifestNotFound) {
-						return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
-					}
-					return nil, err
-				}
-
-				if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
-					return nil, err
-				}
-				return m.LookupSdk(manifest.Name)
+			if autoConfirm {
+				fmt.Printf("[%s] not added yet, automatically proceeding with installation.\n", pterm.LightBlue(name))
 			} else {
-				return nil, cli.Exit("", 1)
+				fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
+				result, _ := pterm.DefaultInteractiveConfirm.
+					WithTextStyle(&pterm.ThemeDefault.DefaultText).
+					WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+					WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+					WithDefaultText("Please confirm").
+					Show()
+				if !result {
+					return nil, cli.Exit("", 1)
+				}
 			}
+			manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
+			if err != nil {
+				if errors.Is(err, ManifestNotFound) {
+					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
+				}
+				return nil, err
+			}
+			if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
+				return nil, err
+			}
+			return m.LookupSdk(manifest.Name)
 		}
 		return nil, fmt.Errorf("%s not supported, error: %w", name, err)
 	} else {
@@ -321,7 +346,12 @@ func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
 		} else {
 			continue
 		}
-		sdk, _ := NewSdk(m, path)
+
+		sdk, err := NewSdk(m, path)
+		if err != nil {
+			return nil, err
+		}
+
 		sdkSlice = append(sdkSlice, sdk)
 
 		m.openSdks[strings.ToLower(sdkName)] = sdk
@@ -624,7 +654,6 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	tempPlugin.ShowNotes()
 
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
-	pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", pname)))
 	return nil
 }
 
@@ -793,21 +822,23 @@ func (m *Manager) loadLegacyFileRecord() (*toolset.FileRecord, error) {
 	return mapFile, nil
 }
 
-// ParseLegacyFile parse legacy file and output the sdkname and version
-func (m *Manager) ParseLegacyFile(output func(sdkname, version string)) error {
+// parseLegacyFile parse legacy file and output the sdkname and version
+func (m *Manager) parseLegacyFile(dirPath string, output func(sdkname, version string)) error {
 	// If the legacy version file is enabled, the legacy file will be parsed.
 	if !m.Config.LegacyVersionFile.Enable {
+		logger.Debugf("Legacy version file is disabled \n")
 		return nil
 	}
 	legacyFileRecord, err := m.loadLegacyFileRecord()
 	if err != nil {
 		return err
 	}
+	logger.Debugf("Legacy file record: %+v \n", legacyFileRecord)
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
 		for filename, sdkname := range legacyFileRecord.Record {
-			path := filepath.Join(m.PathMeta.WorkingDirectory, filename)
+			path := filepath.Join(dirPath, filename)
 			if util.FileExists(path) {
 				logger.Debugf("Parsing legacy file %s \n", path)
 				if sdk, err := m.LookupSdk(sdkname); err == nil {

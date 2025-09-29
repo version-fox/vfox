@@ -26,6 +26,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/toolset"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -40,14 +41,21 @@ var Install = &cli.Command{
 			Aliases: []string{"a"},
 			Usage:   "Install all SDK versions recorded in .tool-versions",
 		},
+		&cli.BoolFlag{
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage:   "Quick installation, skip interactive prompts",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
 }
 
 func installCmd(ctx *cli.Context) error {
+	yes := ctx.Bool("yes")
+
 	if ctx.Bool("all") {
-		return installAll()
+		return installAll(yes)
 	}
 
 	args := ctx.Args()
@@ -77,12 +85,17 @@ func installCmd(ctx *cli.Context) error {
 				name = strings.ToLower(argArr[0])
 				version = ""
 			}
-			source, err := manager.LookupSdkWithInstall(name)
+
+			sdk, err := manager.LookupSdkWithInstall(name, yes)
+
 			if err != nil {
 				errorStore.AddAndShow(name, err)
 				continue
 			}
-			if version == "" {
+
+			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
+			logger.Debugf("resolved version: %s\n", resolvedVersion)
+			if resolvedVersion == "" {
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
 					err := RunSearch(name, []string{})
@@ -92,7 +105,7 @@ func installCmd(ctx *cli.Context) error {
 					continue
 				}
 			} else {
-				if err = source.Install(version); err != nil {
+				if err = sdk.Install(resolvedVersion); err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}
@@ -111,7 +124,7 @@ func installCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func installAll() error {
+func installAll(autoConfirm bool) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
@@ -127,10 +140,13 @@ func installAll() error {
 	fmt.Println("Install the following plugins and SDKs:")
 	printPlugin(plugins, nil)
 	printSdk(sdks, nil)
-	if result, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultValue(true).
-		Show("Do you want to install these plugins and SDKs?"); !result {
-		return nil
+
+	if !autoConfirm {
+		if result, _ := pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true).
+			Show("Do you want to install these plugins and SDKs?"); !result {
+			return nil
+		}
 	}
 
 	var (

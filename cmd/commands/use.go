@@ -87,7 +87,8 @@ func useCmd(ctx *cli.Context) error {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
 
-	if version == "" {
+	var resolvedVersion = manager.ResolveVersion(name, version)
+	if resolvedVersion == "" {
 		list := source.List()
 		var arr []string
 		for _, version := range list {
@@ -107,8 +108,8 @@ func useCmd(ctx *cli.Context) error {
 			},
 		}
 		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-		version = base.Version(result)
+		resolvedVersion = base.Version(result)
 	}
 
-	return source.Use(version, scope)
+	return source.Use(resolvedVersion, scope)
 }
