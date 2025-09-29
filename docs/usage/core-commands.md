@@ -51,6 +51,7 @@ vfox i <sdk-name>@<version>
 **Options**
 
 - `-a, --all`: Install all SDK versions recorded in .tool-versions
+- `-y, --yes`: Quick installation, skip interactive prompts​
 
 ::: tip
 You can install multiple SDKs at the same time by separating them with space.
@@ -58,6 +59,17 @@ You can install multiple SDKs at the same time by separating them with space.
 ```shell
 vfox install nodejs@20 golang ...
 ```
+
+:::
+
+::: tip
+Quick installation, skip interactive prompts​​
+
+```shell
+vfox install --yes nodejs@20
+vfox install --yes --all
+```
+
 :::
 
 ## Use

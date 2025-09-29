@@ -12,12 +12,24 @@ If you use `vfox` for the first time, an empty `config.yaml` file will be create
 Plugins **with support** can read the versions files used by other version managers,
 for example, `.nvmrc` in the case of Nodejs's `nvm`.
 
-This capability is **turned off by default**, you can enable it as follows.
+This capability is **turned on by default**. The related configuration options are as follows:
 
 ```yaml
 legacyVersionFile:
   enable: true
+  strategy: "specified" # Parsing strategy
 ```
+
+- `enable`: Whether to enable legacy version file parsing functionality
+- `strategy`: Parsing strategy, see strategy options below for details
+
+### Strategy Options
+
+`vfox` supports the following three parsing strategies:
+
+- `latest_installed`: Use the latest installed version
+- `latest_available`: Use the latest available version
+- `specified`: Use the version specified in the legacy file (default)
 
 ::: warning
 
@@ -25,7 +37,10 @@ legacyVersionFile:
    directory, `vfox` **priority read** the `.tool-versions` file.
 2. Enabling this feature may cause `vfox` to refresh environment variables slightly slower, **please enable it according
    to your needs**.
-   :::
+
+:::
+
+If you want to disable this feature, you can use the command: `vfox config legacyVersionFile.enable false`
 
 ## Proxy Settings
 
@@ -77,15 +92,15 @@ registry:
 cache time is `12h`.
 
 ::: warning Special Value
+
 - `-1`: Never expire
 - `0`: Do not cache
-:::
+  :::
 
 ```yaml
 cache:
   availableHookDuration: 12h # s second, m minute, h hour
 ```
-
 
 ::: tip Cache File Path
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
