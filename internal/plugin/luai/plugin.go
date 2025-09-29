@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
@@ -14,11 +16,135 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
+// LuaError represents a structured Lua error for CLI tools
+type LuaError struct {
+	PluginName string
+	HookName   string
+	File       string
+	Line       int
+	Message    string
+	OriginalErr error
+}
+
+// Error implements the error interface
+func (e *LuaError) Error() string {
+	var parts []string
+	
+	// Plugin and hook context
+	if e.PluginName != "" && e.HookName != "" {
+		parts = append(parts, fmt.Sprintf("plugin %s [%s] failed", e.PluginName, e.HookName))
+	}
+	
+	// File and line information
+	if e.File != "" {
+		filename := filepath.Base(e.File)
+		if e.Line > 0 {
+			parts = append(parts, fmt.Sprintf("at %s:%d", filename, e.Line))
+		} else {
+			parts = append(parts, fmt.Sprintf("in %s", filename))
+		}
+	}
+	
+	// Error message
+	if e.Message != "" {
+		parts = append(parts, e.Message)
+	}
+	
+	return strings.Join(parts, ": ")
+}
+
+// Unwrap returns the original error for error unwrapping
+func (e *LuaError) Unwrap() error {
+	return e.OriginalErr
+}
+
 type LuaPlugin struct {
 	vm        *LuaVM
 	pluginObj *lua.LTable
 
 	*base.PluginInfo
+}
+
+// wrapLuaError wraps a Lua error with enhanced context information
+func (l *LuaPlugin) wrapLuaError(err error, hookName string) error {
+	if err == nil {
+		return nil
+	}
+	
+	// If it's already a LuaError, don't double-wrap
+	var luaErr *LuaError
+	if errors.As(err, &luaErr) {
+		return err
+	}
+	
+	return l.parseLuaError(err.Error(), hookName, err)
+}
+
+// parseLuaError parses a raw Lua error string into a structured LuaError
+func (l *LuaPlugin) parseLuaError(rawError, hookName string, originalErr error) *LuaError {
+	err := &LuaError{
+		PluginName:  l.Name,
+		HookName:    hookName,
+		Message:     rawError,
+		OriginalErr: originalErr,
+	}
+
+	// Extract main error information from the first line
+	lines := strings.Split(rawError, "\n")
+	if len(lines) == 0 {
+		return err
+	}
+
+	firstLine := strings.TrimSpace(lines[0])
+	
+	// Try to extract file:line: message format
+	if matches := regexp.MustCompile(`^(.+):(\d+): (.+)$`).FindStringSubmatch(firstLine); len(matches) == 4 {
+		err.File = matches[1]
+		if line, parseErr := l.parseInt(matches[2]); parseErr == nil {
+			err.Line = line
+		}
+		err.Message = matches[3]
+	}
+
+	// Clean up common Lua error messages for better CLI output
+	err.Message = l.cleanErrorMessage(err.Message)
+	
+	return err
+}
+
+// cleanErrorMessage cleans up common Lua error patterns for better CLI output
+func (l *LuaPlugin) cleanErrorMessage(message string) string {
+	// Remove redundant "Compilation Failure" wrapper
+	if strings.Contains(message, "Compilation Failure") {
+		return "compilation failed"
+	}
+	
+	// Simplify common error patterns
+	replacements := map[string]string{
+		"attempt to call a nil value":     "function not found",
+		"attempt to index a nil value":    "variable not initialized", 
+		"attempt to index field":          "invalid field access",
+		"bad argument":                    "invalid argument",
+		"stack overflow":                  "infinite recursion detected",
+		"permission denied":               "permission denied",
+		"no such file or directory":       "file not found",
+	}
+	
+	lower := strings.ToLower(message)
+	for pattern, replacement := range replacements {
+		if strings.Contains(lower, pattern) {
+			return replacement
+		}
+	}
+	
+	return message
+}
+
+// parseInt safely parses a string to int
+func (l *LuaPlugin) parseInt(s string) (int, error) {
+	var result int
+	_, parseErr := fmt.Sscanf(s, "%d", &result)
+	return result, parseErr
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
@@ -37,7 +163,7 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 	}
 	table, err := l.CallFunction("Available", ctxTable)
 	if err != nil {
-		return nil, err
+		return nil, l.wrapLuaError(err, "Available")
 	}
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, base.ErrNoResultProvide
@@ -59,7 +185,7 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 	}
 	table, err := l.CallFunction("PreInstall", ctxTable)
 	if err != nil {
-		return nil, err
+		return nil, l.wrapLuaError(err, "PreInstall")
 	}
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, base.ErrNoResultProvide
@@ -80,7 +206,7 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 	}
 	table, err := l.CallFunction("EnvKeys", ctxTable)
 	if err != nil {
-		return nil, err
+		return nil, l.wrapLuaError(err, "EnvKeys")
 	}
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
 		return nil, base.ErrNoResultProvide
@@ -102,7 +228,7 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 	}
 	table, err := l.CallFunction("PreUse", ctxTable)
 	if err != nil {
-		return nil, err
+		return nil, l.wrapLuaError(err, "PreUse")
 	}
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, base.ErrNoResultProvide
@@ -122,7 +248,10 @@ func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
 		return err
 	}
 	_, err = l.CallFunction("PreUninstall", ctxTable)
-	return err
+	if err != nil {
+		return l.wrapLuaError(err, "PreUninstall")
+	}
+	return nil
 }
 
 func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
@@ -132,7 +261,10 @@ func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
 		return err
 	}
 	_, err = l.CallFunction("PostInstall", ctxTable)
-	return err
+	if err != nil {
+		return l.wrapLuaError(err, "PostInstall")
+	}
+	return nil
 }
 
 func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.ParseLegacyFileResult, error) {
@@ -143,7 +275,7 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.Par
 	}
 	table, err := l.CallFunction("ParseLegacyFile", ctxTable)
 	if err != nil {
-		return nil, err
+		return nil, l.wrapLuaError(err, "ParseLegacyFile")
 	}
 	if table == nil || table.Type() == lua.LTNil {
 		return nil, base.ErrNoResultProvide

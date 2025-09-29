@@ -96,7 +96,7 @@ func (b *Sdk) Install(version base.Version) error {
 	}
 	installInfo, err := b.Plugin.PreInstall(version)
 	if err != nil {
-		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
+		return err
 	}
 	if installInfo == nil {
 		return fmt.Errorf("no information about the current version")
@@ -159,7 +159,7 @@ func (b *Sdk) Install(version base.Version) error {
 	}
 	err = b.Plugin.PostInstall(newDirPath, installedSdkInfos)
 	if err != nil {
-		return fmt.Errorf("plugin [PostInstall] method error: %w", err)
+		return err
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
@@ -248,7 +248,7 @@ func (b *Sdk) Uninstall(version base.Version) (err error) {
 	// Give the plugin a chance before actually uninstalling targeted version.
 	err = b.Plugin.PreUninstall(sdkPackage)
 	if err != nil {
-		return
+		return err
 	}
 
 	if b.Current() == version {
@@ -313,7 +313,7 @@ func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.En
 	}
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
-		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
+		return nil, err
 	}
 	return keys, nil
 }
@@ -335,7 +335,7 @@ func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, 
 
 	keys, err := b.Plugin.EnvKeys(sdkPackage)
 	if err != nil {
-		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
+		return nil, err
 	}
 	return keys, nil
 }
@@ -344,7 +344,7 @@ func (b *Sdk) PreUse(version base.Version, scope base.UseScope) (base.Version, e
 	installedSdks := b.getLocalSdkPackages()
 	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
 	if err != nil {
-		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
+		return "", err
 	}
 
 	// If the plugin does not return a version, it means that the plugin does

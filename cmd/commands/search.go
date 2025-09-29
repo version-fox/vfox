@@ -46,7 +46,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	}
 	result, err := source.Available(availableArgs)
 	if err != nil {
-		return fmt.Errorf("plugin [Available] method error: %w", err)
+		return err
 	}
 	if len(result) == 0 {
 		return fmt.Errorf("no available version")
