@@ -55,6 +55,36 @@ $ vfox add --source  https://github.com/version-fox/vfox-nodejs/releases/downloa
 
 ```shell
 vfox info <plugin-name>
+vfox info <plugin-name>@<version>
+vfox info [options] <plugin-name>
+```
+
+`plugin-name`: 插件名称， 如`nodejs`。
+`version`: 插件的特定版本。
+
+**选项**
+
+- `-f, --format`: 使用给定的 Go 模板格式化输出。可用字段：
+  - 插件信息：`Name`、`Version`、`Homepage`、`InstallPath`、`Description`
+  - 版本信息：`Name`、`Version`、`Path`
+
+**例子**
+
+**查看插件信息**
+```shell
+vfox info nodejs
+```
+
+**查看特定版本路径**
+```shell
+vfox info nodejs@20.0.0
+```
+
+**使用模板格式化输出**
+```shell
+vfox info --format "{{.Homepage}}" nodejs
+vfox info --format "{{.InstallPath}}" nodejs
+vfox info --format "{{.Path}}" nodejs@20.0.0
 ```
 
 ## Remove

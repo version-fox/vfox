@@ -6,7 +6,7 @@ vfox available List all available plugins
 vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from official repository or custom source, --alias` and `--source` are not supported when adding multiple plugins.
 vfox remove <sdk-name>          Remove a plugin
 vfox update [<sdk-name> | --all] Update a specified or all plugin(s)
-vfox info <sdk-name>            Show plugin info
+vfox info <sdk-name>[@<version>] [options]  Show plugin info or SDK path with optional formatting
 vfox search <sdk-name>          Search available versions of a SDK
 vfox install <sdk-name>@<version> Install the specified version of SDK
 vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK

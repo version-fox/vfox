@@ -59,6 +59,36 @@ View the SDK information installed locally.
 
 ```shell
 vfox info <plugin-name>
+vfox info <plugin-name>@<version>
+vfox info [options] <plugin-name>
+```
+
+`plugin-name`: Plugin name, such as `nodejs`.
+`version`: Specific version of the plugin.
+
+**Options**
+
+- `-f, --format`: Format the output using the given Go template. Available fields:
+  - For plugin info: `Name`, `Version`, `Homepage`, `InstallPath`, `Description`
+  - For version info: `Name`, `Version`, `Path`
+
+**Examples**
+
+**View plugin information**
+```shell
+vfox info nodejs
+```
+
+**View specific version path**
+```shell
+vfox info nodejs@20.0.0
+```
+
+**Format output with template**
+```shell
+vfox info --format "{{.Homepage}}" nodejs
+vfox info --format "{{.InstallPath}}" nodejs
+vfox info --format "{{.Path}}" nodejs@20.0.0
 ```
 
 ## Remove
