@@ -8,6 +8,8 @@ import (
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/plugin/luai/codec"
+	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	"github.com/version-fox/vfox/internal/util"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -29,7 +31,7 @@ func (l *LuaPlugin) Close() {
 
 func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHookResultItem, error) {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +44,7 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 	}
 
 	var hookResult []*base.AvailableHookResultItem
-	err = Unmarshal(table, &hookResult)
+	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
@@ -51,7 +53,7 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 }
 func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHookResult, error) {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +65,7 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.PreInstallHookResult{}
-	err = Unmarshal(table, &hookResult)
+	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
@@ -72,7 +74,7 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 
 func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResultItem, error) {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,7 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 	}
 
 	var hookResult []*base.EnvKeysHookResultItem
-	err = Unmarshal(table, &hookResult)
+	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
@@ -94,7 +96,7 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 
 func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, error) {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +108,7 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.PreUseHookResult{}
-	err = Unmarshal(table, &hookResult)
+	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
@@ -115,7 +117,7 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 
 func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return err
 	}
@@ -125,7 +127,7 @@ func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
 
 func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +137,7 @@ func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
 
 func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.ParseLegacyFileResult, error) {
 	L := l.vm.Instance
-	ctxTable, err := Marshal(L, ctx)
+	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +149,7 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.Par
 		return nil, base.ErrNoResultProvide
 	}
 	hookResult := base.ParseLegacyFileResult{}
-	err = Unmarshal(table, &hookResult)
+	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
 	}
@@ -164,7 +166,7 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTab
 
 func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*LuaPlugin, error) {
 	vm := NewLuaVM()
-	if err := vm.Prepare(&PrepareOptions{
+	if err := vm.Prepare(&module.PreloadOptions{
 		Config: config,
 	}); err != nil {
 		return nil, err
@@ -211,7 +213,7 @@ func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion
 	vm.Instance.SetGlobal(base.OsType, lua.LString(util.GetOSType()))
 	vm.Instance.SetGlobal(base.ArchType, lua.LString(util.GetArchType()))
 
-	r, err := Marshal(vm.Instance, base.RuntimeInfo{
+	r, err := codec.Marshal(vm.Instance, base.RuntimeInfo{
 		OsType:        string(util.GetOSType()),
 		ArchType:      string(util.GetArchType()),
 		Version:       runtimeVersion,
@@ -228,9 +230,17 @@ func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion
 	}
 	PLUGIN := pluginObj.(*lua.LTable)
 	pluginInfo := &base.PluginInfo{}
-	if err = Unmarshal(PLUGIN, pluginInfo); err != nil {
+	if err = codec.Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, err
 	}
+
+	navigator, err := codec.Marshal(vm.Instance, base.Navigator{
+		UserAgent: computeUserAgent(runtimeVersion, pluginInfo.Name, pluginInfo.Version),
+	})
+	if err != nil {
+		return nil, err
+	}
+	vm.Instance.SetGlobal(base.NavigatorObjKey, navigator)
 
 	source := &LuaPlugin{
 		vm:         vm,

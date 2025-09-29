@@ -20,7 +20,6 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -40,17 +39,13 @@ func NewLuaVM() *LuaVM {
 	}
 }
 
-type PrepareOptions struct {
-	Config *config.Config
-}
-
-func (vm *LuaVM) Prepare(options *PrepareOptions) error {
+func (vm *LuaVM) Prepare(options *module.PreloadOptions) error {
 	if err := vm.Instance.DoString(preloadScript); err != nil {
 		return err
 	}
 
 	if options != nil {
-		module.Preload(vm.Instance, options.Config)
+		module.Preload(vm.Instance, options)
 	}
 
 	return nil
