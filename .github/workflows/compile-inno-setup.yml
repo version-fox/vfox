@@ -18,7 +18,7 @@ jobs:
         working-directory: inno_setup
     steps:
       - name: Checkout version-fox
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Get version-fox version
         id: version-fox-version
         uses: actions/github-script@v8
