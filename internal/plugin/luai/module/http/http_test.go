@@ -159,7 +159,7 @@ func TestUserAgentDefault(t *testing.T) {
 
 	select {
 	case ua := <-uaCh:
-		expected := ua
+		expected := "vfox/0.7.0 vfox-nodejs/0.3.0"
 		if ua != expected {
 			t.Fatalf("expected user-agent %q, got %q", expected, ua)
 		}
