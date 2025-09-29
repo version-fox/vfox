@@ -240,6 +240,10 @@ type RuntimeInfo struct {
 	PluginDirPath string `json:"pluginDirPath"`
 }
 
+type Navigator struct {
+	UserAgent string `json:"userAgent"`
+}
+
 type Package struct {
 	Main      *Info
 	Additions []*Info

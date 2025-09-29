@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -80,7 +81,7 @@ func TestExample(t *testing.T) {
 		}
 
 		table := L.ReturnedValue()
-		err := Unmarshal(table, &output)
+		err := codec.Unmarshal(table, &output)
 		if err != nil {
 			t.Fatalf("unmarshal map failed: %v", err)
 		}
@@ -111,7 +112,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 		goFunc := func() {
 			called = true
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -132,7 +133,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 			receivedInt = a
 			receivedString = b
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -153,7 +154,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 		goFunc := func() (int, string) {
 			return 42, "world"
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -176,7 +177,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 		goFunc := func(x int, y int) int {
 			return x + y
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -199,7 +200,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 			}
 			return fmt.Sprintf("%s%d", prefix, sum)
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -222,16 +223,16 @@ func TestMarshalGoFunctions2(t *testing.T) {
 		goFunc := func(s MyStruct) MyStruct {
 			return MyStruct{Name: s.Name + "_processed", Value: s.Value * 2}
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
 		L.Instance.SetGlobal("testFunc", luaFunc)
-		// Marshal the input struct for Lua
+		// codec.Marshal the input struct for Lua
 		inputStruct := MyStruct{Name: "input", Value: 10}
-		luaInput, err := Marshal(L.Instance, inputStruct)
+		luaInput, err := codec.Marshal(L.Instance, inputStruct)
 		if err != nil {
-			t.Fatalf("Failed to marshal input struct: %v", err)
+			t.Fatalf("Failed to codec.marshal input struct: %v", err)
 		}
 		L.Instance.SetGlobal("inputData", luaInput)
 
@@ -243,7 +244,7 @@ func TestMarshalGoFunctions2(t *testing.T) {
 
 		outputDataLua := L.Instance.GetGlobal("outputData")
 		var outputStruct MyStruct
-		if err := Unmarshal(outputDataLua, &outputStruct); err != nil {
+		if err := codec.Unmarshal(outputDataLua, &outputStruct); err != nil {
 			t.Fatalf("Failed to unmarshal output struct: %v", err)
 		}
 
@@ -424,7 +425,7 @@ func TestCases(t *testing.T) {
 			L := lua.NewState()
 			defer L.Close()
 
-			table, err := Marshal(L, tt.in)
+			table, err := codec.Marshal(L, tt.in)
 			if err != nil {
 				t.Fatalf("marshal map failed: %v", err)
 			}
@@ -461,7 +462,7 @@ func TestCases(t *testing.T) {
 				t.Fatalf("%s: unmarshalTest.ptr %#v is not a pointer to a zero value", tt.CaseName, tt.ptr)
 			}
 
-			err = Unmarshal(table, v.Interface())
+			err = codec.Unmarshal(table, v.Interface())
 
 			if err != tt.err {
 				t.Errorf("expected %+v, got %+v", tt.err, err)
@@ -499,7 +500,7 @@ func TestEncodeFunc(t *testing.T) {
 		L := NewLuaVM()
 		defer L.Close()
 
-		table, err := Marshal(L.Instance, testdata)
+		table, err := codec.Marshal(L.Instance, testdata)
 		if err != nil {
 			t.Fatalf("marshal map failed: %v", err)
 		}
@@ -526,7 +527,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 		goFunc := func() {
 			called = true
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -547,7 +548,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 			receivedInt = a
 			receivedString = b
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -568,7 +569,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 		goFunc := func() (int, string) {
 			return 42, "world"
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -591,7 +592,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 		goFunc := func(x int, y int) int {
 			return x + y
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -614,7 +615,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 			}
 			return fmt.Sprintf("%s%d", prefix, sum)
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
@@ -637,16 +638,16 @@ func TestMarshalGoFunctions(t *testing.T) {
 		goFunc := func(s MyStruct) MyStruct {
 			return MyStruct{Name: s.Name + "_processed", Value: s.Value * 2}
 		}
-		luaFunc, err := Marshal(L.Instance, goFunc)
+		luaFunc, err := codec.Marshal(L.Instance, goFunc)
 		if err != nil {
 			t.Fatalf("Marshal failed: %v", err)
 		}
 		L.Instance.SetGlobal("testFunc", luaFunc)
-		// Marshal the input struct for Lua
+		// codec.Marshal the input struct for Lua
 		inputStruct := MyStruct{Name: "input", Value: 10}
-		luaInput, err := Marshal(L.Instance, inputStruct)
+		luaInput, err := codec.Marshal(L.Instance, inputStruct)
 		if err != nil {
-			t.Fatalf("Failed to marshal input struct: %v", err)
+			t.Fatalf("Failed to codec.marshal input struct: %v", err)
 		}
 		L.Instance.SetGlobal("inputData", luaInput)
 
@@ -656,7 +657,7 @@ func TestMarshalGoFunctions(t *testing.T) {
 
 		outputDataLua := L.Instance.GetGlobal("outputData")
 		var outputStruct MyStruct
-		if err := Unmarshal(outputDataLua, &outputStruct); err != nil {
+		if err := codec.Unmarshal(outputDataLua, &outputStruct); err != nil {
 			t.Fatalf("Failed to unmarshal output struct: %v", err)
 		}
 

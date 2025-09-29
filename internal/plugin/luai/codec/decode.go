@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package luai
+package codec
 
 import (
 	"errors"

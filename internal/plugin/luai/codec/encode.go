@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package luai
+package codec
 
 import (
 	"errors"
@@ -208,4 +208,12 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		return nil, errors.New("marshal: unsupported type " + reflected.Kind().String() + " for reflected ")
 	}
 
+}
+
+func MustMarshal(state *lua.LState, v interface{}) lua.LValue {
+	value, err := Marshal(state, v)
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

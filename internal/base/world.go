@@ -20,8 +20,9 @@ var (
 )
 
 const (
-	PluginObjKey = "PLUGIN"
-	OsType       = "OS_TYPE"
-	ArchType     = "ARCH_TYPE"
-	Runtime      = "RUNTIME"
+	PluginObjKey    = "PLUGIN"
+	NavigatorObjKey = "VFOX_NAVIGATOR"
+	OsType          = "OS_TYPE"
+	ArchType        = "ARCH_TYPE"
+	Runtime         = "RUNTIME"
 )

@@ -17,10 +17,16 @@
 package http
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	"github.com/version-fox/vfox/internal/util"
 
 	"github.com/version-fox/vfox/internal/config"
@@ -118,5 +124,87 @@ func eval(str string, t *testing.T) {
 
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
+	}
+}
+
+func setUserAgent(L *lua.LState, ua string) {
+	L.SetGlobal(base.NavigatorObjKey, codec.MustMarshal(L, base.Navigator{UserAgent: ua}))
+}
+
+func TestUserAgentDefault(t *testing.T) {
+	uaCh := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uaCh <- r.UserAgent()
+		_, _ = w.Write([]byte(`ok`))
+	}))
+	defer server.Close()
+
+	ls := lua.NewState()
+	ua := "vfox/0.7.0 vfox-nodejs/0.3.0"
+	setUserAgent(ls, ua)
+	defer ls.Close()
+	Preload(ls, config.EmptyProxy)
+
+	script := fmt.Sprintf(`
+	local http = require("http")
+	local resp, err = http.get({
+	    url = "%s"
+	})
+	assert(err == nil)
+	assert(resp.status_code == 200)
+	`, server.URL)
+	if err := ls.DoString(script); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case ua := <-uaCh:
+		expected := ua
+		if ua != expected {
+			t.Fatalf("expected user-agent %q, got %q", expected, ua)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for request")
+	}
+}
+
+func TestUserAgentAppend(t *testing.T) {
+	uaCh := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uaCh <- r.UserAgent()
+		_, _ = w.Write([]byte(`ok`))
+	}))
+	defer server.Close()
+
+	ls := lua.NewState()
+	ua := "vfox/0.7.0 vfox-nodejs/0.3.0"
+	setUserAgent(ls, ua)
+	defer ls.Close()
+
+	Preload(ls, config.EmptyProxy)
+
+	script := fmt.Sprintf(`
+	local http = require("http")
+	local resp, err = http.get({
+	    url = "%s",
+	    headers = {
+	        ["User-Agent"] = "custom-agent"
+	    }
+	})
+	assert(err == nil)
+	assert(resp.status_code == 200)
+	`, server.URL)
+	if err := ls.DoString(script); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case ua := <-uaCh:
+		expected := "custom-agent"
+		if ua != expected {
+			t.Fatalf("expected user-agent %q, got %q", expected, ua)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for request")
 	}
 }

@@ -25,7 +25,9 @@ import (
 	"path/filepath"
 
 	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -74,6 +76,8 @@ func (m *Module) Get(L *lua.LState) int {
 			})
 		}
 	}
+	m.ensureUserAgent(L, req)
+
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
@@ -125,6 +129,8 @@ func (m *Module) Head(L *lua.LState) int {
 			})
 		}
 	}
+	m.ensureUserAgent(L, req)
+
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
@@ -183,6 +189,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 			})
 		}
 	}
+	m.ensureUserAgent(L, req)
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
@@ -259,6 +266,19 @@ func createModule(proxy *config.Proxy) lua.LGFunction {
 		L.SetFuncs(t, m.luaMap())
 		L.Push(t)
 		return 1
+	}
+}
+
+func (m *Module) ensureUserAgent(L *lua.LState, req *http.Request) {
+	if req.Header.Get("User-Agent") == "" {
+		navigatorValue := L.GetGlobal(base.NavigatorObjKey)
+		if navigatorValue != lua.LNil {
+			var navigator base.Navigator
+			err := codec.Unmarshal(navigatorValue, &navigator)
+			if err == nil {
+				req.Header.Set("User-Agent", navigator.UserAgent)
+			}
+		}
 	}
 }
 
