@@ -509,7 +509,13 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 	if err = multiToolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
-	if err = b.ToLinkPackage(version, base.ShellLocation); err != nil {
+	// Use GlobalLocation for global scope to create stable symlink at .version-fox/cache/<sdk>/current
+	// Use ShellLocation for other scopes to create symlink in temporary shell-specific directory
+	linkLocation := base.ShellLocation
+	if scope == base.Global {
+		linkLocation = base.GlobalLocation
+	}
+	if err = b.ToLinkPackage(version, linkLocation); err != nil {
 		return err
 	}
 
