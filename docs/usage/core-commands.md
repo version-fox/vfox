@@ -101,6 +101,35 @@ vfox u [options] <sdk-name>[@<version>]
 `Unix-like`: `Session` scope
 :::
 
+## Unuse
+
+Unset the runtime version from a specific scope.
+
+**Usage**
+
+```shell
+vfox unuse [options] <sdk-name>
+```
+
+`sdk-name`: SDK name
+
+**Options**
+
+- `-g, --global`: Remove from global scope
+- `-p, --project`: Remove from project scope (current directory)
+- `-s, --session`: Remove from session scope (current Shell session)
+
+::: tip Default scope
+
+`Windows`: `Global` scope
+
+`Unix-like`: `Session` scope
+:::
+
+::: warning Effect
+After using `unuse`, the SDK will no longer be active in the specified scope. If the SDK is configured in other scopes, those will take precedence according to vfox's scope hierarchy (Session > Project > Global).
+:::
+
 ## Uninstall
 
 Uninstall the specified version of the SDK.

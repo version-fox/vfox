@@ -264,6 +264,53 @@ $ vfox use -s nodejs
 
 
 
+## 6. 取消使用运行时
+
+**命令**: `vfox unuse [-p -g -s] <sdk-name>`
+
+有时你可能希望从特定作用域中移除SDK的版本设置，而不卸载SDK本身。`unuse` 命令允许你从不同作用域中取消版本配置：
+
+### Global
+
+**移除全局版本设置**
+
+```shell
+$ vfox unuse -g nodejs
+```
+
+这会从全局 `$HOME/.version-fox/.tool-versions` 文件中移除SDK条目，有效地取消SDK的全局版本设置。
+
+### Project
+
+**移除项目版本设置**
+
+```shell
+$ vfox unuse -p nodejs
+```
+
+这会从当前目录的 `.tool-versions` 文件中移除SDK条目，取消项目特定的版本设置。
+
+### Session
+
+**移除会话版本设置**
+
+```shell
+$ vfox unuse -s nodejs
+```
+
+这会从当前会话的临时 `.tool-versions` 文件中移除SDK条目。
+
+::: tip 默认作用域
+与 `use` 命令一样，如果你不指定作用域，`vfox unuse` 将使用系统的默认作用域：
+
+对于**Windows**: 默认作用域为`Global`
+对于**Unix-like**: 默认作用域为`Session`
+:::
+
+::: warning 取消设置的效果
+使用 `unuse` 后，SDK将不再在指定作用域中处于活动状态。如果其他作用域中配置了相同的SDK，那些将根据vfox的作用域层次结构优先生效（Session > Project > Global）。
+:::
+
 ## 效果演示
 
 ::: tip

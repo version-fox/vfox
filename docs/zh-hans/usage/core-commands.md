@@ -103,6 +103,34 @@ vfox u [options] <sdk-name>[@<version>]
 
 :::
 
+## Unuse
+
+从指定作用域取消设置运行时版本
+
+**用法**
+
+```shell
+vfox unuse [options] <sdk-name>
+```
+
+`sdk-name`: SDK 名称
+
+**选项**
+
+- `-g, --global`: 从全局作用域移除
+- `-p, --project`: 从项目作用域移除（当前目录）
+- `-s, --session`: 从会话作用域移除（当前 Shell 会话）
+
+::: tip 默认作用域
+`Windows`: 默认`Global`作用域
+
+`Unix-like`: 默认`Session`作用域
+:::
+
+::: warning 效果
+使用 `unuse` 后，SDK 将不再在指定作用域中处于活动状态。如果 SDK 在其他作用域中配置，那些将根据 vfox 的作用域层次结构优先生效（Session > Project > Global）。
+:::
+
 ## Uninstall
 
 卸载指定版本的 SDK。
