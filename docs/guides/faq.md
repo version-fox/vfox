@@ -1,5 +1,9 @@
 # FAQ
 
+## How do I uninstall vfox?
+
+Please refer to the [Uninstallation Guide](./uninstallation.md) for detailed instructions on how to completely remove vfox from your system.
+
 ## Switch xxx not work or the vfox use  command does not work ?
 
 If your shell prompt `Warning: The current shell lacks hook support or configuration. It has switched to global scope

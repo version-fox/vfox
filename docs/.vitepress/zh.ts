@@ -59,7 +59,6 @@ function sidebar(): DefaultTheme.Sidebar {
                 {text: '什么是vfox?', link: '/zh-hans/guides/intro'},
                 {text: '快速入门', link: '/zh-hans/guides/quick-start'},
                 {text: '配置', link: '/zh-hans/guides/configuration'},
-                {text: '卸载', link: '/zh-hans/guides/uninstallation'},
                 {text: '常见问题', link: '/zh-hans/guides/faq'},
             ]
         },

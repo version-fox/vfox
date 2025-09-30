@@ -51,7 +51,6 @@ function sidebar(): DefaultTheme.Sidebar {
                 {text: 'What is vfox?', link: '/guides/intro'},
                 {text: 'Quick Start', link: '/guides/quick-start'},
                 {text: 'Configuration', link: '/guides/configuration'},
-                {text: 'Uninstallation', link: '/guides/uninstallation'},
                 {text: 'FAQ', link: '/guides/faq'},
             ]
         },
