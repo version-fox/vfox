@@ -17,7 +17,7 @@
 package commands
 
 import (
-"context"
+	"context"
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
