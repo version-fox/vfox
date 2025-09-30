@@ -82,9 +82,6 @@ Set the runtime version.
 vfox use [options] <sdk-name>[@<version>]
 
 vfox u [options] <sdk-name>[@<version>]
-
-# Options can also be placed after arguments
-vfox use <sdk-name>[@<version>] [options]
 ```
 
 `sdk-name`: SDK name
@@ -112,9 +109,6 @@ Unset the runtime version from a specific scope.
 
 ```shell
 vfox unuse [options] <sdk-name>
-
-# Options can also be placed after arguments
-vfox unuse <sdk-name> [options]
 ```
 
 `sdk-name`: SDK name
