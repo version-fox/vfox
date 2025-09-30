@@ -1,6 +1,8 @@
 .DS_Store
 .idea
 /docs/node_modules/
+/docs/.vitepress/.temp/
+/docs/.vitepress/dist/
 
 
 coverage.out
