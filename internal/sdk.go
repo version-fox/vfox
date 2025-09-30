@@ -519,7 +519,13 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 	if err = multiToolVersion.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
-	if err = b.ToLinkPackage(version, base.ShellLocation); err != nil {
+	// Use GlobalLocation for global scope to create stable symlink at .version-fox/cache/<sdk>/current
+	// Use ShellLocation for other scopes to create symlink in temporary shell-specific directory
+	linkLocation := base.ShellLocation
+	if scope == base.Global {
+		linkLocation = base.GlobalLocation
+	}
+	if err = b.ToLinkPackage(version, linkLocation); err != nil {
 		return err
 	}
 
@@ -806,12 +812,12 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		
+
 		// Check if the SDK is currently set globally
 		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
 			// Clear global environment for the current version
 			b.clearGlobalEnv(base.Version(oldVersion))
-			
+
 			// Remove shims for the current version
 			envKeys, err := b.MockEnvKeys(base.Version(oldVersion), base.GlobalLocation)
 			if err == nil {
@@ -824,21 +830,21 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 					}
 				}
 			}
-			
+
 			// Flush environment changes
 			_ = b.sdkManager.EnvManager.Flush()
 		}
-		
+
 		// Remove from global tool versions
 		delete(toolVersion.Record, b.Name)
 		multiToolVersion = append(multiToolVersion, toolVersion)
-		
+
 	} else if scope == base.Project {
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
-		
+
 		// Remove from project tool versions
 		delete(toolVersion.Record, b.Name)
 		multiToolVersion = append(multiToolVersion, toolVersion)
@@ -859,7 +865,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 	}
 
 	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))
-	
+
 	// Reopen shell to apply changes if not in hook environment
 	if !env.IsHookEnv() {
 		return shell.Open(os.Getppid())
