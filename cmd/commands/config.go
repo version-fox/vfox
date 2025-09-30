@@ -1,7 +1,7 @@
 package commands
 
 import (
-"context"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/version-fox/vfox/internal/config"
