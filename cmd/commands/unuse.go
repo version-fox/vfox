@@ -17,9 +17,10 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 )
@@ -48,16 +49,16 @@ var Unuse = &cli.Command{
 	Category: CategorySDK,
 }
 
-func unuseCmd(ctx *cli.Context) error {
-	sdkName := ctx.Args().First()
+func unuseCmd(ctx context.Context, cmd *cli.Command) error {
+	sdkName := cmd.Args().First()
 	if len(sdkName) == 0 {
 		return fmt.Errorf("invalid parameter. format: <sdk-name>")
 	}
 
 	scope := base.Session
-	if ctx.IsSet("global") {
+	if cmd.IsSet("global") {
 		scope = base.Global
-	} else if ctx.IsSet("project") {
+	} else if cmd.IsSet("project") {
 		scope = base.Project
 	} else {
 		scope = base.Session

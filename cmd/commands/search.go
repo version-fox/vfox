@@ -17,12 +17,13 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/printer"
@@ -110,10 +111,10 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	return source.Install(base.Version(version.Key))
 }
 
-func searchCmd(ctx *cli.Context) error {
-	sdkName := ctx.Args().First()
+func searchCmd(ctx context.Context, cmd *cli.Command) error {
+	sdkName := cmd.Args().First()
 	if sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	return RunSearch(sdkName, ctx.Args().Tail())
+	return RunSearch(sdkName, cmd.Args().Tail())
 }

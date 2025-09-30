@@ -17,10 +17,11 @@
 package commands
 
 import (
+"context"
 	"fmt"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -43,8 +44,8 @@ var Add = &cli.Command{
 }
 
 // addCmd is the command to add a plugin of sdk
-func addCmd(ctx *cli.Context) error {
-	args := ctx.Args()
+func addCmd(ctx context.Context, cmd *cli.Command) error {
+	args := cmd.Args()
 
 	manager := internal.NewSdkManager()
 	defer manager.Close()
@@ -60,8 +61,8 @@ func addCmd(ctx *cli.Context) error {
 		return nil
 	} else {
 		sdkName := args.First()
-		source := ctx.String("source")
-		alias := ctx.String("alias")
+		source := cmd.String("source")
+		alias := cmd.String("alias")
 		err := manager.Add(sdkName, source, alias)
 		if err == nil {
 			pterm.Printf("Please use `%s` to install the version you need.\n", pterm.LightBlue(fmt.Sprintf("vfox install %s@<version>", sdkName)))
