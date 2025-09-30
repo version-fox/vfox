@@ -96,6 +96,9 @@ func installCmd(ctx *cli.Context) error {
 			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
+				if handled, message, exitCode := internal.ResolveCICommand("install", internal.CIEventMissingVersion, name); handled {
+					return cli.Exit(message, exitCode)
+				}
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
 					err := RunSearch(name, []string{})
@@ -142,9 +145,15 @@ func installAll(autoConfirm bool) error {
 	printSdk(sdks, nil)
 
 	if !autoConfirm {
-		if result, _ := pterm.DefaultInteractiveConfirm.
-			WithDefaultValue(true).
-			Show("Do you want to install these plugins and SDKs?"); !result {
+		var result bool
+		if internal.IsCI() {
+			result = internal.CIConfirm()
+		} else {
+			result, _ = pterm.DefaultInteractiveConfirm.
+				WithDefaultValue(true).
+				Show("Do you want to install these plugins and SDKs?")
+		}
+		if !result {
 			return nil
 		}
 	}

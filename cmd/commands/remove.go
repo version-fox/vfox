@@ -38,12 +38,17 @@ func removeCmd(ctx *cli.Context) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
-	result, _ := pterm.DefaultInteractiveConfirm.
-		WithTextStyle(&pterm.ThemeDefault.DefaultText).
-		WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-		WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-		WithDefaultText("Please confirm").
-		Show()
+	var result bool
+	if internal.IsCI() {
+		result = internal.CIConfirm()
+	} else {
+		result, _ = pterm.DefaultInteractiveConfirm.
+			WithTextStyle(&pterm.ThemeDefault.DefaultText).
+			WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+			WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+			WithDefaultText("Please confirm").
+			Show()
+	}
 	if result {
 		return manager.Remove(args.First())
 	} else {

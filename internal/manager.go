@@ -273,12 +273,17 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (*Sdk, err
 				fmt.Printf("[%s] not added yet, automatically proceeding with installation.\n", pterm.LightBlue(name))
 			} else {
 				fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
-				result, _ := pterm.DefaultInteractiveConfirm.
-					WithTextStyle(&pterm.ThemeDefault.DefaultText).
-					WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-					WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-					WithDefaultText("Please confirm").
-					Show()
+				var result bool
+				if IsCI() {
+					result = CIConfirm()
+				} else {
+					result, _ = pterm.DefaultInteractiveConfirm.
+						WithTextStyle(&pterm.ThemeDefault.DefaultText).
+						WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+						WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+						WithDefaultText("Please confirm").
+						Show()
+				}
 				if !result {
 					return nil, cli.Exit("", 1)
 				}
