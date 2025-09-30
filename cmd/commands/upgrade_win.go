@@ -19,7 +19,7 @@
 package commands
 
 import (
-"context"
+	"context"
 	"golang.org/x/sys/windows"
 	"os"
 	"syscall"
