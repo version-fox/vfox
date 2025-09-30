@@ -787,6 +787,76 @@ func (b *Sdk) ClearCurrentEnv() error {
 	return nil
 }
 
+// Unuse removes the version setting for the SDK from the specified scope
+func (b *Sdk) Unuse(scope base.UseScope) error {
+	var multiToolVersion toolset.MultiToolVersions
+
+	if scope == base.Global {
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+		
+		// Check if the SDK is currently set globally
+		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
+			// Clear global environment for the current version
+			b.clearGlobalEnv(base.Version(oldVersion))
+			
+			// Remove shims for the current version
+			envKeys, err := b.MockEnvKeys(base.Version(oldVersion), base.GlobalLocation)
+			if err == nil {
+				if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
+					for _, p := range paths.Slice() {
+						if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+							// Log but don't fail on shim cleanup errors
+							logger.Debugf("Failed to clear shim %s: %v\n", p, err)
+						}
+					}
+				}
+			}
+			
+			// Flush environment changes
+			_ = b.sdkManager.EnvManager.Flush()
+		}
+		
+		// Remove from global tool versions
+		delete(toolVersion.Record, b.Name)
+		multiToolVersion = append(multiToolVersion, toolVersion)
+		
+	} else if scope == base.Project {
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+		
+		// Remove from project tool versions
+		delete(toolVersion.Record, b.Name)
+		multiToolVersion = append(multiToolVersion, toolVersion)
+	}
+
+	// For session scope, or in addition to global/project scope,
+	// also remove from the session level
+	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to read tool versions, err:%w", err)
+	}
+	delete(sessionToolVersion.Record, b.Name)
+	multiToolVersion = append(multiToolVersion, sessionToolVersion)
+
+	// Save all modified tool version files
+	if err = multiToolVersion.Save(); err != nil {
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+
+	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))
+	
+	// Reopen shell to apply changes if not in hook environment
+	if !env.IsHookEnv() {
+		return shell.Open(os.Getppid())
+	}
+	return nil
+}
+
 // NewSdk creates a new SDK instance.
 func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 	sdkName := filepath.Base(pluginPath)
