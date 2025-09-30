@@ -101,7 +101,7 @@ vfox u [options] <sdk-name>[@<version>]
 `Unix-like`: `Session` scope
 :::
 
-## Unuse
+## Unuse <Badge type="tip" text=">= 0.9.0" vertical="middle" />
 
 Unset the runtime version from a specific scope.
 
