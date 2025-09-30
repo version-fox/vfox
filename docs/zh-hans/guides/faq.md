@@ -1,5 +1,9 @@
 # 常见问题
 
+## 如何卸载vfox?
+
+请参考[卸载指南](./uninstallation.md)了解如何从系统中完全删除vfox的详细说明。
+
 ## 切换xxx不生效？ `vfox use`命令不生效？
 
 如果你看到提示`Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically`
