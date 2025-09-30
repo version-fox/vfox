@@ -84,9 +84,6 @@ vfox install --yes --all
 vfox use [options] <sdk-name>[@<version>]
 
 vfox u [options] <sdk-name>[@<version>]
-
-# 选项也可以放在参数之后
-vfox use <sdk-name>[@<version>] [options]
 ```
 
 `sdk-name`: SDK 名称
@@ -114,9 +111,6 @@ vfox use <sdk-name>[@<version>] [options]
 
 ```shell
 vfox unuse [options] <sdk-name>
-
-# 选项也可以放在参数之后
-vfox unuse <sdk-name> [options]
 ```
 
 `sdk-name`: SDK 名称
