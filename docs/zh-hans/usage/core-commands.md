@@ -103,7 +103,7 @@ vfox u [options] <sdk-name>[@<version>]
 
 :::
 
-## Unuse
+## Unuse <Badge type="tip" text=">= 0.9.0" vertical="middle" />
 
 从指定作用域取消设置运行时版本
 
