@@ -270,54 +270,6 @@ When you close the current terminal, `vfox` will **automatically switch back to 
 :::
 
 
-
-## 6. Unset runtime
-
-**Command**: `vfox unuse [-p -g -s] <sdk-name>`
-
-Sometimes you may want to remove the version setting for an SDK from a specific scope without uninstalling the SDK itself. The `unuse` command allows you to unset the version configuration from different scopes:
-
-### Global
-
-**Remove global version setting**
-
-```shell
-$ vfox unuse -g nodejs
-```
-
-This removes the SDK entry from the global `$HOME/.version-fox/.tool-versions` file, effectively unsetting the global version for the SDK.
-
-### Project
-
-**Remove project version setting**
-
-```shell
-$ vfox unuse -p nodejs
-```
-
-This removes the SDK entry from the current directory's `.tool-versions` file, unsetting the project-specific version.
-
-### Session
-
-**Remove session version setting**
-
-```shell
-$ vfox unuse -s nodejs
-```
-
-This removes the SDK entry from the current session's temporary `.tool-versions` file.
-
-::: tip Default Scope
-Like the `use` command, if you don't specify a scope, `vfox unuse` will use the default scope for your system:
-
-For **Windows**: Default scope is `Global`
-For **Unix-like**: Default scope is `Session`
-:::
-
-::: warning Effect of Unsetting
-After using `unuse`, the SDK will no longer be active in the specified scope. If there are other scopes with the same SDK configured, those will take precedence according to vfox's scope hierarchy (Session > Project > Global).
-:::
-
 ## Demo
 
 ::: tip
