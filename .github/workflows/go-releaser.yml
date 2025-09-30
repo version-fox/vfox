@@ -23,7 +23,7 @@ jobs:
           go-version: 1.21
           cache: true
       - uses: sigstore/cosign-installer@v3.10.0
-      - uses: anchore/sbom-action/download-syft@v0.15.1
+      - uses: anchore/sbom-action/download-syft@v0.20.6
       - uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
