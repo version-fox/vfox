@@ -270,7 +270,6 @@ When you close the current terminal, `vfox` will **automatically switch back to 
 :::
 
 
-
 ## Demo
 
 ::: tip
