@@ -17,6 +17,7 @@
 package util
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -27,9 +28,16 @@ func TestCopyToClipboard(t *testing.T) {
 	err := CopyToClipboard(testText)
 	
 	// In CI/CD environment, clipboard utilities might not be available
-	// So we just verify it doesn't panic
+	// So we just verify it doesn't panic and handles errors appropriately
 	if err != nil {
-		t.Logf("CopyToClipboard returned error (expected in non-interactive environment): %v", err)
+		// Check if it's one of the expected errors
+		if errors.Is(err, ErrClipboardUtilityNotFound) {
+			t.Logf("CopyToClipboard returned expected error: clipboard utility not found")
+		} else if errors.Is(err, ErrClipboardNotSupported) {
+			t.Logf("CopyToClipboard returned expected error: clipboard not supported")
+		} else {
+			t.Logf("CopyToClipboard returned error: %v", err)
+		}
 	} else {
 		t.Log("CopyToClipboard succeeded")
 	}

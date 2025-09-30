@@ -171,6 +171,7 @@ func (b *Sdk) Install(version base.Version) error {
 		if err := util.CopyToClipboard(useCommand); err == nil {
 			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
 		}
+		// Silently ignore clipboard errors (not supported, utility not found, etc.)
 	}
 	
 	return nil

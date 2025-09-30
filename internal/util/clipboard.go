@@ -17,8 +17,16 @@
 package util
 
 import (
+	"errors"
 	"os/exec"
 	"runtime"
+)
+
+var (
+	// ErrClipboardNotSupported is returned when the OS doesn't support clipboard operations
+	ErrClipboardNotSupported = errors.New("clipboard not supported on this OS")
+	// ErrClipboardUtilityNotFound is returned when clipboard utility is not available
+	ErrClipboardUtilityNotFound = errors.New("clipboard utility not found")
 )
 
 // CopyToClipboard copies the given text to the system clipboard
@@ -37,17 +45,17 @@ func CopyToClipboard(text string) error {
 			cmd = exec.Command("xsel", "--clipboard", "--input")
 		} else {
 			// No clipboard utility available
-			return nil
+			return ErrClipboardUtilityNotFound
 		}
 	case "windows":
 		cmd = exec.Command("clip")
 	default:
 		// Unsupported OS
-		return nil
+		return ErrClipboardNotSupported
 	}
 
 	if cmd == nil {
-		return nil
+		return ErrClipboardNotSupported
 	}
 
 	in, err := cmd.StdinPipe()
