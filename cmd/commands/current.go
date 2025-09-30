@@ -17,10 +17,11 @@
 package commands
 
 import (
+"context"
 	"fmt"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -33,10 +34,10 @@ var Current = &cli.Command{
 	Category:  CategorySDK,
 }
 
-func currentCmd(ctx *cli.Context) error {
+func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	sdkName := ctx.Args().First()
+	sdkName := cmd.Args().First()
 	if sdkName == "" {
 		allSdk, err := manager.LoadAllSdk()
 		if err != nil {

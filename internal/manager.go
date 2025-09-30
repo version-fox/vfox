@@ -33,7 +33,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/shirou/gopsutil/v4/process"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"

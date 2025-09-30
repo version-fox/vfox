@@ -17,6 +17,7 @@
 package commands
 
 import (
+"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,7 +28,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/util"
 )
@@ -110,12 +111,12 @@ func downloadFile(c *http.Client, filepath string, url string) error {
 	return err
 }
 
-func upgradeCmd(ctx *cli.Context) error {
+func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	httpClient := manager.HttpClient()
 
-	currVersion := fmt.Sprintf("v%s", ctx.App.Version)
+	currVersion := fmt.Sprintf("v%s", cmd.Version)
 	latestVersion, err := fetchLatestVersion(httpClient)
 	if err != nil {
 		return cli.Exit("Failed to fetch the latest version: "+err.Error(), 1)

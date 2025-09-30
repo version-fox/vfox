@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,7 +26,7 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var Use = &cli.Command{
@@ -53,8 +54,8 @@ var Use = &cli.Command{
 	Category: CategorySDK,
 }
 
-func useCmd(ctx *cli.Context) error {
-	sdkArg := ctx.Args().First()
+func useCmd(ctx context.Context, cmd *cli.Command) error {
+	sdkArg := cmd.Args().First()
 	if len(sdkArg) == 0 {
 		return fmt.Errorf("invalid parameter. format: <sdk-name>[@<version>]")
 	}
@@ -72,9 +73,9 @@ func useCmd(ctx *cli.Context) error {
 	}
 
 	scope := base.Session
-	if ctx.IsSet("global") {
+	if cmd.IsSet("global") {
 		scope = base.Global
-	} else if ctx.IsSet("project") {
+	} else if cmd.IsSet("project") {
 		scope = base.Project
 	} else {
 		scope = base.Session

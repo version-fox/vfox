@@ -17,13 +17,14 @@
 package commands
 
 import (
+"context"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/logger"
@@ -51,14 +52,14 @@ var Install = &cli.Command{
 	Category: CategorySDK,
 }
 
-func installCmd(ctx *cli.Context) error {
-	yes := ctx.Bool("yes")
+func installCmd(ctx context.Context, cmd *cli.Command) error {
+	yes := cmd.Bool("yes")
 
-	if ctx.Bool("all") {
+	if cmd.Bool("all") {
 		return installAll(yes)
 	}
 
-	args := ctx.Args()
+	args := cmd.Args()
 	if args.First() == "" {
 		return cli.Exit("sdk name is required", 1)
 	}

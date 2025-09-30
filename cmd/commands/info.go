@@ -17,13 +17,14 @@
 package commands
 
 import (
+"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
 )
@@ -43,10 +44,10 @@ var Info = &cli.Command{
 	},
 }
 
-func infoCmd(ctx *cli.Context) error {
+func infoCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	args := ctx.Args().First()
+	args := cmd.Args().First()
 	if args == "" {
 		return cli.Exit("invalid arguments", 1)
 	}
@@ -62,7 +63,7 @@ func infoCmd(ctx *cli.Context) error {
 			if name != "" && string(version) != "" {
 				sdk, err := manager.LookupSdk(name)
 				if err != nil {
-					if ctx.IsSet("format") {
+					if cmd.IsSet("format") {
 						// For template output, we still need to output something
 						data := struct {
 							Name    string
@@ -73,7 +74,7 @@ func infoCmd(ctx *cli.Context) error {
 							Version: string(version),
 							Path:    "notfound",
 						}
-						return executeTemplate(ctx, data)
+						return executeTemplate(cmd, data)
 					}
 					fmt.Println("notfound")
 					return nil
@@ -87,7 +88,7 @@ func infoCmd(ctx *cli.Context) error {
 				}
 
 				// Check if format flag is set
-				formatValue := ctx.String("format")
+				formatValue := cmd.String("format")
 				if formatValue != "" {
 					data := struct {
 						Name    string
@@ -98,7 +99,7 @@ func infoCmd(ctx *cli.Context) error {
 						Version: string(version),
 						Path:    path,
 					}
-					return executeTemplate(ctx, data)
+					return executeTemplate(cmd, data)
 				}
 
 				fmt.Println(path)
@@ -115,7 +116,7 @@ func infoCmd(ctx *cli.Context) error {
 	source := s.Plugin
 
 	// If format flag is set, prepare data for template
-	if ctx.IsSet("format") {
+	if cmd.IsSet("format") {
 		data := struct {
 			Name        string
 			Version     string
@@ -129,7 +130,7 @@ func infoCmd(ctx *cli.Context) error {
 			InstallPath: s.InstallPath,
 			Description: source.Description,
 		}
-		return executeTemplate(ctx, data)
+		return executeTemplate(cmd, data)
 	}
 
 	pterm.Println("Plugin Info:")
@@ -142,11 +143,11 @@ func infoCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func executeTemplate(ctx *cli.Context, data interface{}) error {
-	tmplStr := ctx.String("format")
+func executeTemplate(cmd *cli.Command, data interface{}) error {
+	tmplStr := cmd.String("format")
 	tmpl, err := template.New("format").Parse(tmplStr)
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
-	return tmpl.Execute(ctx.App.Writer, data)
+	return tmpl.Execute(cmd.Writer, data)
 }

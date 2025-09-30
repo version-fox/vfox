@@ -17,8 +17,9 @@
 package commands
 
 import (
+"context"
 	"github.com/pterm/pterm"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 )
 
@@ -29,8 +30,8 @@ var Remove = &cli.Command{
 	Category: CategoryPlugin,
 }
 
-func removeCmd(ctx *cli.Context) error {
-	args := ctx.Args()
+func removeCmd(ctx context.Context, cmd *cli.Command) error {
+	args := cmd.Args()
 	l := args.Len()
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
