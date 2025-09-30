@@ -17,7 +17,7 @@
 package commands
 
 import (
-"context"
+	"context"
 	"strings"
 
 	"github.com/pterm/pterm"
