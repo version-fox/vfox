@@ -163,7 +163,17 @@ func (b *Sdk) Install(version base.Version) error {
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
-	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(fmt.Sprintf("vfox use %s", label)))
+	useCommand := fmt.Sprintf("vfox use %s", label)
+	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
+	
+	// Copy command to clipboard in TTY mode
+	if util.IsTTY() {
+		if err := util.CopyToClipboard(useCommand); err == nil {
+			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
+		}
+		// Silently ignore clipboard errors (not supported, utility not found, etc.)
+	}
+	
 	return nil
 }
 
