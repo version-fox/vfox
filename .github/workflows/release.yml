@@ -1,0 +1,135 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如: 0.7.1, 1.0.0-beta.1)'
+        required: true
+        type: string
+      prerelease:
+        description: '是否为预发布版本'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+            echo "❌ 错误: 无效的版本格式。请使用语义化版本 (如 1.2.3)"
+            exit 1
+          fi
+          echo "✅ 版本格式验证通过: $VERSION"
+
+      - name: Check if tag exists
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "❌ 错误: 标签 v$VERSION 已存在"
+            exit 1
+          fi
+          echo "✅ 标签检查通过"
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update version file
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          VERSION_FILE="internal/version.go"
+          
+          echo "📝 更新版本文件: $VERSION_FILE"
+          sed -i "s/const RuntimeVersion = \".*\"/const RuntimeVersion = \"$VERSION\"/" "$VERSION_FILE"
+          
+          # 验证更新
+          NEW_VERSION=$(grep 'const RuntimeVersion' "$VERSION_FILE" | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$NEW_VERSION" != "$VERSION" ]; then
+            echo "❌ 错误: 版本更新失败"
+            exit 1
+          fi
+          echo "✅ 版本已更新为: $VERSION"
+
+      - name: Commit and push version bump
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git add internal/version.go
+          git commit -m "chore: bump version to $VERSION"
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          echo "✅ 已创建并推送标签: v$VERSION"
+
+      - name: Wait for tag to be available
+        run: |
+          echo "⏳ 等待 tag 同步到 GitHub..."
+          sleep 5
+          echo "✅ Tag 应该已经可用，GoReleaser 即将开始工作"
+
+      - name: Summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "### 🎉 版本发布已启动！" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**版本:** v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**标签:** v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 后续自动流程" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ 版本文件已更新 (\`internal/version.go\`)" >> $GITHUB_STEP_SUMMARY
+          echo "2. ✅ Git 标签已创建并推送 (\`v$VERSION\`)" >> $GITHUB_STEP_SUMMARY
+          echo "3. 🔄 [GoReleaser workflow](https://github.com/${{ github.repository }}/actions/workflows/go-releaser.yml) 正在构建..." >> $GITHUB_STEP_SUMMARY
+          echo "   - 构建所有平台的二进制文件" >> $GITHUB_STEP_SUMMARY
+          echo "   - 生成 checksums 和签名" >> $GITHUB_STEP_SUMMARY
+          echo "   - 创建 draft release 和 changelog" >> $GITHUB_STEP_SUMMARY
+          echo "   - 上传所有构建产物" >> $GITHUB_STEP_SUMMARY
+          echo "4. 🔄 [Inno Setup workflow](https://github.com/${{ github.repository }}/actions/workflows/compile-inno-setup.yml) 将编译 Windows 安装包..." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ⏭️ 下一步操作" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 等待 GoReleaser 和 Inno Setup workflows 完成（约 10-15 分钟）" >> $GITHUB_STEP_SUMMARY
+          echo "2. 访问 [Releases 页面](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+          echo "3. 找到 \`v$VERSION\` 的 draft release" >> $GITHUB_STEP_SUMMARY
+          echo "4. 检查 changelog 和所有附件是否完整" >> $GITHUB_STEP_SUMMARY
+          echo "5. 点击 **Publish release** 正式发布" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 **提示:** GoReleaser 会自动创建 draft release，你只需要最后点击发布按钮即可！" >> $GITHUB_STEP_SUMMARY
+
+  notify:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "### 🎉 发版流程已启动！" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**版本:** v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**后续步骤:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ 版本号已更新" >> $GITHUB_STEP_SUMMARY
+          echo "2. ✅ Git 标签已创建" >> $GITHUB_STEP_SUMMARY
+          echo "3. 🔄 GoReleaser 正在构建资源..." >> $GITHUB_STEP_SUMMARY
+          echo "4. 🔄 Inno Setup 将编译 Windows 安装包..." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**注意:** 请等待所有 workflow 完成后，在 [Releases](https://github.com/${{ github.repository }}/releases) 页面发布版本。" >> $GITHUB_STEP_SUMMARY

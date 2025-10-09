@@ -42,24 +42,47 @@ changelog:
   filters:
     exclude:
       - "^test:"
-      - "^chore"
+      - "^chore:"
+      - "^ci:"
+      - "^style:"
       - "merge conflict"
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
       - go mod tidy
   groups:
-    - title: "New Features"
-      regexp: '^feat:'
-      order: 100
-    - title: "Bug fixes"
-      regexp: '^fix:'
-      order: 200
-    - title: "Documentation updates"
-      regexp: '^doc:'
-      order: 400
-    - title: Other work
-      order: 9999
+    - title: "🚀 New Features"
+      regexp: '^feat(\(.+\))?:'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^fix(\(.+\))?:'
+      order: 1
+    - title: "📝 Documentation"
+      regexp: '^docs?(\(.+\))?:'
+      order: 2
+    - title: "⚡ Performance Improvements"
+      regexp: '^perf(\(.+\))?:'
+      order: 3
+    - title: "♻️ Refactoring"
+      regexp: '^refactor(\(.+\))?:'
+      order: 4
+    - title: "🎨 Styling"
+      regexp: '^style(\(.+\))?:'
+      order: 5
+    - title: "🧪 Tests"
+      regexp: '^test(\(.+\))?:'
+      order: 6
+    - title: "🔧 Chores"
+      regexp: '^chore(\(.+\))?:'
+      order: 7
+    - title: "📦 Build & CI"
+      regexp: '^(build|ci)(\(.+\))?:'
+      order: 8
+    - title: "⬆️ Dependencies"
+      regexp: '^(deps|dep)(\(.+\))?:'
+      order: 9
+    - title: "Other Changes"
+      order: 999
 
 archives:
   - name_template: >-
@@ -178,8 +201,26 @@ signs:
       - --yes
 
 release:
-  draft: false
-  prerelease: true
+  # 先创建 draft，给你审查的机会
+  draft: true
+  # 自动检测是否为预发布版本（基于 tag 命名，如 v1.0.0-beta.1）
+  prerelease: auto
   name_template: "v{{ .Version }}"
+  # 如果设置为 true，会替换已存在的 release（用于重新发布）
+  replace: false
+  # 自动使用上面 changelog 配置生成的内容
+  header: |
+    ## 🎉 What's Changed in v{{ .Version }}
+    
   footer: |
+    
+    ---
     **Full Changelog**: https://github.com/version-fox/vfox/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    ## Installation
+    
+    See [installation guide](https://vfox.dev/guides/quick-start.html) for more details.
+    
+    ## Thanks
+    
+    Thanks to all contributors who made this release possible! 🎉
