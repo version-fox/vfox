@@ -26,6 +26,8 @@ var (
 		"HUDSON_URL",
 		"GO_SERVER_URL",
 		"CODEBUILD_BUILD_ID",
+		// https://docs.gitlab.com/ci/variables/predefined_variables/
+		"CI_PIPELINE_ID",
 	}
 )
 
