@@ -112,9 +112,9 @@ func useCmd(ctx *cli.Context) error {
 			OnInterruptFunc: func() {
 				os.Exit(0)
 			},
-	}
-	result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
-	resolvedVersion = base.Version(result)
+		}
+		result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+		resolvedVersion = base.Version(result)
 	}
 
 	return source.Use(resolvedVersion, scope)
