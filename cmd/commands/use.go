@@ -95,6 +95,12 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 		for _, version := range list {
 			arr = append(arr, string(version))
 		}
+		if len(arr) == 0 {
+			return fmt.Errorf("no versions available for %s", name)
+		}
+		if !internal.IsInteractiveTerminal() {
+			return cli.Exit("Please specify a version to use in non-interactive environments", 1)
+		}
 		selectPrinter := pterm.InteractiveSelectPrinter{
 			TextStyle:     &pterm.ThemeDefault.DefaultText,
 			OptionStyle:   &pterm.ThemeDefault.DefaultText,

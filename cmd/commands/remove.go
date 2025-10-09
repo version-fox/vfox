@@ -24,8 +24,15 @@ import (
 )
 
 var Remove = &cli.Command{
-	Name:     "remove",
-	Usage:    "Remove a plugin",
+	Name:  "remove",
+	Usage: "Remove a plugin",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage:   "Skip confirmation prompt",
+		},
+	},
 	Action:   removeCmd,
 	Category: CategoryPlugin,
 }
@@ -36,18 +43,26 @@ func removeCmd(ctx context.Context, cmd *cli.Command) error {
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
+	yes := ctx.Bool("yes")
+
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
-	result, _ := pterm.DefaultInteractiveConfirm.
-		WithTextStyle(&pterm.ThemeDefault.DefaultText).
-		WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
-		WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-		WithDefaultText("Please confirm").
-		Show()
-	if result {
-		return manager.Remove(args.First())
-	} else {
-		return cli.Exit("remove canceled", 1)
+
+	if !yes {
+		if !internal.IsInteractiveTerminal() {
+			return cli.Exit("Use the -y flag to skip confirmation in non-interactive environments", 1)
+		}
+		result, _ := pterm.DefaultInteractiveConfirm.
+			WithTextStyle(&pterm.ThemeDefault.DefaultText).
+			WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
+			WithRejectStyle(&pterm.ThemeDefault.DefaultText).
+			WithDefaultText("Please confirm").
+			Show()
+		if !result {
+			return cli.Exit("remove canceled", 1)
+		}
 	}
+
+	return manager.Remove(args.First())
 }

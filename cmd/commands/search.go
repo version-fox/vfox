@@ -79,6 +79,18 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		installedVersions.Add(string(version))
 	}
 
+	if !internal.IsInteractiveTerminal() {
+		fmt.Println("Available versions:")
+		for _, option := range options {
+			label := option.Value
+			if installedVersions.Contains(option.Key) {
+				label = fmt.Sprintf("%s (installed)", label)
+			}
+			fmt.Printf(" - %s\n", label)
+		}
+		return nil
+	}
+
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText:          "Please select a version of " + sdkName + " to install",
