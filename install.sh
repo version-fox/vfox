@@ -1,6 +1,20 @@
 #!/bin/bash
 
 main() {
+  # Detect if running in Termux
+  IS_TERMUX=false
+  if [[ "${HOME:-}" == *"com.termux"* ]]; then
+    IS_TERMUX=true
+    echo "Detected Termux environment"
+  fi
+
+  # Set installation directory based on environment
+  if [ "$IS_TERMUX" = true ]; then
+    INSTALL_DIR="${PREFIX}/bin"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
+
   # Check if curl or wget is installed
   if command -v curl &> /dev/null
   then
@@ -49,21 +63,35 @@ main() {
     exit 1
   fi
 
-  sudo mkdir -p /usr/local/bin
-  if [ $? -ne 0 ]; then
-    echo "Failed to create /usr/local/bin directory. Please check your sudo permissions and try again."
-    exit 1
-  fi
-
-  if [ -d "/usr/local/bin" ]; then
-    sudo mv "${FILENAME}/vfox" /usr/local/bin
+  # Create installation directory
+  if [ "$IS_TERMUX" = true ]; then
+    # In Termux, no sudo is needed
+    mkdir -p "$INSTALL_DIR"
   else
-    echo "/usr/local/bin is not a directory. Please make sure it is a valid directory path."
+    # In regular Linux/macOS, use sudo
+    sudo mkdir -p "$INSTALL_DIR"
+  fi
+
+  if [ $? -ne 0 ]; then
+    echo "Failed to create $INSTALL_DIR directory. Please check your permissions and try again."
+    exit 1
+  fi
+
+  if [ -d "$INSTALL_DIR" ]; then
+    if [ "$IS_TERMUX" = true ]; then
+      # In Termux, no sudo is needed
+      mv "${FILENAME}/vfox" "$INSTALL_DIR"
+    else
+      # In regular Linux/macOS, use sudo
+      sudo mv "${FILENAME}/vfox" "$INSTALL_DIR"
+    fi
+  else
+    echo "$INSTALL_DIR is not a directory. Please make sure it is a valid directory path."
     exit 1
   fi
 
   if [ $? -ne 0 ]; then
-    echo "Failed to move vfox to /usr/local/bin. Please check your sudo permissions and try again."
+    echo "Failed to move vfox to $INSTALL_DIR. Please check your permissions and try again."
     exit 1
   fi
   rm $TAR_FILE
