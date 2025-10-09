@@ -32,7 +32,11 @@ main() {
   fi
 
   # Get the latest version
-  VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+  if [ -n "${GITHUB_TOKEN}" ]; then
+    VERSION=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+  else
+    VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+  fi
 
   if [ -z "$VERSION" ]; then
     echo "Failed to get the latest version. Please check your network connection and try again."
