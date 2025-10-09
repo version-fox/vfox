@@ -63,8 +63,3 @@ func isTruthyEnv(value string) bool {
 	}
 	return true
 }
-
-// CIConfirm returns the default confirmation value for CI environments.
-func CIConfirm() bool {
-	return true
-}
