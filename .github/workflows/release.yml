@@ -14,12 +14,13 @@ permissions:
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Validate version format
         run: |
@@ -79,3 +80,25 @@ jobs:
           echo "Waiting for tag to sync to GitHub..."
           sleep 5
           echo "Tag should be available, GoReleaser will start shortly"
+
+      - name: Summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "### Release Started" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Automated Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Version file updated (\`internal/version.go\`)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Git tag created and pushed (\`v$VERSION\`)" >> $GITHUB_STEP_SUMMARY
+          echo "3. [GoReleaser workflow](https://github.com/${{ github.repository }}/actions/workflows/go-releaser.yml) will build binaries and create draft release" >> $GITHUB_STEP_SUMMARY
+          echo "4. [Inno Setup workflow](https://github.com/${{ github.repository }}/actions/workflows/compile-inno-setup.yml) will compile Windows installers" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait for workflows to complete (approximately 10-15 minutes)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Visit [Releases page](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Review the draft release for \`v$VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Click **Publish release** to make it official" >> $GITHUB_STEP_SUMMARY
