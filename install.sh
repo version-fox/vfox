@@ -39,13 +39,9 @@ main() {
   fi
 
   # Check if the response contains an error message
-  ERROR_MSG=$(echo "$API_RESPONSE" | grep '"message":' | sed -E 's/.*"message": "([^"]+)".*/\1/')
-  if [ -n "$ERROR_MSG" ]; then
-    echo "GitHub API Error: $ERROR_MSG"
-    DOC_URL=$(echo "$API_RESPONSE" | grep '"documentation_url":' | sed -E 's/.*"documentation_url": "([^"]+)".*/\1/')
-    if [ -n "$DOC_URL" ]; then
-      echo "Documentation: $DOC_URL"
-    fi
+  if echo "$API_RESPONSE" | grep -q '"message":'; then
+    echo "GitHub API Error:"
+    echo "$API_RESPONSE"
     exit 1
   fi
 
