@@ -43,7 +43,7 @@ func removeCmd(ctx context.Context, cmd *cli.Command) error {
 	if l < 1 {
 		return cli.Exit("invalid arguments", 1)
 	}
-	yes := ctx.Bool("yes")
+	yes := cmd.Bool("yes")
 
 	manager := internal.NewSdkManager()
 	defer manager.Close()
