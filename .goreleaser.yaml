@@ -1,5 +1,6 @@
 # .goreleaser.yaml
 project_name: vfox
+
 before:
   hooks:
     - go mod tidy
@@ -113,7 +114,6 @@ brews:
       owner: version-fox
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TOKEN }}"
-    folder: Formula
     goarm: "7"
     homepage: https://github.com/version-fox/vfox
     description: A cross-platform SDK version manager with a simple cli.
@@ -204,7 +204,6 @@ release:
   draft: true
   prerelease: auto
   name_template: "v{{ .Version }}"
-  replace: false
   header: |
     ## 🎉 What's Changed in v{{ .Version }}
     

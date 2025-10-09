@@ -19,7 +19,7 @@ jobs:
         run: echo "flags=--snapshot" >> $GITHUB_ENV
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # 获取完整的 git 历史，用于生成 changelog
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
@@ -29,7 +29,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: '~> v2'  # 使用 v2.x 的最新版本
+          version: latest
           args: release --clean ${{ env.flags }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

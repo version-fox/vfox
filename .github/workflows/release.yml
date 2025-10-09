@@ -65,7 +65,7 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           git add internal/version.go
-          git commit -m "chore: bump version to $VERSION"
+          git commit -m "release v$VERSION 🎉🎉🎉"
           git push origin main
 
       - name: Create and push tag
