@@ -96,7 +96,7 @@ func installCmd(ctx *cli.Context) error {
 			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
-				if internal.IsCI() {
+				if !internal.IsInteractiveTerminal() {
 					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
@@ -145,14 +145,12 @@ func installAll(autoConfirm bool) error {
 	printSdk(sdks, nil)
 
 	if !autoConfirm {
-		var result bool
-		if internal.IsCI() {
-			result = internal.CIConfirm()
-		} else {
-			result, _ = pterm.DefaultInteractiveConfirm.
-				WithDefaultValue(true).
-				Show("Do you want to install these plugins and SDKs?")
+		if !internal.IsInteractiveTerminal() {
+			return cli.Exit("Use the -y flag to automatically confirm installation in non-interactive environments", 1)
 		}
+		result, _ := pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true).
+			Show("Do you want to install these plugins and SDKs?")
 		if !result {
 			return nil
 		}

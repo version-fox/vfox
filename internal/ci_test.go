@@ -72,7 +72,7 @@ func TestIsCI(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			if got := IsCI(); got != tc.want {
+			if got := isCI(); got != tc.want {
 				t.Fatalf("IsCI() = %v, want %v", got, tc.want)
 			}
 		})

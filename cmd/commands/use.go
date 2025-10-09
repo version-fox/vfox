@@ -97,26 +97,24 @@ func useCmd(ctx *cli.Context) error {
 		if len(arr) == 0 {
 			return fmt.Errorf("no versions available for %s", name)
 		}
-		var result string
-		if internal.IsCI() {
-			result = internal.CISelect(arr)
-		} else {
-			selectPrinter := pterm.InteractiveSelectPrinter{
-				TextStyle:     &pterm.ThemeDefault.DefaultText,
-				OptionStyle:   &pterm.ThemeDefault.DefaultText,
-				Options:       arr,
-				DefaultOption: "",
-				MaxHeight:     5,
-				Selector:      "->",
-				SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
-				Filter:        true,
-				OnInterruptFunc: func() {
-					os.Exit(0)
-				},
-			}
-			result, _ = selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+		if !internal.IsInteractiveTerminal() {
+			return cli.Exit("Please specify a version to use in non-interactive environments", 1)
 		}
-		resolvedVersion = base.Version(result)
+		selectPrinter := pterm.InteractiveSelectPrinter{
+			TextStyle:     &pterm.ThemeDefault.DefaultText,
+			OptionStyle:   &pterm.ThemeDefault.DefaultText,
+			Options:       arr,
+			DefaultOption: "",
+			MaxHeight:     5,
+			Selector:      "->",
+			SelectorStyle: &pterm.ThemeDefault.SuccessMessageStyle,
+			Filter:        true,
+			OnInterruptFunc: func() {
+				os.Exit(0)
+			},
+	}
+	result, _ := selectPrinter.Show(fmt.Sprintf("Please select a version of %s", name))
+	resolvedVersion = base.Version(result)
 	}
 
 	return source.Use(resolvedVersion, scope)

@@ -39,8 +39,8 @@ func removeCmd(ctx *cli.Context) error {
 	defer manager.Close()
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
 	var result bool
-	if internal.IsCI() {
-		result = internal.CIConfirm()
+	if !internal.IsInteractiveTerminal() {
+		result = true
 	} else {
 		result, _ = pterm.DefaultInteractiveConfirm.
 			WithTextStyle(&pterm.ThemeDefault.DefaultText).

@@ -271,8 +271,8 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (*Sdk, err
 		if errors.As(err, &NotFoundError{}) {
 			if autoConfirm {
 				fmt.Printf("[%s] not added yet, automatically proceeding with installation.\n", pterm.LightBlue(name))
-			} else if IsCI() {
-				return nil, cli.Exit(fmt.Sprintf("Plugin %s is not installed. Use the -y flag to automatically install plugins in CI environments", name), 1)
+			} else if !IsInteractiveTerminal() {
+				return nil, cli.Exit(fmt.Sprintf("Plugin %s is not installed. Use the -y flag to automatically install plugins in non-interactive environments", name), 1)
 			} else {
 				fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
 				result, _ := pterm.DefaultInteractiveConfirm.

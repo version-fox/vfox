@@ -29,8 +29,8 @@ var (
 	}
 )
 
-// IsCI checks if the current environment is CI.
-func IsCI() bool {
+// isCI checks if the current environment is CI.
+func isCI() bool {
 	for _, key := range ciTruthyEnvVars {
 		if isTruthyEnv(os.Getenv(key)) {
 			return true
@@ -46,6 +46,15 @@ func IsCI() bool {
 	return false
 }
 
+// IsInteractiveTerminal checks if the current environment supports interactive terminal operations.
+// Returns false if running in CI or if stdout is not a terminal (e.g., piped output).
+func IsInteractiveTerminal() bool {
+	if isCI() {
+		return false
+	}
+	return true
+}
+
 func isTruthyEnv(value string) bool {
 	normalized := strings.TrimSpace(strings.ToLower(value))
 	switch normalized {
@@ -58,12 +67,4 @@ func isTruthyEnv(value string) bool {
 // CIConfirm returns the default confirmation value for CI environments.
 func CIConfirm() bool {
 	return true
-}
-
-// CISelect returns the default selection for CI environments (first option).
-func CISelect(options []string) string {
-	if len(options) > 0 {
-		return options[0]
-	}
-	return ""
 }
