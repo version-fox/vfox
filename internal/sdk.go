@@ -73,8 +73,38 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 	}
 
 	osPaths := env.NewPaths(env.OsPaths)
-	pathsStr := envKeys.Paths.Merge(osPaths).String()
+	// Remove previously added vfox paths to avoid duplicates
+	// We use __VFOX_PATHS environment variable to track paths added by vfox
+	oldVfoxPaths := os.Getenv("__VFOX_PATHS")
+	cleanedPaths := env.NewPaths(env.EmptyPaths)
+	
+	if oldVfoxPaths != "" {
+		// Build a set of old vfox paths for quick lookup
+		oldPathSet := make(map[string]struct{})
+		for _, p := range strings.Split(oldVfoxPaths, string(os.PathListSeparator)) {
+			if p != "" {
+				oldPathSet[p] = struct{}{}
+			}
+		}
+		
+		// Filter out old vfox paths from current PATH
+		for _, p := range osPaths.Slice() {
+			if _, isVfoxPath := oldPathSet[p]; !isVfoxPath {
+				cleanedPaths.Add(p)
+			}
+		}
+	} else {
+		// First time or not in hook environment, keep all paths
+		cleanedPaths = osPaths
+	}
+	
+	// Merge new vfox paths with cleaned PATH
+	pathsStr := envKeys.Paths.Merge(cleanedPaths).String()
 	exportEnvs["PATH"] = &pathsStr
+	
+	// Record current vfox paths for next time
+	vfoxPathsStr := envKeys.Paths.String()
+	exportEnvs["__VFOX_PATHS"] = &vfoxPathsStr
 
 	return exportEnvs
 }

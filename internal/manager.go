@@ -82,10 +82,42 @@ func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.EnvKeys(toolset.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
-	}, base.ShellLocation)
+
+	var sdkEnvs SdkEnvs
+	tools := make(map[string]struct{})
+
+	// Process workspace (project) tools with ShellLocation
+	for name, version := range workToolVersion.Record {
+		if lookupSdk, err := m.LookupSdk(name); err == nil {
+			v := base.Version(version)
+			if ek, err := lookupSdk.EnvKeys(v, base.ShellLocation); err == nil {
+				tools[name] = struct{}{}
+				sdkEnvs = append(sdkEnvs, &SdkEnv{
+					Sdk: lookupSdk,
+					Env: ek,
+				})
+			}
+		}
+	}
+
+	// Process home (global) tools with GlobalLocation
+	for name, version := range homeToolVersion.Record {
+		if _, ok := tools[name]; ok {
+			continue // Skip if already processed in workspace
+		}
+		if lookupSdk, err := m.LookupSdk(name); err == nil {
+			v := base.Version(version)
+			if ek, err := lookupSdk.EnvKeys(v, base.GlobalLocation); err == nil {
+				tools[name] = struct{}{}
+				sdkEnvs = append(sdkEnvs, &SdkEnv{
+					Sdk: lookupSdk,
+					Env: ek,
+				})
+			}
+		}
+	}
+
+	return sdkEnvs, nil
 }
 
 func (m *Manager) WorkspaceToolVersion() (*toolset.ToolVersion, error) {
@@ -133,21 +165,17 @@ type SessionEnvOptions struct {
 //   - A new .tool-versions file is encountered
 //   - The environment is explicitly modified via the `use` command
 func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
-	tvs := toolset.MultiToolVersions{}
-
 	workToolVersion, err := m.WorkspaceToolVersion()
 	if err != nil {
 		return nil, err
 	}
-	tvs = append(tvs, workToolVersion)
 
+	var homeToolVersion *toolset.ToolVersion
 	if opt.WithGlobalEnv {
-		homeToolVersion, herr := toolset.NewToolVersion(m.PathMeta.HomePath)
-		if herr != nil {
-			return nil, herr
+		homeToolVersion, err = toolset.NewToolVersion(m.PathMeta.HomePath)
+		if err != nil {
+			return nil, err
 		}
-
-		tvs = append(tvs, homeToolVersion)
 	}
 
 	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.CurTmpPath)
@@ -156,8 +184,6 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	}
 	defer curToolVersion.Save()
 
-	tvs = append(tvs, curToolVersion)
-
 	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.CurTmpPath, "flush_env.cache"))
 	if err != nil {
 		return nil, err
@@ -165,13 +191,19 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	defer flushCache.Close()
 
 	var sdkEnvs []*SdkEnv
+	
+	// Track which tools are processed and from which scope
+	processedTools := make(map[string]struct{})
 
-	tvs.FilterTools(func(name, version string) bool {
+	// First process workspace (project) tools with ShellLocation
+	for name, version := range workToolVersion.Record {
 		if lookupSdk, err := m.LookupSdk(name); err == nil {
 			vv, ok := flushCache.Get(name)
 			if ok && string(vv) == version {
 				logger.Debugf("Hit cache, skip flush environment, %s@%s\n", name, version)
-				return true
+				processedTools[name] = struct{}{}
+				curToolVersion.Record[name] = version
+				continue
 			} else {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
 			}
@@ -184,11 +216,69 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 				})
 
 				curToolVersion.Record[name] = version
-				return true
+				processedTools[name] = struct{}{}
 			}
 		}
-		return false
-	})
+	}
+
+	// Then process session tools with ShellLocation
+	for name, version := range curToolVersion.Record {
+		if _, ok := processedTools[name]; ok {
+			continue // Skip if already processed
+		}
+		if lookupSdk, err := m.LookupSdk(name); err == nil {
+			vv, ok := flushCache.Get(name)
+			if ok && string(vv) == version {
+				logger.Debugf("Hit cache, skip flush environment, %s@%s\n", name, version)
+				processedTools[name] = struct{}{}
+				continue
+			} else {
+				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+			}
+			v := base.Version(version)
+			if keys, err := lookupSdk.EnvKeys(v, base.ShellLocation); err == nil {
+				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
+
+				sdkEnvs = append(sdkEnvs, &SdkEnv{
+					Sdk: lookupSdk, Env: keys,
+				})
+
+				processedTools[name] = struct{}{}
+			}
+		}
+	}
+
+	// Finally process home (global) tools with GlobalLocation if WithGlobalEnv is true
+	if opt.WithGlobalEnv && homeToolVersion != nil {
+		for name, version := range homeToolVersion.Record {
+			if _, ok := processedTools[name]; ok {
+				continue // Skip if already processed in workspace or session
+			}
+			if lookupSdk, err := m.LookupSdk(name); err == nil {
+				vv, ok := flushCache.Get(name)
+				if ok && string(vv) == version {
+					logger.Debugf("Hit cache, skip flush environment, %s@%s\n", name, version)
+					processedTools[name] = struct{}{}
+					curToolVersion.Record[name] = version
+					continue
+				} else {
+					logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
+				}
+				v := base.Version(version)
+				// Use GlobalLocation for global scope tools
+				if keys, err := lookupSdk.EnvKeys(v, base.GlobalLocation); err == nil {
+					flushCache.Set(name, cache.Value(version), cache.NeverExpired)
+
+					sdkEnvs = append(sdkEnvs, &SdkEnv{
+						Sdk: lookupSdk, Env: keys,
+					})
+
+					curToolVersion.Record[name] = version
+					processedTools[name] = struct{}{}
+				}
+			}
+		}
+	}
 
 	return sdkEnvs, nil
 }
