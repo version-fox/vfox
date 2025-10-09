@@ -72,39 +72,51 @@ func (d *SdkEnvs) ToExportEnvs() env.Vars {
 		exportEnvs[k] = v
 	}
 
+	// Build a map of current SDK names to their new paths
+	currentSdkPaths := make(map[string][]string)
+	for _, sdkEnv := range *d {
+		sdkName := sdkEnv.Sdk.Name
+		paths := sdkEnv.Env.Paths.Slice()
+		if len(paths) > 0 {
+			currentSdkPaths[sdkName] = paths
+		}
+	}
+	
 	osPaths := env.NewPaths(env.OsPaths)
-	// Remove previously added vfox paths to avoid duplicates
-	// We use __VFOX_PATHS environment variable to track paths added by vfox
-	oldVfoxPaths := os.Getenv("__VFOX_PATHS")
 	cleanedPaths := env.NewPaths(env.EmptyPaths)
 	
-	if oldVfoxPaths != "" {
-		// Build a set of old vfox paths for quick lookup
-		oldPathSet := make(map[string]struct{})
-		for _, p := range strings.Split(oldVfoxPaths, string(os.PathListSeparator)) {
-			if p != "" {
-				oldPathSet[p] = struct{}{}
+	// Build a set of paths to remove (only for SDKs being updated)
+	pathsToRemove := make(map[string]struct{})
+	for sdkName := range currentSdkPaths {
+		// Get old paths for this SDK from environment variable
+		envVarName := "__VFOX_SDK_" + strings.ToUpper(sdkName)
+		oldPaths := os.Getenv(envVarName)
+		if oldPaths != "" {
+			for _, p := range strings.Split(oldPaths, string(os.PathListSeparator)) {
+				if p != "" {
+					pathsToRemove[p] = struct{}{}
+				}
 			}
 		}
-		
-		// Filter out old vfox paths from current PATH
-		for _, p := range osPaths.Slice() {
-			if _, isVfoxPath := oldPathSet[p]; !isVfoxPath {
-				cleanedPaths.Add(p)
-			}
+	}
+	
+	// Filter out old paths of SDKs being updated from current PATH
+	for _, p := range osPaths.Slice() {
+		if _, shouldRemove := pathsToRemove[p]; !shouldRemove {
+			cleanedPaths.Add(p)
 		}
-	} else {
-		// First time or not in hook environment, keep all paths
-		cleanedPaths = osPaths
 	}
 	
 	// Merge new vfox paths with cleaned PATH
 	pathsStr := envKeys.Paths.Merge(cleanedPaths).String()
 	exportEnvs["PATH"] = &pathsStr
 	
-	// Record current vfox paths for next time
-	vfoxPathsStr := envKeys.Paths.String()
-	exportEnvs["__VFOX_PATHS"] = &vfoxPathsStr
+	// Save each SDK's paths to its own environment variable
+	for sdkName, paths := range currentSdkPaths {
+		envVarName := "__VFOX_SDK_" + strings.ToUpper(sdkName)
+		pathsStr := strings.Join(paths, string(os.PathListSeparator))
+		exportEnvs[envVarName] = &pathsStr
+	}
 
 	return exportEnvs
 }
