@@ -1,6 +1,24 @@
 #!/bin/bash
 
 main() {
+  # Detect if running in Termux
+  IS_TERMUX=false
+  case "${HOME:-}" in
+    *com.termux*)
+      IS_TERMUX=true
+      echo "Detected Termux environment"
+      ;;
+  esac
+
+  # Set installation directory and sudo command based on environment
+  if [ "$IS_TERMUX" = true ]; then
+    INSTALL_DIR="${PREFIX}/bin"
+    SUDO_CMD=""
+  else
+    INSTALL_DIR="/usr/local/bin"
+    SUDO_CMD="sudo"
+  fi
+
   # Check if curl or wget is installed
   if command -v curl &> /dev/null
   then
@@ -14,8 +32,20 @@ main() {
   fi
 
   # Get the latest version
-  VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+  if [ -n "${GITHUB_TOKEN}" ]; then
+    API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest")
+  else
+    API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest")
+  fi
 
+  # Check if the response contains an error message
+  if echo "$API_RESPONSE" | grep -q '"message":'; then
+    echo "GitHub API Error:"
+    echo "$API_RESPONSE"
+    exit 1
+  fi
+
+  VERSION=$(echo "$API_RESPONSE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
   if [ -z "$VERSION" ]; then
     echo "Failed to get the latest version. Please check your network connection and try again."
     exit 1
@@ -49,21 +79,22 @@ main() {
     exit 1
   fi
 
-  sudo mkdir -p /usr/local/bin
+  # Create installation directory
+  $SUDO_CMD mkdir -p "$INSTALL_DIR"
   if [ $? -ne 0 ]; then
-    echo "Failed to create /usr/local/bin directory. Please check your sudo permissions and try again."
+    echo "Failed to create $INSTALL_DIR directory. Please check your permissions and try again."
     exit 1
   fi
 
-  if [ -d "/usr/local/bin" ]; then
-    sudo mv "${FILENAME}/vfox" /usr/local/bin
+  if [ -d "$INSTALL_DIR" ]; then
+    $SUDO_CMD mv "${FILENAME}/vfox" "$INSTALL_DIR"
   else
-    echo "/usr/local/bin is not a directory. Please make sure it is a valid directory path."
+    echo "$INSTALL_DIR is not a directory. Please make sure it is a valid directory path."
     exit 1
   fi
 
   if [ $? -ne 0 ]; then
-    echo "Failed to move vfox to /usr/local/bin. Please check your sudo permissions and try again."
+    echo "Failed to move vfox to $INSTALL_DIR. Please check your permissions and try again."
     exit 1
   fi
   rm $TAR_FILE
