@@ -96,8 +96,8 @@ func installCmd(ctx *cli.Context) error {
 			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
-				if handled, message, exitCode := internal.ResolveCICommand("install", internal.CIEventMissingVersion, name); handled {
-					return cli.Exit(message, exitCode)
+				if internal.IsCI() {
+					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
