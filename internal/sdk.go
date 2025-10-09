@@ -590,7 +590,13 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 	}
 
 	if scope == base.Global || scope == base.Project {
-		// When switching to Global or Project scope, remove from session to avoid override
+		// Save Global/Project tool version first
+		multiToolVersion.Add(b.Name, string(version))
+		if err = multiToolVersion.Save(); err != nil {
+			return fmt.Errorf("failed to save tool versions, err:%w", err)
+		}
+		
+		// Then remove from session to avoid override
 		delete(sessionToolVersion.Record, b.Name)
 		if err = sessionToolVersion.Save(); err != nil {
 			return fmt.Errorf("failed to save session tool versions, err:%w", err)
