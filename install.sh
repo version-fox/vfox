@@ -8,11 +8,13 @@ main() {
     echo "Detected Termux environment"
   fi
 
-  # Set installation directory based on environment
+  # Set installation directory and sudo command based on environment
   if [ "$IS_TERMUX" = true ]; then
     INSTALL_DIR="${PREFIX}/bin"
+    SUDO_CMD=""
   else
     INSTALL_DIR="/usr/local/bin"
+    SUDO_CMD="sudo"
   fi
 
   # Check if curl or wget is installed
@@ -64,27 +66,14 @@ main() {
   fi
 
   # Create installation directory
-  if [ "$IS_TERMUX" = true ]; then
-    # In Termux, no sudo is needed
-    mkdir -p "$INSTALL_DIR"
-  else
-    # In regular Linux/macOS, use sudo
-    sudo mkdir -p "$INSTALL_DIR"
-  fi
-
+  $SUDO_CMD mkdir -p "$INSTALL_DIR"
   if [ $? -ne 0 ]; then
     echo "Failed to create $INSTALL_DIR directory. Please check your permissions and try again."
     exit 1
   fi
 
   if [ -d "$INSTALL_DIR" ]; then
-    if [ "$IS_TERMUX" = true ]; then
-      # In Termux, no sudo is needed
-      mv "${FILENAME}/vfox" "$INSTALL_DIR"
-    else
-      # In regular Linux/macOS, use sudo
-      sudo mv "${FILENAME}/vfox" "$INSTALL_DIR"
-    fi
+    $SUDO_CMD mv "${FILENAME}/vfox" "$INSTALL_DIR"
   else
     echo "$INSTALL_DIR is not a directory. Please make sure it is a valid directory path."
     exit 1
