@@ -33,11 +33,23 @@ main() {
 
   # Get the latest version
   if [ -n "${GITHUB_TOKEN}" ]; then
-    VERSION=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+    API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest")
   else
-    VERSION=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+    API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest")
   fi
 
+  # Check if the response contains an error message
+  ERROR_MSG=$(echo "$API_RESPONSE" | grep '"message":' | sed -E 's/.*"message": "([^"]+)".*/\1/')
+  if [ -n "$ERROR_MSG" ]; then
+    echo "GitHub API Error: $ERROR_MSG"
+    DOC_URL=$(echo "$API_RESPONSE" | grep '"documentation_url":' | sed -E 's/.*"documentation_url": "([^"]+)".*/\1/')
+    if [ -n "$DOC_URL" ]; then
+      echo "Documentation: $DOC_URL"
+    fi
+    exit 1
+  fi
+
+  VERSION=$(echo "$API_RESPONSE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
   if [ -z "$VERSION" ]; then
     echo "Failed to get the latest version. Please check your network connection and try again."
     exit 1
