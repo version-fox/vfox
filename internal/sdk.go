@@ -583,17 +583,25 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 		multiToolVersion = append(multiToolVersion, toolVersion)
 	}
 
-	// It must also be saved once at the session level.
-	toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
+	// Handle session level tool versions
+	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
 	if err != nil {
 		return fmt.Errorf("failed to read tool versions, err:%w", err)
 	}
-	multiToolVersion = append(multiToolVersion, toolVersion)
 
-	multiToolVersion.Add(b.Name, string(version))
-
-	if err = multiToolVersion.Save(); err != nil {
-		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	if scope == base.Global || scope == base.Project {
+		// When switching to Global or Project scope, remove from session to avoid override
+		delete(sessionToolVersion.Record, b.Name)
+		if err = sessionToolVersion.Save(); err != nil {
+			return fmt.Errorf("failed to save session tool versions, err:%w", err)
+		}
+	} else {
+		// Session scope: save to session
+		multiToolVersion = append(multiToolVersion, sessionToolVersion)
+		multiToolVersion.Add(b.Name, string(version))
+		if err = multiToolVersion.Save(); err != nil {
+			return fmt.Errorf("failed to save tool versions, err:%w", err)
+		}
 	}
 	// Use GlobalLocation for global scope to create stable symlink at .version-fox/cache/<sdk>/current
 	// Use ShellLocation for other scopes to create symlink in temporary shell-specific directory
