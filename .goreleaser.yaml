@@ -201,14 +201,10 @@ signs:
       - --yes
 
 release:
-  # 先创建 draft，给你审查的机会
   draft: true
-  # 自动检测是否为预发布版本（基于 tag 命名，如 v1.0.0-beta.1）
   prerelease: auto
   name_template: "v{{ .Version }}"
-  # 如果设置为 true，会替换已存在的 release（用于重新发布）
   replace: false
-  # 自动使用上面 changelog 配置生成的内容
   header: |
     ## 🎉 What's Changed in v{{ .Version }}
     
