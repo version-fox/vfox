@@ -3,10 +3,12 @@
 main() {
   # Detect if running in Termux
   IS_TERMUX=false
-  if [[ "${HOME:-}" == *"com.termux"* ]]; then
-    IS_TERMUX=true
-    echo "Detected Termux environment"
-  fi
+  case "${HOME:-}" in
+    *com.termux*)
+      IS_TERMUX=true
+      echo "Detected Termux environment"
+      ;;
+  esac
 
   # Set installation directory and sudo command based on environment
   if [ "$IS_TERMUX" = true ]; then
