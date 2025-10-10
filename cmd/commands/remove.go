@@ -18,9 +18,11 @@ package commands
 
 import (
 	"context"
+
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 var Remove = &cli.Command{
@@ -50,7 +52,7 @@ func removeCmd(ctx context.Context, cmd *cli.Command) error {
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
 
 	if !yes {
-		if !internal.IsInteractiveTerminal() {
+		if util.IsNonInteractiveTerminal() {
 			return cli.Exit("Use the -y flag to skip confirmation in non-interactive environments", 1)
 		}
 		result, _ := pterm.DefaultInteractiveConfirm.

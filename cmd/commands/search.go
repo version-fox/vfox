@@ -79,7 +79,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		installedVersions.Add(string(version))
 	}
 
-	if !internal.IsInteractiveTerminal() {
+	if util.IsNonInteractiveTerminal() {
 		fmt.Println("Available versions:")
 		for _, option := range options {
 			label := option.Value
