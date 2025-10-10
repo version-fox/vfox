@@ -48,8 +48,8 @@ func isCI() bool {
 	return false
 }
 
-// IsNonInteractiveTerminal checks if the current environment supports interactive terminal operations.
-// Returns false if running in CI or if stdout is not a terminal (e.g., piped output).
+// IsNonInteractiveTerminal checks if the current environment is non-interactive.
+// Returns true if running in CI or if stdout is not a terminal (e.g., piped output).
 func IsNonInteractiveTerminal() bool {
 	if isCI() {
 		return true
