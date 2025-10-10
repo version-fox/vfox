@@ -1,4 +1,4 @@
-package internal
+package util
 
 import (
 	"os"
@@ -48,13 +48,13 @@ func isCI() bool {
 	return false
 }
 
-// IsInteractiveTerminal checks if the current environment supports interactive terminal operations.
+// IsNonInteractiveTerminal checks if the current environment supports interactive terminal operations.
 // Returns false if running in CI or if stdout is not a terminal (e.g., piped output).
-func IsInteractiveTerminal() bool {
+func IsNonInteractiveTerminal() bool {
 	if isCI() {
-		return false
+		return true
 	}
-	return true
+	return !IsTTY()
 }
 
 func isTruthyEnv(value string) bool {

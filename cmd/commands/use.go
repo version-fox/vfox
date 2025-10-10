@@ -22,6 +22,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/version-fox/vfox/internal/util"
+
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/base"
@@ -98,7 +100,7 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 		if len(arr) == 0 {
 			return fmt.Errorf("no versions available for %s", name)
 		}
-		if !internal.IsInteractiveTerminal() {
+		if util.IsNonInteractiveTerminal() {
 			return cli.Exit("Please specify a version to use in non-interactive environments", 1)
 		}
 		selectPrinter := pterm.InteractiveSelectPrinter{
