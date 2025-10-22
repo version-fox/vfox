@@ -353,7 +353,7 @@ func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, 
 		// so we need to run into something like `shims` mode.
 		rawKeys, err := b.Plugin.EnvKeys(linkPackage.from)
 		if err != nil {
-			return nil, fmt.Errorf("plugin [RawEnvKeys] error: err:%w", err)
+			return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
 		}
 
 		keys.MergePaths(rawKeys)
