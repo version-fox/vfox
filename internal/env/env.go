@@ -37,3 +37,11 @@ type Envs struct {
 	BinPaths  *Paths
 	Paths     *Paths
 }
+
+func (e *Envs) MergePaths(envs *Envs) {
+	if envs == nil {
+		return
+	}
+	e.BinPaths.Merge(envs.BinPaths)
+	e.Paths.Merge(envs.Paths)
+}

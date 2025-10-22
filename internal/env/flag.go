@@ -35,6 +35,11 @@ func IsHookEnv() bool {
 	return os.Getenv(HookFlag) != ""
 }
 
+// https://code.visualstudio.com/docs/configure/command-line#_how-do-i-detect-when-a-shell-was-launched-by-vs-code
+func IsInVSCodeStartup() bool {
+	return os.Getenv("VSCODE_RESOLVING_ENVIRONMENT") == "1"
+}
+
 func GetPid() int {
 	if pid := os.Getenv(PidFlag); pid != "" {
 		p, _ := strconv.Atoi(pid) // Convert pid from string to int

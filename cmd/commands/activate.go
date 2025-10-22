@@ -27,6 +27,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -58,8 +59,15 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	exportEnvs := sdkEnvs.ToExportEnvs()
 
-	exportEnvs[env.HookFlag] = &name
-	exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
+	// When VS Code starts up, it launch a shell in order to source the "shell environment" to help set up tools.
+	// It will launch an interactive login shell and fetch its environment
+	// If we setup hook in this shell, it will cause all terminal launched by VSCode could not be hooked properly.
+	if !env.IsInVSCodeStartup() {
+		exportEnvs[env.HookFlag] = &name
+		exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
+	}
+
+	logger.Debugf("export envs: %+v", exportEnvs)
 
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
@@ -67,6 +75,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	if s == nil {
 		return fmt.Errorf("unknown target shell %s", name)
 	}
+
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate(
 		shell.ActivateConfig{

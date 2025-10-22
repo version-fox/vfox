@@ -165,7 +165,7 @@ func (b *Sdk) Install(version base.Version) error {
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
 	useCommand := fmt.Sprintf("vfox use %s", label)
 	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
-	
+
 	// Copy command to clipboard in TTY mode
 	if util.IsTTY() {
 		if err := util.CopyToClipboard(useCommand); err == nil {
@@ -173,7 +173,7 @@ func (b *Sdk) Install(version base.Version) error {
 		}
 		// Silently ignore clipboard errors (not supported, utility not found, etc.)
 	}
-	
+
 	return nil
 }
 
@@ -347,6 +347,18 @@ func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, 
 	if err != nil {
 		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
 	}
+
+	if env.IsInVSCodeStartup() {
+		// VSCode will kill the shell process after the activation,
+		// so we need to ran into something like `shims` mode.
+		rawKeys, err := b.Plugin.EnvKeys(linkPackage.from)
+		if err != nil {
+			return nil, fmt.Errorf("plugin [RawEnvKeys] error: err:%w", err)
+		}
+
+		keys.MergePaths(rawKeys)
+	}
+
 	return keys, nil
 }
 
