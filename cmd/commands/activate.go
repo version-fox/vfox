@@ -59,10 +59,9 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	exportEnvs := sdkEnvs.ToExportEnvs()
 
-	// When VS Code starts up, it launch a shell in order to source the "shell environment" to help set up tools.
-	// It will launch an interactive login shell and fetch its environment
-	// If we setup hook in this shell, it will cause all terminal launched by VSCode could not be hooked properly.
-	if !env.IsInVSCodeStartup() {
+	// Current shell is not for user use, it will be killed after the activation.
+	// If we setup hook in this shell, it will cause all terminal launched by IDE could not be hooked properly.
+	if !env.IsIDEEnvironmentResolution() {
 		exportEnvs[env.HookFlag] = &name
 		exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
 	}

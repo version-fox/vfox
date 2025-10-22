@@ -348,8 +348,8 @@ func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, 
 		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
 	}
 
-	if env.IsInVSCodeStartup() {
-		// VSCode will kill the shell process after the activation,
+	if env.IsIDEEnvironmentResolution() {
+		// current shell will be killed after the activation,
 		// so we need to run into something like `shims` mode.
 		rawKeys, err := b.Plugin.EnvKeys(linkPackage.from)
 		if err != nil {
