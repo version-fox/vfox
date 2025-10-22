@@ -18,11 +18,12 @@ package env
 
 import (
 	"fmt"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 type PathFrom int
@@ -38,6 +39,9 @@ type Paths struct {
 }
 
 func (p *Paths) Merge(other *Paths) *Paths {
+	if other == nil {
+		return p
+	}
 	for _, path := range other.Slice() {
 		p.Add(path)
 	}

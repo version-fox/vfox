@@ -79,8 +79,27 @@ func newCmd() *cmd {
 		},
 	}
 
+	debugFd := &cli.IntFlag{
+		Name:   "debug-fd",
+		Usage:  "show debug information in file descriptor (1=stdout, 2=stderr)",
+		Hidden: true,
+		Action: func(ctx context.Context, cmd *cli.Command, fd int) error {
+			logger.SetLevel(logger.DebugLevel)
+			switch fd {
+			case 1:
+				logger.SetOutput(os.Stdout)
+			case 2:
+				logger.SetOutput(os.Stderr)
+			default:
+				return fmt.Errorf("unsupported file descriptor: %d, only 1 (stdout) and 2 (stderr) are supported", fd)
+			}
+			return nil
+		},
+	}
+
 	app.Flags = []cli.Flag{
 		debugFlags,
+		debugFd,
 	}
 	app.Commands = []*cli.Command{
 		commands.Info,
