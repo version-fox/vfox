@@ -41,10 +41,13 @@ func IsInVSCodeStartup() bool {
 }
 
 func GetPid() int {
-	if pid := os.Getenv(PidFlag); pid != "" {
-		p, _ := strconv.Atoi(pid) // Convert pid from string to int
-		return p
+	if IsHookEnv() {
+		if pid := os.Getenv(PidFlag); pid != "" {
+			p, _ := strconv.Atoi(pid) // Convert pid from string to int
+			return p
+		}
 	}
+
 	return os.Getppid()
 }
 
