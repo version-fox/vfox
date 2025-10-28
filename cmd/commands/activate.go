@@ -27,6 +27,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -58,8 +59,14 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	exportEnvs := sdkEnvs.ToExportEnvs()
 
-	exportEnvs[env.HookFlag] = &name
-	exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
+	// Current shell is not for user use, it will be killed after the activation.
+	// If we setup hook in this shell, it will cause all terminal launched by IDE could not be hooked properly.
+	if !env.IsIDEEnvironmentResolution() {
+		exportEnvs[env.HookFlag] = &name
+		exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
+	}
+
+	logger.Debugf("export envs: %+v", exportEnvs)
 
 	path := manager.PathMeta.ExecutablePath
 	path = strings.Replace(path, "\\", "/", -1)
@@ -67,6 +74,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	if s == nil {
 		return fmt.Errorf("unknown target shell %s", name)
 	}
+
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate(
 		shell.ActivateConfig{

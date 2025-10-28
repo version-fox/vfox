@@ -35,11 +35,30 @@ func IsHookEnv() bool {
 	return os.Getenv(HookFlag) != ""
 }
 
+// IsIDEEnvironmentResolution detects if the current shell session was launched by an IDE
+// for the purpose of environment variable resolution. This is useful to avoid certain
+// shell initialization behaviors that might interfere with IDE environment detection.
+//
+// Supported IDEs:
+//   - Visual Studio Code: Detects via VSCODE_RESOLVING_ENVIRONMENT environment variable
+//     Reference: https://code.visualstudio.com/docs/configure/command-line#_how-do-i-detect-when-a-shell-was-launched-by-vs-code
+//   - JetBrains IDEs (IntelliJ IDEA, PyCharm, etc.): Detects via INTELLIJ_ENVIRONMENT_READER environment variable
+//     Reference: https://youtrack.jetbrains.com/articles/SUPPORT-A-1727/Shell-Environment-Loading
+//
+// Returns true if any of the supported IDE environment resolution indicators are present.
+func IsIDEEnvironmentResolution() bool {
+	return os.Getenv("VSCODE_RESOLVING_ENVIRONMENT") != "" ||
+		os.Getenv("INTELLIJ_ENVIRONMENT_READER") != ""
+}
+
 func GetPid() int {
-	if pid := os.Getenv(PidFlag); pid != "" {
-		p, _ := strconv.Atoi(pid) // Convert pid from string to int
-		return p
+	if IsHookEnv() {
+		if pid := os.Getenv(PidFlag); pid != "" {
+			p, _ := strconv.Atoi(pid) // Convert pid from string to int
+			return p
+		}
 	}
+
 	return os.Getppid()
 }
 
