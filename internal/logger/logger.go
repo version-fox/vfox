@@ -16,11 +16,7 @@
 
 package logger
 
-import (
-	"fmt"
-	"io"
-	"os"
-)
+import "fmt"
 
 type LoggerLevel int
 
@@ -32,25 +28,20 @@ const (
 )
 
 var currentLevel = InfoLevel
-var output io.Writer = os.Stdout
 
 func SetLevel(_level LoggerLevel) {
 	currentLevel = _level
 }
 
-func SetOutput(w io.Writer) {
-	output = w
-}
-
 func Log(level LoggerLevel, args ...interface{}) {
 	if currentLevel <= level {
-		fmt.Fprintln(output, args...)
+		fmt.Println(args...)
 	}
 }
 
 func Logf(level LoggerLevel, message string, args ...interface{}) {
 	if currentLevel <= level {
-		fmt.Fprintf(output, message, args...)
+		fmt.Printf(message, args...)
 	}
 }
 
