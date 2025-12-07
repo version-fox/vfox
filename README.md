@@ -49,6 +49,7 @@ echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 # For PowerShell:
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }
 echo 'Invoke-Expression "$(vfox activate pwsh)"' >> $PROFILE
 
 # For Clink:
