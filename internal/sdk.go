@@ -42,6 +42,31 @@ import (
 	"github.com/version-fox/vfox/internal/util"
 )
 
+// getShellConfigFile returns the appropriate config file for the given shell
+func getShellConfigFile(shellName string) string {
+	switch strings.ToLower(shellName) {
+	case "zsh":
+		return "zshrc"
+	case "bash":
+		// Check if .bashrc exists, otherwise suggest .bash_profile
+		if home, _ := os.UserHomeDir(); home != "" {
+			if _, err := os.Stat(filepath.Join(home, ".bashrc")); err == nil {
+				return "bashrc"
+			}
+		}
+		return "bash_profile"
+	case "fish":
+		return "config/fish/config.fish"
+	case "pwsh", "powershell":
+		return "config/powershell/Microsoft.PowerShell_profile.ps1"
+	case "nushell":
+		return "config/nushell/config.nu"
+	default:
+		// Default to shell name + "rc"
+		return shellName + "rc"
+	}
+}
+
 type SdkEnv struct {
 	Sdk *Sdk
 	Env *env.Envs
@@ -426,7 +451,17 @@ func (b *Sdk) Use(version base.Version, scope base.UseScope) error {
 	}
 
 	if !env.IsHookEnv() {
-		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
+		// Check if this is an IDE environment
+		if env.IsIDEEnvironmentResolution() {
+			// In IDE environments, don't show warning as hooks are not expected
+			logger.Debugf("IDE environment detected, skipping hook warning")
+		} else {
+			currentShell := shell.GetShellName()
+			pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
+			pterm.Printf("To enable session scope, add this line to your ~/.%s:\n", getShellConfigFile(currentShell))
+			pterm.Printf("  eval \"$(vfox activate %s)\"\n", currentShell)
+			pterm.Printf("\nThen restart your terminal or run: source ~/.%s\n", getShellConfigFile(currentShell))
+		}
 
 		keys, err := b.EnvKeys(version, base.GlobalLocation)
 		if err != nil {

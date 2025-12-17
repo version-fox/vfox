@@ -41,7 +41,26 @@ var Activate = &cli.Command{
 func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	if name == "" {
-		return cli.Exit("shell name is required", 1)
+		// Try to auto-detect shell if not provided
+		if detected := shell.GetShellName(); detected != "" {
+			name = detected
+			fmt.Fprintf(os.Stderr, "Warning: No shell specified, auto-detected: %s\n", name)
+			fmt.Fprintf(os.Stderr, "To avoid this warning, specify shell explicitly:\n")
+			fmt.Fprintf(os.Stderr, "  eval \"$(vfox activate %s)\"\n\n", name)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: shell name is required and auto-detection failed\n")
+			fmt.Fprintf(os.Stderr, "\nUsage:\n")
+			fmt.Fprintf(os.Stderr, "  eval \"$(vfox activate <shell>)\"\n\n")
+			fmt.Fprintf(os.Stderr, "Examples:\n")
+			fmt.Fprintf(os.Stderr, "  eval \"$(vfox activate zsh)\"    # For Zsh\n")
+			fmt.Fprintf(os.Stderr, "  eval \"$(vfox activate bash)\"   # For Bash\n")
+			fmt.Fprintf(os.Stderr, "  eval \"$(vfox activate fish)\"   # For Fish\n\n")
+			fmt.Fprintf(os.Stderr, "Configuration:\n")
+			fmt.Fprintf(os.Stderr, "  Add this line to your ~/.zshrc, ~/.bashrc, or ~/.config/fish/config.fish:\n")
+			fmt.Fprintf(os.Stderr, "    eval \"$(vfox activate <shell>)\"\n\n")
+			fmt.Fprintf(os.Stderr, "Note: Place this in your shell's interactive config file, not .zprofile\n")
+			return cli.Exit("", 1)
+		}
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()

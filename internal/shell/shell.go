@@ -27,6 +27,67 @@ import (
 	"github.com/version-fox/vfox/internal/logger"
 )
 
+// GetShellName returns the current shell name
+func GetShellName() string {
+	// Try to get shell from SHELL environment variable first
+	if shellEnv := os.Getenv("SHELL"); shellEnv != "" {
+		// Handle both Unix (/) and Windows (\) paths
+		var parts []string
+		if strings.Contains(shellEnv, "\\") {
+			parts = strings.Split(shellEnv, "\\")
+		} else {
+			parts = strings.Split(shellEnv, "/")
+		}
+		if len(parts) > 0 {
+			shellName := parts[len(parts)-1]
+			// Remove common suffixes
+			if strings.HasSuffix(strings.ToLower(shellName), ".exe") {
+				shellName = shellName[:len(shellName)-4]
+			}
+			return shellName
+		}
+	}
+
+	// Fallback to detecting parent process
+	p, err := process.NewProcess(int32(os.Getppid()))
+	if err != nil {
+		return "bash" // Default fallback
+	}
+
+	cmdSlice, err := p.CmdlineSlice()
+	if err != nil || len(cmdSlice) == 0 {
+		return "bash" // Default fallback
+	}
+
+	shellName := cmdSlice[0]
+	if strings.HasPrefix(shellName, "-") {
+		shellName = shellName[1:]
+	}
+
+	// Extract just the shell name from path
+	var parts []string
+	if strings.Contains(shellName, "\\") {
+		parts = strings.Split(shellName, "\\")
+	} else {
+		parts = strings.Split(shellName, "/")
+	}
+	if len(parts) > 0 {
+		shellName = parts[len(parts)-1]
+	}
+
+	// Remove .exe extension on Windows
+	if strings.HasSuffix(strings.ToLower(shellName), ".exe") {
+		shellName = shellName[:len(shellName)-4]
+	}
+
+	// Default to bash if empty
+	if shellName == "" {
+		shellName = "bash"
+	}
+
+	return shellName
+}
+
 type ActivateConfig struct {
 	SelfPath string
 	Args     []string
