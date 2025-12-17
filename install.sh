@@ -16,7 +16,12 @@ main() {
     SUDO_CMD=""
   else
     INSTALL_DIR="/usr/local/bin"
-    SUDO_CMD="sudo"
+    # Check if sudo is available
+    if command -v sudo &> /dev/null; then
+      SUDO_CMD="sudo"
+    else
+      SUDO_CMD=""
+    fi
   fi
 
   # Check if curl or wget is installed
