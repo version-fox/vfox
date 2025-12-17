@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
@@ -118,7 +119,27 @@ func cleanTmp() error {
 func envFlag(cmd *cli.Command, mode string) error {
 	shellName := cmd.String("shell")
 	if shellName == "" {
-		return cli.Exit("shell name is required", 1)
+		// Try to auto-detect shell if not provided
+		if detected := shell.GetShellName(); detected != "" {
+			shellName = detected
+			fmt.Fprintf(os.Stderr, "Warning: No shell specified, auto-detected: %s\n", shellName)
+			fmt.Fprintf(os.Stderr, "To avoid this warning, specify shell explicitly:\n")
+			fmt.Fprintf(os.Stderr, "  vfox env --shell %s\n\n", shellName)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: shell name is required and auto-detection failed\n")
+			fmt.Fprintf(os.Stderr, "\nUsage:\n")
+			fmt.Fprintf(os.Stderr, "  vfox env --shell <shell>\n\n")
+			fmt.Fprintf(os.Stderr, "Examples:\n")
+			fmt.Fprintf(os.Stderr, "  vfox env --shell zsh\n")
+			fmt.Fprintf(os.Stderr, "  vfox env -s bash\n")
+			fmt.Fprintf(os.Stderr, "  vfox env --shell fish\n\n")
+			fmt.Fprintf(os.Stderr, "Options:\n")
+			fmt.Fprintf(os.Stderr, "  --shell, -s    shell name\n")
+			fmt.Fprintf(os.Stderr, "  --full        output full env\n")
+			fmt.Fprintf(os.Stderr, "  --json, -j    output json format\n")
+			fmt.Fprintf(os.Stderr, "  --cleanup, -c cleanup old temp files\n")
+			return cli.Exit("", 1)
+		}
 	}
 	s := shell.NewShell(shellName)
 	if s == nil {
