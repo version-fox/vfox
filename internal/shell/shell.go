@@ -82,7 +82,37 @@ func Open(pid int) error {
 	}
 
 	logger.Debugf("open a new shell: %s\n", cmdSlice[0])
-	command := exec.Command(cmdSlice[0])
+
+	// Remove leading '-' from shell name (login shell indicator)
+	shellName := cmdSlice[0]
+	if strings.HasPrefix(shellName, "-") {
+		shellName = shellName[1:]
+	}
+
+	// Look for the shell in PATH
+	shellPath, err := exec.LookPath(shellName)
+	if err != nil {
+		// Try to find common shell paths if not in PATH
+		commonPaths := []string{
+			"/bin/" + shellName,
+			"/usr/bin/" + shellName,
+			"/usr/local/bin/" + shellName,
+			"/opt/homebrew/bin/" + shellName, // macOS ARM Homebrew
+			"/usr/local/Cellar/" + shellName, // macOS Intel Homebrew
+		}
+		for _, path := range commonPaths {
+			if _, err := os.Stat(path); err == nil {
+				shellPath = path
+				break
+			}
+		}
+		if shellPath == "" {
+			return fmt.Errorf("open a new shell failed, err: %s executable not found in $PATH or common locations", shellName)
+		}
+	}
+
+	logger.Debugf("Using shell path: %s\n", shellPath)
+	command := exec.Command(shellPath)
 	command.Env = os.Environ()
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
