@@ -27,6 +27,7 @@ const bashHook = `
 {{.EnvContent}}
 
 export __VFOX_PID=$$;
+export __VFOX_SHELL='bash';
 
 _vfox_hook() {
   local previous_exit_status=$?;
