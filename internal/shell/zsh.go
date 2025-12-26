@@ -29,6 +29,7 @@ if [[ -z "$__VFOX_PID" || -z "$__VFOX_SHELL" ]]; then
   {{.EnvContent}}
 
   export __VFOX_PID=$$;
+  export __VFOX_SHELL='zsh';
 
   _vfox_hook() {
     trap -- '' SIGINT;

@@ -38,6 +38,7 @@ DO NOT PUT IN MODULE.
 {{.EnvContent}}
 
 $env:__VFOX_PID = $pid;
+$env:__VFOX_SHELL = 'pwsh';
 
 # remove any existing dynamic module of vfox
 if ($null -ne (Get-Module -Name "version-fox")) {

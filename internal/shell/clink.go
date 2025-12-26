@@ -24,6 +24,7 @@ import (
 
 const clinkHook = `
 {{.EnvContent}}
+set "__VFOX_SHELL=clink"
 "{{.SelfPath}}" env --cleanup > nul 2> nul
 `
 
