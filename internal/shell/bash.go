@@ -24,27 +24,29 @@ import (
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
-{{.EnvContent}}
+if [[ -z "$__VFOX_PID" || "$__VFOX_PID" != "$$" ]]; then
+  {{.EnvContent}}
 
-export __VFOX_PID=$$;
-export __VFOX_SHELL='bash';
+  export __VFOX_PID=$$;
+  export __VFOX_SHELL='bash';
 
-_vfox_hook() {
-  local previous_exit_status=$?;
-  trap -- '' SIGINT;
-  eval "$("{{.SelfPath}}" env -s bash)";
-  trap - SIGINT;
-  return $previous_exit_status;
-};
-if ! [[ "${PROMPT_COMMAND[*]:-}" =~ _vfox_hook ]]; then
-  if [[ "$(declare -p PROMPT_COMMAND 2>&1)" == "declare -a"* ]]; then
-    PROMPT_COMMAND=(_vfox_hook "${PROMPT_COMMAND[@]}")
-  else
-    PROMPT_COMMAND="_vfox_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+  _vfox_hook() {
+    local previous_exit_status=$?;
+    trap -- '' SIGINT;
+    eval "$("{{.SelfPath}}" env -s bash)";
+    trap - SIGINT;
+    return $previous_exit_status;
+  };
+  if ! [[ "${PROMPT_COMMAND[*]:-}" =~ _vfox_hook ]]; then
+    if [[ "$(declare -p PROMPT_COMMAND 2>&1)" == "declare -a"* ]]; then
+      PROMPT_COMMAND=(_vfox_hook "${PROMPT_COMMAND[@]}")
+    else
+      PROMPT_COMMAND="_vfox_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+    fi
   fi
-fi
 
-trap 'vfox env --cleanup' EXIT
+  trap 'vfox env --cleanup' EXIT
+fi
 `
 
 type bash struct{}
