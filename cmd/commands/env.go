@@ -142,11 +142,11 @@ func envFlag(cmd *cli.Command, mode string) error {
 		return err
 	}
 
-	if len(sdkEnvs) == 0 {
-		return nil
-	}
-
 	exportEnvs := sdkEnvs.ToExportEnvs()
+
+	// Always export __VFOX_CURTMPPATH so that all vfox commands in the session use the same temp directory
+	curTmpPath := manager.PathMeta.CurTmpPath
+	exportEnvs["__VFOX_CURTMPPATH"] = &curTmpPath
 
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
