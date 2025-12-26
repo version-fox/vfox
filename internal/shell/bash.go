@@ -24,7 +24,7 @@ import (
 
 // Based on https://github.com/direnv/direnv/blob/master/internal/cmd/shell_bash.go
 const bashHook = `
-if [[ -z "$__VFOX_PID" || "$__VFOX_PID" != "$$" ]]; then
+if [[ -z "$__VFOX_PID" || "$__VFOX_PID" != "$$" || "$__VFOX_SHELL" != "bash" ]]; then
   {{.EnvContent}}
 
   export __VFOX_PID=$$;
