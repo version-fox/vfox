@@ -146,7 +146,7 @@ func envFlag(cmd *cli.Command, mode string) error {
 
 	// Always export __VFOX_CURTMPPATH so that all vfox commands in the session use the same temp directory
 	curTmpPath := manager.PathMeta.CurTmpPath
-	exportEnvs["__VFOX_CURTMPPATH"] = &curTmpPath
+	exportEnvs[internal.HookCurTmpPath] = &curTmpPath
 
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)
