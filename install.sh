@@ -163,9 +163,9 @@ main() {
           fish)
             echo "  For fish:"
             echo "    # Run this in a fish shell:"
-            echo "    fish_add_path ~/.local/bin"
+            echo "    fish_add_path $INSTALL_DIR"
             echo "    # Or persist it by adding this line to your config:"
-            echo "    echo 'fish_add_path ~/.local/bin' >> ~/.config/fish/config.fish"
+            echo "    echo 'fish_add_path $INSTALL_DIR' >> ~/.config/fish/config.fish"
             ;;
           *)
             echo "  For bash/zsh:"
