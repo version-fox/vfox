@@ -1,6 +1,21 @@
 #!/bin/bash
 
 main() {
+  # Parse command-line arguments
+  USER_INSTALL=false
+  for arg in "$@"; do
+    case "$arg" in
+      --user)
+        USER_INSTALL=true
+        ;;
+      *)
+        echo "Unknown argument: $arg"
+        echo "Usage: $0 [--user]"
+        exit 1
+        ;;
+    esac
+  done
+
   # Detect if running in Termux
   IS_TERMUX=false
   case "${HOME:-}" in
@@ -11,7 +26,11 @@ main() {
   esac
 
   # Set installation directory and sudo command based on environment
-  if [ "$IS_TERMUX" = true ]; then
+  if [ "$USER_INSTALL" = true ]; then
+    INSTALL_DIR="${HOME}/.local/bin"
+    SUDO_CMD=""
+    echo "Installing to user directory: $INSTALL_DIR"
+  elif [ "$IS_TERMUX" = true ]; then
     INSTALL_DIR="${PREFIX}/bin"
     SUDO_CMD=""
   else
@@ -105,6 +124,60 @@ main() {
   rm $TAR_FILE
   rm -rf $FILENAME
   echo "vfox installed successfully!"
+
+  # Check and update PATH if installing to user directory
+  if [ "$USER_INSTALL" = true ]; then
+    # Check if ~/.local/bin is in PATH using POSIX-compliant pattern matching
+    case ":$PATH:" in
+      *":$INSTALL_DIR:"*)
+        echo "$INSTALL_DIR is already in your PATH."
+        ;;
+      *)
+        echo ""
+        echo "WARNING: $INSTALL_DIR is not in your PATH."
+        echo "To add it to your PATH, run one of the following commands based on your shell:"
+        echo ""
+
+        # Common export command for bash/zsh
+        PATH_EXPORT_CMD='export PATH="$HOME/.local/bin:$PATH"'
+
+        # Detect the current shell more reliably than using $SHELL alone
+        if command -v ps >/dev/null 2>&1; then
+          CURRENT_SHELL=$(ps -p "$$" -o comm= 2>/dev/null | tr -d ' ')
+        fi
+        if [ -z "$CURRENT_SHELL" ] && [ -n "$SHELL" ]; then
+          CURRENT_SHELL=$(basename "$SHELL")
+        fi
+
+        case "$CURRENT_SHELL" in
+          bash)
+            echo "  For bash:"
+            echo "    echo '$PATH_EXPORT_CMD' >> ~/.bashrc"
+            echo "    source ~/.bashrc"
+            ;;
+          zsh)
+            echo "  For zsh:"
+            echo "    echo '$PATH_EXPORT_CMD' >> ~/.zshrc"
+            echo "    source ~/.zshrc"
+            ;;
+          fish)
+            echo "  For fish:"
+            echo "    # Run this in a fish shell:"
+            echo "    fish_add_path $INSTALL_DIR"
+            echo "    # Or persist it by adding this line to your config:"
+            echo "    echo 'fish_add_path $INSTALL_DIR' >> ~/.config/fish/config.fish"
+            ;;
+          *)
+            echo "  For bash/zsh:"
+            echo "    echo '$PATH_EXPORT_CMD' >> ~/.bashrc  # or ~/.zshrc"
+            echo "    source ~/.bashrc  # or source ~/.zshrc"
+            ;;
+        esac
+        echo ""
+        echo "Or manually add $INSTALL_DIR to your PATH in your shell's configuration file."
+        ;;
+    esac
+  fi
 }
 
 main "$@"

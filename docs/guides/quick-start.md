@@ -71,6 +71,19 @@ sudo yum install vfox
 $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
+**User-local Installation (no sudo required)**
+
+If you want to install `vfox` to your user directory (`~/.local/bin`) instead of system-wide, use the `--user` flag. This is particularly useful for environments where you don't have sudo access or where system directories are ephemeral (e.g., Coder workspaces):
+
+```shell
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user
+```
+
+This will:
+- Install `vfox` to `~/.local/bin` (no sudo required)
+- Automatically create the directory if it doesn't exist
+- Provide instructions to add `~/.local/bin` to your `PATH` if needed
+
 :::
 
 ## 2. Hook `vfox` to your `Shell`

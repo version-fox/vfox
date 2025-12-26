@@ -72,6 +72,19 @@ sudo yum install vfox
 $ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
+**用户级安装（无需 sudo）**
+
+如果您想将 `vfox` 安装到用户目录（`~/.local/bin`）而不是系统范围内，请使用 `--user` 标志。这对于没有 sudo 访问权限或系统目录为临时目录的环境（例如 Coder 工作区）特别有用：
+
+```shell
+$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user
+```
+
+此命令将：
+- 将 `vfox` 安装到 `~/.local/bin`（无需 sudo）
+- 如果目录不存在，会自动创建
+- 如果需要，会提供将 `~/.local/bin` 添加到 `PATH` 的说明
+
 :::
 
 ## 2. 挂载`vfox`到你的`Shell`
