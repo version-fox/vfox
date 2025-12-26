@@ -141,8 +141,13 @@ main() {
         # Common export command for bash/zsh
         PATH_EXPORT_CMD='export PATH="$HOME/.local/bin:$PATH"'
 
-        # Detect the current shell
-        CURRENT_SHELL=$(basename "$SHELL")
+        # Detect the current shell more reliably than using $SHELL alone
+        if command -v ps >/dev/null 2>&1; then
+          CURRENT_SHELL=$(ps -p "$$" -o comm= 2>/dev/null | tr -d ' ')
+        fi
+        if [ -z "$CURRENT_SHELL" ] && [ -n "$SHELL" ]; then
+          CURRENT_SHELL=$(basename "$SHELL")
+        fi
 
         case "$CURRENT_SHELL" in
           bash)
@@ -157,7 +162,10 @@ main() {
             ;;
           fish)
             echo "  For fish:"
+            echo "    # Run this in a fish shell:"
             echo "    fish_add_path ~/.local/bin"
+            echo "    # Or persist it by adding this line to your config:"
+            echo "    echo 'fish_add_path ~/.local/bin' >> ~/.config/fish/config.fish"
             ;;
           *)
             echo "  For bash/zsh:"
