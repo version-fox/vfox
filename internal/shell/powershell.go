@@ -30,56 +30,33 @@ type pwsh struct{}
 var Pwsh Shell = pwsh{}
 
 const hook = `
+{{.EnvContent}}
 
 <#
-All environment variables must be set in global scope
-DO NOT PUT IN MODULE.
+Due to a bug in PowerShell, we have to cleanup first when the shell open.
 #>
-{{.EnvContent}}
+& '{{.SelfPath}}' env --cleanup 2>$null | Out-Null;
 
 $env:__VFOX_PID = $pid;
 $env:__VFOX_SHELL = 'pwsh';
 
-# remove any existing dynamic module of vfox
-if ($null -ne (Get-Module -Name "version-fox")) {
-    Remove-Module -Name "version-fox" -Force
+$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [Text.UTF8Encoding]::UTF8;
+
+if (-not $env:__VFOX_INITIALIZED) {
+	$env:__VFOX_INITIALIZED = '1';
+	$originalPrompt = $function:prompt;
+	function prompt {
+		$export = &"{{.SelfPath}}" env -s pwsh;
+		if ($export) {
+			Invoke-Expression -Command $export;
+		}
+		&$originalPrompt;	
+	}
+		
+	Register-EngineEvent -SourceIdentifier VfoxCleanup -Action {
+        &"{{.SelfPath}}" env --cleanup
+    } | Out-Null;
 }
-
-# create a new module to override the prompt function
-New-Module -Name "version-fox" -ScriptBlock {
-
-    <#
-    Due to a bug in PowerShell, we have to cleanup first when the shell open.
-    #>
-    & '{{.SelfPath}}' env --cleanup 2>$null | Out-Null;
-
-    $originalPrompt = $function:prompt;
-    $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [Text.UTF8Encoding]::UTF8;
-
-    $promptFunction = {
-        $export = &"{{.SelfPath}}" env -s pwsh;
-        if ($export) {
-            Invoke-Expression -Command $export;
-        }
-        &$originalPrompt;
-    }
-    $function:prompt = $promptFunction
-
-    <#
-     There is a bug here.
-     When powershell is closed via the x button, this event will not be fired.
-     See https://github.com/PowerShell/PowerShell/issues/8000
-    #>
-    $subscription = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
-        &"{{.SelfPath}}" env --cleanup;
-    }
-
-    # perform cleanup on removal so a new initialization in current session works
-    $ExecutionContext.SessionState.Module.OnRemove += {
-        $function:prompt = $originalPrompt
-        Unregister-Event -SubscriptionId $subscription.Id
-    }
-} | Import-Module -Global
 `
 
 func (sh pwsh) Activate(config ActivateConfig) (string, error) {
