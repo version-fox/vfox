@@ -78,8 +78,9 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate(
 		shell.ActivateConfig{
-			SelfPath: path,
-			Args:     cmd.Args().Tail(),
+			SelfPath:       path,
+			Args:           cmd.Args().Tail(),
+			EnablePidCheck: env.IsMultiplexerEnvironment(),
 		},
 	)
 	if err != nil {
@@ -90,11 +91,13 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 	tmpCtx := struct {
-		SelfPath   string
-		EnvContent string
+		SelfPath       string
+		EnvContent     string
+		EnablePidCheck bool
 	}{
-		SelfPath:   path,
-		EnvContent: exportStr,
+		SelfPath:       path,
+		EnvContent:     exportStr,
+		EnablePidCheck: env.IsMultiplexerEnvironment(),
 	}
 	return hookTemplate.Execute(cmd.Writer, tmpCtx)
 }

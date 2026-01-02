@@ -33,6 +33,12 @@ if [[ -z "$__VFOX_PID" || -z "$__VFOX_SHELL" ]]; then
 
   _vfox_hook() {
     trap -- '' SIGINT;
+    {{if .EnablePidCheck}}
+    # Check if PID changed (e.g., in tmux new pane)
+    if [[ "$$" != "$__VFOX_PID" ]]; then
+      export __VFOX_PID=$$;
+    fi
+    {{end}}
     eval "$("{{.SelfPath}}" env -s zsh)";
     trap - SIGINT;
   }

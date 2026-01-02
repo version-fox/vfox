@@ -35,8 +35,14 @@ const fishHook = `
 set -x -g __VFOX_PID %self;
 set -x -g __VFOX_SHELL 'fish';
 function __vfox_export_eval --on-event fish_prompt;
-	"{{.SelfPath}}" env -s fish | source;
+	{{if .EnablePidCheck}}
+    # Check if PID changed (e.g., in tmux new pane)
+    if test "$fish_pid" != "$__VFOX_PID"
+      set -x -g __VFOX_PID $fish_pid;
+    end;
+    {{end}}
 
+	"{{.SelfPath}}" env -s fish | source;
 	if test "$vfox_fish_mode" != "disable_arrow";
 		function __vfox_cd_hook --on-variable PWD;
 			if test "$vfox_fish_mode" = "eval_after_arrow";

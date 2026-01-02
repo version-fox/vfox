@@ -28,8 +28,9 @@ import (
 )
 
 type ActivateConfig struct {
-	SelfPath string
-	Args     []string
+	SelfPath       string
+	Args           []string
+	EnablePidCheck bool
 }
 
 type Shell interface {
