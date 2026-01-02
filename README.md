@@ -44,9 +44,9 @@ and switch between different environment you need via the command line.
 #### 2. ⚠️ **_Hook `vfox` into your shell_ (pick one that works for your shell)** ⚠️
 
 ```bash
-echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
-echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
-echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+touch ~/.bashrc; echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
+touch ~/.zshrc; echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
+mkdir -p ~/.config/fish; touch ~/.config/fish/config.fish; echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 
 # For PowerShell:
 if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'

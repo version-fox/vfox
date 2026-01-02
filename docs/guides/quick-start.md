@@ -95,7 +95,7 @@ Please select a command suitable for your Shell from below to execute!
 ::: details Bash
 
 ```shell
-echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
+touch ~/.bashrc; echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 ```
 
 :::
@@ -103,7 +103,7 @@ echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
 ::: details ZSH
 
 ```shell
-echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
+touch ~/.zshrc; echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 ```
 
 :::
@@ -111,7 +111,7 @@ echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 ::: details Fish
 
 ```shell
-echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
+mkdir -p ~/.config/fish; touch ~/.config/fish/config.fish; echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 ```
 
 :::
