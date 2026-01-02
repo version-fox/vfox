@@ -46,6 +46,12 @@ if (-not $env:__VFOX_INITIALIZED) {
 	$env:__VFOX_INITIALIZED = '1';
 	$originalPrompt = $function:prompt;
 	function prompt {
+		{{if .EnablePidCheck}}
+		# Check if PID changed (e.g., in tmux new pane)
+		if ($pid -ne $env:__VFOX_PID) {
+			$env:__VFOX_PID = $pid;
+		}
+		{{end}}
 		$export = &"{{.SelfPath}}" env -s pwsh;
 		if ($export) {
 			Invoke-Expression -Command $export;

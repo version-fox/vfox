@@ -23,6 +23,12 @@ const nushellConfig = `
 export-env {
   # This function updates environment variables based on the output of the "vfox env" command.
   def --env updateVfoxEnvironment [] {
+    {{if .EnablePidCheck}}
+    # Check if PID changed (e.g., in tmux new pane)
+    if ($nu.pid != $env.__VFOX_PID) {
+      $env.__VFOX_PID = $nu.pid
+    }
+    {{end}}
     let envData = (^'{{.SelfPath}}' env -s nushell --full | from json)
     if ($envData | is-empty) {
       return

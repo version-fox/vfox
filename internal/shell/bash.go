@@ -32,6 +32,12 @@ export __VFOX_SHELL='bash';
 _vfox_hook() {
   local previous_exit_status=$?;
   trap -- '' SIGINT;
+  {{if .EnablePidCheck}}
+  # Check if PID changed (e.g., in tmux new pane)
+  if [[ "$$" != "$__VFOX_PID" ]]; then
+    export __VFOX_PID=$$;
+  fi
+  {{end}}
   eval "$("{{.SelfPath}}" env -s bash)";
   trap - SIGINT;
   return $previous_exit_status;

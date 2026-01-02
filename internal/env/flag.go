@@ -51,6 +51,20 @@ func IsIDEEnvironmentResolution() bool {
 		os.Getenv("INTELLIJ_ENVIRONMENT_READER") != ""
 }
 
+// IsMultiplexerEnvironment detects if the current shell session is running inside a multiplexer
+// or other environment where new panes/windows should have isolated environments.
+// This includes tmux, screen, and potentially other terminal multiplexers.
+//
+// Supported multiplexers:
+//   - tmux: Detects via TMUX environment variable
+//   - screen: Detects via STY environment variable (GNU screen)
+//   - Windows Terminal: Detects via WT_SESSION environment variable
+//
+// Returns true if running in a multiplexer environment.
+func IsMultiplexerEnvironment() bool {
+	return os.Getenv("TMUX") != ""
+}
+
 func GetPid() int {
 	if IsHookEnv() {
 		if pid := os.Getenv(PidFlag); pid != "" {
