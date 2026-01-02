@@ -1,5 +1,5 @@
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -146,7 +146,7 @@ func TestUnuseCommandValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Simulate the validation logic from the unuse command
 			hasError := len(tt.sdkName) == 0
-			
+
 			if hasError != tt.expectError {
 				t.Errorf("Expected error: %v, but got error: %v", tt.expectError, hasError)
 			}

@@ -123,6 +123,6 @@ $ node -v
 
 ## COPYRIGHT
 
-[Apache 2.0 license](./LICENSE) - Copyright (C) 2025 Han Li
+[Apache 2.0 license](./LICENSE) - Copyright (C) 2026 Han Li
 and [contributors](https://github.com/version-fox/vfox/graphs/contributors)
 

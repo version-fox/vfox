@@ -1,5 +1,5 @@
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -22,15 +22,16 @@ import (
 )
 
 // computeUserAgent constructs a user agent string for the vfox runtime and plugin.
-// 
+//
 // Parameters:
 //   - runtimeVersion: the version of the vfox runtime (may be empty).
 //   - pluginName: the name of the plugin (will be prefixed with "vfox-" if not already).
 //   - pluginVersion: the version of the plugin (may be empty).
 //
 // Returns:
-//   A user agent string in the format "vfox/<runtimeVersion> vfox-<pluginName>/<pluginVersion>",
-//   omitting version information if not provided, and trimming extra spaces.
+//
+//	A user agent string in the format "vfox/<runtimeVersion> vfox-<pluginName>/<pluginVersion>",
+//	omitting version information if not provided, and trimming extra spaces.
 func computeUserAgent(runtimeVersion, pluginName, pluginVersion string) string {
 	components := make([]string, 0, 2)
 	if runtimeVersion != "" {

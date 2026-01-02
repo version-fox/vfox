@@ -1,5 +1,5 @@
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 package config
 
 import (
-	"gopkg.in/yaml.v3"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestCacheDuration_MarshalYAML(t *testing.T) {

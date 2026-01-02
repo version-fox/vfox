@@ -1,5 +1,5 @@
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 
 func TestCopyToClipboard(t *testing.T) {
 	testText := "vfox use java@23.0.1+11"
-	
+
 	// CopyToClipboard should not panic and should return nil or an error
 	err := CopyToClipboard(testText)
-	
+
 	// In CI/CD environment, clipboard utilities might not be available
 	// So we just verify it doesn't panic and handles errors appropriately
 	if err != nil {

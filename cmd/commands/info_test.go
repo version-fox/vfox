@@ -1,5 +1,5 @@
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 func TestSDKVersionDataStructure(t *testing.T) {
 	// Test that the data structure for template output contains all required fields
 	// This is more of a compile-time check to ensure we have the right fields
-	
+
 	// For sdk@version format
 	sdkData := struct {
 		Name    string
@@ -37,7 +37,7 @@ func TestSDKVersionDataStructure(t *testing.T) {
 		Version: "1.0.0",
 		Path:    "/path/to/sdk",
 	}
-	
+
 	// Check that all fields exist and are accessible
 	if sdkData.Name != "test" {
 		t.Errorf("Expected Name to be 'test', got %s", sdkData.Name)
@@ -53,7 +53,7 @@ func TestSDKVersionDataStructure(t *testing.T) {
 func TestPluginInfoDataStructure(t *testing.T) {
 	// Test that the data structure for plugin info template output contains all required fields
 	// This is more of a compile-time check to ensure we have the right fields
-	
+
 	// For plugin info format
 	pluginData := struct {
 		Name        string
@@ -68,7 +68,7 @@ func TestPluginInfoDataStructure(t *testing.T) {
 		InstallPath: "/path/to/plugin",
 		Description: "Test plugin",
 	}
-	
+
 	// Check that all fields exist and are accessible
 	if pluginData.Name != "test" {
 		t.Errorf("Expected Name to be 'test', got %s", pluginData.Name)
@@ -245,7 +245,7 @@ func TestTemplateExecution(t *testing.T) {
 func TestExecuteTemplate(t *testing.T) {
 	// Create a mock CLI context for testing
 	// Since we can't easily create a real cli.Context, we'll test the template execution directly
-	
+
 	// Test SDK version data template
 	sdkData := struct {
 		Name    string
@@ -256,27 +256,27 @@ func TestExecuteTemplate(t *testing.T) {
 		Version: "26.2.3",
 		Path:    "/path/to/erlang-26.2.3",
 	}
-	
+
 	// Create a template
 	tmplStr := "{{.Name}}@{{.Version}}: {{.Path}}"
 	tmpl, err := template.New("test").Parse(tmplStr)
 	if err != nil {
 		t.Fatalf("Error parsing template: %v", err)
 	}
-	
+
 	// Execute template
 	var result bytes.Buffer
 	err = tmpl.Execute(&result, sdkData)
 	if err != nil {
 		t.Fatalf("Error executing template: %v", err)
 	}
-	
+
 	expected := "erlang@26.2.3: /path/to/erlang-26.2.3"
 	actual := result.String()
 	if actual != expected {
 		t.Errorf("Expected %q, but got %q", expected, actual)
 	}
-	
+
 	// Test plugin info data template
 	pluginData := struct {
 		Name        string
@@ -291,41 +291,41 @@ func TestExecuteTemplate(t *testing.T) {
 		InstallPath: "/path/to/erlang/plugin",
 		Description: "Erlang/OTP vfox plugin",
 	}
-	
+
 	// Create a template for plugin info
 	pluginTmplStr := "Name: {{.Name}}, Version: {{.Version}}"
 	pluginTmpl, err := template.New("plugin").Parse(pluginTmplStr)
 	if err != nil {
 		t.Fatalf("Error parsing plugin template: %v", err)
 	}
-	
+
 	// Execute plugin template
 	var pluginResult bytes.Buffer
 	err = pluginTmpl.Execute(&pluginResult, pluginData)
 	if err != nil {
 		t.Fatalf("Error executing plugin template: %v", err)
 	}
-	
+
 	pluginExpected := "Name: erlang, Version: 1.2.0"
 	pluginActual := pluginResult.String()
 	if pluginActual != pluginExpected {
 		t.Errorf("Expected %q, but got %q", pluginExpected, pluginActual)
 	}
-	
+
 	// Test plugin info with Homepage and InstallPath
 	fullPluginTmplStr := "Homepage: {{.Homepage}}, InstallPath: {{.InstallPath}}"
 	fullPluginTmpl, err := template.New("fullPlugin").Parse(fullPluginTmplStr)
 	if err != nil {
 		t.Fatalf("Error parsing full plugin template: %v", err)
 	}
-	
+
 	// Execute full plugin template
 	var fullPluginResult bytes.Buffer
 	err = fullPluginTmpl.Execute(&fullPluginResult, pluginData)
 	if err != nil {
 		t.Fatalf("Error executing full plugin template: %v", err)
 	}
-	
+
 	fullPluginExpected := "Homepage: https://github.com/version-fox/vfox-erlang, InstallPath: /path/to/erlang/plugin"
 	fullPluginActual := fullPluginResult.String()
 	if fullPluginActual != fullPluginExpected {

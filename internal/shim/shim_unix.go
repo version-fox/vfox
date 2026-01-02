@@ -1,7 +1,7 @@
 //go:build !windows
 
 /*
- *    Copyright 2025 Han Li and contributors
+ *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@
 package shim
 
 import (
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
 	"os"
 	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/util"
 )
 
 // Clear removes the generated shim.
