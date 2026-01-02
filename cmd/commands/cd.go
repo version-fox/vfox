@@ -7,7 +7,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shell"
 )
 
@@ -56,5 +55,5 @@ func cdCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	return shell.Open(env.GetPid())
+	return shell.Open(os.Getppid())
 }
