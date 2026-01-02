@@ -57,8 +57,6 @@ func IsIDEEnvironmentResolution() bool {
 //
 // Supported multiplexers:
 //   - tmux: Detects via TMUX environment variable
-//   - screen: Detects via STY environment variable (GNU screen)
-//   - Windows Terminal: Detects via WT_SESSION environment variable
 //
 // Returns true if running in a multiplexer environment.
 func IsMultiplexerEnvironment() bool {
