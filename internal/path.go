@@ -80,7 +80,7 @@ func newPathMeta() (*PathMeta, error) {
 		curTmpPath = filepath.Join(tmpPath, name)
 	}
 	if !util.FileExists(curTmpPath) {
-		err = os.Mkdir(curTmpPath, 0755)
+		err = os.MkdirAll(curTmpPath, 0755)
 		if err != nil {
 			return nil, fmt.Errorf("create temp dir failed: %w", err)
 		}
