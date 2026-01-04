@@ -37,7 +37,6 @@ import (
 	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/cache"
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/toolset"
@@ -66,10 +65,9 @@ type Arg struct {
 }
 
 type Manager struct {
-	PathMeta   *PathMeta
-	openSdks   map[string]*Sdk
-	EnvManager env.Manager
-	Config     *config.Config
+	PathMeta *PathMeta
+	openSdks map[string]*Sdk
+	Config   *config.Config
 }
 
 func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
@@ -369,7 +367,6 @@ func (m *Manager) Close() {
 	for _, handler := range m.openSdks {
 		handler.Close()
 	}
-	_ = m.EnvManager.Close()
 }
 
 func (m *Manager) Remove(pluginName string) error {
@@ -868,10 +865,6 @@ func NewSdkManager() *Manager {
 }
 
 func newSdkManager(meta *PathMeta) *Manager {
-	envManger, err := env.NewEnvManager(meta.HomePath)
-	if err != nil {
-		panic("Init env manager error")
-	}
 	c, err := config.NewConfig(meta.HomePath)
 	if err != nil {
 		panic(fmt.Errorf("init Config error: %w", err))
@@ -886,10 +879,9 @@ func newSdkManager(meta *PathMeta) *Manager {
 		meta.SdkCachePath = c.Storage.SdkPath
 	}
 	manager := &Manager{
-		PathMeta:   meta,
-		EnvManager: envManger,
-		openSdks:   make(map[string]*Sdk),
-		Config:     c,
+		PathMeta: meta,
+		openSdks: make(map[string]*Sdk),
+		Config:   c,
 	}
 	return manager
 }

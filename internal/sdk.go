@@ -453,13 +453,6 @@ func (b *Sdk) Use(version base.Version, scope base.UseScope) error {
 		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
 			b.clearGlobalEnv(base.Version(oldVersion))
 		}
-		if err = b.sdkManager.EnvManager.Load(keys); err != nil {
-			return err
-		}
-		err = b.sdkManager.EnvManager.Flush()
-		if err != nil {
-			return err
-		}
 		toolVersion.Record[b.Name] = string(version)
 		if err = toolVersion.Save(); err != nil {
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
@@ -502,13 +495,6 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 			b.clearGlobalEnv(base.Version(oldVersion))
 		}
 
-		if err = b.sdkManager.EnvManager.Load(envKeys); err != nil {
-			return err
-		}
-		err = b.sdkManager.EnvManager.Flush()
-		if err != nil {
-			return err
-		}
 		multiToolVersion = append(multiToolVersion, toolVersion)
 	} else if scope == base.Project {
 		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
@@ -623,10 +609,8 @@ func (b *Sdk) clearGlobalEnv(version base.Version) {
 	if err != nil {
 		return
 	}
-	envManager := b.sdkManager.EnvManager
 	// Compatible symbolic link paths for v0.5.0-0.5.2
 	envKV.Paths.Add(filepath.Join(b.InstallPath, "current"))
-	_ = envManager.Remove(envKV)
 }
 
 func (b *Sdk) GetLocalSdkPackage(version base.Version) (*base.Package, error) {
@@ -781,18 +765,13 @@ func (b *Sdk) ClearCurrentEnv() error {
 			}
 		}
 
-		envManager := b.sdkManager.EnvManager
 		fmt.Println("Cleaning up env config...")
 		envKeys.Paths.Add(filepath.Join(b.InstallPath, "current"))
-		_ = envManager.Remove(envKeys)
-		_ = envManager.Flush()
 
 		envKeys, err = b.MockEnvKeys(current, base.OriginalLocation)
 		if err != nil {
 			return err
 		}
-		_ = envManager.Remove(envKeys)
-		_ = envManager.Flush()
 	}
 
 	fmt.Println("Cleaning up current link...")
@@ -844,7 +823,6 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 			}
 
 			// Flush environment changes
-			_ = b.sdkManager.EnvManager.Flush()
 		}
 
 		// Remove from global tool versions

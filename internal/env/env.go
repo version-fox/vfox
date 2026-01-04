@@ -16,17 +16,7 @@
 
 package env
 
-import (
-	"io"
-)
-
-type Manager interface {
-	Flush() error
-	Load(envs *Envs) error
-	Get(key string) (string, bool)
-	Remove(envs *Envs) error
-	io.Closer
-}
+import ()
 
 // Vars is a map of environment variables
 type Vars map[string]*string
