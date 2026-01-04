@@ -73,6 +73,10 @@ func (b bash) Export(envs env.Vars) (out string) {
 }
 
 func (b bash) export(key, value string) string {
+	// Use double quotes for PATH-like variables to avoid unnecessary ANSI-C quoting
+	if key == "PATH" {
+		return fmt.Sprintf("export %s=\"%s\";", key, value)
+	}
 	return "export " + b.escape(key) + "=" + b.escape(value) + ";"
 }
 

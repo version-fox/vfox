@@ -24,6 +24,8 @@ import (
 	"text/template"
 
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/toolset"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
@@ -46,7 +48,20 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 
-	sdkEnvs, err := manager.GlobalEnvKeys()
+	workToolVersion, err := manager.LoadToolVersionByScope(base.Project)
+	if err != nil {
+		return err
+	}
+	homeToolVersion, err := manager.LoadToolVersionByScope(base.Global)
+	if err != nil {
+		return err
+	}
+	// Project > Global
+	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
+		workToolVersion,
+		homeToolVersion,
+	})
+
 	if err != nil {
 		return err
 	}
@@ -56,15 +71,20 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	// So we need to set the env.HookFlag first to let the Paths know
 	// which shell we are using.
 	_ = os.Setenv(env.HookFlag, name)
+	// TODO：deprecated
+	_ = os.Setenv(internal.HookCurTmpPath, manager.PathMeta.SessionLinkSdkPath)
 
-	exportEnvs := sdkEnvs.ToExportEnvs()
+	envs := sdkEnvs.ToEnvs()
 
-	// Current shell is not for user use, it will be killed after the activation.
-	// If we setup hook in this shell, it will cause all terminal launched by IDE could not be hooked properly.
-	if !env.IsIDEEnvironmentResolution() {
-		exportEnvs[env.HookFlag] = &name
-		exportEnvs[internal.HookCurTmpPath] = &manager.PathMeta.CurTmpPath
+	threeLayerPaths := generatePATH(manager.PathMeta)
+	envs.Paths.Merge(threeLayerPaths)
+
+	exportEnvs := make(env.Vars)
+	for k, v := range envs.Variables {
+		exportEnvs[k] = v
 	}
+	pathStr := envs.Paths.String()
+	exportEnvs["PATH"] = &pathStr
 
 	logger.Debugf("export envs: %+v", exportEnvs)
 

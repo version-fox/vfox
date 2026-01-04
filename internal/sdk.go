@@ -49,6 +49,17 @@ type SdkEnv struct {
 
 type SdkEnvs []*SdkEnv
 
+// ToVars export the env vars of SDK to shell
+func (d *SdkEnvs) ToVars() env.Vars {
+	vars := make(env.Vars)
+	for _, sdkEnv := range *d {
+		for key, value := range sdkEnv.Env.Variables {
+			vars[key] = value
+		}
+	}
+	return vars
+}
+
 func (d *SdkEnvs) ToEnvs() *env.Envs {
 	envs := &env.Envs{
 		Variables: make(env.Vars),
@@ -58,7 +69,6 @@ func (d *SdkEnvs) ToEnvs() *env.Envs {
 		for key, value := range sdkEnv.Env.Variables {
 			envs.Variables[key] = value
 		}
-		envs.Paths.Merge(sdkEnv.Env.Paths)
 	}
 
 	return envs
@@ -328,37 +338,21 @@ func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.En
 	return keys, nil
 }
 
-// EnvKeys will make symlink according base.Location.
-func (b *Sdk) EnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
+// EnvKeys Only return the really installed path of this SDK
+func (b *Sdk) EnvKeys(version base.Version) (*env.Envs, error) {
 	label := b.Label(version)
 	if !b.CheckExists(version) {
 		return nil, fmt.Errorf("%s is not installed", label)
 	}
-	linkPackage, err := b.GetLinkPackage(version, location)
-	if err != nil {
-		return nil, err
-	}
-	sdkPackage, err := linkPackage.Link()
-	if err != nil {
-		return nil, err
-	}
 
-	keys, err := b.Plugin.EnvKeys(sdkPackage)
+	sdkInstalledPackage, err := b.GetLocalSdkPackage(version)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := b.Plugin.EnvKeys(sdkInstalledPackage)
 	if err != nil {
 		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
 	}
-
-	if env.IsIDEEnvironmentResolution() {
-		// current shell will be killed after the activation,
-		// so we need to run into something like `shims` mode.
-		rawKeys, err := b.Plugin.EnvKeys(linkPackage.from)
-		if err != nil {
-			return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
-		}
-
-		keys.MergePaths(rawKeys)
-	}
-
 	return keys, nil
 }
 
@@ -411,126 +405,59 @@ func (e *VersionNotExistsError) Error() string {
 }
 
 func (b *Sdk) Use(version base.Version, scope base.UseScope) error {
-	logger.Debugf("Use SDK version: %s, scope:%v\n", string(version), scope)
+	logger.Debugf("Use SDK version: %s, scope: %v\n", string(version), scope)
 
-	version, err := b.PreUse(version, scope)
+	// Verify hook environment is available
+	if !env.IsHookEnv() {
+		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
+	}
+
+	// Resolve version with PreUse hook
+	resolvedVersion, err := b.PreUse(version, scope)
 	if err != nil {
 		return err
 	}
 
-	label := b.Label(version)
-	if !b.CheckExists(version) {
-		return &VersionNotExistsError{
-			Label: label,
-		}
+	// Verify version exists
+	label := b.Label(resolvedVersion)
+	if !b.CheckExists(resolvedVersion) {
+		return &VersionNotExistsError{Label: label}
 	}
 
-	if !env.IsHookEnv() {
-		pterm.Printf("Warning: The current shell lacks hook support or configuration. It has switched to global scope automatically.\n")
-
-		keys, err := b.EnvKeys(version, base.GlobalLocation)
-		if err != nil {
-			return err
-		}
-
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
-		if err != nil {
-			return fmt.Errorf("failed to read tool versions, err:%w", err)
-		}
-
-		bins, err := keys.Paths.ToBinPaths()
-		if err != nil {
-			return err
-		}
-		for _, bin := range bins.Slice() {
-			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.GlobalShimsPath)
-			if err = binShim.Generate(); err != nil {
-				continue
-			}
-		}
-
-		// clear global env
-		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
-			b.clearGlobalEnv(base.Version(oldVersion))
-		}
-		toolVersion.Record[b.Name] = string(version)
-		if err = toolVersion.Save(); err != nil {
-			return fmt.Errorf("failed to save tool versions, err:%w", err)
-		}
-		return shell.Open(os.Getppid())
-	} else {
-		return b.useInHook(version, scope)
-	}
+	return b.useInHook(resolvedVersion, scope)
 }
 
 func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
-	var (
-		multiToolVersion toolset.MultiToolVersions
-	)
 
-	if scope == base.Global {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
-		if err != nil {
-			return fmt.Errorf("failed to read tool versions, err:%w", err)
-		}
-
-		envKeys, err := b.EnvKeys(version, base.GlobalLocation)
-		if err != nil {
-			return err
-		}
-		binPaths, err := envKeys.Paths.ToBinPaths()
-		if err != nil {
-			return err
-		}
-		for _, bin := range binPaths.Slice() {
-			binShim := shim.NewShim(bin, b.sdkManager.PathMeta.GlobalShimsPath)
-			if err = binShim.Generate(); err != nil {
-				return err
+	// 特殊，需要判断是否存在目录，不存在在创建
+	if base.Project == scope {
+		if !util.FileExists(b.sdkManager.PathMeta.WorkingDirectory) {
+			err := os.MkdirAll(b.sdkManager.PathMeta.WorkingDirectory, 0755)
+			if err != nil {
+				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
 		}
-
-		// clear global env
-		logger.Debugf("Clear global env: %s\n", b.Name)
-		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
-			b.clearGlobalEnv(base.Version(oldVersion))
-		}
-
-		multiToolVersion = append(multiToolVersion, toolVersion)
-	} else if scope == base.Project {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
-		if err != nil {
-			return fmt.Errorf("failed to read tool versions, err:%w", err)
-		}
-		logger.Debugf("Load project toolchain versions: %v\n", toolVersion.Record)
-		multiToolVersion = append(multiToolVersion, toolVersion)
 	}
 
-	// It must also be saved once at the session level.
-	toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
+	toolVersions, err := b.sdkManager.LoadToolVersionByScope(scope)
 	if err != nil {
-		return fmt.Errorf("failed to read tool versions, err:%w", err)
-	}
-	multiToolVersion = append(multiToolVersion, toolVersion)
-
-	multiToolVersion.Add(b.Name, string(version))
-
-	if err = multiToolVersion.Save(); err != nil {
-		return fmt.Errorf("failed to save tool versions, err:%w", err)
-	}
-	// Use GlobalLocation for global scope to create stable symlink at .version-fox/cache/<sdk>/current
-	// Use ShellLocation for other scopes to create symlink in temporary shell-specific directory
-	linkLocation := base.ShellLocation
-	if scope == base.Global {
-		linkLocation = base.GlobalLocation
-	}
-	if err = b.ToLinkPackage(version, linkLocation); err != nil {
 		return err
 	}
 
-	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
-	if !env.IsHookEnv() {
-		return shell.Open(os.Getppid())
+	logger.Debugf("Load %v tool versions: %v\n", scope, toolVersions.Record)
+
+	// Update version record in all affected scopes
+	toolVersions.Record[b.Name] = string(version)
+	if err := toolVersions.Save(); err != nil {
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
+
+	// Create symlinks for the specified scope
+	if err := b.createSymlinksForScope(version, scope); err != nil {
+		return fmt.Errorf("failed to create symlinks, err:%w", err)
+	}
+
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	return nil
 }
 
@@ -571,7 +498,7 @@ func (b *Sdk) getLocalSdkPackages() []*base.Package {
 func (b *Sdk) Current() base.Version {
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
 		b.sdkManager.PathMeta.WorkingDirectory,
-		b.sdkManager.PathMeta.CurTmpPath,
+		b.sdkManager.PathMeta.SessionLinkSdkPath,
 		b.sdkManager.PathMeta.HomePath,
 	})
 	if err != nil {
@@ -611,6 +538,57 @@ func (b *Sdk) clearGlobalEnv(version base.Version) {
 	}
 	// Compatible symbolic link paths for v0.5.0-0.5.2
 	envKV.Paths.Add(filepath.Join(b.InstallPath, "current"))
+}
+
+// createSymlinksForScope creates symlinks in the appropriate SDK directory for the scope
+func (b *Sdk) createSymlinksForScope(version base.Version, scope base.UseScope) error {
+	// Get SDK binaries
+	envKeys, err := b.EnvKeys(version)
+	if err != nil {
+		return fmt.Errorf("failed to get env keys for %s, err:%w", b.Label(version), err)
+	}
+
+	binPaths, err := envKeys.Paths.ToBinPaths()
+	if err != nil {
+		return fmt.Errorf("failed to get bin paths, err:%w", err)
+	}
+
+	// Determine target SDK directory based on scope
+	var sdkDir string
+	switch scope {
+	case base.Global:
+		sdkDir = b.sdkManager.PathMeta.GlobalLinkSdkPath
+	case base.Project:
+		sdkDir = b.sdkManager.PathMeta.ProjectLinkSdkPath
+	case base.Session:
+		sdkDir = b.sdkManager.PathMeta.SessionLinkSdkPath
+	}
+
+	// Whatever scope used, the session scope must be created symlinks.
+	if scope != base.Session {
+		_ = b.createBinSymlinks(binPaths, b.sdkManager.PathMeta.SessionLinkSdkPath)
+	}
+	// Create symlinks for each binary
+	return b.createBinSymlinks(binPaths, sdkDir)
+
+}
+
+// createBinSymlinks creates symlinks for all binaries in the given paths
+func (b *Sdk) createBinSymlinks(binPaths *env.Paths, targetDir string) error {
+	// Ensure target directory exists
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create SDK directory %s, err:%w", targetDir, err)
+	}
+
+	for _, binPath := range binPaths.Slice() {
+		binName := filepath.Base(binPath)
+		binShim := shim.NewShim(binPath, targetDir)
+		if err := binShim.Generate(); err != nil {
+			logger.Debugf("Failed to create symlink for %s, err:%v\n", binName, err)
+			continue
+		}
+	}
+	return nil
 }
 
 func (b *Sdk) GetLocalSdkPackage(version base.Version) (*base.Package, error) {
@@ -759,7 +737,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 		fmt.Println("Cleaning up the shims...")
 		if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
 			for _, p := range paths.Slice() {
-				if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+				if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalLinkSdkPath).Clear(); err != nil {
 					return err
 				}
 			}
@@ -782,7 +760,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 
 	// clear tool versions
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
-		b.sdkManager.PathMeta.CurTmpPath,
+		b.sdkManager.PathMeta.SessionLinkSdkPath,
 		b.sdkManager.PathMeta.HomePath,
 	})
 	if err != nil {
@@ -814,7 +792,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 			if err == nil {
 				if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
 					for _, p := range paths.Slice() {
-						if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalShimsPath).Clear(); err != nil {
+						if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalLinkSdkPath).Clear(); err != nil {
 							// Log but don't fail on shim cleanup errors
 							logger.Debugf("Failed to clear shim %s: %v\n", p, err)
 						}
@@ -842,7 +820,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 
 	// For session scope, or in addition to global/project scope,
 	// also remove from the session level
-	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.CurTmpPath)
+	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.SessionLinkSdkPath)
 	if err != nil {
 		return fmt.Errorf("failed to read tool versions, err:%w", err)
 	}

@@ -1,3 +1,5 @@
+//go:build darwin || linux
+
 /*
  *    Copyright 2026 Han Li and contributors
  *
@@ -14,22 +16,20 @@
  *    limitations under the License.
  */
 
-package env
+package commands
 
-// Vars is a map of environment variables
-type Vars map[string]*string
+import (
+	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/env"
+)
 
-// Envs is a struct that contains environment variables and PATH.
-type Envs struct {
-	Variables Vars
-	BinPaths  *Paths
-	Paths     *Paths
-}
-
-func (e *Envs) MergePaths(envs *Envs) {
-	if envs == nil {
-		return
-	}
-	e.BinPaths.Merge(envs.BinPaths)
-	e.Paths.Merge(envs.Paths)
+// generatePATH generates the PATH string with three layers
+func generatePATH(pathMeta *internal.PathMeta) *env.Paths {
+	// Unix: relative for project, absolute for others
+	paths := env.NewPaths(env.EmptyPaths)
+	paths.Add(pathMeta.ProjectLinkSdkPath)
+	paths.Add(pathMeta.SessionLinkSdkPath)
+	paths.Add(pathMeta.GlobalLinkSdkPath)
+	paths.Add("$PATH")
+	return paths
 }

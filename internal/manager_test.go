@@ -57,7 +57,7 @@ func TestCleanTmp(t *testing.T) {
 	}
 
 	// Construct Manager
-	m := &Manager{PathMeta: &PathMeta{CurTmpPath: tmpRoot, TempPath: tmpRoot}}
+	m := &Manager{PathMeta: &PathMeta{SessionLinkSdkPath: tmpRoot, TempPath: tmpRoot}}
 
 	// Execute cleanup
 	m.CleanTmp()

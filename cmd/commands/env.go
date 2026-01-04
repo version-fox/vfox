@@ -61,10 +61,8 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 		return outputJSON()
 	} else if cmd.IsSet("cleanup") {
 		return cleanTmp()
-	} else if cmd.IsSet("full") {
-		return envFlag(cmd, "full")
 	} else {
-		return envFlag(cmd, "cwd")
+		return envFlag(cmd)
 	}
 }
 
@@ -83,7 +81,7 @@ func outputJSON() error {
 	defer manager.Close()
 	tvs, err := toolset.NewMultiToolVersions([]string{
 		manager.PathMeta.WorkingDirectory,
-		manager.PathMeta.CurTmpPath,
+		manager.PathMeta.SessionLinkSdkPath,
 		manager.PathMeta.HomePath,
 	})
 	if err != nil {
@@ -91,7 +89,7 @@ func outputJSON() error {
 	}
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			if keys, err := lookupSdk.EnvKeys(base.Version(version), base.OriginalLocation); err == nil {
+			if keys, err := lookupSdk.EnvKeys(base.Version(version)); err == nil {
 				data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				return true
@@ -115,7 +113,7 @@ func cleanTmp() error {
 	return nil
 }
 
-func envFlag(cmd *cli.Command, mode string) error {
+func envFlag(cmd *cli.Command) error {
 	shellName := cmd.String("shell")
 	if shellName == "" {
 		return cli.Exit("shell name is required", 1)
@@ -126,18 +124,25 @@ func envFlag(cmd *cli.Command, mode string) error {
 	}
 	manager := internal.NewSdkManager()
 	defer manager.Close()
-	var sdkEnvs internal.SdkEnvs
-	var err error
-	if mode == "full" {
-		sdkEnvs, err = manager.SessionEnvKeys(internal.SessionEnvOptions{
-			WithGlobalEnv: true,
-		})
-	} else {
-		sdkEnvs, err = manager.SessionEnvKeys(internal.SessionEnvOptions{
-			WithGlobalEnv: false,
-		})
+
+	projectToolVersions, err := manager.LoadToolVersionByScope(base.Project)
+	if err != nil {
+		return err
+	}
+	sessionToolVersions, err := manager.LoadToolVersionByScope(base.Session)
+	if err != nil {
+		return err
+	}
+	globalToolVersions, err := manager.LoadToolVersionByScope(base.Global)
+	if err != nil {
+		return err
 	}
 
+	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
+		projectToolVersions,
+		sessionToolVersions,
+		globalToolVersions,
+	})
 	if err != nil {
 		return err
 	}
@@ -146,7 +151,11 @@ func envFlag(cmd *cli.Command, mode string) error {
 		return nil
 	}
 
-	exportEnvs := sdkEnvs.ToExportEnvs()
+	envs := sdkEnvs.ToEnvs()
+	exportEnvs := make(env.Vars)
+	for k, v := range envs.Variables {
+		exportEnvs[k] = v
+	}
 
 	exportStr := s.Export(exportEnvs)
 	fmt.Println(exportStr)

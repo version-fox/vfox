@@ -29,6 +29,11 @@ const (
 
 	HookFlag = "__VFOX_SHELL"
 	PidFlag  = "__VFOX_PID"
+
+	ProjectBinPathFlag = "__VFOX_PROJECT_BIN_PATH"
+	SessionBinPathFlag = "__VFOX_SESSION_BIN_PATH"
+	GlobalBinPathFlag  = "__VFOX_GLOBAL_BIN_PATH"
+	VfoxPwd            = "__VFOX_PWD"
 )
 
 func IsHookEnv() bool {

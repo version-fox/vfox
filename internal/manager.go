@@ -70,20 +70,28 @@ type Manager struct {
 	Config   *config.Config
 }
 
-func (m *Manager) GlobalEnvKeys() (SdkEnvs, error) {
-	workToolVersion, err := m.WorkspaceToolVersion()
-	if err != nil {
-		return nil, err
-	}
+func (m *Manager) LoadToolVersionByScope(scope base.UseScope) (*toolset.ToolVersion, error) {
+	if base.Global == scope {
+		return toolset.NewToolVersion(m.PathMeta.HomePath)
+	} else if base.Project == scope {
+		workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+		if err != nil {
+			return nil, err
+		}
 
-	homeToolVersion, err := toolset.NewToolVersion(m.PathMeta.HomePath)
-	if err != nil {
-		return nil, err
+		if err = m.parseLegacyFile(m.PathMeta.WorkingDirectory, func(sdkname, version string) {
+			logger.Debugf("parse legacy file: %s@%s\n", sdkname, version)
+			if _, ok := workToolVersion.Record[sdkname]; !ok {
+				workToolVersion.Record[sdkname] = version
+			}
+		}); err != nil {
+			return nil, err
+		}
+
+		return workToolVersion, nil
+	} else {
+		return toolset.NewToolVersion(m.PathMeta.SessionLinkSdkPath)
 	}
-	return m.EnvKeys(toolset.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
-	}, base.ShellLocation)
 }
 
 func (m *Manager) WorkspaceToolVersion() (*toolset.ToolVersion, error) {
@@ -148,7 +156,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 		tvs = append(tvs, homeToolVersion)
 	}
 
-	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.CurTmpPath)
+	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.SessionLinkSdkPath)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +164,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 
 	tvs = append(tvs, curToolVersion)
 
-	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.CurTmpPath, "flush_env.cache"))
+	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.SessionLinkSdkPath, "flush_env.cache"))
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +182,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 				logger.Debugf("No hit cache, name: %s cache: %s, expected: %s \n", name, string(vv), version)
 			}
 			v := base.Version(version)
-			if keys, err := lookupSdk.EnvKeys(v, base.ShellLocation); err == nil {
+			if keys, err := lookupSdk.EnvKeys(v); err == nil {
 				flushCache.Set(name, cache.Value(version), cache.NeverExpired)
 
 				sdkEnvs = append(sdkEnvs, &SdkEnv{
@@ -191,7 +199,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	return sdkEnvs, nil
 }
 
-func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location base.Location) (SdkEnvs, error) {
+func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions) (SdkEnvs, error) {
 	var sdkEnvs SdkEnvs
 	tools := make(map[string]struct{})
 	for _, t := range tvs {
@@ -201,9 +209,8 @@ func (m *Manager) EnvKeys(tvs toolset.MultiToolVersions, location base.Location)
 			}
 			if lookupSdk, err := m.LookupSdk(name); err == nil {
 				v := base.Version(version)
-				if ek, err := lookupSdk.EnvKeys(v, location); err == nil {
+				if ek, err := lookupSdk.EnvKeys(v); err == nil {
 					tools[name] = struct{}{}
-
 					sdkEnvs = append(sdkEnvs, &SdkEnv{
 						Sdk: lookupSdk,
 						Env: ek,

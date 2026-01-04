@@ -26,15 +26,18 @@ import (
 )
 
 type PathMeta struct {
-	TempPath string
-	// Temporary directory for the current process
-	CurTmpPath       string
+	TempPath         string
 	HomePath         string
 	SdkCachePath     string
 	PluginPath       string
 	ExecutablePath   string
 	WorkingDirectory string
-	GlobalShimsPath  string
+	// session sdk path
+	SessionLinkSdkPath string
+	// global sdk path
+	GlobalLinkSdkPath string
+	// project sdk path
+	ProjectLinkSdkPath string
 }
 
 const (
@@ -45,6 +48,10 @@ const (
 	PLUGIN_DIR = "plugin"
 	CACHE_DIR  = "cache"
 	TEMP_DIR   = "temp"
+
+	SdkLinkBinPath = "sdk"
+
+	vfoxHomePath = ".vfox"
 )
 
 func newTempPath() string {
@@ -86,23 +93,26 @@ func newPathMeta() (*PathMeta, error) {
 		}
 	}
 
-	globalShimsPath := filepath.Join(homePath, "shims")
-	_ = os.MkdirAll(globalShimsPath, 0777)
+	globalLinkSdkPath := filepath.Join(homePath, SdkLinkBinPath)
+	_ = os.MkdirAll(globalLinkSdkPath, 0777)
 
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("get current working directory failed: %w", err)
 	}
 
+	projectLinkSdkPath := filepath.Join(vfoxHomePath, SdkLinkBinPath)
+
 	return &PathMeta{
-		TempPath:         tmpPath,
-		CurTmpPath:       curTmpPath,
-		HomePath:         homePath,
-		SdkCachePath:     sdkCachePath,
-		PluginPath:       pluginPath,
-		ExecutablePath:   exePath,
-		WorkingDirectory: workingDirectory,
-		GlobalShimsPath:  globalShimsPath,
+		TempPath:           tmpPath,
+		SessionLinkSdkPath: curTmpPath,
+		HomePath:           homePath,
+		SdkCachePath:       sdkCachePath,
+		PluginPath:         pluginPath,
+		ExecutablePath:     exePath,
+		WorkingDirectory:   workingDirectory,
+		GlobalLinkSdkPath:  globalLinkSdkPath,
+		ProjectLinkSdkPath: projectLinkSdkPath,
 	}, nil
 }
 

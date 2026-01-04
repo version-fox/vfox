@@ -225,7 +225,7 @@ func installAll(autoConfirm bool) error {
 func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]string, err error) {
 	tvs, err := toolset.NewMultiToolVersions([]string{
 		manager.PathMeta.WorkingDirectory,
-		manager.PathMeta.CurTmpPath,
+		manager.PathMeta.SessionLinkSdkPath,
 		manager.PathMeta.HomePath,
 	})
 	if err != nil {
