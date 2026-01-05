@@ -64,6 +64,8 @@ const (
 	installedDirPrefix = "installed" // Shared installed directory
 	configFilePrefix   = "config.yaml"
 	shimDirPrefix      = "shims"
+
+	ReadWriteAuth = 0700 // can write and read
 )
 
 func newTempPath() string {
@@ -111,11 +113,11 @@ func newPathMeta() (*PathMeta, error) {
 	}
 
 	// Initialize necessary directories
-	_ = os.MkdirAll(meta.User.Temp, 0755)
-	_ = os.MkdirAll(meta.User.Cache, 0755)
-	_ = os.MkdirAll(meta.Working.GlobalShim, 0755)
-	_ = os.Mkdir(meta.Shared.Installs, 0755)
-	_ = os.Mkdir(meta.Shared.Plugins, 0755)
+	_ = os.MkdirAll(meta.User.Temp, ReadWriteAuth)
+	_ = os.MkdirAll(meta.User.Cache, ReadWriteAuth)
+	_ = os.MkdirAll(meta.Working.GlobalShim, ReadWriteAuth)
+	_ = os.Mkdir(meta.Shared.Installs, ReadWriteAuth)
+	_ = os.Mkdir(meta.Shared.Plugins, ReadWriteAuth)
 
 	return meta, nil
 }
@@ -144,7 +146,7 @@ func generateSessionShimPath(userTemp string) string {
 		curTmpPath = filepath.Join(userTemp, name)
 	}
 	if !util.FileExists(curTmpPath) {
-		err := os.MkdirAll(curTmpPath, 0755)
+		err := os.MkdirAll(curTmpPath, ReadWriteAuth)
 		if err != nil {
 			logger.Errorf("create temp dir failed: %v", err)
 		}

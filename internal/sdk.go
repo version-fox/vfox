@@ -296,48 +296,6 @@ func (b *Sdk) Available(args []string) ([]*base.Package, error) {
 	return b.Plugin.Available(args)
 }
 
-func (b *Sdk) ToLinkPackage(version base.Version, location base.Location) error {
-	linkPackage, err := b.GetLinkPackage(version, location)
-	if err != nil {
-		return err
-	}
-	_, err = linkPackage.Link()
-	return err
-}
-
-// GetLinkPackage will make symlink according base.Location and return the sdk package.
-func (b *Sdk) GetLinkPackage(version base.Version, location base.Location) (*LocationPackage, error) {
-	return newLocationPackage(version, b, location)
-}
-
-// MockEnvKeys It just simulates to get the environment configuration information,
-// if the corresponding location of the package does not exist, then it will return
-// the empty environment information, without calling the EnvKeys hook.
-func (b *Sdk) MockEnvKeys(version base.Version, location base.Location) (*env.Envs, error) {
-	label := b.Label(version)
-	if !b.CheckExists(version) {
-		return nil, fmt.Errorf("%s is not installed", label)
-	}
-	linkPackage, err := b.GetLinkPackage(version, location)
-	if err != nil {
-		return nil, err
-	}
-	sdkPackage := linkPackage.ConvertLocation()
-	if !checkPackageValid(sdkPackage) {
-		logger.Debugf("Package is invalid: %v\n", sdkPackage)
-		return &env.Envs{
-			Variables: make(env.Vars),
-			Paths:     env.NewPaths(env.EmptyPaths),
-			BinPaths:  env.NewPaths(env.EmptyPaths),
-		}, nil
-	}
-	keys, err := b.Plugin.EnvKeys(sdkPackage)
-	if err != nil {
-		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
-	}
-	return keys, nil
-}
-
 // EnvKeys Only return the really installed path of this SDK
 func (b *Sdk) EnvKeys(version base.Version) (*env.Envs, error) {
 	label := b.Label(version)
@@ -432,7 +390,7 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 	// 特殊，需要判断是否存在目录，不存在在创建
 	if base.Project == scope {
 		if !util.FileExists(b.sdkManager.PathMeta.Working.Directory) {
-			err := os.MkdirAll(b.sdkManager.PathMeta.Working.Directory, 0755)
+			err := os.MkdirAll(b.sdkManager.PathMeta.Working.Directory, ReadWriteAuth)
 			if err != nil {
 				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
@@ -525,19 +483,20 @@ func (b *Sdk) Close() {
 
 // clearGlobalEnv Mainly used to clear record from Windows registry
 func (b *Sdk) clearGlobalEnv(version base.Version) {
-	if version == "" {
-		return
-	}
-	sdkPackage, err := b.GetLinkPackage(version, base.GlobalLocation)
-	if err != nil {
-		return
-	}
-	envKV, err := b.Plugin.EnvKeys(sdkPackage.ConvertLocation())
-	if err != nil {
-		return
-	}
-	// Compatible symbolic link paths for v0.5.0-0.5.2
-	envKV.Paths.Add(filepath.Join(b.InstallPath, "current"))
+	// TODO
+	//if version == "" {
+	//	return
+	//}
+	//sdkPackage, err := b.GetLinkPackage(version, base.GlobalLocation)
+	//if err != nil {
+	//	return
+	//}
+	//envKV, err := b.Plugin.EnvKeys(sdkPackage.ConvertLocation())
+	//if err != nil {
+	//	return
+	//}
+	//// Compatible symbolic link paths for v0.5.0-0.5.2
+	//envKV.Paths.Add(filepath.Join(b.InstallPath, "current"))
 }
 
 // createSymlinksForScope creates symlinks in the appropriate SDK directory for the scope
@@ -576,7 +535,7 @@ func (b *Sdk) createSymlinksForScope(version base.Version, scope base.UseScope) 
 // createBinSymlinks creates symlinks for all binaries in the given paths
 func (b *Sdk) createBinSymlinks(binPaths *env.Paths, targetDir string) error {
 	// Ensure target directory exists
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, ReadWriteAuth); err != nil {
 		return fmt.Errorf("failed to create SDK directory %s, err:%w", targetDir, err)
 	}
 
@@ -730,26 +689,27 @@ func (b *Sdk) ClearCurrentEnv() error {
 	current := b.Current()
 
 	if current != "" {
-		envKeys, err := b.MockEnvKeys(current, base.GlobalLocation)
-		if err != nil {
-			return err
-		}
-		fmt.Println("Cleaning up the shims...")
-		if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
-			for _, p := range paths.Slice() {
-				if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
-					return err
-				}
-			}
-		}
-
-		fmt.Println("Cleaning up env config...")
-		envKeys.Paths.Add(filepath.Join(b.InstallPath, "current"))
-
-		envKeys, err = b.MockEnvKeys(current, base.OriginalLocation)
-		if err != nil {
-			return err
-		}
+		// TODO: clear
+		//envKeys, err := b.MockEnvKeys(current, base.GlobalLocation)
+		//if err != nil {
+		//	return err
+		//}
+		//fmt.Println("Cleaning up the shims...")
+		//if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
+		//	for _, p := range paths.Slice() {
+		//		if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
+		//			return err
+		//		}
+		//	}
+		//}
+		//
+		//fmt.Println("Cleaning up env config...")
+		//envKeys.Paths.Add(filepath.Join(b.InstallPath, "current"))
+		//
+		//envKeys, err = b.MockEnvKeys(current, base.OriginalLocation)
+		//if err != nil {
+		//	return err
+		//}
 	}
 
 	fmt.Println("Cleaning up current link...")
@@ -788,18 +748,19 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 			b.clearGlobalEnv(base.Version(oldVersion))
 
 			// Remove shims for the current version
-			envKeys, err := b.MockEnvKeys(base.Version(oldVersion), base.GlobalLocation)
-			if err == nil {
-				if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
-					for _, p := range paths.Slice() {
-						if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
-							// Log but don't fail on shim cleanup errors
-							logger.Debugf("Failed to clear shim %s: %v\n", p, err)
-						}
-					}
-				}
-			}
-
+			// TODO: clear
+			//envKeys, err := b.MockEnvKeys(base.Version(oldVersion), base.GlobalLocation)
+			//if err == nil {
+			//	if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
+			//		for _, p := range paths.Slice() {
+			//			if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
+			//				// Log but don't fail on shim cleanup errors
+			//				logger.Debugf("Failed to clear shim %s: %v\n", p, err)
+			//			}
+			//		}
+			//	}
+			//}
+			//
 			// Flush environment changes
 		}
 
