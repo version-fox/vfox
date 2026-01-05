@@ -27,9 +27,9 @@ import (
 func generatePATH(pathMeta *internal.PathMeta) *env.Paths {
 	// Unix: relative for project, absolute for others
 	paths := env.NewPaths(env.EmptyPaths)
-	paths.Add(pathMeta.ProjectLinkSdkPath)
-	paths.Add(pathMeta.SessionLinkSdkPath)
-	paths.Add(pathMeta.GlobalLinkSdkPath)
+	paths.Add(pathMeta.Working.ProjectShim)
+	paths.Add(pathMeta.Working.SessionShim)
+	paths.Add(pathMeta.Working.GlobalShim)
 	paths.Add("$PATH")
 	return paths
 }

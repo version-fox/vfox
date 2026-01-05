@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/version-fox/vfox/internal/config"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/version-fox/vfox/internal/config"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
@@ -63,7 +64,7 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	return manager.Config.SaveConfig(manager.PathMeta.HomePath)
+	return manager.Config.SaveConfig(manager.PathMeta.User.Home)
 }
 
 func configList(prefix string, v reflect.Value) {

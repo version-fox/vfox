@@ -28,7 +28,7 @@ func cdCmd(ctx context.Context, cmd *cli.Command) error {
 
 	manager := internal.NewSdkManager()
 	if cmd.Args().Len() == 0 {
-		dir = manager.PathMeta.HomePath
+		dir = manager.PathMeta.User.Home
 	} else {
 		sdkName := cmd.Args().First()
 		sdk, err := manager.LookupSdk(sdkName)

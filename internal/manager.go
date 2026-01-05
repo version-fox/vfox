@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -72,14 +71,14 @@ type Manager struct {
 
 func (m *Manager) LoadToolVersionByScope(scope base.UseScope) (*toolset.ToolVersion, error) {
 	if base.Global == scope {
-		return toolset.NewToolVersion(m.PathMeta.HomePath)
+		return toolset.NewToolVersion(m.PathMeta.User.Home)
 	} else if base.Project == scope {
-		workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+		workToolVersion, err := toolset.NewToolVersion(m.PathMeta.Working.Directory)
 		if err != nil {
 			return nil, err
 		}
 
-		if err = m.parseLegacyFile(m.PathMeta.WorkingDirectory, func(sdkname, version string) {
+		if err = m.parseLegacyFile(m.PathMeta.Working.Directory, func(sdkname, version string) {
 			logger.Debugf("parse legacy file: %s@%s\n", sdkname, version)
 			if _, ok := workToolVersion.Record[sdkname]; !ok {
 				workToolVersion.Record[sdkname] = version
@@ -90,17 +89,17 @@ func (m *Manager) LoadToolVersionByScope(scope base.UseScope) (*toolset.ToolVers
 
 		return workToolVersion, nil
 	} else {
-		return toolset.NewToolVersion(m.PathMeta.SessionLinkSdkPath)
+		return toolset.NewToolVersion(m.PathMeta.Working.SessionShim)
 	}
 }
 
 func (m *Manager) WorkspaceToolVersion() (*toolset.ToolVersion, error) {
-	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.WorkingDirectory)
+	workToolVersion, err := toolset.NewToolVersion(m.PathMeta.Working.Directory)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = m.parseLegacyFile(m.PathMeta.WorkingDirectory, func(sdkname, version string) {
+	if err = m.parseLegacyFile(m.PathMeta.Working.Directory, func(sdkname, version string) {
 		logger.Debugf("parse legacy file: %s@%s\n", sdkname, version)
 		if _, ok := workToolVersion.Record[sdkname]; !ok {
 			workToolVersion.Record[sdkname] = version
@@ -148,7 +147,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 	tvs = append(tvs, workToolVersion)
 
 	if opt.WithGlobalEnv {
-		homeToolVersion, herr := toolset.NewToolVersion(m.PathMeta.HomePath)
+		homeToolVersion, herr := toolset.NewToolVersion(m.PathMeta.User.Home)
 		if herr != nil {
 			return nil, herr
 		}
@@ -156,7 +155,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 		tvs = append(tvs, homeToolVersion)
 	}
 
-	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.SessionLinkSdkPath)
+	curToolVersion, err := toolset.NewToolVersion(m.PathMeta.Working.SessionShim)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +163,7 @@ func (m *Manager) SessionEnvKeys(opt SessionEnvOptions) (SdkEnvs, error) {
 
 	tvs = append(tvs, curToolVersion)
 
-	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.SessionLinkSdkPath, "flush_env.cache"))
+	flushCache, err := cache.NewFileCache(filepath.Join(m.PathMeta.Working.SessionShim, "flush_env.cache"))
 	if err != nil {
 		return nil, err
 	}
@@ -228,22 +227,10 @@ func (m *Manager) LookupSdk(name string) (*Sdk, error) {
 		return sdk, nil
 	}
 
-	pluginPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name))
+	// Query plugin directly from shared root
+	pluginPath := filepath.Join(m.PathMeta.Shared.Plugins, strings.ToLower(name))
 	if !util.FileExists(pluginPath) {
-		oldPath := filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)+".lua")
-		if !util.FileExists(oldPath) {
-			return nil, NotFoundError{Msg: fmt.Sprintf("%s not installed", name)}
-		}
-		logger.Debugf("Found old plugin path %s \n", oldPath)
-		// FIXME !!! This snippet will be removed in a later version
-		// rename old plugin path to new plugin path
-		err := os.Mkdir(filepath.Join(m.PathMeta.PluginPath, strings.ToLower(name)), 0777)
-		if err != nil {
-			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
-		}
-		if err = os.Rename(oldPath, filepath.Join(pluginPath, "main.lua")); err != nil {
-			return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
-		}
+		return nil, NotFoundError{Msg: fmt.Sprintf("%s not installed", name)}
 	}
 	sdk, err := NewSdk(m, pluginPath)
 	if err != nil {
@@ -309,64 +296,39 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (*Sdk, err
 }
 
 func (m *Manager) LoadAllSdk() ([]*Sdk, error) {
-	dir, err := os.ReadDir(m.PathMeta.PluginPath)
-	if err != nil {
-		return nil, fmt.Errorf("load sdks error: %w", err)
+	dir := m.PathMeta.Shared.Plugins
+
+	if !util.FileExists(dir) {
+		return []*Sdk{}, nil // Return empty if shared root does not exist
 	}
+
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read plugins directory error: %w", err)
+	}
+
 	sdkSlice := make([]*Sdk, 0)
-	for _, d := range dir {
-		sdkName := d.Name()
-		path := filepath.Join(m.PathMeta.PluginPath, sdkName)
 
-		// Resolve symbolic link, useful for plugin development
-		dirInfo, err := d.Info()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get directory info: %w", err)
-		}
-		if dirInfo.Mode()&os.ModeSymlink != 0 {
-			resolvedPath, err := filepath.EvalSymlinks(path)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve symboling link : %w", err)
-			}
-			dirFileInfo, err := os.Lstat(resolvedPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get stat for resolved symbolic link : %w", err)
-			}
-			d = fs.FileInfoToDirEntry(dirFileInfo)
-		}
+	for _, f := range files {
+		sdkName := f.Name()
+		path := filepath.Join(dir, sdkName)
 
-		if d.IsDir() {
+		if f.IsDir() {
+			sdk, err := NewSdk(m, path)
+			if err == nil {
+				sdkSlice = append(sdkSlice, sdk)
+				m.openSdks[strings.ToLower(sdkName)] = sdk
+			}
 		} else if strings.HasSuffix(sdkName, ".lua") {
-			logger.Debugf("Found old plugin: %s \n", path)
-			// FIXME !!! This snippet will be removed in a later version
-			// rename old plugin path to new plugin path
-			newPluginDir := filepath.Join(m.PathMeta.PluginPath, strings.TrimSuffix(sdkName, ".lua"))
-			err = os.Mkdir(newPluginDir, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
-			}
-			if err = os.Rename(filepath.Join(m.PathMeta.PluginPath, sdkName), filepath.Join(newPluginDir, "main.lua")); err != nil {
-				return nil, fmt.Errorf("failed to migrate an old plug-in: %w", err)
-			}
-			path = newPluginDir
-			sdkName = strings.TrimSuffix(sdkName, ".lua")
-		} else {
-			continue
+			// Compatible with old format
+			logger.Warnf("Found old plugin format: %s", path)
 		}
-
-		sdk, err := NewSdk(m, path)
-		if err != nil {
-			return nil, err
-		}
-
-		sdkSlice = append(sdkSlice, sdk)
-
-		m.openSdks[strings.ToLower(sdkName)] = sdk
 	}
 
 	sort.Slice(sdkSlice, func(i, j int) bool {
 		return sdkSlice[j].Name > sdkSlice[i].Name
 	})
+
 	return sdkSlice, nil
 }
 
@@ -385,7 +347,7 @@ func (m *Manager) Remove(pluginName string) error {
 	if err = source.ClearCurrentEnv(); err != nil {
 		return err
 	}
-	pPath := filepath.Join(m.PathMeta.PluginPath, pluginName)
+	pPath := filepath.Join(m.PathMeta.Shared.Plugins, pluginName)
 	pterm.Printf("Removing %s plugin...\n", pPath)
 	err = os.RemoveAll(pPath)
 	if err != nil {
@@ -564,7 +526,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", fmt.Errorf("plugin not found at %s", downloadUrl)
 	}
 
-	path := filepath.Join(m.PathMeta.PluginPath, filepath.Base(downloadUrl))
+	path := filepath.Join(m.PathMeta.Shared.Plugins, filepath.Base(downloadUrl))
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return "", err
@@ -601,7 +563,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	var installPath string
 	// first quick check.
 	if pname != "" {
-		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		installPath = filepath.Join(m.PathMeta.Shared.Plugins, pname)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
@@ -626,7 +588,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
 	if pname == "" {
 		pname = tempPlugin.Name
-		installPath = filepath.Join(m.PathMeta.PluginPath, pname)
+		installPath = filepath.Join(m.PathMeta.Shared.Plugins, pname)
 		logger.Debugf("No plugin name provided, use %s as plugin name, installPath: %s\n", pname, installPath)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
@@ -687,7 +649,7 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.PluginWrapper, error
 		}()
 	}
 	success := false
-	tempInstallPath, err := os.MkdirTemp(m.PathMeta.TempPath, "vfox-")
+	tempInstallPath, err := os.MkdirTemp(m.PathMeta.User.Temp, "vfox-")
 	if err != nil {
 		return nil, fmt.Errorf("install plugin error: %w", err)
 	}
@@ -768,7 +730,7 @@ func (m *Manager) Available() (RegistryIndex, error) {
 
 func (m *Manager) CleanTmp() {
 	// once per day
-	cleanFlagPath := filepath.Join(m.PathMeta.TempPath, cleanupFlagFilename)
+	cleanFlagPath := filepath.Join(m.PathMeta.User.Temp, cleanupFlagFilename)
 	if str, err := os.ReadFile(cleanFlagPath); err == nil {
 		if i, err := strconv.ParseInt(string(str), 10, 64); err == nil && !util.IsBeforeToday(i) {
 			return
@@ -786,7 +748,7 @@ func (m *Manager) CleanTmp() {
 		return
 	}
 
-	dir, err := os.ReadDir(m.PathMeta.TempPath)
+	dir, err := os.ReadDir(m.PathMeta.User.Temp)
 	if err == nil {
 		for _, file := range dir {
 			if !file.IsDir() {
@@ -804,7 +766,7 @@ func (m *Manager) CleanTmp() {
 				continue
 			}
 			if util.IsBeforeToday(i) {
-				_ = os.RemoveAll(filepath.Join(m.PathMeta.TempPath, file.Name()))
+				_ = os.RemoveAll(filepath.Join(m.PathMeta.User.Temp, file.Name()))
 			}
 		}
 	}
@@ -819,7 +781,7 @@ func (m *Manager) GetRegistryAddress(uri string) string {
 
 // loadLegacyFileRecord load legacy file record which store the mapping of legacy filename and sdk-name
 func (m *Manager) loadLegacyFileRecord() (*toolset.FileRecord, error) {
-	file := filepath.Join(m.PathMeta.HomePath, ".legacy_filenames")
+	file := filepath.Join(m.PathMeta.User.Home, ".legacy_filenames")
 	logger.Debugf("Loading legacy file record %s \n", file)
 	mapFile, err := toolset.NewFileRecord(file)
 	if err != nil {
@@ -872,19 +834,20 @@ func NewSdkManager() *Manager {
 }
 
 func newSdkManager(meta *PathMeta) *Manager {
-	c, err := config.NewConfig(meta.HomePath)
+	c, err := config.NewConfig(meta.User.Home) // Config from user directory
 	if err != nil {
 		panic(fmt.Errorf("init Config error: %w", err))
 	}
 
-	// custom sdk path first
-	if len(c.Storage.SdkPath) > 0 {
-		err = c.Storage.Validate()
-		if err != nil {
-			panic(fmt.Errorf("validate storage error: %w", err))
-		}
-		meta.SdkCachePath = c.Storage.SdkPath
+	// Check if shared root exists (SDK operations may fail if not)
+	if !util.FileExists(meta.Shared.Root) {
+		logger.Warnf("Shared root not found: %s. SDK operations may fail. Use 'vfox init' to create it.", meta.Shared.Root)
 	}
+
+	// Initialize shared directories (if permission allows)
+	_ = os.MkdirAll(meta.Shared.Installs, 0755)
+	_ = os.MkdirAll(meta.Shared.Plugins, 0755)
+
 	manager := &Manager{
 		PathMeta: meta,
 		openSdks: make(map[string]*Sdk),

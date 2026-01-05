@@ -276,7 +276,7 @@ func (b *Sdk) Uninstall(version base.Version) (err error) {
 			return err
 		}
 
-		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		tv, err := toolset.NewToolVersion(b.sdkManager.PathMeta.User.Home)
 		if err != nil {
 			return err
 		}
@@ -358,7 +358,7 @@ func (b *Sdk) EnvKeys(version base.Version) (*env.Envs, error) {
 
 func (b *Sdk) PreUse(version base.Version, scope base.UseScope) (base.Version, error) {
 	installedSdks := b.getLocalSdkPackages()
-	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.WorkingDirectory, installedSdks)
+	newVersion, err := b.Plugin.PreUse(version, b.Current(), scope, b.sdkManager.PathMeta.Working.Directory, installedSdks)
 	if err != nil {
 		return "", fmt.Errorf("plugin [PreUse] error: err:%w", err)
 	}
@@ -431,8 +431,8 @@ func (b *Sdk) useInHook(version base.Version, scope base.UseScope) error {
 
 	// 特殊，需要判断是否存在目录，不存在在创建
 	if base.Project == scope {
-		if !util.FileExists(b.sdkManager.PathMeta.WorkingDirectory) {
-			err := os.MkdirAll(b.sdkManager.PathMeta.WorkingDirectory, 0755)
+		if !util.FileExists(b.sdkManager.PathMeta.Working.Directory) {
+			err := os.MkdirAll(b.sdkManager.PathMeta.Working.Directory, 0755)
 			if err != nil {
 				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
@@ -497,9 +497,9 @@ func (b *Sdk) getLocalSdkPackages() []*base.Package {
 // Lookup priority is: project > session > global
 func (b *Sdk) Current() base.Version {
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
-		b.sdkManager.PathMeta.WorkingDirectory,
-		b.sdkManager.PathMeta.SessionLinkSdkPath,
-		b.sdkManager.PathMeta.HomePath,
+		b.sdkManager.PathMeta.Working.Directory,
+		b.sdkManager.PathMeta.Working.SessionShim,
+		b.sdkManager.PathMeta.User.Home,
 	})
 	if err != nil {
 		return ""
@@ -557,16 +557,16 @@ func (b *Sdk) createSymlinksForScope(version base.Version, scope base.UseScope) 
 	var sdkDir string
 	switch scope {
 	case base.Global:
-		sdkDir = b.sdkManager.PathMeta.GlobalLinkSdkPath
+		sdkDir = b.sdkManager.PathMeta.Working.GlobalShim
 	case base.Project:
-		sdkDir = b.sdkManager.PathMeta.ProjectLinkSdkPath
+		sdkDir = b.sdkManager.PathMeta.Working.ProjectShim
 	case base.Session:
-		sdkDir = b.sdkManager.PathMeta.SessionLinkSdkPath
+		sdkDir = b.sdkManager.PathMeta.Working.SessionShim
 	}
 
 	// Whatever scope used, the session scope must be created symlinks.
 	if scope != base.Session {
-		_ = b.createBinSymlinks(binPaths, b.sdkManager.PathMeta.SessionLinkSdkPath)
+		_ = b.createBinSymlinks(binPaths, b.sdkManager.PathMeta.Working.SessionShim)
 	}
 	// Create symlinks for each binary
 	return b.createBinSymlinks(binPaths, sdkDir)
@@ -737,7 +737,7 @@ func (b *Sdk) ClearCurrentEnv() error {
 		fmt.Println("Cleaning up the shims...")
 		if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
 			for _, p := range paths.Slice() {
-				if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalLinkSdkPath).Clear(); err != nil {
+				if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
 					return err
 				}
 			}
@@ -760,8 +760,8 @@ func (b *Sdk) ClearCurrentEnv() error {
 
 	// clear tool versions
 	toolVersion, err := toolset.NewMultiToolVersions([]string{
-		b.sdkManager.PathMeta.SessionLinkSdkPath,
-		b.sdkManager.PathMeta.HomePath,
+		b.sdkManager.PathMeta.Working.SessionShim,
+		b.sdkManager.PathMeta.User.Home,
 	})
 	if err != nil {
 		return err
@@ -777,7 +777,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 	var multiToolVersion toolset.MultiToolVersions
 
 	if scope == base.Global {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.HomePath)
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.User.Home)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
@@ -792,7 +792,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 			if err == nil {
 				if paths, err := envKeys.Paths.ToBinPaths(); err == nil {
 					for _, p := range paths.Slice() {
-						if err = shim.NewShim(p, b.sdkManager.PathMeta.GlobalLinkSdkPath).Clear(); err != nil {
+						if err = shim.NewShim(p, b.sdkManager.PathMeta.Working.GlobalShim).Clear(); err != nil {
 							// Log but don't fail on shim cleanup errors
 							logger.Debugf("Failed to clear shim %s: %v\n", p, err)
 						}
@@ -808,7 +808,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 		multiToolVersion = append(multiToolVersion, toolVersion)
 
 	} else if scope == base.Project {
-		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.WorkingDirectory)
+		toolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.Working.Directory)
 		if err != nil {
 			return fmt.Errorf("failed to read tool versions, err:%w", err)
 		}
@@ -820,7 +820,7 @@ func (b *Sdk) Unuse(scope base.UseScope) error {
 
 	// For session scope, or in addition to global/project scope,
 	// also remove from the session level
-	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.SessionLinkSdkPath)
+	sessionToolVersion, err := toolset.NewToolVersion(b.sdkManager.PathMeta.Working.SessionShim)
 	if err != nil {
 		return fmt.Errorf("failed to read tool versions, err:%w", err)
 	}
@@ -848,10 +848,17 @@ func NewSdk(manager *Manager, pluginPath string) (*Sdk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin: %w", err)
 	}
+
+	// SDK install path fixed to shared root (single location)
+	installPath := filepath.Join(
+		manager.PathMeta.Shared.Installs,
+		strings.ToLower(sdkName),
+	)
+
 	return &Sdk{
 		Name:                 sdkName,
 		sdkManager:           manager,
-		InstallPath:          filepath.Join(manager.PathMeta.SdkCachePath, strings.ToLower(sdkName)),
+		InstallPath:          installPath,
 		Plugin:               plugin,
 		localSdkPackageCache: make(map[base.Version]*base.Package),
 	}, nil

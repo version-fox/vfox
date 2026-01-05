@@ -24,6 +24,7 @@ type LoggerLevel int
 const (
 	DebugLevel LoggerLevel = iota
 	InfoLevel
+	WarnLevel
 	ErrorLevel
 )
 
@@ -59,6 +60,14 @@ func Info(message ...interface{}) {
 
 func Infof(message string, args ...interface{}) {
 	Logf(InfoLevel, message, args...)
+}
+
+func Warn(message ...interface{}) {
+	Log(WarnLevel, message...)
+}
+
+func Warnf(message string, args ...interface{}) {
+	Logf(WarnLevel, message, args...)
 }
 
 func Debug(args ...interface{}) {

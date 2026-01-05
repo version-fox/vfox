@@ -80,9 +80,9 @@ func outputJSON() error {
 	manager := internal.NewSdkManager()
 	defer manager.Close()
 	tvs, err := toolset.NewMultiToolVersions([]string{
-		manager.PathMeta.WorkingDirectory,
-		manager.PathMeta.SessionLinkSdkPath,
-		manager.PathMeta.HomePath,
+		manager.PathMeta.Working.Directory,
+		manager.PathMeta.Working.SessionShim,
+		manager.PathMeta.User.Home,
 	})
 	if err != nil {
 		return err

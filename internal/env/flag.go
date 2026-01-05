@@ -26,6 +26,7 @@ const (
 	PluginFromEnv = "VFOX_PLUGIN"
 	CacheFromEnv  = "VFOX_CACHE"
 	TempFromEnv   = "VFOX_TEMP"
+	RootFromEnv   = "VFOX_ROOT" // New: Shared root environment variable
 
 	HookFlag = "__VFOX_SHELL"
 	PidFlag  = "__VFOX_PID"
@@ -38,22 +39,6 @@ const (
 
 func IsHookEnv() bool {
 	return os.Getenv(HookFlag) != ""
-}
-
-// IsIDEEnvironmentResolution detects if the current shell session was launched by an IDE
-// for the purpose of environment variable resolution. This is useful to avoid certain
-// shell initialization behaviors that might interfere with IDE environment detection.
-//
-// Supported IDEs:
-//   - Visual Studio Code: Detects via VSCODE_RESOLVING_ENVIRONMENT environment variable
-//     Reference: https://code.visualstudio.com/docs/configure/command-line#_how-do-i-detect-when-a-shell-was-launched-by-vs-code
-//   - JetBrains IDEs (IntelliJ IDEA, PyCharm, etc.): Detects via INTELLIJ_ENVIRONMENT_READER environment variable
-//     Reference: https://youtrack.jetbrains.com/articles/SUPPORT-A-1727/Shell-Environment-Loading
-//
-// Returns true if any of the supported IDE environment resolution indicators are present.
-func IsIDEEnvironmentResolution() bool {
-	return os.Getenv("VSCODE_RESOLVING_ENVIRONMENT") != "" ||
-		os.Getenv("INTELLIJ_ENVIRONMENT_READER") != ""
 }
 
 // IsMultiplexerEnvironment detects if the current shell session is running inside a multiplexer
@@ -93,4 +78,8 @@ func GetVfoxCache() string {
 
 func GetVfoxTemp() string {
 	return os.Getenv(TempFromEnv)
+}
+
+func GetVfoxRoot() string {
+	return os.Getenv(RootFromEnv)
 }

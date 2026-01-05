@@ -72,7 +72,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	// which shell we are using.
 	_ = os.Setenv(env.HookFlag, name)
 	// TODO：deprecated
-	_ = os.Setenv(internal.HookCurTmpPath, manager.PathMeta.SessionLinkSdkPath)
+	_ = os.Setenv(internal.HookCurTmpPath, manager.PathMeta.Working.SessionShim)
 
 	envs := sdkEnvs.ToEnvs()
 
@@ -88,7 +88,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	logger.Debugf("export envs: %+v", exportEnvs)
 
-	path := manager.PathMeta.ExecutablePath
+	path := manager.PathMeta.Executable
 	path = strings.Replace(path, "\\", "/", -1)
 	s := shell.NewShell(name)
 	if s == nil {
