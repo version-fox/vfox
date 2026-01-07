@@ -47,7 +47,10 @@ var Add = &cli.Command{
 func addCmd(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 
 	// multiple plugins

@@ -19,17 +19,25 @@ package env
 // Vars is a map of environment variables
 type Vars map[string]*string
 
+func (v Vars) Merge(vars Vars) {
+	if vars == nil {
+		return
+	}
+	for key, value := range vars {
+		v[key] = value
+	}
+}
+
 // Envs is a struct that contains environment variables and PATH.
 type Envs struct {
 	Variables Vars
-	BinPaths  *Paths
 	Paths     *Paths
 }
 
-func (e *Envs) MergePaths(envs *Envs) {
+func (e *Envs) Merge(envs *Envs) {
 	if envs == nil {
 		return
 	}
-	e.BinPaths.Merge(envs.BinPaths)
 	e.Paths.Merge(envs.Paths)
+	e.Variables.Merge(envs.Variables)
 }

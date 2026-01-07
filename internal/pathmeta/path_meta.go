@@ -1,4 +1,5 @@
 /*
+ *
  *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +13,18 @@
  *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
+ *
  */
 
-package internal
+package pathmeta
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 type UserPaths struct {
@@ -68,27 +69,15 @@ const (
 	ReadWriteAuth = 0700 // can write and read
 )
 
-func newTempPath() string {
-	pid := env.GetPid()
+func newTempPath(pid int) string {
 	timestamp := util.GetBeginOfToday()
 	name := fmt.Sprintf("%d-%d", timestamp, pid)
 	return name
 }
 
-func newPathMeta() (*PathMeta, error) {
-	userHomeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("get user home dir error: %w", err)
-	}
-
-	userHome := getVfoxUserHomeDir(userHomeDir)
-
-	// Get shared root (by priority)
-	sharedRoot := env.GetVfoxRoot()
-	if sharedRoot == "" {
-		// use UserHome as sharedRoot if not set VFOX_ROOT
-		sharedRoot = userHome
-	}
+// NewPathMeta creates a new PathMeta instance based on the provided parameters and environment variables.
+// If not provide sharedRoot, it will use userHome as sharedRoot.
+func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, error) {
 
 	meta := &PathMeta{
 		User: UserPaths{
@@ -104,9 +93,9 @@ func newPathMeta() (*PathMeta, error) {
 			Config:   filepath.Join(sharedRoot, configFilePrefix),
 		},
 		Working: WorkingPaths{
-			Directory:   getWorkingDirectory(),
+			Directory:   currentDir,
 			ProjectShim: filepath.Join(vfoxDirPrefix, shimDirPrefix),
-			SessionShim: generateSessionShimPath(filepath.Join(userHome, tmpDirPrefix)),
+			SessionShim: generateSessionShimPath(filepath.Join(userHome, tmpDirPrefix), pid),
 			GlobalShim:  filepath.Join(userHome, shimDirPrefix),
 		},
 		Executable: getExecutablePath(),
@@ -122,27 +111,15 @@ func newPathMeta() (*PathMeta, error) {
 	return meta, nil
 }
 
-func getVfoxUserHomeDir(UserHome string) string {
-	vfoxHomeDir := env.GetVfoxHome()
-	if len(vfoxHomeDir) != 0 {
-		return vfoxHomeDir
-	}
+func GetVfoxUserHomeDir(UserHome string) string {
+
 	return filepath.Join(UserHome, vfoxDirPrefix)
 }
 
-func getWorkingDirectory() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		logger.Errorf("get current working directory failed: %v", err)
-		return ""
-	}
-	return wd
-}
-
-func generateSessionShimPath(userTemp string) string {
+func generateSessionShimPath(userTemp string, pid int) string {
 	curTmpPath := os.Getenv(HookCurTmpPath)
 	if curTmpPath == "" {
-		name := newTempPath()
+		name := newTempPath(pid)
 		curTmpPath = filepath.Join(userTemp, name)
 	}
 	if !util.FileExists(curTmpPath) {

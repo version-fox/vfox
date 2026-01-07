@@ -22,8 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // Clear removes the generated shim.

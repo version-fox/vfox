@@ -21,7 +21,7 @@ import (
 	"strings"
 )
 
-// computeUserAgent constructs a user agent string for the vfox runtime and plugin.
+// ComputeUserAgent constructs a user agent string for the vfox runtime and plugin.
 //
 // Parameters:
 //   - runtimeVersion: the version of the vfox runtime (may be empty).
@@ -32,7 +32,7 @@ import (
 //
 //	A user agent string in the format "vfox/<runtimeVersion> vfox-<pluginName>/<pluginVersion>",
 //	omitting version information if not provided, and trimming extra spaces.
-func computeUserAgent(runtimeVersion, pluginName, pluginVersion string) string {
+func ComputeUserAgent(runtimeVersion, pluginName, pluginVersion string) string {
 	components := make([]string, 0, 2)
 	if runtimeVersion != "" {
 		components = append(components, fmt.Sprintf("vfox/%s", runtimeVersion))

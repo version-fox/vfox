@@ -1,24 +1,40 @@
-package luai
+/*
+ *
+ *    Copyright 2026 Han Li and contributors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ *
+ */
+
+package plugin
 
 import (
 	"errors"
 	"fmt"
 	"path/filepath"
 
-	"github.com/version-fox/vfox/internal/base"
-	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin/luai"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	"github.com/version-fox/vfox/internal/plugin/luai/module"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/util"
 	lua "github.com/yuin/gopher-lua"
 )
 
 type LuaPlugin struct {
-	vm        *LuaVM
+	vm        *luai.LuaVM
 	pluginObj *lua.LTable
-
-	*base.PluginInfo
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
@@ -29,7 +45,7 @@ func (l *LuaPlugin) Close() {
 	l.vm.Close()
 }
 
-func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHookResultItem, error) {
+func (l *LuaPlugin) Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -40,10 +56,10 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, base.ErrNoResultProvide
+		return nil, ErrNoResultProvide
 	}
 
-	var hookResult []*base.AvailableHookResultItem
+	var hookResult []*AvailableHookResultItem
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -51,7 +67,7 @@ func (l *LuaPlugin) Available(ctx *base.AvailableHookCtx) ([]*base.AvailableHook
 
 	return hookResult, nil
 }
-func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHookResult, error) {
+func (l *LuaPlugin) PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -62,9 +78,9 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, base.ErrNoResultProvide
+		return nil, ErrNoResultProvide
 	}
-	hookResult := base.PreInstallHookResult{}
+	hookResult := PreInstallHookResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -72,7 +88,7 @@ func (l *LuaPlugin) PreInstall(ctx *base.PreInstallHookCtx) (*base.PreInstallHoo
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResultItem, error) {
+func (l *LuaPlugin) EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -83,10 +99,10 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
-		return nil, base.ErrNoResultProvide
+		return nil, ErrNoResultProvide
 	}
 
-	var hookResult []*base.EnvKeysHookResultItem
+	var hookResult []*EnvKeysHookResultItem
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -94,7 +110,7 @@ func (l *LuaPlugin) EnvKeys(ctx *base.EnvKeysHookCtx) ([]*base.EnvKeysHookResult
 	return hookResult, nil
 }
 
-func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, error) {
+func (l *LuaPlugin) PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -105,9 +121,9 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, base.ErrNoResultProvide
+		return nil, ErrNoResultProvide
 	}
-	hookResult := base.PreUseHookResult{}
+	hookResult := PreUseHookResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -115,7 +131,7 @@ func (l *LuaPlugin) PreUse(ctx *base.PreUseHookCtx) (*base.PreUseHookResult, err
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
+func (l *LuaPlugin) PreUninstall(ctx *PreUninstallHookCtx) error {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -125,7 +141,7 @@ func (l *LuaPlugin) PreUninstall(ctx *base.PreUninstallHookCtx) error {
 	return err
 }
 
-func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
+func (l *LuaPlugin) PostInstall(ctx *PostInstallHookCtx) error {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -135,7 +151,7 @@ func (l *LuaPlugin) PostInstall(ctx *base.PostInstallHookCtx) error {
 	return err
 }
 
-func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.ParseLegacyFileResult, error) {
+func (l *LuaPlugin) ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
 	if err != nil {
@@ -146,9 +162,9 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *base.ParseLegacyFileHookCtx) (*base.Par
 		return nil, err
 	}
 	if table == nil || table.Type() == lua.LTNil {
-		return nil, base.ErrNoResultProvide
+		return nil, ErrNoResultProvide
 	}
-	hookResult := base.ParseLegacyFileResult{}
+	hookResult := ParseLegacyFileResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
@@ -164,12 +180,12 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTab
 	return table, err
 }
 
-func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion string) (*LuaPlugin, error) {
-	vm := NewLuaVM()
+func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaPlugin, *Metadata, error) {
+	vm := luai.NewLuaVM()
 	if err := vm.Prepare(&module.PreloadOptions{
-		Config: config,
+		Config: envCtx.UserConfig,
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	mainPath := filepath.Join(pluginDirPath, "main.lua")
@@ -177,7 +193,7 @@ func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion
 	if util.FileExists(mainPath) {
 		vm.LimitPackagePath(filepath.Join(pluginDirPath, "?.lua"))
 		if err := vm.Instance.DoFile(mainPath); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		// Limit package search scope, hooks directory search priority is higher than lib directory
@@ -188,65 +204,64 @@ func CreateLuaPlugin(pluginDirPath string, config *config.Config, runtimeVersion
 		// load metadata file
 		metadataPath := filepath.Join(pluginDirPath, "metadata.lua")
 		if !util.FileExists(metadataPath) {
-			return nil, fmt.Errorf("plugin invalid, metadata file not found")
+			return nil, nil, fmt.Errorf("plugin invalid, metadata file not found")
 		}
 
 		if err := vm.Instance.DoFile(metadataPath); err != nil {
-			return nil, fmt.Errorf("failed to load metadata file, %w", err)
+			return nil, nil, fmt.Errorf("failed to load metadata file, %w", err)
 		}
 
 		// load hook func files
-		for _, hf := range base.HookFuncMap {
+		for _, hf := range HookFuncMap {
 			hp := filepath.Join(pluginDirPath, "hooks", hf.Filename+".lua")
 
 			if !hf.Required && !util.FileExists(hp) {
 				continue
 			}
 			if err := vm.Instance.DoFile(hp); err != nil {
-				return nil, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
+				return nil, nil, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
 			}
 		}
 	}
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(base.OsType, lua.LString(util.GetOSType()))
-	vm.Instance.SetGlobal(base.ArchType, lua.LString(util.GetArchType()))
+	vm.Instance.SetGlobal(luai.OsType, lua.LString(util.GetOSType()))
+	vm.Instance.SetGlobal(luai.ArchType, lua.LString(util.GetArchType()))
 
-	r, err := codec.Marshal(vm.Instance, base.RuntimeInfo{
+	r, err := codec.Marshal(vm.Instance, RuntimeInfo{
 		OsType:        string(util.GetOSType()),
 		ArchType:      string(util.GetArchType()),
-		Version:       runtimeVersion,
+		Version:       envCtx.RuntimeVersion,
 		PluginDirPath: pluginDirPath,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	vm.Instance.SetGlobal(base.Runtime, r)
-	pluginObj := vm.Instance.GetGlobal(base.PluginObjKey)
+	vm.Instance.SetGlobal(luai.Runtime, r)
+	pluginObj := vm.Instance.GetGlobal(luai.PluginObjKey)
 	if pluginObj.Type() == lua.LTNil {
-		return nil, fmt.Errorf("plugin object not found")
+		return nil, nil, fmt.Errorf("plugin object not found")
 	}
 	PLUGIN := pluginObj.(*lua.LTable)
-	pluginInfo := &base.PluginInfo{}
+	pluginInfo := &Metadata{}
 	if err = codec.Unmarshal(PLUGIN, pluginInfo); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	navigator, err := codec.Marshal(vm.Instance, base.Navigator{
-		UserAgent: computeUserAgent(runtimeVersion, pluginInfo.Name, pluginInfo.Version),
+	navigator, err := codec.Marshal(vm.Instance, codec.Navigator{
+		UserAgent: luai.ComputeUserAgent(envCtx.RuntimeVersion, pluginInfo.Name, pluginInfo.Version),
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	vm.Instance.SetGlobal(base.NavigatorObjKey, navigator)
+	vm.Instance.SetGlobal(codec.NavigatorObjKey, navigator)
 
 	source := &LuaPlugin{
-		vm:         vm,
-		pluginObj:  PLUGIN,
-		PluginInfo: pluginInfo,
+		vm:        vm,
+		pluginObj: PLUGIN,
 	}
 
-	return source, nil
+	return source, pluginInfo, nil
 }

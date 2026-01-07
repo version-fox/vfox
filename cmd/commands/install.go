@@ -26,10 +26,10 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/toolset"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 var Install = &cli.Command{
@@ -64,7 +64,10 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		return cli.Exit("sdk name is required", 1)
 	}
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return nil
+	}
 	defer manager.Close()
 
 	errorStore := util.NewErrorStore()
@@ -78,23 +81,24 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
 			var name string
-			var version base.Version
+			var version sdk.Version
 			if argsLen == 2 {
 				name = strings.ToLower(argArr[0])
-				version = base.Version(argArr[1])
+				version = sdk.Version(argArr[1])
 			} else {
 				name = strings.ToLower(argArr[0])
 				version = ""
 			}
 
-			sdk, err := manager.LookupSdkWithInstall(name, yes)
+			sdkSource, err := manager.LookupSdkWithInstall(name, yes)
 
 			if err != nil {
 				errorStore.AddAndShow(name, err)
 				continue
 			}
+			sdkMetadata := sdkSource.Metadata()
 
-			var resolvedVersion = manager.ResolveVersion(sdk.Name, version)
+			var resolvedVersion = manager.ResolveVersion(sdkMetadata.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
 				if util.IsNonInteractiveTerminal() {
@@ -109,7 +113,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				if err = sdk.Install(resolvedVersion); err != nil {
+				if err = sdkSource.Install(resolvedVersion); err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}
@@ -129,7 +133,10 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 func installAll(autoConfirm bool) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return nil
+	}
 	defer manager.Close()
 
 	plugins, sdks, err := notInstalled(manager)
@@ -189,17 +196,17 @@ func installAll(autoConfirm bool) error {
 		}
 		pluginsResult[plugin] = true
 	}
-	for sdk, version := range sdks {
+	for sdkName, version := range sdks {
 		index++
-		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s@%s installing...\033[K", index, count, "SDK", sdk, version))
-		sdkVersion := fmt.Sprintf("%s@%s", sdk, version)
+		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s@%s installing...\033[K", index, count, "SDK", sdkName, version))
+		sdkVersion := fmt.Sprintf("%s@%s", sdkName, version)
 		sdksResult[sdkVersion] = false
-		lookupSdk, err := manager.LookupSdk(sdk)
+		lookupSdk, err := manager.LookupSdk(sdkName)
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
 		}
-		err = lookupSdk.Install(base.Version(version))
+		err = lookupSdk.Install(sdk.Version(version))
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
@@ -223,10 +230,11 @@ func installAll(autoConfirm bool) error {
 }
 
 func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]string, err error) {
-	tvs, err := toolset.NewMultiToolVersions([]string{
-		manager.PathMeta.Working.Directory,
-		manager.PathMeta.Working.SessionShim,
-		manager.PathMeta.User.Home,
+	envContext := manager.RuntimeEnvContext
+	tvs, err := pathmeta.NewMultiToolVersions([]string{
+		envContext.PathMeta.Working.Directory,
+		envContext.PathMeta.Working.SessionShim,
+		envContext.PathMeta.User.Home,
 	})
 	if err != nil {
 		return
@@ -237,7 +245,7 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 			plugins = append(plugins, name)
 			return true
 		}
-		if !lookupSdk.CheckExists(base.Version(version)) {
+		if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
 			return true
 		}
 		return false

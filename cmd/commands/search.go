@@ -25,9 +25,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
-	"github.com/version-fox/vfox/internal/printer"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/printer"
+	"github.com/version-fox/vfox/internal/shared/util"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -39,7 +39,10 @@ var Search = &cli.Command{
 }
 
 func RunSearch(sdkName string, availableArgs []string) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	source, err := manager.LookupSdkWithInstall(sdkName, false)
 	if err != nil {
@@ -56,10 +59,10 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	var options []*printer.KV
 	for _, p := range result {
 		var value string
-		if p.Main.Note != "" {
-			value = fmt.Sprintf("v%s (%s)", p.Main.Version, p.Main.Note)
+		if p.Note != "" {
+			value = fmt.Sprintf("v%s (%s)", p.Version, p.Note)
 		} else {
-			value = fmt.Sprintf("v%s", p.Main.Version)
+			value = fmt.Sprintf("v%s", p.Version)
 		}
 		if len(p.Additions) != 0 {
 			var additional []string
@@ -69,13 +72,13 @@ func RunSearch(sdkName string, availableArgs []string) error {
 			value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
 		}
 		options = append(options, &printer.KV{
-			Key:   string(p.Main.Version),
+			Key:   string(p.Version),
 			Value: value,
 		})
 	}
 
 	installedVersions := util.NewSet[string]()
-	for _, version := range source.List() {
+	for _, version := range source.InstalledList() {
 		installedVersions.Add(string(version))
 	}
 
@@ -120,7 +123,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	if version == nil {
 		return nil
 	}
-	return source.Install(base.Version(version.Key))
+	return source.Install(sdk.Version(version.Key))
 }
 
 func searchCmd(ctx context.Context, cmd *cli.Command) error {

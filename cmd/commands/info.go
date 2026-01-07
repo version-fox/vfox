@@ -26,7 +26,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Info = &cli.Command{
@@ -45,7 +45,10 @@ var Info = &cli.Command{
 }
 
 func infoCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	args := cmd.Args().First()
 	if args == "" {
@@ -57,11 +60,11 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 		argArr := strings.Split(args, "@")
 		if len(argArr) == 2 {
 			name := strings.ToLower(argArr[0])
-			version := base.Version(argArr[1])
+			version := sdk.Version(argArr[1])
 
 			// Check for empty SDK name or version
 			if name != "" && string(version) != "" {
-				sdk, err := manager.LookupSdk(name)
+				sdkSource, err := manager.LookupSdk(name)
 				if err != nil {
 					if cmd.IsSet("format") {
 						// For template output, we still need to output something
@@ -79,10 +82,11 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 					fmt.Println("notfound")
 					return nil
 				}
-
 				path := ""
-				if sdk.CheckExists(version) {
-					path = filepath.Join(sdk.VersionPath(version), fmt.Sprintf("%s-%s", name, version))
+				runtimePackage, err := sdkSource.GetRuntimePackage(version)
+				if err == nil {
+					// TODO check
+					path = filepath.Join(runtimePackage.PackagePath)
 				} else {
 					path = "notfound"
 				}
@@ -113,7 +117,7 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", args, err)
 	}
-	source := s.Plugin
+	source := s.Metadata()
 
 	// If format flag is set, prepare data for template
 	if cmd.IsSet("format") {
@@ -124,22 +128,22 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 			InstallPath string
 			Description string
 		}{
-			Name:        source.Name,
-			Version:     source.Version,
-			Homepage:    source.Homepage,
-			InstallPath: s.InstallPath,
-			Description: source.Description,
+			Name:        source.PluginMetadata.Name,
+			Version:     source.PluginMetadata.Version,
+			Homepage:    source.PluginMetadata.Homepage,
+			InstallPath: source.SdkInstalledPath,
+			Description: source.PluginMetadata.Description,
 		}
 		return executeTemplate(cmd, data)
 	}
 
 	pterm.Println("Plugin Info:")
-	pterm.Println("Name    ", "->", pterm.LightBlue(source.Name))
-	pterm.Println("Version ", "->", pterm.LightBlue(source.Version))
-	pterm.Println("Homepage", "->", pterm.LightBlue(source.Homepage))
+	pterm.Println("Name    ", "->", pterm.LightBlue(source.PluginMetadata.Name))
+	pterm.Println("Version ", "->", pterm.LightBlue(source.PluginMetadata.Version))
+	pterm.Println("Homepage", "->", pterm.LightBlue(source.PluginMetadata.Homepage))
 	pterm.Println("Desc    ", "->")
-	pterm.Println(pterm.LightBlue(source.Description))
-	source.ShowNotes()
+	pterm.Println(pterm.LightBlue(source.PluginMetadata.Description))
+	source.PluginMetadata.ShowNotes()
 	return nil
 }
 

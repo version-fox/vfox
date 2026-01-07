@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 
 	"github.com/schollz/progressbar/v3"
-	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	lua "github.com/yuin/gopher-lua"
@@ -271,9 +270,9 @@ func createModule(proxy *config.Proxy) lua.LGFunction {
 
 func (m *Module) ensureUserAgent(L *lua.LState, req *http.Request) {
 	if req.Header.Get("User-Agent") == "" {
-		navigatorValue := L.GetGlobal(base.NavigatorObjKey)
+		navigatorValue := L.GetGlobal(codec.NavigatorObjKey)
 		if navigatorValue != lua.LNil {
-			var navigator base.Navigator
+			var navigator codec.Navigator
 			err := codec.Unmarshal(navigatorValue, &navigator)
 			if err == nil {
 				req.Header.Set("User-Agent", navigator.UserAgent)

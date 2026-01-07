@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/shared/cache"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
@@ -34,9 +35,13 @@ var Config = &cli.Command{
 }
 
 func configCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
-	conf := reflect.ValueOf(manager.Config)
+	runtimeEnvContext := manager.RuntimeEnvContext
+	conf := reflect.ValueOf(runtimeEnvContext.UserConfig)
 
 	if cmd.Bool("list") {
 		configList("", conf)
@@ -60,11 +65,11 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 	if unset {
 		value = defaultConfig(keys)
 	}
-	err := configSet(conf, keys, value)
+	err = configSet(conf, keys, value)
 	if err != nil {
 		return err
 	}
-	return manager.Config.SaveConfig(manager.PathMeta.User.Home)
+	return runtimeEnvContext.UserConfig.SaveConfig(runtimeEnvContext.PathMeta.User.Home)
 }
 
 func configList(prefix string, v reflect.Value) {
@@ -128,7 +133,7 @@ func configSet(v reflect.Value, keys []string, value any) error {
 					v.Field(i).SetBool(parseBool)
 				case reflect.Int64:
 					value := fmt.Sprintf("%v", value)
-					if v.Field(i).Type() == reflect.TypeOf(config.CacheDuration(0)) {
+					if v.Field(i).Type() == reflect.TypeOf(cache.Duration(0)) {
 						if value == "-1" {
 							v.Field(i).SetInt(-1)
 						} else {

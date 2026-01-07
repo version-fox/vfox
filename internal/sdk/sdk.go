@@ -1,0 +1,950 @@
+/*
+ *    Copyright 2026 Han Li and contributors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package sdk
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"sort"
+	"strings"
+	"syscall"
+
+	"github.com/pterm/pterm"
+	"github.com/schollz/progressbar/v3"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/plugin"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/shim"
+	"github.com/version-fox/vfox/internal/shared/util"
+)
+
+const (
+	packageInstalledPrefix = "v-"   // Prefix of path for installed SDK packages
+	additionRuntimePrefix  = "add-" // Prefix of path for additional runtime packages
+)
+
+// Sdk interface defines the methods for managing software development kits (SDKs).
+type Sdk interface {
+	Install(version Version) error                               // Install a specific runtime of the SDK
+	Uninstall(version Version) error                             // Uninstall a specific runtime of the SDK
+	Available(args []string) ([]*AvailableRuntimePackage, error) // List available runtime of the SDK
+	EnvKeys(version Version) (*env.Envs, error)                  // Get environment variables for a specific runtime of the SDK
+	Use(version Version, scope env.UseScope) error               // Use a specific runtime in a given scope
+	Unuse(scope env.UseScope) error                              // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error)  // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                      // Check if a specific runtime version is installed
+	InstalledList() []Version
+	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
+	Current() Version
+	Metadata() *Metadata // Get the metadata of the SDK
+	Close()
+}
+
+// impl represents a software development kit managed by the SDK manager.
+type impl struct {
+	// TODO: check this name what is it
+	Name        string                 // Name of the SDK
+	envContext  *env.RuntimeEnvContext // Environment context
+	plugin      *plugin.Wrapper        // Plugin wrapper
+	InstallPath string                 // Installation path of the SDK
+}
+
+func (b *impl) Metadata() *Metadata {
+	return &Metadata{
+		Name:                b.Name,
+		PluginMetadata:      b.plugin.Metadata,
+		SdkInstalledPath:    b.InstallPath,
+		PluginInstalledPath: b.plugin.InstalledPath,
+	}
+}
+
+func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
+	ctx := &plugin.AvailableHookCtx{
+		Args: args,
+	}
+	available, err := b.plugin.Available(ctx)
+	if b.plugin.IsNoResultProvided(err) {
+		return nil, fmt.Errorf("no available version provided")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("plugin [Available] method error: %w", err)
+	}
+	return convertAvailableHookResultItem2AvailableRuntimePackage(b.Name, available), nil
+}
+
+// Install installs a specific version of the SDK.
+// For main runtime, it will be installed to {InstallPath}/v-{main_version}/{main_name}-{main_version}
+// For additional runtimes, it will be installed to {InstallPath}/v-{main_version}/add-{addition_name}-{addition_version}
+func (b *impl) Install(version Version) error {
+	label := b.Label(version)
+	if b.CheckRuntimeExist(version) {
+		fmt.Printf("%s is already installed\n", label)
+		return nil
+	}
+
+	ctx := &plugin.PreInstallHookCtx{
+		Version: string(version),
+	}
+	installInfo, err := b.plugin.PreInstall(ctx)
+	if b.plugin.IsNoResultProvided(err) {
+		return fmt.Errorf("no installable runtime provided")
+	}
+	if err != nil {
+		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
+	}
+	if installInfo == nil {
+		return fmt.Errorf("no information about the current version")
+	}
+
+	mainSdk := installInfo.PreInstallPackageItem
+	mainSdk.Name = b.plugin.Name
+
+	sdkVersion := Version(mainSdk.Version)
+	// A second check is required because the plug-in may change the version number,
+	// for example, latest is resolved to a specific version number.
+	label = b.Label(sdkVersion)
+	if b.CheckRuntimeExist(sdkVersion) {
+		fmt.Printf("%s is already installed\n", label)
+		return nil
+	}
+	success := false
+	newDirPath := b.packagePath(sdkVersion)
+
+	sigs := make(chan os.Signal, 1)
+
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		_ = <-sigs
+		if !success {
+			_ = os.RemoveAll(newDirPath)
+		}
+		os.Exit(0)
+	}()
+
+	// Delete directory after failed installation
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(newDirPath)
+		}
+	}()
+	installedPackage := make(map[string]*plugin.InstalledPackageItem)
+
+	path, err := b.preInstallSdk(mainSdk, filepath.Join(newDirPath, b.runtimePathDirName(true, mainSdk)))
+
+	if err != nil {
+		return err
+	}
+	installedPackage[mainSdk.Name] = &plugin.InstalledPackageItem{
+		Name:    mainSdk.Name,
+		Version: mainSdk.Version,
+		Path:    path,
+	}
+	if len(installInfo.Addition) > 0 {
+		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Addition))
+		for _, oSdk := range installInfo.Addition {
+			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, b.runtimePathDirName(false, oSdk)))
+			if err != nil {
+				return err
+			}
+			installedPackage[oSdk.Name] = &plugin.InstalledPackageItem{
+				Name:    oSdk.Name,
+				Version: oSdk.Version,
+				Path:    path,
+			}
+		}
+	}
+	postCtx := &plugin.PostInstallHookCtx{
+		RootPath: newDirPath,
+		SdkInfo:  installedPackage,
+	}
+	if b.plugin.HasFunction("PostInstall") {
+		logger.Debugf("Running post-installation steps...\n")
+		err = b.plugin.PostInstall(postCtx)
+		if err != nil {
+			return fmt.Errorf("plugin [PostInstall] method error: %w", err)
+		}
+	}
+	success = true
+	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
+	useCommand := fmt.Sprintf("vfox use %s", label)
+	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
+
+	// Copy command to clipboard in TTY mode
+	if util.IsTTY() {
+		if err := util.CopyToClipboard(useCommand); err == nil {
+			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
+		}
+		// Silently ignore clipboard errors (not supported, utility not found, etc.)
+	}
+
+	return nil
+}
+
+func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath string) error {
+	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
+	if err := util.MoveFiles(info.Path, targetPath); err != nil {
+		return fmt.Errorf("failed to move file, err:%w", err)
+	}
+	return nil
+}
+
+func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath string) error {
+	u, err := url.Parse(info.Path)
+	label := info.Label()
+	if err != nil {
+		return err
+	}
+	filePath, err := b.Download(u, info.Headers)
+	if err != nil {
+		return fmt.Errorf("failed to download %s file, err:%w", label, err)
+	}
+	defer func() {
+		// del cache file
+		_ = os.Remove(filePath)
+	}()
+	checksum := info.Checksum()
+	pterm.Printf("Verifying checksum %s...\n", checksum.Value)
+	verify := checksum.Verify(filePath)
+	if !verify {
+		fmt.Printf("Checksum error, file: %s\n", filePath)
+		return errors.New("checksum error")
+	}
+	decompressor := util.NewDecompressor(filePath)
+	if decompressor == nil {
+		// If it is not a compressed file, move file to the corresponding sdk directory,
+		// and the rest be handled by the PostInstall function.
+		if err = util.MoveFiles(filePath, targetPath); err != nil {
+			return fmt.Errorf("failed to move file, err:%w", err)
+		}
+		return nil
+	}
+	pterm.Printf("Unpacking %s...\n", filePath)
+	err = decompressor.Decompress(targetPath)
+	if err != nil {
+		return fmt.Errorf("unpack failed, err:%w", err)
+	}
+	return nil
+}
+
+func (b *impl) runtimePathDirName(isMain bool, info *plugin.PreInstallPackageItem) string {
+	var name string
+	if isMain {
+		if info.Version == "" {
+			// {name}
+			name = info.Name
+		} else {
+			// {name}-{version}
+			name = info.Name + "-" + info.Version
+		}
+	} else {
+		if info.Version == "" {
+			// add-{name}
+			name = additionRuntimePrefix + info.Name
+		} else {
+			// add-{name}-{version}
+			name = additionRuntimePrefix + info.Name + "-" + info.Version
+		}
+	}
+	return name
+}
+
+func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string) (string, error) {
+	pterm.Printf("Preinstalling %s...\n", info.Name+"@"+info.Version)
+
+	path := sdkDestPath
+	if !util.FileExists(path) {
+		if err := os.MkdirAll(path, pathmeta.ReadWriteAuth); err != nil {
+			return "", fmt.Errorf("failed to create directory, err:%w", err)
+		}
+	}
+	if info.Path == "" {
+		return path, nil
+	}
+	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
+		if err := b.moveRemoteFile(info, path); err != nil {
+			return "", err
+		}
+		return path, nil
+	} else {
+		if err := b.moveLocalFile(info, path); err != nil {
+			return "", err
+		}
+		return path, nil
+	}
+}
+
+func (b *impl) Uninstall(version Version) (err error) {
+	label := b.Label(version)
+	if !b.CheckRuntimeExist(version) {
+		return fmt.Errorf("%s is not installed", pterm.Red(label))
+	}
+	path := b.packagePath(version)
+	sdkPackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return
+	}
+	if b.plugin.HasFunction("PreUninstall") {
+		// Give the plugin a chance before actually uninstalling targeted version.
+		main := convertRuntime2InstalledPackageItem(sdkPackage.Runtime)
+		sdkInfo := map[string]*plugin.InstalledPackageItem{}
+		for _, addition := range sdkPackage.Additions {
+			sdkInfo[addition.Name] = convertRuntime2InstalledPackageItem(addition)
+		}
+		sdkInfo[main.Name] = main
+		preUninstallCtx := &plugin.PreUninstallHookCtx{
+			Main:    main,
+			SdkInfo: sdkInfo,
+		}
+		err = b.plugin.PreUninstall(preUninstallCtx)
+		if err != nil {
+			return
+		}
+	}
+
+	// If the version to be uninstalled is currently in use, unuse it first.
+	if b.Current() == version {
+		if err = b.Unuse(env.Global); err != nil {
+			return err
+		}
+	}
+
+	err = os.RemoveAll(path)
+	if err != nil {
+		return
+	}
+	pterm.Printf("Uninstalled %s successfully!\n", label)
+	return
+}
+
+// EnvKeys Only return the really installed path of this SDK
+func (b *impl) EnvKeys(version Version) (*env.Envs, error) {
+	label := b.Label(version)
+	if !b.CheckRuntimeExist(version) {
+		return nil, fmt.Errorf("%s is not installed", label)
+	}
+
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return nil, err
+	}
+	sdkInfos := make(map[string]*plugin.InstalledPackageItem)
+	mainSdk := convertRuntime2InstalledPackageItem(runtimePackage.Runtime)
+	sdkInfos[mainSdk.Name] = mainSdk
+
+	for _, addition := range runtimePackage.Additions {
+		sdkInfos[addition.Name] = convertRuntime2InstalledPackageItem(addition)
+	}
+
+	envKeysCtx := &plugin.EnvKeysHookCtx{
+		Main:    mainSdk,
+		SdkInfo: sdkInfos,
+		Path:    runtimePackage.Path,
+	}
+	envKeysHookResultItems, err := b.plugin.EnvKeys(envKeysCtx)
+	if b.plugin.IsNoResultProvided(err) {
+		return nil, fmt.Errorf("no environment variables provided")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("plugin [EnvKeys] error: err:%w", err)
+	}
+
+	envKeys := &env.Envs{
+		Variables: make(env.Vars),
+		Paths:     env.NewPaths(env.EmptyPaths),
+	}
+	for _, item := range envKeysHookResultItems {
+		if item.Key == "PATH" {
+			envKeys.Paths.Add(item.Value)
+		} else {
+			envKeys.Variables[item.Key] = &item.Value
+		}
+	}
+	logger.Debugf("EnvKeysHookResult: %+v \n", envKeys)
+	return envKeys, nil
+}
+
+func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
+	if !b.plugin.HasFunction("PreUse") {
+		logger.Debug("plugin does not have PreUse function")
+		return "", nil
+	}
+	installedSdks, err := b.getAllRuntimes()
+	sdks := make(map[string]*plugin.InstalledPackageItem)
+
+	for _, sdk := range installedSdks {
+		sdks[sdk.Runtime.Name] = &plugin.InstalledPackageItem{
+			Name:    sdk.Runtime.Name,
+			Version: string(sdk.Runtime.Version),
+			Path:    sdk.PackagePath,
+		}
+	}
+	preUseCtx := &plugin.PreUseHookCtx{
+		Cwd:             b.envContext.PathMeta.Working.Directory,
+		PreviousVersion: string(b.Current()),
+		Scope:           scope.String(),
+		Version:         string(version),
+		InstalledSdks:   sdks,
+	}
+	preUseResult, err := b.plugin.PreUse(preUseCtx)
+	if err != nil {
+		return "", fmt.Errorf("plugin [preUse] error: err:%w", err)
+	}
+
+	newVersion := preUseResult.Version
+
+	// If the plugin does not return a version, it means that the plugin does
+	// not want to change the version or not implement the preUse function.
+	// We can simply fuzzy match the version based on the input version.
+	if newVersion == "" {
+		// Before fuzzy matching, perform exact matching first.
+		if b.CheckRuntimeExist(version) {
+			return version, nil
+		}
+		installedVersions := make(util.VersionSort, 0, len(installedSdks))
+		for _, sdk := range installedSdks {
+			installedVersions = append(installedVersions, string(sdk.Runtime.Version))
+		}
+		sort.Sort(installedVersions)
+		version := string(version)
+		prefix := version + "."
+		for _, v := range installedVersions {
+			if version == v {
+				newVersion = v
+				break
+			}
+			if strings.HasPrefix(v, prefix) {
+				newVersion = v
+				break
+			}
+		}
+	}
+	if newVersion == "" {
+		return version, nil
+	}
+
+	return Version(newVersion), nil
+}
+
+type VersionNotExistsError struct {
+	Label string
+}
+
+func (e *VersionNotExistsError) Error() string {
+	return fmt.Sprintf("%s is not installed", e.Label)
+}
+
+func (b *impl) Use(version Version, scope env.UseScope) error {
+	logger.Debugf("Use SDK version: %s, scope: %v\n", string(version), scope)
+
+	// TODO: move to before
+	// Verify hook environment is available
+	if !env.IsHookEnv() {
+		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
+	}
+
+	// Resolve version with preUse hook
+	resolvedVersion, err := b.preUse(version, scope)
+	if err != nil {
+		return err
+	}
+
+	// Verify version exists
+	label := b.Label(resolvedVersion)
+	if !b.CheckRuntimeExist(resolvedVersion) {
+		return &VersionNotExistsError{Label: label}
+	}
+
+	return b.useInHook(resolvedVersion, scope)
+}
+
+// LoadToolVersionByScope loads the tool version for the given scope,
+// and also tries to parse legacy version files for project scope.
+func (b *impl) LoadToolVersionByScope(scope env.UseScope) (*pathmeta.ToolVersion, error) {
+	toolVersions, err := b.envContext.LoadToolVersionByScope(scope)
+	if err != nil {
+		return nil, err
+	}
+
+	// Need to parse legacy file for project scope
+	if env.Project == scope {
+		version, err := b.ParseLegacyFile(b.envContext.CurrentWorkingDir)
+		if err != nil {
+			return nil, err
+		}
+		if version != "" {
+			toolVersions.Record[b.Name] = string(version)
+		}
+	}
+	return toolVersions, nil
+}
+
+func (b *impl) useInHook(version Version, scope env.UseScope) error {
+
+	// 特殊，需要判断是否存在目录，不存在在创建
+	if env.Project == scope {
+		if !util.FileExists(b.envContext.PathMeta.Working.Directory) {
+			err := os.MkdirAll(b.envContext.PathMeta.Working.Directory, pathmeta.ReadWriteAuth)
+			if err != nil {
+				return fmt.Errorf("failed to create .vfox directory: %w", err)
+			}
+		}
+	}
+
+	// Only read the content of .tool-versions file for the given scope
+	// Not parse legacy files here, because we only need to update the version record.
+	toolVersions, err := b.envContext.LoadToolVersionByScope(scope)
+	if err != nil {
+		return err
+	}
+
+	logger.Debugf("Load %v tool versions: %v\n", scope, toolVersions.Record)
+
+	// Update version record in all affected scopes
+	toolVersions.Record[b.Name] = string(version)
+	if err := toolVersions.Save(); err != nil {
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+
+	// Create symlinks for the specified scope
+	if err := b.createSymlinksForScope(version, scope); err != nil {
+		return fmt.Errorf("failed to create symlinks, err:%w", err)
+	}
+
+	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
+	return nil
+}
+
+func (b *impl) InstalledList() []Version {
+	if !util.FileExists(b.InstallPath) {
+		return make([]Version, 0)
+	}
+	var versions []Version
+	dir, err := os.ReadDir(b.InstallPath)
+	if err != nil {
+		return make([]Version, 0)
+	}
+	for _, d := range dir {
+		if d.IsDir() && strings.HasPrefix(d.Name(), "v-") {
+			versions = append(versions, Version(strings.TrimPrefix(d.Name(), "v-")))
+		}
+	}
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i] > versions[j]
+	})
+	return versions
+}
+
+// Current returns the current version of the SDK.
+// Lookup priority is: project > session > global
+func (b *impl) Current() Version {
+	toolVersion, err := pathmeta.NewMultiToolVersions([]string{
+		b.envContext.PathMeta.Working.Directory,
+		b.envContext.PathMeta.Working.SessionShim,
+		b.envContext.PathMeta.User.Home,
+	})
+	if err != nil {
+		logger.Debugf("Failed to load current tool versions: %v", err)
+		return ""
+	}
+	current := toolVersion.FilterTools(func(name, version string) bool {
+		return name == b.Name && b.CheckRuntimeExist(Version(version))
+	})
+	if len(current) == 0 {
+		return ""
+	}
+	return Version(current[b.Name])
+}
+
+// ParseLegacyFile tries to parse legacy version files to get the Runtime version.
+// It returns the first valid version found.
+func (b *impl) ParseLegacyFile(path string) (Version, error) {
+	legacyFilenames := b.plugin.Metadata.LegacyFilenames
+	if len(legacyFilenames) > 0 {
+		return "", nil
+	}
+	for _, filename := range legacyFilenames {
+		legacyFilePath := filepath.Join(path, filename)
+		if !util.FileExists(legacyFilePath) {
+			continue
+		}
+		logger.Debugf("Parsing legacy file %s \n", legacyFilePath)
+		ctx := &plugin.ParseLegacyFileHookCtx{
+			Filepath: legacyFilePath,
+			Filename: filename,
+			GetInstalledVersions: func() []string {
+				versions := b.InstalledList()
+				logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
+				convertVersions := make([]string, 0, len(versions))
+				for _, v := range versions {
+					convertVersions = append(convertVersions, string(v))
+				}
+				return convertVersions
+			},
+			Strategy: b.envContext.UserConfig.LegacyVersionFile.Strategy,
+		}
+
+		result, err := b.plugin.ParseLegacyFile(ctx)
+		if err != nil {
+			logger.Debugf("Parsing legacy file failed:%s , error:%v\n", legacyFilePath, err)
+			return "", err
+		}
+		if result.Version != "" {
+			return Version(result.Version), nil
+		}
+	}
+	return "", nil
+}
+
+func (b *impl) Close() {
+	b.plugin.Close()
+}
+
+// createSymlinksForScope creates symlinks in the appropriate SDK directory for the scope
+func (b *impl) createSymlinksForScope(version Version, scope env.UseScope) error {
+	// Get SDK binaries
+	envKeys, err := b.EnvKeys(version)
+	if err != nil {
+		return fmt.Errorf("failed to get env keys for %s, err:%w", b.Label(version), err)
+	}
+
+	binPaths, err := envKeys.Paths.ToBinPaths()
+	if err != nil {
+		return fmt.Errorf("failed to get bin paths, err:%w", err)
+	}
+
+	// Determine target SDK directory based on scope
+	var sdkDir string
+	switch scope {
+	case env.Global:
+		sdkDir = b.envContext.PathMeta.Working.GlobalShim
+	case env.Project:
+		sdkDir = b.envContext.PathMeta.Working.ProjectShim
+	case env.Session:
+		sdkDir = b.envContext.PathMeta.Working.SessionShim
+	}
+
+	// Whatever scope used, the session scope must be created symlinks.
+	if scope != env.Session {
+		_ = b.createBinSymlinks(binPaths, b.envContext.PathMeta.Working.SessionShim)
+	}
+	// Create symlinks for each binary
+	return b.createBinSymlinks(binPaths, sdkDir)
+
+}
+
+// removeSymlinksForScope removes symlinks for the specified scope and version
+func (b *impl) removeSymlinksForScope(version Version, scope env.UseScope) error {
+	// Get SDK binaries
+	envKeys, err := b.EnvKeys(version)
+	if err != nil {
+		return fmt.Errorf("failed to get env keys for %s, err:%w", b.Label(version), err)
+	}
+
+	binPaths, err := envKeys.Paths.ToBinPaths()
+	if err != nil {
+		return fmt.Errorf("failed to get bin paths, err:%w", err)
+	}
+
+	// Determine target SDK directory based on scope
+	var sdkDir string
+	switch scope {
+	case env.Global:
+		sdkDir = b.envContext.PathMeta.Working.GlobalShim
+	case env.Project:
+		sdkDir = b.envContext.PathMeta.Working.ProjectShim
+	case env.Session:
+		sdkDir = b.envContext.PathMeta.Working.SessionShim
+	}
+
+	// Remove symlinks for each binary
+	return b.removeBinSymlinks(binPaths, sdkDir)
+}
+
+// removeBinSymlinks removes symlinks for all binaries in the given paths
+func (b *impl) removeBinSymlinks(binPaths *env.Paths, targetDir string) error {
+	for _, binPath := range binPaths.Slice() {
+		binName := filepath.Base(binPath)
+		binShim := shim.NewShim(binPath, targetDir)
+		if err := binShim.Clear(); err != nil {
+			logger.Debugf("Failed to remove symlink for %s, err:%v\n", binName, err)
+			continue
+		}
+	}
+	return nil
+}
+
+// createBinSymlinks creates symlinks for all binaries in the given paths
+func (b *impl) createBinSymlinks(binPaths *env.Paths, targetDir string) error {
+	// Ensure target directory exists
+	if err := os.MkdirAll(targetDir, pathmeta.ReadWriteAuth); err != nil {
+		return fmt.Errorf("failed to create SDK directory %s, err:%w", targetDir, err)
+	}
+
+	for _, binPath := range binPaths.Slice() {
+		binName := filepath.Base(binPath)
+		binShim := shim.NewShim(binPath, targetDir)
+		if err := binShim.Generate(); err != nil {
+			logger.Debugf("Failed to create symlink for %s, err:%v\n", binName, err)
+			continue
+		}
+	}
+	return nil
+}
+
+func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
+	versionPath := b.packagePath(version)
+	items := make(map[string]*Runtime)
+	dir, err := os.ReadDir(versionPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range dir {
+		if d.IsDir() {
+			if strings.HasSuffix(d.Name(), string(version)) {
+				name := strings.TrimSuffix(d.Name(), "-"+string(version))
+				if name == "" {
+					continue
+				}
+				logger.Debugf("Load SDK package item: name:%s, version: %s \n", name, version)
+				items[name] = &Runtime{
+					Name:    name,
+					Version: version,
+					Path:    filepath.Join(versionPath, d.Name()),
+				}
+			}
+		}
+	}
+	main, ok := items[b.plugin.Name]
+	if !ok {
+		return nil, ErrRuntimeNotFound
+	}
+	delete(items, b.plugin.Name)
+	if main.Path == "" {
+		return nil, ErrRuntimeNotFound
+	}
+	var additions []*Runtime
+	for _, v := range items {
+		additions = append(additions, v)
+	}
+	p2 := &RuntimePackage{
+		Runtime:     main,
+		Additions:   additions,
+		PackagePath: versionPath,
+	}
+	return p2, nil
+}
+
+func (b *impl) CheckRuntimeExist(version Version) bool {
+	return util.FileExists(b.packagePath(version))
+}
+
+func (b *impl) packagePath(version Version) string {
+	return filepath.Join(b.InstallPath, packageInstalledPrefix+string(version))
+}
+
+func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	for key, value := range headers {
+		req.Header.Add(key, value)
+	}
+	resp, err := b.envContext.HttpClient().Do(req)
+	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			var netErr net.Error
+			if errors.As(urlErr.Err, &netErr) && netErr.Timeout() {
+				return "", errors.New("request timeout")
+			}
+		}
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", errors.New("source file not found")
+	}
+
+	err = os.MkdirAll(b.InstallPath, 0755)
+	if err != nil {
+		return "", err
+	}
+
+	fileName := filepath.Base(u.Path)
+	if strings.HasPrefix(u.Fragment, "/") && strings.Contains(u.Fragment, ".") {
+		fileName = strings.Trim(u.Fragment, "/")
+	} else if !strings.Contains(fileName, ".") {
+		finalURL, err := url.Parse(resp.Request.URL.String())
+		if err != nil {
+			return "", err
+		}
+		fileName = filepath.Base(finalURL.Path)
+	}
+	path := filepath.Join(b.InstallPath, fileName)
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	defer f.Close()
+
+	bar := progressbar.NewOptions64(
+		resp.ContentLength,
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionOnCompletion(func() {
+			fmt.Fprintf(os.Stderr, "\n")
+		}),
+		progressbar.OptionSetDescription("Downloading..."),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+	)
+	defer bar.Close()
+	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (b *impl) Label(version Version) string {
+	return fmt.Sprintf("%s@%s", strings.ToLower(b.Name), version)
+}
+
+// Unuse removes the version setting for the SDK from the specified scope
+func (b *impl) Unuse(scope env.UseScope) error {
+	var multiToolVersion pathmeta.MultiToolVersions
+
+	if scope == env.Global {
+		toolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.User.Home)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+
+		// Check if the SDK is currently set globally
+		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
+			// Remove shims for the current version
+			if err := b.removeSymlinksForScope(Version(oldVersion), env.Global); err != nil {
+				logger.Debugf("Failed to remove global symlinks: %v\n", err)
+			}
+		}
+
+		// Remove from global tool versions
+		delete(toolVersion.Record, b.Name)
+		multiToolVersion = append(multiToolVersion, toolVersion)
+
+	} else if scope == env.Project {
+		toolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.Working.Directory)
+		if err != nil {
+			return fmt.Errorf("failed to read tool versions, err:%w", err)
+		}
+
+		// Check if the SDK is currently set in project
+		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
+			// Remove shims for the current version
+			if err := b.removeSymlinksForScope(Version(oldVersion), env.Project); err != nil {
+				logger.Debugf("Failed to remove project symlinks: %v\n", err)
+			}
+		}
+
+		// Remove from project tool versions
+		delete(toolVersion.Record, b.Name)
+		multiToolVersion = append(multiToolVersion, toolVersion)
+	}
+
+	// For session scope, or in addition to global/project scope,
+	// also remove from the session level
+	sessionToolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.Working.SessionShim)
+	if err != nil {
+		return fmt.Errorf("failed to read tool versions, err:%w", err)
+	}
+
+	// Check if the SDK is currently set in session
+	if oldVersion, ok := sessionToolVersion.Record[b.Name]; ok {
+		// Remove shims for the current version
+		if err := b.removeSymlinksForScope(Version(oldVersion), env.Session); err != nil {
+			logger.Debugf("Failed to remove session symlinks: %v\n", err)
+		}
+	}
+
+	delete(sessionToolVersion.Record, b.Name)
+	multiToolVersion = append(multiToolVersion, sessionToolVersion)
+
+	// Save all modified tool version files
+	if err = multiToolVersion.Save(); err != nil {
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+
+	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))
+
+	return nil
+}
+
+func (b *impl) getAllRuntimes() ([]*RuntimePackage, error) {
+	versions := b.InstalledList()
+	var runtimes []*RuntimePackage
+	for _, v := range versions {
+		runtime, err := b.GetRuntimePackage(v)
+		if err != nil {
+			return nil, err
+		}
+		runtimes = append(runtimes, runtime)
+	}
+	return runtimes, nil
+}
+
+// NewSdk creates a new SDK instance based on the provided plugin path and runtime environment context.
+func NewSdk(runtimeEnvContext *env.RuntimeEnvContext, pluginPath string) (Sdk, error) {
+	sdkName := filepath.Base(pluginPath)
+	plugin, err := plugin.CreatePlugin(pluginPath, runtimeEnvContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plugin: %w", err)
+	}
+
+	// SDK install path fixed to shared root (single location)
+	installPath := filepath.Join(
+		runtimeEnvContext.PathMeta.Shared.Installs,
+		strings.ToLower(sdkName),
+	)
+
+	return &impl{
+		Name:        sdkName,
+		InstallPath: installPath,
+		envContext:  runtimeEnvContext,
+		plugin:      plugin,
+	}, nil
+}

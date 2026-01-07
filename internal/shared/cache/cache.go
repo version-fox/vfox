@@ -19,14 +19,75 @@ package cache
 import (
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
 	NeverExpired ExpireTime = -1
 )
+
+// Duration is a duration that represents the cache duration and some special values
+// -1: never expire
+// 0: never cache
+type Duration time.Duration
+
+func (d Duration) MarshalYAML() (interface{}, error) {
+	switch d {
+	case -1:
+		return -1, nil
+	case 0:
+		return 0, nil
+	default:
+		return d.String(), nil
+	}
+}
+
+func (d *Duration) UnmarshalYAML(node *yaml.Node) error {
+	var data any
+	err := node.Decode(&data)
+	if err != nil {
+		return err
+	}
+	switch va := data.(type) {
+	case int:
+		*d = Duration(va)
+	case string:
+		pd, err := time.ParseDuration(va)
+		if err != nil {
+			return err
+		}
+		*d = Duration(pd)
+	}
+	return nil
+}
+
+func (d Duration) String() string {
+	switch d {
+	case -1:
+		return "-1"
+	case 0:
+		return "0"
+	}
+
+	var str string
+	duration := time.Duration(d)
+	if h := int(duration.Hours()); h > 0 {
+		str = fmt.Sprintf("%dh", h)
+	}
+	if m := int(duration.Minutes()) % 60; m > 0 {
+		str = fmt.Sprintf("%s%dm", str, m)
+	}
+	if s := int(duration.Seconds()) % 60; s > 0 {
+		str = fmt.Sprintf("%s%ds", str, s)
+	}
+
+	return str
+}
 
 // ExpireTime in UnixNano
 type ExpireTime int64

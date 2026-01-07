@@ -24,7 +24,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/cmd/commands"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 func Execute(args []string) {

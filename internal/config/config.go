@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/util"
 	"gopkg.in/yaml.v3"
 )
 

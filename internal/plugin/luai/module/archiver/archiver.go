@@ -1,7 +1,7 @@
 package archiver
 
 import (
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/util"
 	lua "github.com/yuin/gopher-lua"
 )
 

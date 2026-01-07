@@ -24,13 +24,12 @@ import (
 	"text/template"
 
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
-	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/pathmeta"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/env/shell"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 var Activate = &cli.Command{
@@ -45,19 +44,22 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
-	manager := internal.NewSdkManager()
-	defer manager.Close()
-
-	workToolVersion, err := manager.LoadToolVersionByScope(base.Project)
+	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return err
 	}
-	homeToolVersion, err := manager.LoadToolVersionByScope(base.Global)
+	defer manager.Close()
+
+	workToolVersion, err := manager.LoadToolVersionByScope(env.Project)
+	if err != nil {
+		return err
+	}
+	homeToolVersion, err := manager.LoadToolVersionByScope(env.Global)
 	if err != nil {
 		return err
 	}
 	// Project > Global
-	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
+	envs, err := manager.EnvKeys(pathmeta.MultiToolVersions{
 		workToolVersion,
 		homeToolVersion,
 	})
@@ -66,29 +68,28 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	runtimeEnvContext := manager.RuntimeEnvContext
+
 	// Note: This step must be the first.
 	// the Paths will handle the path format of GitBash which is different from other shells.
 	// So we need to set the env.HookFlag first to let the Paths know
 	// which shell we are using.
 	_ = os.Setenv(env.HookFlag, name)
 	// TODO：deprecated
-	_ = os.Setenv(internal.HookCurTmpPath, manager.PathMeta.Working.SessionShim)
+	_ = os.Setenv(pathmeta.HookCurTmpPath, runtimeEnvContext.PathMeta.Working.SessionShim)
 
-	envs := sdkEnvs.ToEnvs()
-
-	threeLayerPaths := generatePATH(manager.PathMeta)
-	envs.Paths.Merge(threeLayerPaths)
+	threeLayerPaths := generatePATH(runtimeEnvContext.PathMeta)
 
 	exportEnvs := make(env.Vars)
 	for k, v := range envs.Variables {
 		exportEnvs[k] = v
 	}
-	pathStr := envs.Paths.String()
+	pathStr := threeLayerPaths.String()
 	exportEnvs["PATH"] = &pathStr
 
 	logger.Debugf("export envs: %+v", exportEnvs)
 
-	path := manager.PathMeta.Executable
+	path := runtimeEnvContext.PathMeta.Executable
 	path = strings.Replace(path, "\\", "/", -1)
 	s := shell.NewShell(name)
 	if s == nil {

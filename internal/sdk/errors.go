@@ -1,6 +1,5 @@
-//go:build windows
-
 /*
+ *
  *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,21 +13,11 @@
  *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
+ *
  */
 
-package commands
+package sdk
 
-import (
-	"github.com/version-fox/vfox/internal/env"
-)
+import "errors"
 
-// generatePATH generates the PATH string with three layers
-func generatePATH(pathMeta *pathmeta.PathMeta) *env.Paths {
-	// Unix: relative for project, absolute for others
-	paths := env.NewPaths(env.EmptyPaths)
-	paths.Add("%" + env.VfoxPwd + "%" + pathMeta.Working.ProjectShim)
-	paths.Add(pathMeta.Working.SessionShim)
-	paths.Add(pathMeta.Working.GlobalShim)
-	paths.Add("%PATH%")
-	return paths
-}
+var ErrRuntimeNotFound = errors.New("runtime not found")

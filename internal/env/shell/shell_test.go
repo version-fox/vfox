@@ -57,8 +57,8 @@ func TestCommonShellPaths(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "zsh paths",
-			shell:    "zsh",
+			name:  "zsh paths",
+			shell: "zsh",
 			expected: []string{
 				"/bin/zsh",
 				"/usr/bin/zsh",
@@ -68,8 +68,8 @@ func TestCommonShellPaths(t *testing.T) {
 			},
 		},
 		{
-			name:     "bash paths",
-			shell:    "bash",
+			name:  "bash paths",
+			shell: "bash",
 			expected: []string{
 				"/bin/bash",
 				"/usr/bin/bash",

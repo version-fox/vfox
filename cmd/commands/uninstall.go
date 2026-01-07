@@ -25,7 +25,8 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Uninstall = &cli.Command{
@@ -41,7 +42,10 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	if sdkArg == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	argArr := strings.Split(sdkArg, "@")
 	argsLen := len(argArr)
@@ -50,7 +54,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	name := strings.ToLower(argArr[0])
-	version := base.Version(argArr[1])
+	version := sdk.Version(argArr[1])
 	resolvedVersion := manager.ResolveVersion(name, version)
 
 	source, err := manager.LookupSdk(name)
@@ -61,15 +65,15 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	if err = source.Uninstall(resolvedVersion); err != nil {
 		return err
 	}
-	remainVersion := source.List()
+	remainVersion := source.InstalledList()
 	if len(remainVersion) == 0 {
-		_ = os.RemoveAll(source.InstallPath)
+		_ = os.RemoveAll(source.Metadata().SdkInstalledPath)
 		return nil
 	}
 	if cv == version {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, base.Global)
+		return source.Use(firstVersion, env.Global)
 	}
 	return nil
 }

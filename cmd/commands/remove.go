@@ -22,7 +22,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 var Remove = &cli.Command{
@@ -47,7 +47,10 @@ func removeCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	yes := cmd.Bool("yes")
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	pterm.Println("Removing this plugin will remove the installed sdk along with the plugin.")
 

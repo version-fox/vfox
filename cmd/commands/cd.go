@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/shell"
+	"github.com/version-fox/vfox/internal/env/shell"
 )
 
 var Cd = &cli.Command{
@@ -26,9 +26,15 @@ var Cd = &cli.Command{
 func cdCmd(ctx context.Context, cmd *cli.Command) error {
 	var dir string
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
+	defer manager.Close()
+	runtimeEnvContext := manager.RuntimeEnvContext
+
 	if cmd.Args().Len() == 0 {
-		dir = manager.PathMeta.User.Home
+		dir = runtimeEnvContext.PathMeta.User.Home
 	} else {
 		sdkName := cmd.Args().First()
 		sdk, err := manager.LookupSdk(sdkName)
@@ -36,22 +42,21 @@ func cdCmd(ctx context.Context, cmd *cli.Command) error {
 			return err
 		}
 		if cmd.Bool("plugin") {
-			dir = sdk.Plugin.Path
+			dir = sdk.Metadata().PluginInstalledPath
 		} else {
 			current := sdk.Current()
 			if current == "" {
 				return fmt.Errorf("no current version of %s", sdkName)
 			}
-			sdkPackage, err := sdk.GetLocalSdkPackage(current)
+			sdkPackage, err := sdk.GetRuntimePackage(current)
 			if err != nil {
 				return err
 			}
-			dir = sdkPackage.Main.Path
+			dir = sdkPackage.Path
 		}
 	}
-	manager.Close()
 
-	err := os.Chdir(dir)
+	err = os.Chdir(dir)
 	if err != nil {
 		return err
 	}

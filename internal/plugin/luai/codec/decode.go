@@ -252,29 +252,18 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 				reflected.Set(reflect.MakeSlice(reflected.Type(), 0, 0))
 			}
 		case reflect.Struct:
-			tagMap := make(map[string]int)
-
+			// Initialize nil embedded pointers
 			for i := 0; i < reflected.NumField(); i++ {
-				fieldTypeField := reflected.Type().Field(i)
-				tag := fieldTypeField.Tag.Get("json")
-				if tag != "" {
-					tagMap[tag] = i
+				f := reflected.Type().Field(i)
+				if f.Anonymous && reflected.Field(i).Kind() == reflect.Ptr && reflected.Field(i).IsNil() {
+					reflected.Field(i).Set(reflect.New(reflected.Field(i).Type().Elem()))
 				}
 			}
 
 			(value.(*lua.LTable)).ForEach(func(key, value lua.LValue) {
 				fieldName := key.String()
 
-				field := reflected.FieldByName(fieldName)
-
-				// if field is not found, try to find it by tag
-				if !field.IsValid() {
-					fieldIndex, ok := tagMap[fieldName]
-					if !ok {
-						return
-					}
-					field = reflected.Field(fieldIndex)
-				}
+				field := findField(reflected, fieldName)
 
 				if !field.IsValid() {
 					return
@@ -296,6 +285,48 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 		}
 	}
 	return nil
+}
+
+// findField finds a field in the struct, including embedded fields recursively
+func findField(reflected reflect.Value, fieldName string) reflect.Value {
+	// First, try direct field name
+	field := reflected.FieldByName(fieldName)
+	if field.IsValid() {
+		return field
+	}
+
+	// Try tags
+	t := reflected.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == fieldName {
+			return reflected.Field(i)
+		}
+	}
+
+	// Now, check embedded fields
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.Anonymous {
+			embeddedValue := reflected.Field(i)
+			if embeddedValue.Kind() == reflect.Ptr {
+				if embeddedValue.IsNil() {
+					embeddedValue.Set(reflect.New(embeddedValue.Type().Elem()))
+				}
+				embeddedValue = embeddedValue.Elem()
+			} else if embeddedValue.Kind() == reflect.Struct {
+				// ok
+			} else {
+				continue
+			}
+			subField := findField(embeddedValue, fieldName)
+			if subField.IsValid() {
+				return subField
+			}
+		}
+	}
+	return reflect.Value{}
 }
 
 func Unmarshal(value lua.LValue, v any) error {

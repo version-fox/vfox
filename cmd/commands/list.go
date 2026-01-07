@@ -35,7 +35,10 @@ var List = &cli.Command{
 }
 
 func listCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	sdkName := cmd.Args().First()
 	if sdkName == "" {
@@ -49,9 +52,9 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		tree := pterm.LeveledList{}
 
 		for _, s := range allSdk {
-			name := s.Name
+			name := s.Metadata().Name
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
-			for _, version := range s.List() {
+			for _, version := range s.InstalledList() {
 				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})
 			}
 		}
@@ -67,7 +70,7 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
 	}
 	curVersion := source.Current()
-	list := source.List()
+	list := source.InstalledList()
 	if len(list) == 0 {
 		return fmt.Errorf("no available version")
 	}

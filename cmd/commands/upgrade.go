@@ -30,7 +30,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 const SelfUpgradeName = "upgrade"
@@ -112,9 +112,12 @@ func downloadFile(c *http.Client, filepath string, url string) error {
 }
 
 func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
-	httpClient := manager.HttpClient()
+	httpClient := manager.RuntimeEnvContext.HttpClient()
 
 	currVersion := fmt.Sprintf("v%s", internal.RuntimeVersion)
 	latestVersion, err := fetchLatestVersion(httpClient)

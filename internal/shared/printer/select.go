@@ -26,8 +26,8 @@ import (
 	"atomicgo.dev/keyboard/keys"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/internal/logger"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 type PageKVSelect struct {

@@ -24,7 +24,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 type ActivateConfig struct {

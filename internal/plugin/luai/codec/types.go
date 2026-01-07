@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  *    Copyright 2026 Han Li and contributors
  *
@@ -16,19 +14,12 @@
  *    limitations under the License.
  */
 
-package commands
+package codec
 
-import (
-	"github.com/version-fox/vfox/internal/env"
+const (
+	NavigatorObjKey = "VFOX_NAVIGATOR"
 )
 
-// generatePATH generates the PATH string with three layers
-func generatePATH(pathMeta *pathmeta.PathMeta) *env.Paths {
-	// Unix: relative for project, absolute for others
-	paths := env.NewPaths(env.EmptyPaths)
-	paths.Add("%" + env.VfoxPwd + "%" + pathMeta.Working.ProjectShim)
-	paths.Add(pathMeta.Working.SessionShim)
-	paths.Add(pathMeta.Working.GlobalShim)
-	paths.Add("%PATH%")
-	return paths
+type Navigator struct {
+	UserAgent string `json:"userAgent"`
 }

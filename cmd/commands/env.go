@@ -23,10 +23,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/shell"
-	"github.com/version-fox/vfox/internal/toolset"
+	"github.com/version-fox/vfox/internal/env/shell"
+	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var Env = &cli.Command{
@@ -77,20 +77,25 @@ func outputJSON() error {
 		Paths:     []string{},
 		SDKs:      make(SDKs),
 	}
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
-	tvs, err := toolset.NewMultiToolVersions([]string{
-		manager.PathMeta.Working.Directory,
-		manager.PathMeta.Working.SessionShim,
-		manager.PathMeta.User.Home,
+	envContext := manager.RuntimeEnvContext
+	tvs, err := pathmeta.NewMultiToolVersions([]string{
+		envContext.PathMeta.Working.Directory,
+		envContext.PathMeta.Working.SessionShim,
+		envContext.PathMeta.User.Home,
 	})
 	if err != nil {
 		return err
 	}
 	tvs.FilterTools(func(name, version string) bool {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
-			if keys, err := lookupSdk.EnvKeys(base.Version(version)); err == nil {
-				data.SDKs[lookupSdk.Plugin.Name] = keys.Variables
+			if keys, err := lookupSdk.EnvKeys(sdk.Version(version)); err == nil {
+				metadata := lookupSdk.Metadata()
+				data.SDKs[metadata.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
 				return true
 			}
@@ -106,8 +111,10 @@ func outputJSON() error {
 }
 
 func cleanTmp() error {
-	manager := internal.NewSdkManager()
-	defer manager.Close()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	// Clean up the old temp files, before today.
 	manager.CleanTmp()
 	return nil
@@ -122,23 +129,25 @@ func envFlag(cmd *cli.Command) error {
 	if s == nil {
 		return fmt.Errorf("unknown target shell %s", shellName)
 	}
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
+	projectToolVersions, err := manager.LoadToolVersionByScope(env.Project)
+	if err != nil {
+		return err
+	}
+	sessionToolVersions, err := manager.LoadToolVersionByScope(env.Session)
+	if err != nil {
+		return err
+	}
+	globalToolVersions, err := manager.LoadToolVersionByScope(env.Global)
+	if err != nil {
+		return err
+	}
 
-	projectToolVersions, err := manager.LoadToolVersionByScope(base.Project)
-	if err != nil {
-		return err
-	}
-	sessionToolVersions, err := manager.LoadToolVersionByScope(base.Session)
-	if err != nil {
-		return err
-	}
-	globalToolVersions, err := manager.LoadToolVersionByScope(base.Global)
-	if err != nil {
-		return err
-	}
-
-	sdkEnvs, err := manager.EnvKeys(toolset.MultiToolVersions{
+	sdkEnvs, err := manager.EnvKeys(pathmeta.MultiToolVersions{
 		projectToolVersions,
 		sessionToolVersions,
 		globalToolVersions,
@@ -147,17 +156,11 @@ func envFlag(cmd *cli.Command) error {
 		return err
 	}
 
-	if len(sdkEnvs) == 0 {
+	if len(sdkEnvs.Variables) == 0 {
 		return nil
 	}
 
-	envs := sdkEnvs.ToEnvs()
-	exportEnvs := make(env.Vars)
-	for k, v := range envs.Variables {
-		exportEnvs[k] = v
-	}
-
-	exportStr := s.Export(exportEnvs)
+	exportStr := s.Export(sdkEnvs.Variables)
 	fmt.Println(exportStr)
 	return nil
 }

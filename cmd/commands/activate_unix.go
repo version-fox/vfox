@@ -19,12 +19,12 @@
 package commands
 
 import (
-	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/pathmeta"
 )
 
 // generatePATH generates the PATH string with three layers
-func generatePATH(pathMeta *internal.PathMeta) *env.Paths {
+func generatePATH(pathMeta *pathmeta.PathMeta) *env.Paths {
 	// Unix: relative for project, absolute for others
 	paths := env.NewPaths(env.EmptyPaths)
 	paths.Add(pathMeta.Working.ProjectShim)

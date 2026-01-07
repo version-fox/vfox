@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/version-fox/vfox/internal/logger"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
+	"github.com/version-fox/vfox/internal/shared/logger"
 	lua "github.com/yuin/gopher-lua"
 )
 

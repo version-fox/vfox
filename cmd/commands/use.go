@@ -22,12 +22,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/util"
 
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
-	"github.com/version-fox/vfox/internal/logger"
+	"github.com/version-fox/vfox/internal/shared/logger"
 
 	"github.com/urfave/cli/v3"
 )
@@ -69,48 +70,51 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 	// Determine scope
 	scope := determineScopeFromFlags(cmd)
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 
 	// Lookup SDK
-	sdk, err := manager.LookupSdk(name)
+	sdkSource, err := manager.LookupSdk(name)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
 
 	// Resolve version (with interactive prompt if needed)
-	resolvedVersion, err := resolveVersion(sdk, manager, version, name)
+	resolvedVersion, err := resolveVersion(sdkSource, manager, version, name)
 	if err != nil {
 		return err
 	}
 
 	// Execute use operation
-	return sdk.Use(resolvedVersion, scope)
+	return sdkSource.Use(resolvedVersion, scope)
 }
 
 // parseSdkArg parses the SDK argument in format "name@version"
-func parseSdkArg(sdkArg string) (name string, version base.Version) {
+func parseSdkArg(sdkArg string) (name string, version sdk.Version) {
 	parts := strings.Split(sdkArg, "@")
 	name = parts[0]
 	if len(parts) > 1 {
-		version = base.Version(parts[1])
+		version = sdk.Version(parts[1])
 	}
 	return
 }
 
 // determineScopeFromFlags determines the scope based on command flags
-func determineScopeFromFlags(cmd *cli.Command) base.UseScope {
+func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 	if cmd.IsSet("global") {
-		return base.Global
+		return env.Global
 	}
 	if cmd.IsSet("project") {
-		return base.Project
+		return env.Project
 	}
-	return base.Session
+	return env.Session
 }
 
 // resolveVersion resolves the version, with interactive selection if needed
-func resolveVersion(sdk *internal.Sdk, manager *internal.Manager, version base.Version, name string) (base.Version, error) {
+func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Version, name string) (sdk.Version, error) {
 	// Try to resolve version first
 	resolvedVersion := manager.ResolveVersion(name, version)
 	if resolvedVersion != "" {
@@ -118,7 +122,7 @@ func resolveVersion(sdk *internal.Sdk, manager *internal.Manager, version base.V
 	}
 
 	// If not resolved, try interactive selection
-	availableVersions := sdk.List()
+	availableVersions := sdkSource.InstalledList()
 	if len(availableVersions) == 0 {
 		return "", fmt.Errorf("no versions available for %s", name)
 	}
@@ -139,7 +143,7 @@ func resolveVersion(sdk *internal.Sdk, manager *internal.Manager, version base.V
 		return "", err
 	}
 
-	return base.Version(selectedVersion), nil
+	return sdk.Version(selectedVersion), nil
 }
 
 // selectFromOptions displays an interactive selection prompt

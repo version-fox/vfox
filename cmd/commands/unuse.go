@@ -22,7 +22,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/base"
+	"github.com/version-fox/vfox/internal/env"
 )
 
 var Unuse = &cli.Command{
@@ -55,16 +55,19 @@ func unuseCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("invalid parameter. format: <sdk-name>")
 	}
 
-	scope := base.Session
+	scope := env.Session
 	if cmd.IsSet("global") {
-		scope = base.Global
+		scope = env.Global
 	} else if cmd.IsSet("project") {
-		scope = base.Project
+		scope = env.Project
 	} else {
-		scope = base.Session
+		scope = env.Session
 	}
 
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 
 	source, err := manager.LookupSdk(sdkName)

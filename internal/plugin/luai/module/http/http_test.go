@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/version-fox/vfox/internal/base"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	"github.com/version-fox/vfox/internal/util"
 
@@ -128,7 +127,7 @@ func eval(str string, t *testing.T) {
 }
 
 func setUserAgent(L *lua.LState, ua string) {
-	L.SetGlobal(base.NavigatorObjKey, codec.MustMarshal(L, base.Navigator{UserAgent: ua}))
+	L.SetGlobal(codec.NavigatorObjKey, codec.MustMarshal(L, codec.Navigator{UserAgent: ua}))
 }
 
 func TestUserAgentDefault(t *testing.T) {

@@ -35,7 +35,10 @@ var Current = &cli.Command{
 }
 
 func currentCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	sdkName := cmd.Args().First()
 	if sdkName == "" {
@@ -45,7 +48,7 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		for _, s := range allSdk {
-			name := s.Name
+			name := s.Metadata().Name
 			current := s.Current()
 			if current == "" {
 				pterm.Printf("%s -> N/A \n", name)

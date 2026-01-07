@@ -42,7 +42,10 @@ var Update = &cli.Command{
 }
 
 func updateCmd(ctx context.Context, cmd *cli.Command) error {
-	manager := internal.NewSdkManager()
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return err
+	}
 	defer manager.Close()
 	if cmd.Bool(allFlag) {
 		if sdks, err := manager.LoadAllSdk(); err == nil {
@@ -51,7 +54,7 @@ func updateCmd(ctx context.Context, cmd *cli.Command) error {
 				total = len(sdks)
 			)
 			for _, s := range sdks {
-				sdkName := s.Name
+				sdkName := s.Metadata().Name
 				index++
 				pterm.Printf("[%s/%d]: Updating %s plugin...\n", pterm.Green(index), total, pterm.Green(sdkName))
 				if err = manager.Update(sdkName); err != nil {
