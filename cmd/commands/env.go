@@ -25,7 +25,6 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/env/shell"
-	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/sdk"
 )
 
@@ -82,26 +81,24 @@ func outputJSON() error {
 		return err
 	}
 	defer manager.Close()
-	envContext := manager.RuntimeEnvContext
-	tvs, err := pathmeta.NewMultiToolVersions([]string{
-		envContext.PathMeta.Working.Directory,
-		envContext.PathMeta.Working.SessionShim,
-		envContext.PathMeta.User.Home,
-	})
+
+	// Load all scope configs with priority: Global < Session < Project
+	chain, err := manager.RuntimeEnvContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
 		return err
 	}
-	tvs.FilterTools(func(name, version string) bool {
+
+	// Filter tools to only include those that are installed
+	allTools := chain.GetAllTools()
+	for name, version := range allTools {
 		if lookupSdk, err := manager.LookupSdk(name); err == nil {
 			if keys, err := lookupSdk.EnvKeys(sdk.Version(version)); err == nil {
 				metadata := lookupSdk.Metadata()
 				data.SDKs[metadata.Name] = keys.Variables
 				data.Paths = append(data.Paths, keys.Paths.Slice()...)
-				return true
 			}
 		}
-		return false
-	})
+	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -134,24 +131,14 @@ func envFlag(cmd *cli.Command) error {
 		return err
 	}
 	defer manager.Close()
-	projectToolVersions, err := manager.LoadToolVersionByScope(env.Project)
-	if err != nil {
-		return err
-	}
-	sessionToolVersions, err := manager.LoadToolVersionByScope(env.Session)
-	if err != nil {
-		return err
-	}
-	globalToolVersions, err := manager.LoadToolVersionByScope(env.Global)
+
+	// Load configs from all scopes with priority: Global < Session < Project
+	chain, err := manager.RuntimeEnvContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
 		return err
 	}
 
-	sdkEnvs, err := manager.EnvKeys(pathmeta.MultiToolVersions{
-		projectToolVersions,
-		sessionToolVersions,
-		globalToolVersions,
-	})
+	sdkEnvs, err := manager.EnvKeys(chain)
 	if err != nil {
 		return err
 	}

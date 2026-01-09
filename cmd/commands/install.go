@@ -26,7 +26,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
@@ -231,25 +231,27 @@ func installAll(autoConfirm bool) error {
 
 func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]string, err error) {
 	envContext := manager.RuntimeEnvContext
-	tvs, err := pathmeta.NewMultiToolVersions([]string{
-		envContext.PathMeta.Working.Directory,
-		envContext.PathMeta.Working.SessionShim,
-		envContext.PathMeta.User.Home,
-	})
+
+	// Load configs from all scopes with priority: Global < Session < Project
+	chain, err := envContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
 		return
 	}
-	sdks = tvs.FilterTools(func(name, version string) bool {
+
+	// Get all tools from the chain
+	allTools := chain.GetAllTools()
+	sdks = make(map[string]string)
+
+	for name, version := range allTools {
 		lookupSdk, err := manager.LookupSdk(name)
 		if err != nil {
+			// Plugin not installed
 			plugins = append(plugins, name)
-			return true
+		} else if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
+			// SDK not installed
+			sdks[name] = version
 		}
-		if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
-			return true
-		}
-		return false
-	})
+	}
 	return
 }
 

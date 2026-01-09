@@ -480,27 +480,6 @@ func (b *impl) Use(version Version, scope env.UseScope) error {
 	return b.useInHook(resolvedVersion, scope)
 }
 
-// LoadToolVersionByScope loads the tool version for the given scope,
-// and also tries to parse legacy version files for project scope.
-func (b *impl) LoadToolVersionByScope(scope env.UseScope) (*pathmeta.ToolVersion, error) {
-	toolVersions, err := b.envContext.LoadToolVersionByScope(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	// Need to parse legacy file for project scope
-	if env.Project == scope {
-		version, err := b.ParseLegacyFile(b.envContext.CurrentWorkingDir)
-		if err != nil {
-			return nil, err
-		}
-		if version != "" {
-			toolVersions.Record[b.Name] = string(version)
-		}
-	}
-	return toolVersions, nil
-}
-
 func (b *impl) useInHook(version Version, scope env.UseScope) error {
 
 	// 特殊，需要判断是否存在目录，不存在在创建
@@ -513,18 +492,17 @@ func (b *impl) useInHook(version Version, scope env.UseScope) error {
 		}
 	}
 
-	// Only read the content of .tool-versions file for the given scope
-	// Not parse legacy files here, because we only need to update the version record.
-	toolVersions, err := b.envContext.LoadToolVersionByScope(scope)
+	// Load config for the specified scope
+	vfoxToml, err := b.envContext.LoadConfigByScope(scope)
 	if err != nil {
 		return err
 	}
 
-	logger.Debugf("Load %v tool versions: %v\n", scope, toolVersions.Record)
+	logger.Debugf("Load %v tool versions: %v\n", scope, vfoxToml.GetAllTools())
 
-	// Update version record in all affected scopes
-	toolVersions.Record[b.Name] = string(version)
-	if err := toolVersions.Save(); err != nil {
+	// Update version record
+	vfoxToml.SetTool(b.Name, string(version))
+	if err := vfoxToml.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
 
@@ -560,22 +538,18 @@ func (b *impl) InstalledList() []Version {
 // Current returns the current version of the SDK.
 // Lookup priority is: project > session > global
 func (b *impl) Current() Version {
-	toolVersion, err := pathmeta.NewMultiToolVersions([]string{
-		b.envContext.PathMeta.Working.Directory,
-		b.envContext.PathMeta.Working.SessionShim,
-		b.envContext.PathMeta.User.Home,
-	})
+	// Load configs from all scopes with priority: Global < Session < Project
+	chain, err := b.envContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
-		logger.Debugf("Failed to load current tool versions: %v", err)
+		logger.Debugf("Failed to load config chain: %v", err)
 		return ""
 	}
-	current := toolVersion.FilterTools(func(name, version string) bool {
-		return name == b.Name && b.CheckRuntimeExist(Version(version))
-	})
-	if len(current) == 0 {
-		return ""
+
+	// Search for current version (with priority)
+	if version, ok := chain.GetToolVersion(b.Name); ok && b.CheckRuntimeExist(Version(version)) {
+		return Version(version)
 	}
-	return Version(current[b.Name])
+	return ""
 }
 
 // ParseLegacyFile tries to parse legacy version files to get the Runtime version.
@@ -847,66 +821,67 @@ func (b *impl) Label(version Version) string {
 
 // Unuse removes the version setting for the SDK from the specified scope
 func (b *impl) Unuse(scope env.UseScope) error {
-	var multiToolVersion pathmeta.MultiToolVersions
+	// Create a config chain to manage all affected scopes
+	chain := pathmeta.NewVfoxTomlChain()
 
 	if scope == env.Global {
-		toolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.User.Home)
+		globalConfig, err := b.envContext.LoadConfigByScope(env.Global)
 		if err != nil {
-			return fmt.Errorf("failed to read tool versions, err:%w", err)
+			return fmt.Errorf("failed to read global config: %w", err)
 		}
 
 		// Check if the SDK is currently set globally
-		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
+		if version, ok := globalConfig.GetToolVersion(b.Name); ok {
 			// Remove shims for the current version
-			if err := b.removeSymlinksForScope(Version(oldVersion), env.Global); err != nil {
+			if err := b.removeSymlinksForScope(Version(version), env.Global); err != nil {
 				logger.Debugf("Failed to remove global symlinks: %v\n", err)
 			}
 		}
 
-		// Remove from global tool versions
-		delete(toolVersion.Record, b.Name)
-		multiToolVersion = append(multiToolVersion, toolVersion)
+		// Remove from global config
+		globalConfig.RemoveTool(b.Name)
+		chain.Add(globalConfig)
 
 	} else if scope == env.Project {
-		toolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.Working.Directory)
+		projectConfig, err := b.envContext.LoadConfigByScope(env.Project)
 		if err != nil {
-			return fmt.Errorf("failed to read tool versions, err:%w", err)
+			return fmt.Errorf("failed to read project config: %w", err)
 		}
 
 		// Check if the SDK is currently set in project
-		if oldVersion, ok := toolVersion.Record[b.Name]; ok {
+		if version, ok := projectConfig.GetToolVersion(b.Name); ok {
 			// Remove shims for the current version
-			if err := b.removeSymlinksForScope(Version(oldVersion), env.Project); err != nil {
+			if err := b.removeSymlinksForScope(Version(version), env.Project); err != nil {
 				logger.Debugf("Failed to remove project symlinks: %v\n", err)
 			}
 		}
 
-		// Remove from project tool versions
-		delete(toolVersion.Record, b.Name)
-		multiToolVersion = append(multiToolVersion, toolVersion)
+		// Remove from project config
+		projectConfig.RemoveTool(b.Name)
+		chain.Add(projectConfig)
 	}
 
 	// For session scope, or in addition to global/project scope,
 	// also remove from the session level
-	sessionToolVersion, err := pathmeta.NewToolVersion(b.envContext.PathMeta.Working.SessionShim)
+	sessionConfig, err := b.envContext.LoadConfigByScope(env.Session)
 	if err != nil {
-		return fmt.Errorf("failed to read tool versions, err:%w", err)
+		return fmt.Errorf("failed to read session config: %w", err)
 	}
 
 	// Check if the SDK is currently set in session
-	if oldVersion, ok := sessionToolVersion.Record[b.Name]; ok {
+	if version, ok := sessionConfig.GetToolVersion(b.Name); ok {
 		// Remove shims for the current version
-		if err := b.removeSymlinksForScope(Version(oldVersion), env.Session); err != nil {
+		if err := b.removeSymlinksForScope(Version(version), env.Session); err != nil {
 			logger.Debugf("Failed to remove session symlinks: %v\n", err)
 		}
 	}
 
-	delete(sessionToolVersion.Record, b.Name)
-	multiToolVersion = append(multiToolVersion, sessionToolVersion)
+	sessionConfig.RemoveTool(b.Name)
+	chain.Add(sessionConfig)
 
-	// Save all modified tool version files
-	if err = multiToolVersion.Save(); err != nil {
-		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	// Save all modified configs
+	if err = chain.Save(); err != nil {
+		return fmt.Errorf("failed to save configs: %w", err)
 	}
 
 	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))

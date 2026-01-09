@@ -68,45 +68,27 @@ type Manager struct {
 	openSdks          map[string]sdk.Sdk
 }
 
-// LoadToolVersionByScope loads tool versions based on the specified scope (global, project, or session).
-func (m *Manager) LoadToolVersionByScope(scope env.UseScope) (*pathmeta.ToolVersion, error) {
-	envContext := m.RuntimeEnvContext
-	toolVersions, err := envContext.LoadToolVersionByScope(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	// Need to parse legacy file for project scope
-	if env.Project == scope {
-		if err = m.parseLegacyFile(envContext.PathMeta.Working.Directory, func(sdkname, version string) {
-			logger.Debugf("parse legacy file: %s@%s\n", sdkname, version)
-			if _, ok := toolVersions.Record[sdkname]; !ok {
-				toolVersions.Record[sdkname] = version
-			}
-		}); err != nil {
-			return nil, err
-		}
-	}
-	return toolVersions, nil
-}
-
-func (m *Manager) EnvKeys(tvs pathmeta.MultiToolVersions) (*env.Envs, error) {
+// LookupSdk lookup sdk by name
+// Loads SDK plugins and generates env keys based on the tool versions in the chain
+func (m *Manager) EnvKeys(chain pathmeta.VfoxTomlChain) (*env.Envs, error) {
 	sdkEnvs := &env.Envs{
 		Variables: make(env.Vars),
 		Paths:     env.NewPaths(env.EmptyPaths),
 	}
 	tools := make(map[string]struct{})
-	for _, t := range tvs {
-		for name, version := range t.Record {
-			if _, ok := tools[name]; ok {
-				continue
-			}
-			if lookupSdk, err := m.LookupSdk(name); err == nil {
-				v := sdk.Version(version)
-				if ek, err := lookupSdk.EnvKeys(v); err == nil {
-					tools[name] = struct{}{}
-					sdkEnvs.Merge(ek)
-				}
+
+	// Get merged tools from the chain
+	allTools := chain.GetAllTools()
+
+	for name, version := range allTools {
+		if _, ok := tools[name]; ok {
+			continue
+		}
+		if lookupSdk, err := m.LookupSdk(name); err == nil {
+			v := sdk.Version(version)
+			if ek, err := lookupSdk.EnvKeys(v); err == nil {
+				tools[name] = struct{}{}
+				sdkEnvs.Merge(ek)
 			}
 		}
 	}
@@ -134,15 +116,15 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 
 func (m *Manager) ResolveVersion(sdkName string, version sdk.Version) sdk.Version {
 	if version == "" {
-		// when version is empty, try to get version from workspace tool
-		workspaceTool, err := m.RuntimeEnvContext.LoadToolVersionByScope(env.Project)
+		// when version is empty, try to get version from workspace config
+		workspaceConfig, err := m.RuntimeEnvContext.LoadConfigByScope(env.Project)
 		if err != nil {
-			logger.Errorf("Failed to get workspace tool version: %v", err)
+			logger.Errorf("Failed to get workspace config: %v", err)
 			return version
 		}
 
-		logger.Debugf("workspace tool version: %+v\n", workspaceTool)
-		if v, ok := workspaceTool.Record[sdkName]; ok {
+		logger.Debugf("workspace config: %+v\n", workspaceConfig.GetAllTools())
+		if v, ok := workspaceConfig.Tools.GetVersion(sdkName); ok {
 			return sdk.Version(v)
 		}
 	}

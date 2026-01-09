@@ -50,19 +50,14 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	defer manager.Close()
 
-	workToolVersion, err := manager.LoadToolVersionByScope(env.Project)
+	// Load Project and Global configs
+	chain, err := manager.RuntimeEnvContext.LoadConfigChainByScopes(env.Global, env.Project)
 	if err != nil {
 		return err
 	}
-	homeToolVersion, err := manager.LoadToolVersionByScope(env.Global)
-	if err != nil {
-		return err
-	}
+
 	// Project > Global
-	envs, err := manager.EnvKeys(pathmeta.MultiToolVersions{
-		workToolVersion,
-		homeToolVersion,
-	})
+	envs, err := manager.EnvKeys(chain)
 
 	if err != nil {
 		return err

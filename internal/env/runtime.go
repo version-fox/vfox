@@ -19,6 +19,7 @@
 package env
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -34,15 +35,40 @@ type RuntimeEnvContext struct {
 	RuntimeVersion    string             // RuntimeVersion is the version of vfox
 }
 
-// LoadToolVersionByScope loads the tool version based on the specified scope.
-func (m *RuntimeEnvContext) LoadToolVersionByScope(scope UseScope) (*pathmeta.ToolVersion, error) {
-	if Global == scope {
-		return pathmeta.NewToolVersion(m.PathMeta.User.Home)
-	} else if Project == scope {
-		return pathmeta.NewToolVersion(m.PathMeta.Working.Directory)
-	} else {
-		return pathmeta.NewToolVersion(m.PathMeta.Working.SessionShim)
+// LoadConfigByScope loads the config for the specified scope
+// pathmeta is not aware of scope, but we don't need to track it in VfoxToml
+func (m *RuntimeEnvContext) LoadConfigByScope(scope UseScope) (*pathmeta.VfoxToml, error) {
+	var dir string
+
+	switch scope {
+	case Global:
+		dir = m.PathMeta.User.Home
+	case Project:
+		dir = m.PathMeta.Working.Directory
+	case Session:
+		dir = m.PathMeta.Working.SessionShim
+	default:
+		return nil, fmt.Errorf("unknown scope: %v", scope)
 	}
+
+	return pathmeta.LoadConfig(dir)
+}
+
+// LoadConfigChainByScopes loads configs for multiple scopes and returns a chain
+// Scopes are added in order (first added = lowest priority)
+// Example: LoadConfigChainByScopes(Global, Session, Project) → Project has highest priority
+func (m *RuntimeEnvContext) LoadConfigChainByScopes(scopes ...UseScope) (pathmeta.VfoxTomlChain, error) {
+	chain := pathmeta.NewVfoxTomlChain()
+
+	for _, scope := range scopes {
+		c, err := m.LoadConfigByScope(scope)
+		if err != nil {
+			return chain, err
+		}
+		chain.Add(c)
+	}
+
+	return chain, nil
 }
 
 // HttpClient creates an HTTP client based on the proxy settings in the user configuration.
