@@ -1,0 +1,143 @@
+/*
+ *
+ *    Copyright 2026 Han Li and contributors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ *
+ */
+
+package pathmeta
+
+// VfoxTomlChain is a chain of VfoxToml configs, supporting multi-config merging
+type VfoxTomlChain []*VfoxToml
+
+// NewVfoxTomlChain creates a new config chain
+func NewVfoxTomlChain() VfoxTomlChain {
+	return make(VfoxTomlChain, 0, 3)
+}
+
+// Add appends a config to the end of the chain
+func (c *VfoxTomlChain) Add(config *VfoxToml) {
+	*c = append(*c, config)
+}
+
+// Merge merges configs by priority
+// Later configs in the chain override earlier ones (if the same tool exists)
+// Example: [Global, Session, Project] → Project has highest priority
+func (c *VfoxTomlChain) Merge() *VfoxToml {
+	if len(*c) == 0 {
+		return NewVfoxToml()
+	}
+
+	if len(*c) == 1 {
+		return (*c)[0]
+	}
+
+	result := NewVfoxToml()
+
+	// Merge in order, later overrides earlier
+	for _, config := range *c {
+		if config == nil {
+			continue
+		}
+
+		for name, toolConfig := range config.Tools {
+			if toolConfig == nil {
+				continue
+			}
+			// Copy the tool config to result
+			result.Tools.SetWithAttr(name, toolConfig.Version, toolConfig.Attr)
+		}
+	}
+
+	return result
+}
+
+// GetAllTools returns all tools after merging
+func (c *VfoxTomlChain) GetAllTools() ToolVersions {
+	return c.Merge().GetAllTools()
+}
+
+// GetToolConfig retrieves a tool config (searches by priority)
+// Searches from tail to head (high priority to low priority)
+func (c *VfoxTomlChain) GetToolConfig(name string) (*ToolConfig, bool) {
+	// Search from high priority to low priority
+	for i := len(*c) - 1; i >= 0; i-- {
+		if (*c)[i] != nil {
+			if config, ok := (*c)[i].Tools.Get(name); ok {
+				return config, true
+			}
+		}
+	}
+	return nil, false
+}
+
+// GetToolVersion retrieves only the version of a tool (searches by priority)
+func (c *VfoxTomlChain) GetToolVersion(name string) (string, bool) {
+	if config, ok := c.GetToolConfig(name); ok {
+		return config.Version, true
+	}
+	return "", false
+}
+
+// GetByIndex returns the config at the specified index
+func (c *VfoxTomlChain) GetByIndex(index int) *VfoxToml {
+	if index < 0 || index >= len(*c) {
+		return nil
+	}
+	return (*c)[index]
+}
+
+// Length returns the length of the config chain
+func (c *VfoxTomlChain) Length() int {
+	return len(*c)
+}
+
+// IsEmpty checks if the chain is empty
+func (c *VfoxTomlChain) IsEmpty() bool {
+	return len(*c) == 0
+}
+
+// Save saves all configs in the chain
+// Calls Save() on each VfoxToml (which won't create files if empty)
+func (c *VfoxTomlChain) Save() error {
+	for _, config := range *c {
+		if config == nil {
+			continue
+		}
+		if err := config.Save(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AddTool adds a tool to all configs in the chain
+func (c *VfoxTomlChain) AddTool(name, version string) {
+	for _, config := range *c {
+		if config == nil {
+			continue
+		}
+		config.SetTool(name, version)
+	}
+}
+
+// RemoveTool removes a tool from all configs in the chain
+func (c *VfoxTomlChain) RemoveTool(name string) {
+	for _, config := range *c {
+		if config == nil {
+			continue
+		}
+		config.RemoveTool(name)
+	}
+}
