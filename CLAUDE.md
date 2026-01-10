@@ -80,10 +80,11 @@ Manager Layer (internal/manager.go)
 #### Key Components
 
 **Manager** (`internal/manager.go`):
-- Central orchestration component
-- Manages SDK lifecycle (install, uninstall, use, unuse)
-- Handles plugin operations (add, remove, update)
-- Coordinates version resolution across scopes
+- **Orchestration and coordination only**: Does NOT directly handle SDK operations
+- Manages plugin registry (add, remove, update plugins)
+- Provides SDK lookup (`LookupSdk`)
+- Coordinates multi-SDK operations and scope priority
+- **Delegates all SDK-specific operations to the SDK layer**
 
 **PathMeta** (`internal/pathmeta/path_meta.go`):
 - Defines all path structures (user, shared, working)
@@ -91,10 +92,12 @@ Manager Layer (internal/manager.go)
 - Provides stable paths for symlinks/shims
 
 **SDK Module** (`internal/sdk/sdk.go`):
-- Represents a single SDK (e.g., nodejs, java)
-- Handles version installation and removal
+- **Autonomous SDK lifecycle management**: All SDK operations happen here
+- Handles version installation, removal, and symlinks
 - Interfaces with Lua plugins for SDK-specific operations
+- **Scope-aware operations**: `CreateSymlinksForScope()`, `EnvKeysForScope()`
 - Provides environment variables and paths for specific versions
+- **Independent**: SDK layer does NOT depend on Manager (follows dependency hierarchy)
 
 **Plugin System** (`internal/plugin/`):
 - **Lua-based**: Each SDK is managed by a Lua plugin
@@ -140,8 +143,20 @@ sdk, err := manager.LookupSdk("nodejs")
 if err != nil {
     return err
 }
-// Use sdk.Install(), sdk.Use(), etc.
+
+// Create symlinks for a specific scope
+sdk.CreateSymlinksForScope(sdk.Version("21.5.0"), env.Project)
+
+// Get environment variables for a scope (returns paths pointing to symlinks)
+envs, err := sdk.EnvKeysForScope(sdk.Version("21.5.0"), env.Project)
+
+// Other operations
+sdk.Install(sdk.Version("21.5.0"))
+sdk.Uninstall(sdk.Version("21.5.0"))
+sdk.Use(sdk.Version("21.5.0"), env.Global)
 ```
+
+**Key Principle**: All SDK-specific operations (symlinks, environment variables, installation) are handled by the SDK layer. The Manager only provides SDK lookup and multi-SDK coordination.
 
 ## Package Organization
 
@@ -149,8 +164,8 @@ The `internal/` directory contains the core packages organized by responsibility
 
 ### Core Packages
 
-- **`manager`**: Central orchestration layer, coordinates all SDK operations
-- **`sdk`**: SDK abstraction, handles installation, removal, and environment lookup
+- **`manager`**: Orchestration layer, provides SDK lookup and multi-SDK coordination (does NOT handle SDK-specific operations)
+- **`sdk`**: Autonomous SDK lifecycle management, handles installation, removal, symlinks, and environment lookup
 - **`plugin`**: Lua plugin system, loads and executes plugin scripts
 - **`env`**: Environment variable management and shell integration
 - **`pathmeta`**: Path metadata and configuration file management (TOML, legacy formats)
@@ -169,9 +184,10 @@ These are utility packages that can be imported by any internal package:
 
 1. **No circular dependencies**: Follow the layered architecture described above
 2. **Clear separation of concerns**: Each package has a single, well-defined responsibility
-3. **Configuration via pathmeta**: All version config loading goes through `pathmeta.LoadConfig()`
-4. **Shared utilities only**: `shared/*` packages should not contain business logic
-5. **Test-driven development**: Every implementation must have corresponding unit tests in `*_test.go` files
+3. **SDK autonomy**: All SDK-specific operations happen in the SDK layer, Manager only orchestrates
+4. **Configuration via pathmeta**: All version config loading goes through `pathmeta.LoadConfig()`
+5. **Shared utilities only**: `shared/*` packages should not contain business logic
+6. **Test-driven development**: Every implementation must have corresponding unit tests in `*_test.go` files
 
 ## Important Design Decisions
 
