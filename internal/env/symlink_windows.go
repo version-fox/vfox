@@ -21,10 +21,16 @@
 package env
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
+)
+
+const (
+	fsctlSetReparsePoint = 589990
 )
 
 // CreateDirSymlink creates a directory junction on Windows systems
@@ -33,34 +39,90 @@ func CreateDirSymlink(target, link string) error {
 	// Ensure target is an absolute path
 	targetAbs, err := filepath.Abs(target)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve target path: %w", err)
 	}
 
 	// Ensure link parent directory exists
 	linkParent := filepath.Dir(link)
 	if err := os.MkdirAll(linkParent, 0755); err != nil {
-		return err
+		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
 	// If link already exists, remove it first
-	if _, err := os.Stat(link); err == nil {
-		if err := os.RemoveAll(link); err != nil {
-			return err
+	// Use Lstat instead of Stat to check the link itself, not its target
+	if fileInfo, err := os.Lstat(link); err == nil {
+		// Remove existing file/directory/symlink
+		if fileInfo.IsDir() {
+			if err := os.RemoveAll(link); err != nil {
+				return fmt.Errorf("failed to remove existing directory: %w", err)
+			}
+		} else {
+			if err := os.Remove(link); err != nil {
+				return fmt.Errorf("failed to remove existing file: %w", err)
+			}
 		}
 	}
 
-	// Convert to UTF-16
-	targetPtr, err := windows.UTF16PtrFromString(targetAbs)
-	if err != nil {
-		return err
-	}
-	linkPtr, err := windows.UTF16PtrFromString(link)
-	if err != nil {
-		return err
+	// Create the directory for the junction
+	if err := os.Mkdir(link, 0777); err != nil {
+		return fmt.Errorf("failed to create junction directory: %w", err)
 	}
 
-	// Create the junction using golang.org/x/sys/windows
-	return windows.CreateJunction(targetPtr, linkPtr)
+	success := false
+	defer func() {
+		if !success {
+			// Clean up on failure
+			os.Remove(link)
+		}
+	}()
+
+	// Open the directory with GENERIC_WRITE access
+	linkPtr, err := windows.UTF16PtrFromString(link)
+	if err != nil {
+		return fmt.Errorf("failed to convert link path: %w", err)
+	}
+
+	handle, err := windows.CreateFile(
+		linkPtr,
+		windows.GENERIC_WRITE,
+		0,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS,
+		0,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to open directory: %w", err)
+	}
+	defer windows.CloseHandle(handle)
+
+	// Create reparse point data
+	rp := winio.ReparsePoint{
+		Target:       targetAbs,
+		IsMountPoint: true,
+	}
+
+	data := winio.EncodeReparsePoint(&rp)
+
+	// Set the reparse point
+	var bytesReturned uint32
+	err = windows.DeviceIoControl(
+		handle,
+		fsctlSetReparsePoint,
+		&data[0],
+		uint32(len(data)),
+		nil,
+		0,
+		&bytesReturned,
+		nil,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to set reparse point: %w", err)
+	}
+
+	success = true
+	return nil
 }
 
 // RemoveDirSymlink removes a directory junction on Windows systems

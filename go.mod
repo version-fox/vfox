@@ -23,6 +23,7 @@ require (
 require (
 	atomicgo.dev/schedule v0.1.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
