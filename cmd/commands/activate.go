@@ -61,6 +61,17 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	projectToml, _ := chain.GetTomlByScope(env.Project)
+	// Give a chance to legacy file to set tool versions if not already set in vfox.toml
+	// This allows backward compatibility with older projects using legacy files
+	// New projects should use vfox.toml directly
+	_ = manager.ParseLegacyFile(runtimeEnvContext.CurrentWorkingDir, func(sdkname, version string) {
+		// Set only if not already set in vfox.toml
+		if _, ok := projectToml.GetToolVersion(sdkname); !ok {
+			projectToml.SetTool(sdkname, version)
+		}
+	})
+
 	// 2. Process each SDK: check if link is needed, create symlinks if necessary
 	// Collect envs by scope to ensure proper PATH priority: Project > Session > Global > System
 	allTools := chain.GetAllTools()

@@ -617,8 +617,8 @@ func (m *Manager) loadLegacyFileRecord() (*pathmeta.FileRecord, error) {
 	return mapFile, nil
 }
 
-// parseLegacyFile parse legacy file and output the sdkname and version
-func (m *Manager) parseLegacyFile(dirPath string, output func(sdkname, version string)) error {
+// ParseLegacyFile parse legacy file and output the sdkname and version
+func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version string)) error {
 	// If the legacy version file is enabled, the legacy file will be parsed.
 	if !m.RuntimeEnvContext.UserConfig.LegacyVersionFile.Enable {
 		logger.Debugf("Legacy version file is disabled \n")
