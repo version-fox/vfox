@@ -35,9 +35,9 @@ type RuntimeEnvContext struct {
 	RuntimeVersion    string             // RuntimeVersion is the version of vfox
 }
 
-// LoadConfigByScope loads the config for the specified scope
+// LoadVfoxTomlByScope loads the config for the specified scope
 // pathmeta is not aware of scope, but we don't need to track it in VfoxToml
-func (m *RuntimeEnvContext) LoadConfigByScope(scope UseScope) (*pathmeta.VfoxToml, error) {
+func (m *RuntimeEnvContext) LoadVfoxTomlByScope(scope UseScope) (*pathmeta.VfoxToml, error) {
 	var dir string
 
 	switch scope {
@@ -46,7 +46,7 @@ func (m *RuntimeEnvContext) LoadConfigByScope(scope UseScope) (*pathmeta.VfoxTom
 	case Project:
 		dir = m.PathMeta.Working.Directory
 	case Session:
-		dir = m.PathMeta.Working.SessionShim
+		dir = m.PathMeta.Working.SessionSdkDir
 	default:
 		return nil, fmt.Errorf("unknown scope: %v", scope)
 	}
@@ -54,14 +54,14 @@ func (m *RuntimeEnvContext) LoadConfigByScope(scope UseScope) (*pathmeta.VfoxTom
 	return pathmeta.LoadConfig(dir)
 }
 
-// LoadConfigChainByScopes loads configs for multiple scopes and returns a chain
+// LoadVfoxTomlChainByScopes loads configs for multiple scopes and returns a chain
 // Scopes are added in order (first added = lowest priority)
-// Example: LoadConfigChainByScopes(Global, Session, Project) → Project has highest priority
-func (m *RuntimeEnvContext) LoadConfigChainByScopes(scopes ...UseScope) (pathmeta.VfoxTomlChain, error) {
+// Example: LoadVfoxTomlChainByScopes(Global, Session, Project) → Project has highest priority
+func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (pathmeta.VfoxTomlChain, error) {
 	chain := pathmeta.NewVfoxTomlChain()
 
 	for _, scope := range scopes {
-		c, err := m.LoadConfigByScope(scope)
+		c, err := m.LoadVfoxTomlByScope(scope)
 		if err != nil {
 			return chain, err
 		}
@@ -88,4 +88,18 @@ func (m *RuntimeEnvContext) HttpClient() *http.Client {
 	}
 
 	return client
+}
+
+// GetLinkDirPathByScope returns the symlink directory path for the given scope.
+func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
+	var linkDir string
+	switch scope {
+	case Global:
+		linkDir = m.PathMeta.Working.GlobalSdkDir
+	case Project:
+		linkDir = m.PathMeta.Working.ProjectSdkDir
+	case Session:
+		linkDir = m.PathMeta.Working.SessionSdkDir
+	}
+	return linkDir
 }

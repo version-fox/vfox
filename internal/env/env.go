@@ -34,6 +34,13 @@ type Envs struct {
 	Paths     *Paths
 }
 
+func NewEnvs() *Envs {
+	return &Envs{
+		Variables: make(Vars),
+		Paths:     NewPaths(EmptyPaths),
+	}
+}
+
 func (e *Envs) Merge(envs *Envs) {
 	if envs == nil {
 		return

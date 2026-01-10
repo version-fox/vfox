@@ -18,7 +18,11 @@
 
 package sdk
 
-import "github.com/version-fox/vfox/internal/plugin"
+import (
+	"path/filepath"
+
+	"github.com/version-fox/vfox/internal/plugin"
+)
 
 // Version represents the version string of SDK runtime.
 type Version string
@@ -30,11 +34,35 @@ type Runtime struct {
 	Path    string  `json:"path"`
 }
 
+// replacePath returns a new Runtime with the Path replaced by joining the parentPath and the runtime's Name.
+func (r *Runtime) replacePath(parentPath string) *Runtime {
+	path := filepath.Join(parentPath, r.Name)
+	return &Runtime{
+		Name:    r.Name,
+		Version: r.Version,
+		Path:    path,
+	}
+}
+
 // RuntimePackage represents a package of runtimes, including a main runtime and additional runtimes.
 type RuntimePackage struct {
 	*Runtime
 	PackagePath string
 	Additions   []*Runtime `json:"additions"`
+}
+
+// ReplacePath returns a new RuntimePackage with all runtimes' paths replaced by joining the parentPath and their names.
+func (r *RuntimePackage) ReplacePath(parentPath string) *RuntimePackage {
+	mainRuntime := r.Runtime.replacePath(parentPath)
+	additions := make([]*Runtime, 0, len(r.Additions))
+	for _, addition := range r.Additions {
+		additions = append(additions, addition.replacePath(parentPath))
+	}
+	return &RuntimePackage{
+		Runtime:     mainRuntime,
+		PackagePath: parentPath,
+		Additions:   additions,
+	}
 }
 
 type AvailableRuntime struct {

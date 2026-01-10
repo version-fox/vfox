@@ -36,7 +36,6 @@ import (
 	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shared/logger"
-	"github.com/version-fox/vfox/internal/shared/shim"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -50,7 +49,7 @@ type Sdk interface {
 	Install(version Version) error                               // Install a specific runtime of the SDK
 	Uninstall(version Version) error                             // Uninstall a specific runtime of the SDK
 	Available(args []string) ([]*AvailableRuntimePackage, error) // List available runtime of the SDK
-	EnvKeys(version Version) (*env.Envs, error)                  // Get environment variables for a specific runtime of the SDK
+	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)   // Get environment variables for a specific runtime of the SDK
 	Use(version Version, scope env.UseScope) error               // Use a specific runtime in a given scope
 	Unuse(scope env.UseScope) error                              // Unuse the current runtime in a given scope
 	GetRuntimePackage(version Version) (*RuntimePackage, error)  // Get the runtime package for a specific version
@@ -59,6 +58,13 @@ type Sdk interface {
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
 	Metadata() *Metadata // Get the metadata of the SDK
+
+	// CreateSymlinksForScope creates symlinks for a specific version in the given scope
+	CreateSymlinksForScope(version Version, scope env.UseScope) error
+	// EnvKeysForScope returns environment variables for a version in the given scope
+	// It creates symlinks if needed and returns env vars with paths pointing to symlinks
+	EnvKeysForScope(version Version, scope env.UseScope) (*env.Envs, error)
+
 	Close()
 }
 
@@ -340,16 +346,7 @@ func (b *impl) Uninstall(version Version) (err error) {
 }
 
 // EnvKeys Only return the really installed path of this SDK
-func (b *impl) EnvKeys(version Version) (*env.Envs, error) {
-	label := b.Label(version)
-	if !b.CheckRuntimeExist(version) {
-		return nil, fmt.Errorf("%s is not installed", label)
-	}
-
-	runtimePackage, err := b.GetRuntimePackage(version)
-	if err != nil {
-		return nil, err
-	}
+func (b *impl) EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error) {
 	sdkInfos := make(map[string]*plugin.InstalledPackageItem)
 	mainSdk := convertRuntime2InstalledPackageItem(runtimePackage.Runtime)
 	sdkInfos[mainSdk.Name] = mainSdk
@@ -482,10 +479,16 @@ func (b *impl) Use(version Version, scope env.UseScope) error {
 
 func (b *impl) useInHook(version Version, scope env.UseScope) error {
 
-	// 特殊，需要判断是否存在目录，不存在在创建
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		logger.Debugf("Failed to get runtime package for %s: %v", b.Label(version), err)
+		return ErrRuntimeNotFound
+	}
+
+	// Ensure .vfox directory exists for project scope
 	if env.Project == scope {
-		if !util.FileExists(b.envContext.PathMeta.Working.Directory) {
-			err := os.MkdirAll(b.envContext.PathMeta.Working.Directory, pathmeta.ReadWriteAuth)
+		if !util.FileExists(b.envContext.PathMeta.Working.ProjectSdkDir) {
+			err := os.MkdirAll(b.envContext.PathMeta.Working.ProjectSdkDir, pathmeta.ReadWriteAuth)
 			if err != nil {
 				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
@@ -493,7 +496,7 @@ func (b *impl) useInHook(version Version, scope env.UseScope) error {
 	}
 
 	// Load config for the specified scope
-	vfoxToml, err := b.envContext.LoadConfigByScope(scope)
+	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(scope)
 	if err != nil {
 		return err
 	}
@@ -507,7 +510,7 @@ func (b *impl) useInHook(version Version, scope env.UseScope) error {
 	}
 
 	// Create symlinks for the specified scope
-	if err := b.createSymlinksForScope(version, scope); err != nil {
+	if err := b.createSymlinksForScope(runtimePackage, scope); err != nil {
 		return fmt.Errorf("failed to create symlinks, err:%w", err)
 	}
 
@@ -539,7 +542,7 @@ func (b *impl) InstalledList() []Version {
 // Lookup priority is: project > session > global
 func (b *impl) Current() Version {
 	// Load configs from all scopes with priority: Global < Session < Project
-	chain, err := b.envContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
+	chain, err := b.envContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
 		logger.Debugf("Failed to load config chain: %v", err)
 		return ""
@@ -597,95 +600,77 @@ func (b *impl) Close() {
 }
 
 // createSymlinksForScope creates symlinks in the appropriate SDK directory for the scope
-func (b *impl) createSymlinksForScope(version Version, scope env.UseScope) error {
-	// Get SDK binaries
-	envKeys, err := b.EnvKeys(version)
-	if err != nil {
-		return fmt.Errorf("failed to get env keys for %s, err:%w", b.Label(version), err)
-	}
-
-	binPaths, err := envKeys.Paths.ToBinPaths()
-	if err != nil {
-		return fmt.Errorf("failed to get bin paths, err:%w", err)
-	}
+func (b *impl) createSymlinksForScope(runtimePackage *RuntimePackage, scope env.UseScope) error {
 
 	// Determine target SDK directory based on scope
-	var sdkDir string
-	switch scope {
-	case env.Global:
-		sdkDir = b.envContext.PathMeta.Working.GlobalShim
-	case env.Project:
-		sdkDir = b.envContext.PathMeta.Working.ProjectShim
-	case env.Session:
-		sdkDir = b.envContext.PathMeta.Working.SessionShim
+	sdkDir := b.envContext.GetLinkDirPathByScope(scope)
+	// Create symlinks for main runtime
+	if err := b.createDirSymlinks(runtimePackage.Runtime, sdkDir); err != nil {
+		return err
+	}
+	// Create symlinks for all additions
+	for _, addition := range runtimePackage.Additions {
+		if err := b.createDirSymlinks(addition, sdkDir); err != nil {
+			// Log but continue with other additions
+			logger.Debugf("Failed to create symlink for addition %s: %v", addition.Name, err)
+		}
+	}
+	return nil
+}
+
+// CreateSymlinksForScope creates symlinks for a specific version in the given scope
+func (b *impl) CreateSymlinksForScope(version Version, scope env.UseScope) error {
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return err
+	}
+	return b.createSymlinksForScope(runtimePackage, scope)
+}
+
+// EnvKeysForScope returns environment variables for a version in the given scope.
+// It returns env vars with paths pointing to symlinks (does NOT create symlinks).
+func (b *impl) EnvKeysForScope(version Version, scope env.UseScope) (*env.Envs, error) {
+	// 1. Get the real runtime package
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return nil, err
 	}
 
-	// Whatever scope used, the session scope must be created symlinks.
-	if scope != env.Session {
-		_ = b.createBinSymlinks(binPaths, b.envContext.PathMeta.Working.SessionShim)
-	}
-	// Create symlinks for each binary
-	return b.createBinSymlinks(binPaths, sdkDir)
-
+	// 2. Get the symlink directory for this scope
+	linkDir := b.envContext.GetLinkDirPathByScope(scope)
+	// 3. Return env keys with paths pointing to symlinks
+	symlinkPackage := runtimePackage.ReplacePath(linkDir)
+	return b.EnvKeys(symlinkPackage)
 }
 
 // removeSymlinksForScope removes symlinks for the specified scope and version
 func (b *impl) removeSymlinksForScope(version Version, scope env.UseScope) error {
-	// Get SDK binaries
-	envKeys, err := b.EnvKeys(version)
-	if err != nil {
-		return fmt.Errorf("failed to get env keys for %s, err:%w", b.Label(version), err)
-	}
-
-	binPaths, err := envKeys.Paths.ToBinPaths()
-	if err != nil {
-		return fmt.Errorf("failed to get bin paths, err:%w", err)
-	}
-
 	// Determine target SDK directory based on scope
-	var sdkDir string
-	switch scope {
-	case env.Global:
-		sdkDir = b.envContext.PathMeta.Working.GlobalShim
-	case env.Project:
-		sdkDir = b.envContext.PathMeta.Working.ProjectShim
-	case env.Session:
-		sdkDir = b.envContext.PathMeta.Working.SessionShim
+	sdkDir := b.envContext.GetLinkDirPathByScope(scope)
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return err
 	}
+	symlinkRuntimePackage := runtimePackage.ReplacePath(sdkDir)
 
-	// Remove symlinks for each binary
-	return b.removeBinSymlinks(binPaths, sdkDir)
-}
-
-// removeBinSymlinks removes symlinks for all binaries in the given paths
-func (b *impl) removeBinSymlinks(binPaths *env.Paths, targetDir string) error {
-	for _, binPath := range binPaths.Slice() {
-		binName := filepath.Base(binPath)
-		binShim := shim.NewShim(binPath, targetDir)
-		if err := binShim.Clear(); err != nil {
-			logger.Debugf("Failed to remove symlink for %s, err:%v\n", binName, err)
-			continue
-		}
+	mainRuntime := symlinkRuntimePackage.Runtime
+	_ = env.RemoveDirSymlink(mainRuntime.Path)
+	for _, addition := range symlinkRuntimePackage.Additions {
+		_ = env.RemoveDirSymlink(addition.Path)
 	}
 	return nil
 }
 
-// createBinSymlinks creates symlinks for all binaries in the given paths
-func (b *impl) createBinSymlinks(binPaths *env.Paths, targetDir string) error {
+// createDirSymlinks creates symlinks for runtime in the given paths
+func (b *impl) createDirSymlinks(runtime *Runtime, targetDir string) error {
+	// sdk name
+	path := filepath.Join(targetDir, runtime.Name)
 	// Ensure target directory exists
-	if err := os.MkdirAll(targetDir, pathmeta.ReadWriteAuth); err != nil {
+	if err := os.MkdirAll(path, pathmeta.ReadWriteAuth); err != nil {
 		return fmt.Errorf("failed to create SDK directory %s, err:%w", targetDir, err)
 	}
 
-	for _, binPath := range binPaths.Slice() {
-		binName := filepath.Base(binPath)
-		binShim := shim.NewShim(binPath, targetDir)
-		if err := binShim.Generate(); err != nil {
-			logger.Debugf("Failed to create symlink for %s, err:%v\n", binName, err)
-			continue
-		}
-	}
-	return nil
+	return env.CreateDirSymlink(runtime.Path, path)
 }
 
 func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
@@ -825,7 +810,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 	chain := pathmeta.NewVfoxTomlChain()
 
 	if scope == env.Global {
-		globalConfig, err := b.envContext.LoadConfigByScope(env.Global)
+		globalConfig, err := b.envContext.LoadVfoxTomlByScope(env.Global)
 		if err != nil {
 			return fmt.Errorf("failed to read global config: %w", err)
 		}
@@ -843,7 +828,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 		chain.Add(globalConfig)
 
 	} else if scope == env.Project {
-		projectConfig, err := b.envContext.LoadConfigByScope(env.Project)
+		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
 		if err != nil {
 			return fmt.Errorf("failed to read project config: %w", err)
 		}
@@ -863,7 +848,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 
 	// For session scope, or in addition to global/project scope,
 	// also remove from the session level
-	sessionConfig, err := b.envContext.LoadConfigByScope(env.Session)
+	sessionConfig, err := b.envContext.LoadVfoxTomlByScope(env.Session)
 	if err != nil {
 		return fmt.Errorf("failed to read session config: %w", err)
 	}

@@ -68,8 +68,6 @@ type Manager struct {
 	openSdks          map[string]sdk.Sdk
 }
 
-// LookupSdk lookup sdk by name
-// Loads SDK plugins and generates env keys based on the tool versions in the chain
 func (m *Manager) EnvKeys(chain pathmeta.VfoxTomlChain) (*env.Envs, error) {
 	sdkEnvs := &env.Envs{
 		Variables: make(env.Vars),
@@ -84,18 +82,19 @@ func (m *Manager) EnvKeys(chain pathmeta.VfoxTomlChain) (*env.Envs, error) {
 		if _, ok := tools[name]; ok {
 			continue
 		}
-		if lookupSdk, err := m.LookupSdk(name); err == nil {
-			v := sdk.Version(version)
-			if ek, err := lookupSdk.EnvKeys(v); err == nil {
-				tools[name] = struct{}{}
-				sdkEnvs.Merge(ek)
-			}
+		if _, err := m.LookupSdk(name); err == nil {
+			_ = sdk.Version(version)
+			//if ek, err := lookupSdk.(runtimePackage); err == nil {
+			//	tools[name] = struct{}{}
+			//	sdkEnvs.Merge(ek)
+			//}
 		}
 	}
 	return sdkEnvs, nil
 }
 
 // LookupSdk lookup sdk by name
+// Loads SDK plugins and generates env keys based on the tool versions in the chain
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	if s, ok := m.openSdks[name]; ok {
 		return s, nil
@@ -117,7 +116,7 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 func (m *Manager) ResolveVersion(sdkName string, version sdk.Version) sdk.Version {
 	if version == "" {
 		// when version is empty, try to get version from workspace config
-		workspaceConfig, err := m.RuntimeEnvContext.LoadConfigByScope(env.Project)
+		workspaceConfig, err := m.RuntimeEnvContext.LoadVfoxTomlByScope(env.Project)
 		if err != nil {
 			logger.Errorf("Failed to get workspace config: %v", err)
 			return version

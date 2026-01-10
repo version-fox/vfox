@@ -42,10 +42,10 @@ type SharedPaths struct {
 }
 
 type WorkingPaths struct {
-	Directory   string // Current working directory
-	ProjectShim string // .vfox/sdk (project-level)
-	SessionShim string // Session temporary shim path
-	GlobalShim  string // Global shim path in user home
+	Directory     string // Current working directory
+	ProjectSdkDir string // .vfox/sdk (project-level)
+	SessionSdkDir string // Session temporary shim path
+	GlobalSdkDir  string // Global shim path in user home
 }
 
 type PathMeta struct {
@@ -64,7 +64,7 @@ const (
 	tmpDirPrefix       = "tmp"       // User-level temp
 	installedDirPrefix = "installed" // Shared installed directory
 	configFilePrefix   = "config.yaml"
-	shimDirPrefix      = "shims"
+	shimDirPrefix      = "sdks"
 
 	ReadWriteAuth = 0700 // can write and read
 )
@@ -93,10 +93,10 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 			Config:   filepath.Join(sharedRoot, configFilePrefix),
 		},
 		Working: WorkingPaths{
-			Directory:   currentDir,
-			ProjectShim: filepath.Join(vfoxDirPrefix, shimDirPrefix),
-			SessionShim: generateSessionShimPath(filepath.Join(userHome, tmpDirPrefix), pid),
-			GlobalShim:  filepath.Join(userHome, shimDirPrefix),
+			Directory:     currentDir,
+			ProjectSdkDir: filepath.Join(vfoxDirPrefix, shimDirPrefix),
+			SessionSdkDir: generateSessionShimPath(filepath.Join(userHome, tmpDirPrefix), pid),
+			GlobalSdkDir:  filepath.Join(userHome, shimDirPrefix),
 		},
 		Executable: getExecutablePath(),
 	}
@@ -104,7 +104,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 	// Initialize necessary directories
 	_ = os.MkdirAll(meta.User.Temp, ReadWriteAuth)
 	_ = os.MkdirAll(meta.User.Cache, ReadWriteAuth)
-	_ = os.MkdirAll(meta.Working.GlobalShim, ReadWriteAuth)
+	_ = os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Installs, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Plugins, ReadWriteAuth)
 

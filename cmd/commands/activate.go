@@ -51,7 +51,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	// Load Project and Global configs
-	chain, err := manager.RuntimeEnvContext.LoadConfigChainByScopes(env.Global, env.Project)
+	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Project)
 	if err != nil {
 		return err
 	}
@@ -71,16 +71,16 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	// which shell we are using.
 	_ = os.Setenv(env.HookFlag, name)
 	// TODO：deprecated
-	_ = os.Setenv(pathmeta.HookCurTmpPath, runtimeEnvContext.PathMeta.Working.SessionShim)
+	_ = os.Setenv(pathmeta.HookCurTmpPath, runtimeEnvContext.PathMeta.Working.SessionSdkDir)
 
-	threeLayerPaths := generatePATH(runtimeEnvContext.PathMeta)
+	//threeLayerPaths := generatePATH(runtimeEnvContext.PathMeta)
 
 	exportEnvs := make(env.Vars)
 	for k, v := range envs.Variables {
 		exportEnvs[k] = v
 	}
-	pathStr := threeLayerPaths.String()
-	exportEnvs["PATH"] = &pathStr
+	//pathStr := threeLayerPaths.String()
+	//exportEnvs["PATH"] = &pathStr
 
 	logger.Debugf("export envs: %+v", exportEnvs)
 

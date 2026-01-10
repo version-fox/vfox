@@ -233,7 +233,7 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 	envContext := manager.RuntimeEnvContext
 
 	// Load configs from all scopes with priority: Global < Session < Project
-	chain, err := envContext.LoadConfigChainByScopes(env.Global, env.Session, env.Project)
+	chain, err := envContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
 	if err != nil {
 		return
 	}
