@@ -68,31 +68,6 @@ type Manager struct {
 	openSdks          map[string]sdk.Sdk
 }
 
-func (m *Manager) EnvKeys(chain pathmeta.VfoxTomlChain) (*env.Envs, error) {
-	sdkEnvs := &env.Envs{
-		Variables: make(env.Vars),
-		Paths:     env.NewPaths(env.EmptyPaths),
-	}
-	tools := make(map[string]struct{})
-
-	// Get merged tools from the chain
-	allTools := chain.GetAllTools()
-
-	for name, version := range allTools {
-		if _, ok := tools[name]; ok {
-			continue
-		}
-		if _, err := m.LookupSdk(name); err == nil {
-			_ = sdk.Version(version)
-			//if ek, err := lookupSdk.(runtimePackage); err == nil {
-			//	tools[name] = struct{}{}
-			//	sdkEnvs.Merge(ek)
-			//}
-		}
-	}
-	return sdkEnvs, nil
-}
-
 // LookupSdk lookup sdk by name
 // Loads SDK plugins and generates env keys based on the tool versions in the chain
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {

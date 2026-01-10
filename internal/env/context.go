@@ -22,9 +22,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 // RuntimeEnvContext represents the runtime environment context.
@@ -57,15 +61,15 @@ func (m *RuntimeEnvContext) LoadVfoxTomlByScope(scope UseScope) (*pathmeta.VfoxT
 // LoadVfoxTomlChainByScopes loads configs for multiple scopes and returns a chain
 // Scopes are added in order (first added = lowest priority)
 // Example: LoadVfoxTomlChainByScopes(Global, Session, Project) → Project has highest priority
-func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (pathmeta.VfoxTomlChain, error) {
-	chain := pathmeta.NewVfoxTomlChain()
+func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (VfoxTomlChain, error) {
+	chain := NewVfoxTomlChain()
 
 	for _, scope := range scopes {
 		c, err := m.LoadVfoxTomlByScope(scope)
 		if err != nil {
 			return chain, err
 		}
-		chain.Add(c)
+		chain.Add(c, scope)
 	}
 
 	return chain, nil
@@ -102,4 +106,39 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 		linkDir = m.PathMeta.Working.SessionSdkDir
 	}
 	return linkDir
+}
+
+// CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
+// This ensures the system PATH is clean before adding vfox paths back in priority order.
+func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
+	// Get system paths
+	systemPaths := strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
+
+	// vfox paths to filter out
+	vfoxPaths := []string{
+		m.PathMeta.Working.ProjectSdkDir,
+		m.PathMeta.Working.SessionSdkDir,
+		m.PathMeta.Working.GlobalSdkDir,
+	}
+
+	cleanPaths := NewPaths(EmptyPaths)
+	for _, path := range systemPaths {
+		shouldRemove := false
+		for _, vfoxPath := range vfoxPaths {
+			// Use prefix matching to remove any path under vfox directories
+			// Ensure both paths are cleaned for proper comparison
+			cleanPath := filepath.Clean(path)
+			cleanVfoxPath := filepath.Clean(vfoxPath)
+			if cleanPath == cleanVfoxPath || strings.HasPrefix(cleanPath, cleanVfoxPath+string(filepath.Separator)) {
+				shouldRemove = true
+				logger.Debugf("Removing vfox path from system PATH: %s", path)
+				break
+			}
+		}
+		if !shouldRemove {
+			cleanPaths.Add(path)
+		}
+	}
+
+	return cleanPaths
 }

@@ -48,3 +48,37 @@ func (e *Envs) Merge(envs *Envs) {
 	e.Paths.Merge(envs.Paths)
 	e.Variables.Merge(envs.Variables)
 }
+
+// MergeByScopePriority merges envs from different scopes with proper priority
+// scopePriority: list of scopes in order from HIGHEST to LOWEST priority
+// For example: [Project, Session, Global] means Project has highest priority
+//
+// NOTE: PATH and Vars are merged differently due to their different semantics:
+// - Paths.Merge appends (first added has higher priority)
+// - Vars.Merge overwrites (last added wins)
+//
+// So this method handles them separately:
+// - Paths: merged in given order (HIGHEST priority first)
+// - Vars: merged in reverse order (LOWEST priority first, HIGHEST overrides)
+func (e *Envs) MergeByScopePriority(envsByScope map[UseScope]*Envs, scopePriority []UseScope) {
+	if len(envsByScope) == 0 {
+		return
+	}
+
+	// Merge Paths in given order (HIGHEST to LOWEST priority)
+	// HIGHEST priority Paths will come FIRST in PATH
+	for _, scope := range scopePriority {
+		if envs := envsByScope[scope]; envs != nil {
+			e.Paths.Merge(envs.Paths)
+		}
+	}
+
+	// Merge Vars in REVERSE order (LOWEST to HIGHEST priority)
+	// HIGHEST priority Vars will override LOWER priority ones
+	for i := len(scopePriority) - 1; i >= 0; i-- {
+		scope := scopePriority[i]
+		if envs := envsByScope[scope]; envs != nil {
+			e.Variables.Merge(envs.Variables)
+		}
+	}
+}

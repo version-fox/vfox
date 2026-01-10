@@ -503,8 +503,19 @@ func (b *impl) useInHook(version Version, scope env.UseScope) error {
 
 	logger.Debugf("Load %v tool versions: %v\n", scope, vfoxToml.GetAllTools())
 
+	var useLink string
+	if scope == env.Project {
+		useLink = NoLink
+	} else {
+		useLink = YesLink
+	}
+
+	attr := pathmeta.Attr{
+		LinkAttrFlag: useLink,
+	}
+
 	// Update version record
-	vfoxToml.SetTool(b.Name, string(version))
+	vfoxToml.SetToolWithAttr(b.Name, string(version), attr)
 	if err := vfoxToml.Save(); err != nil {
 		return fmt.Errorf("failed to save tool versions, err:%w", err)
 	}
@@ -549,7 +560,7 @@ func (b *impl) Current() Version {
 	}
 
 	// Search for current version (with priority)
-	if version, ok := chain.GetToolVersion(b.Name); ok && b.CheckRuntimeExist(Version(version)) {
+	if version, _, ok := chain.GetToolVersion(b.Name); ok && b.CheckRuntimeExist(Version(version)) {
 		return Version(version)
 	}
 	return ""
@@ -662,15 +673,38 @@ func (b *impl) removeSymlinksForScope(version Version, scope env.UseScope) error
 }
 
 // createDirSymlinks creates symlinks for runtime in the given paths
+// Checks if symlink already exists and points to the correct target before creating
 func (b *impl) createDirSymlinks(runtime *Runtime, targetDir string) error {
-	// sdk name
-	path := filepath.Join(targetDir, runtime.Name)
-	// Ensure target directory exists
-	if err := os.MkdirAll(path, pathmeta.ReadWriteAuth); err != nil {
+	// Full path to the symlink
+	linkPath := filepath.Join(targetDir, runtime.Name)
+
+	// Check if symlink already exists and points to the correct target
+	if env.IsDirSymlink(linkPath) {
+		currentTarget, err := env.ReadDirSymlink(linkPath)
+		if err == nil {
+			// Normalize paths for comparison (handles path separators, etc.)
+			// Convert both paths to absolute paths for accurate comparison
+			currentTargetAbs, err1 := filepath.Abs(currentTarget)
+			expectedTargetAbs, err2 := filepath.Abs(runtime.Path)
+
+			if err1 == nil && err2 == nil && currentTargetAbs == expectedTargetAbs {
+				// Symlink already exists and points to the correct target, skip creation
+				logger.Debugf("Symlink already exists and is correct: %s -> %s \n", linkPath, currentTarget)
+				return nil
+			}
+			// Symlink exists but points to wrong target or path resolution failed, need to recreate
+			logger.Debugf("Symlink exists but points to wrong target, recreating: %s (current: %s, expected: %s) \n",
+				linkPath, currentTarget, runtime.Path)
+		}
+	}
+
+	// Ensure parent directory exists
+	if err := os.MkdirAll(targetDir, pathmeta.ReadWriteAuth); err != nil {
 		return fmt.Errorf("failed to create SDK directory %s, err:%w", targetDir, err)
 	}
 
-	return env.CreateDirSymlink(runtime.Path, path)
+	// Create the symlink (env.CreateDirSymlink will handle removing old symlink if needed)
+	return env.CreateDirSymlink(runtime.Path, linkPath)
 }
 
 func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
@@ -807,7 +841,7 @@ func (b *impl) Label(version Version) string {
 // Unuse removes the version setting for the SDK from the specified scope
 func (b *impl) Unuse(scope env.UseScope) error {
 	// Create a config chain to manage all affected scopes
-	chain := pathmeta.NewVfoxTomlChain()
+	chain := env.NewVfoxTomlChain()
 
 	if scope == env.Global {
 		globalConfig, err := b.envContext.LoadVfoxTomlByScope(env.Global)
@@ -825,7 +859,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 
 		// Remove from global config
 		globalConfig.RemoveTool(b.Name)
-		chain.Add(globalConfig)
+		chain.Add(globalConfig, scope)
 
 	} else if scope == env.Project {
 		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
@@ -843,7 +877,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 
 		// Remove from project config
 		projectConfig.RemoveTool(b.Name)
-		chain.Add(projectConfig)
+		chain.Add(projectConfig, scope)
 	}
 
 	// For session scope, or in addition to global/project scope,
@@ -862,7 +896,7 @@ func (b *impl) Unuse(scope env.UseScope) error {
 	}
 
 	sessionConfig.RemoveTool(b.Name)
-	chain.Add(sessionConfig)
+	chain.Add(sessionConfig, scope)
 
 	// Save all modified configs
 	if err = chain.Save(); err != nil {

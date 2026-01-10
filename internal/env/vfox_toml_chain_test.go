@@ -16,12 +16,13 @@
  *
  */
 
-package pathmeta
+package env
 
 import (
 	"path/filepath"
 	"testing"
 
+	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -50,16 +51,16 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("add and get configs", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.Path = filepath.Join(tempDir, "config1.toml")
 		config1.SetTool("nodejs", "21.5.0")
 
-		config2 := NewVfoxToml()
+		config2 := pathmeta.NewVfoxToml()
 		config2.Path = filepath.Join(tempDir, "config2.toml")
 		config2.SetTool("java", "21")
 
-		chain.Add(config1)
-		chain.Add(config2)
+		chain.Add(config1, Global)
+		chain.Add(config2, Project)
 
 		if chain.IsEmpty() {
 			t.Error("Expected chain to not be empty")
@@ -90,17 +91,17 @@ func TestVfoxTomlChain(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
 		// Global config
-		globalConfig := NewVfoxToml()
+		globalConfig := pathmeta.NewVfoxToml()
 		globalConfig.SetTool("nodejs", "20.0.0")
 		globalConfig.SetTool("java", "17")
 
 		// Project config (higher priority)
-		projectConfig := NewVfoxToml()
+		projectConfig := pathmeta.NewVfoxToml()
 		projectConfig.SetTool("nodejs", "21.5.0")
 		projectConfig.SetTool("python", "3.12")
 
-		chain.Add(globalConfig)
-		chain.Add(projectConfig)
+		chain.Add(globalConfig, Global)
+		chain.Add(projectConfig, Project)
 
 		merged := chain.Merge()
 		if merged == nil {
@@ -138,16 +139,16 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("GetAllTools", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.SetTool("nodejs", "20.0.0")
 		config1.SetTool("java", "17")
 
-		config2 := NewVfoxToml()
+		config2 := pathmeta.NewVfoxToml()
 		config2.SetTool("nodejs", "21.5.0")
 		config2.SetTool("python", "3.12")
 
-		chain.Add(config1)
-		chain.Add(config2)
+		chain.Add(config1, Global)
+		chain.Add(config2, Project)
 
 		allTools := chain.GetAllTools()
 		if len(allTools) != 3 {
@@ -169,22 +170,25 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("GetTool with priority", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		globalConfig := NewVfoxToml()
+		globalConfig := pathmeta.NewVfoxToml()
 		globalConfig.SetTool("nodejs", "20.0.0")
 
-		projectConfig := NewVfoxToml()
+		projectConfig := pathmeta.NewVfoxToml()
 		projectConfig.SetTool("nodejs", "21.5.0")
 
-		chain.Add(globalConfig)
-		chain.Add(projectConfig)
+		chain.Add(globalConfig, Global)
+		chain.Add(projectConfig, Project)
 
 		// Should find in project (higher priority)
-		config, ok := chain.GetToolConfig("nodejs")
+		config, scope, ok := chain.GetToolConfig("nodejs")
 		if !ok {
 			t.Error("Expected nodejs to be found")
 		}
 		if config.Version != "21.5.0" {
 			t.Errorf("Expected version 21.5.0, got %s", config.Version)
+		}
+		if scope != Project {
+			t.Errorf("Expected scope project, got %s", scope.String())
 		}
 		// Empty map is acceptable for no attributes
 		if config.Attr != nil && len(config.Attr) != 0 {
@@ -195,12 +199,12 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("GetTool not found", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config := NewVfoxToml()
+		config := pathmeta.NewVfoxToml()
 		config.SetTool("nodejs", "21.5.0")
 
-		chain.Add(config)
+		chain.Add(config, Global)
 
-		_, ok := chain.GetToolVersion("java")
+		_, _, ok := chain.GetToolVersion("java")
 		if ok {
 			t.Error("Expected java to not be found")
 		}
@@ -209,11 +213,11 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("AddTool to all configs", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
-		config2 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
+		config2 := pathmeta.NewVfoxToml()
 
-		chain.Add(config1)
-		chain.Add(config2)
+		chain.Add(config1, Global)
+		chain.Add(config2, Global)
 
 		chain.AddTool("nodejs", "21.5.0")
 
@@ -232,16 +236,16 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("RemoveTool from all configs", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.SetTool("nodejs", "21.5.0")
 		config1.SetTool("java", "17")
 
-		config2 := NewVfoxToml()
+		config2 := pathmeta.NewVfoxToml()
 		config2.SetTool("nodejs", "20.0.0")
 		config2.SetTool("python", "3.12")
 
-		chain.Add(config1)
-		chain.Add(config2)
+		chain.Add(config1, Global)
+		chain.Add(config2, Global)
 
 		chain.RemoveTool("nodejs")
 
@@ -272,16 +276,16 @@ func TestVfoxTomlChain(t *testing.T) {
 		tempDir := t.TempDir()
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.Path = filepath.Join(tempDir, "config1.toml")
 		config1.SetTool("nodejs", "21.5.0")
 
-		config2 := NewVfoxToml()
+		config2 := pathmeta.NewVfoxToml()
 		config2.Path = filepath.Join(tempDir, "config2.toml")
 		config2.SetTool("java", "17")
 
-		chain.Add(config1)
-		chain.Add(config2)
+		chain.Add(config1, Global)
+		chain.Add(config2, Global)
 
 		// Save all configs
 		if err := chain.Save(); err != nil {
@@ -297,7 +301,7 @@ func TestVfoxTomlChain(t *testing.T) {
 		}
 
 		// Verify content
-		loaded1, err := LoadVfoxToml(config1.Path)
+		loaded1, err := pathmeta.LoadVfoxToml(config1.Path)
 		if err != nil {
 			t.Fatalf("Failed to load config1: %v", err)
 		}
@@ -306,7 +310,7 @@ func TestVfoxTomlChain(t *testing.T) {
 			t.Errorf("Expected nodejs@21.5.0 in config1, got %v", version)
 		}
 
-		loaded2, err := LoadVfoxToml(config2.Path)
+		loaded2, err := pathmeta.LoadVfoxToml(config2.Path)
 		if err != nil {
 			t.Fatalf("Failed to load config2: %v", err)
 		}
@@ -320,16 +324,16 @@ func TestVfoxTomlChain(t *testing.T) {
 		tempDir := t.TempDir()
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.Path = filepath.Join(tempDir, "config1.toml")
 		config1.SetTool("nodejs", "21.5.0")
 
-		config3 := NewVfoxToml()
+		config3 := pathmeta.NewVfoxToml()
 		config3.Path = filepath.Join(tempDir, "config3.toml")
 
-		chain.Add(config1)
-		chain.Add(nil) // Add nil config
-		chain.Add(config3)
+		chain.Add(config1, Global)
+		chain.Add(nil, Project) // Add nil config
+		chain.Add(config3, Session)
 
 		// Should handle gracefully
 		merged := chain.Merge()
@@ -356,12 +360,12 @@ func TestVfoxTomlChain(t *testing.T) {
 	t.Run("merge with nil configs", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 
-		config1 := NewVfoxToml()
+		config1 := pathmeta.NewVfoxToml()
 		config1.SetTool("nodejs", "21.5.0")
 
-		chain.Add(nil)
-		chain.Add(config1)
-		chain.Add(nil)
+		chain.Add(nil, Global)
+		chain.Add(config1, Project)
+		chain.Add(nil, Session)
 
 		merged := chain.Merge()
 		if merged == nil {

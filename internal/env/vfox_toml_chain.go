@@ -16,10 +16,18 @@
  *
  */
 
-package pathmeta
+package env
+
+import "github.com/version-fox/vfox/internal/pathmeta"
+
+// chainItem represents a single config in the chain with its scope
+type chainItem struct {
+	config *pathmeta.VfoxToml
+	scope  UseScope
+}
 
 // VfoxTomlChain is a chain of VfoxToml configs, supporting multi-config merging
-type VfoxTomlChain []*VfoxToml
+type VfoxTomlChain []*chainItem
 
 // NewVfoxTomlChain creates a new config chain
 func NewVfoxTomlChain() VfoxTomlChain {
@@ -27,31 +35,34 @@ func NewVfoxTomlChain() VfoxTomlChain {
 }
 
 // Add appends a config to the end of the chain
-func (c *VfoxTomlChain) Add(config *VfoxToml) {
-	*c = append(*c, config)
+func (c *VfoxTomlChain) Add(config *pathmeta.VfoxToml, useScope UseScope) {
+	*c = append(*c, &chainItem{
+		config: config,
+		scope:  useScope,
+	})
 }
 
 // Merge merges configs by priority
 // Later configs in the chain override earlier ones (if the same tool exists)
 // Example: [Global, Session, Project] → Project has highest priority
-func (c *VfoxTomlChain) Merge() *VfoxToml {
+func (c *VfoxTomlChain) Merge() *pathmeta.VfoxToml {
 	if len(*c) == 0 {
-		return NewVfoxToml()
+		return pathmeta.NewVfoxToml()
 	}
 
 	if len(*c) == 1 {
-		return (*c)[0]
+		return (*c)[0].config
 	}
 
-	result := NewVfoxToml()
+	result := pathmeta.NewVfoxToml()
 
 	// Merge in order, later overrides earlier
 	for _, config := range *c {
-		if config == nil {
+		if config == nil || config.config == nil {
 			continue
 		}
 
-		for name, toolConfig := range config.Tools {
+		for name, toolConfig := range config.config.Tools {
 			if toolConfig == nil {
 				continue
 			}
@@ -64,38 +75,53 @@ func (c *VfoxTomlChain) Merge() *VfoxToml {
 }
 
 // GetAllTools returns all tools after merging
-func (c *VfoxTomlChain) GetAllTools() ToolVersions {
+func (c *VfoxTomlChain) GetAllTools() pathmeta.ToolVersions {
 	return c.Merge().GetAllTools()
 }
 
 // GetToolConfig retrieves a tool config (searches by priority)
 // Searches from tail to head (high priority to low priority)
-func (c *VfoxTomlChain) GetToolConfig(name string) (*ToolConfig, bool) {
+func (c *VfoxTomlChain) GetToolConfig(name string) (*pathmeta.ToolConfig, UseScope, bool) {
 	// Search from high priority to low priority
 	for i := len(*c) - 1; i >= 0; i-- {
-		if (*c)[i] != nil {
-			if config, ok := (*c)[i].Tools.Get(name); ok {
-				return config, true
-			}
+		item := (*c)[i]
+		if item == nil || item.config == nil {
+			continue
+		}
+		if config, ok := item.config.Tools.Get(name); ok {
+			return config, item.scope, true
 		}
 	}
-	return nil, false
+	return nil, Global, false
 }
 
 // GetToolVersion retrieves only the version of a tool (searches by priority)
-func (c *VfoxTomlChain) GetToolVersion(name string) (string, bool) {
-	if config, ok := c.GetToolConfig(name); ok {
-		return config.Version, true
+func (c *VfoxTomlChain) GetToolVersion(name string) (string, UseScope, bool) {
+	if config, scope, ok := c.GetToolConfig(name); ok {
+		return config.Version, scope, true
 	}
-	return "", false
+	return "", Global, false
 }
 
 // GetByIndex returns the config at the specified index
-func (c *VfoxTomlChain) GetByIndex(index int) *VfoxToml {
+func (c *VfoxTomlChain) GetByIndex(index int) *pathmeta.VfoxToml {
 	if index < 0 || index >= len(*c) {
 		return nil
 	}
-	return (*c)[index]
+	return (*c)[index].config
+}
+
+// GetTomlByScope returns the config and scope for the given scope
+func (c *VfoxTomlChain) GetTomlByScope(scope UseScope) (*pathmeta.VfoxToml, bool) {
+	for _, item := range *c {
+		if item == nil || item.config == nil {
+			continue
+		}
+		if item.scope == scope {
+			return item.config, true
+		}
+	}
+	return nil, false
 }
 
 // Length returns the length of the config chain
@@ -112,10 +138,10 @@ func (c *VfoxTomlChain) IsEmpty() bool {
 // Calls Save() on each VfoxToml (which won't create files if empty)
 func (c *VfoxTomlChain) Save() error {
 	for _, config := range *c {
-		if config == nil {
+		if config == nil || config.config == nil {
 			continue
 		}
-		if err := config.Save(); err != nil {
+		if err := config.config.Save(); err != nil {
 			return err
 		}
 	}
@@ -125,19 +151,19 @@ func (c *VfoxTomlChain) Save() error {
 // AddTool adds a tool to all configs in the chain
 func (c *VfoxTomlChain) AddTool(name, version string) {
 	for _, config := range *c {
-		if config == nil {
+		if config == nil || config.config == nil {
 			continue
 		}
-		config.SetTool(name, version)
+		config.config.SetTool(name, version)
 	}
 }
 
 // RemoveTool removes a tool from all configs in the chain
 func (c *VfoxTomlChain) RemoveTool(name string) {
 	for _, config := range *c {
-		if config == nil {
+		if config == nil || config.config == nil {
 			continue
 		}
-		config.RemoveTool(name)
+		config.config.RemoveTool(name)
 	}
 }

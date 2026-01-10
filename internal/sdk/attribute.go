@@ -18,17 +18,14 @@
 
 package sdk
 
+import "github.com/version-fox/vfox/internal/pathmeta"
+
 const (
 	YesLink      = "true"
 	NoLink       = "false"
 	LinkAttrFlag = "link"
 )
 
-type (
-	// LinkAttr represents whether to create a symbolic link for the runtime
-	LinkAttr string
-)
-
-func (l LinkAttr) Ok() bool {
-	return l == YesLink
+func IsUseLink(attr pathmeta.Attr) bool {
+	return attr[LinkAttrFlag] == YesLink
 }

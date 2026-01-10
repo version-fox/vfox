@@ -21,15 +21,18 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/sdk"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/env/shell"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"golang.org/x/sync/errgroup"
 )
 
 var Activate = &cli.Command{
@@ -50,42 +53,122 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	defer manager.Close()
 
-	// Load Project and Global configs
-	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Project)
-	if err != nil {
-		return err
-	}
-
-	// Project > Global
-	envs, err := manager.EnvKeys(chain)
-
-	if err != nil {
-		return err
-	}
-
 	runtimeEnvContext := manager.RuntimeEnvContext
 
+	// 1. Load Project and Global configs with scope information
+	chain, err := runtimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Project)
+	if err != nil {
+		return err
+	}
+
+	// 2. Process each SDK: check if link is needed, create symlinks if necessary
+	// Collect envs by scope to ensure proper PATH priority: Project > Session > Global > System
+	allTools := chain.GetAllTools()
+	envsByScope := map[env.UseScope]*env.Envs{
+		env.Project: env.NewEnvs(),
+		env.Session: env.NewEnvs(),
+		env.Global:  env.NewEnvs(),
+	}
+	var mu sync.Mutex
+
+	// Process SDKs concurrently using errgroup
+	g, _ := errgroup.WithContext(ctx)
+
+	for sdkName, version := range allTools {
+		sdkName := sdkName // Capture loop variable
+		version := version // Capture loop variable
+
+		g.Go(func() error {
+			// Lookup SDK
+			sdkObj, err := manager.LookupSdk(sdkName)
+			if err != nil {
+				logger.Debugf("SDK %s not found: %v", sdkName, err)
+				return nil // Continue processing other SDKs
+			}
+
+			sdkVersion := sdk.Version(version)
+
+			// Get tool config with scope information (searches by priority)
+			toolConfig, scope, ok := chain.GetToolConfig(sdkName)
+			if !ok {
+				return nil
+			}
+
+			// Determine the actual scope to use
+			// - If the scope is Project but linking is not enabled, downgrade to Session
+			// - Global always uses link (no change)
+			// - Session always uses link (no change)
+			actualScope := scope
+			if env.Project == scope && !sdk.IsUseLink(toolConfig.Attr) {
+				actualScope = env.Session
+			}
+
+			// Create symlinks if needed (internal logic checks if symlink already exists)
+			if err := sdkObj.CreateSymlinksForScope(sdkVersion, actualScope); err != nil {
+				logger.Debugf("Failed to create symlinks for %s@%s (scope: %s): %v",
+					sdkName, version, actualScope.String(), err)
+				return nil // Continue processing other SDKs
+			}
+
+			// Get environment variables pointing to symlinks
+			sdkEnvs, err := sdkObj.EnvKeysForScope(sdkVersion, actualScope)
+			if err != nil {
+				logger.Debugf("Failed to get env keys for %s@%s: %v", sdkName, version, err)
+				return nil // Continue processing other SDKs
+			}
+
+			// Collect envs by scope to ensure proper PATH priority (thread-safe)
+			mu.Lock()
+			envsByScope[actualScope].Merge(sdkEnvs)
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	// Wait for all SDK processing to complete
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	// 3. Merge envs by scope priority: Project > Session > Global
+	// This ensures proper priority for both PATH (Project first) and Vars (Project overrides)
+	finalEnvs := env.NewEnvs()
+	scopePriority := []env.UseScope{env.Project, env.Session, env.Global}
+	finalEnvs.MergeByScopePriority(envsByScope, scopePriority)
+
+	// 3. Build final PATH with proper priority: Project > Session > Global > Cleaned System PATH
+	// Get clean system PATH (removes all vfox-managed paths)
+	cleanSystemPaths := runtimeEnvContext.CleanSystemPaths()
+
+	// Merge in priority order: vfox paths (already sorted by scope) > clean system paths
+	finalEnvs.Paths.Merge(cleanSystemPaths)
+
+	// 4. Export environment variables
 	// Note: This step must be the first.
 	// the Paths will handle the path format of GitBash which is different from other shells.
 	// So we need to set the env.HookFlag first to let the Paths know
 	// which shell we are using.
 	_ = os.Setenv(env.HookFlag, name)
-	// TODO：deprecated
-	_ = os.Setenv(pathmeta.HookCurTmpPath, runtimeEnvContext.PathMeta.Working.SessionSdkDir)
-
-	//threeLayerPaths := generatePATH(runtimeEnvContext.PathMeta)
 
 	exportEnvs := make(env.Vars)
-	for k, v := range envs.Variables {
+	for k, v := range finalEnvs.Variables {
 		exportEnvs[k] = v
 	}
-	//pathStr := threeLayerPaths.String()
-	//exportEnvs["PATH"] = &pathStr
 
-	logger.Debugf("export envs: %+v", exportEnvs)
+	// Add PATH with proper priority
+	pathStr := finalEnvs.Paths.String()
+	exportEnvs["PATH"] = &pathStr
 
-	path := runtimeEnvContext.PathMeta.Executable
-	path = strings.Replace(path, "\\", "/", -1)
+	// Export __VFOX_CURTMFPATH so that vfox env can use the same session directory
+	// This ensures state cache works across multiple vfox env calls in the same session
+	curTmpPath := runtimeEnvContext.PathMeta.Working.SessionSdkDir
+	exportEnvs[pathmeta.HookCurTmpPath] = &curTmpPath
+
+	logger.Debugf("Export envs: %+v", exportEnvs)
+
+	vfoxPath := runtimeEnvContext.PathMeta.Executable
+	vfoxPath = strings.Replace(vfoxPath, "\\", "/", -1)
 	s := shell.NewShell(name)
 	if s == nil {
 		return fmt.Errorf("unknown target shell %s", name)
@@ -94,7 +177,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate(
 		shell.ActivateConfig{
-			SelfPath:       path,
+			SelfPath:       vfoxPath,
 			Args:           cmd.Args().Tail(),
 			EnablePidCheck: env.IsMultiplexerEnvironment(),
 		},
@@ -111,7 +194,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 		EnvContent     string
 		EnablePidCheck bool
 	}{
-		SelfPath:       path,
+		SelfPath:       vfoxPath,
 		EnvContent:     exportStr,
 		EnablePidCheck: env.IsMultiplexerEnvironment(),
 	}

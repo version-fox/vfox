@@ -1,6 +1,6 @@
 module github.com/version-fox/vfox
 
-go 1.23.0
+go 1.24.0
 
 require (
 	atomicgo.dev/cursor v0.2.0
@@ -48,5 +48,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
