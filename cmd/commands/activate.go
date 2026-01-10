@@ -110,7 +110,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 			// - Global always uses link (no change)
 			// - Session always uses link (no change)
 			actualScope := scope
-			if env.Project == scope && !sdk.IsUseLink(toolConfig.Attr) {
+			if env.Project == scope && sdk.IsUseUnLink(toolConfig.Attr) {
 				actualScope = env.Session
 			}
 

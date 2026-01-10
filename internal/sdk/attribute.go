@@ -21,11 +21,11 @@ package sdk
 import "github.com/version-fox/vfox/internal/pathmeta"
 
 const (
-	YesLink      = "true"
-	NoLink       = "false"
-	LinkAttrFlag = "link"
+	BoolYes        = "true"
+	BoolNo         = "false"
+	UnLinkAttrFlag = "unlink"
 )
 
-func IsUseLink(attr pathmeta.Attr) bool {
-	return attr[LinkAttrFlag] == YesLink
+func IsUseUnLink(attr pathmeta.Attr) bool {
+	return attr[UnLinkAttrFlag] == BoolYes
 }

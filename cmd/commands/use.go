@@ -46,12 +46,16 @@ var Use = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "project",
 			Aliases: []string{"p"},
-			Usage:   "Used with the current directory",
+			Usage:   "Used with the current directory (default)",
 		},
 		&cli.BoolFlag{
 			Name:    "session",
 			Aliases: []string{"s"},
 			Usage:   "Used with the current shell session",
+		},
+		&cli.BoolFlag{
+			Name:  "unlink",
+			Usage: "Do not create symlinks for project scope (downgrade to session scope)",
 		},
 	},
 	Action:   useCmd,
@@ -88,8 +92,11 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	// Determine if should unlink (only valid for project scope)
+	unlink := cmd.IsSet("unlink")
+
 	// Execute use operation
-	return sdkSource.Use(resolvedVersion, scope)
+	return sdkSource.UseWithConfig(resolvedVersion, scope, unlink)
 }
 
 // parseSdkArg parses the SDK argument in format "name@version"
@@ -107,10 +114,11 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 	if cmd.IsSet("global") {
 		return env.Global
 	}
-	if cmd.IsSet("project") {
-		return env.Project
+	if cmd.IsSet("session") {
+		return env.Session
 	}
-	return env.Session
+	// Default to project if no scope specified
+	return env.Project
 }
 
 // resolveVersion resolves the version, with interactive selection if needed

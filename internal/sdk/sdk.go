@@ -46,14 +46,15 @@ const (
 
 // Sdk interface defines the methods for managing software development kits (SDKs).
 type Sdk interface {
-	Install(version Version) error                               // Install a specific runtime of the SDK
-	Uninstall(version Version) error                             // Uninstall a specific runtime of the SDK
-	Available(args []string) ([]*AvailableRuntimePackage, error) // List available runtime of the SDK
-	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)   // Get environment variables for a specific runtime of the SDK
-	Use(version Version, scope env.UseScope) error               // Use a specific runtime in a given scope
-	Unuse(scope env.UseScope) error                              // Unuse the current runtime in a given scope
-	GetRuntimePackage(version Version) (*RuntimePackage, error)  // Get the runtime package for a specific version
-	CheckRuntimeExist(version Version) bool                      // Check if a specific runtime version is installed
+	Install(version Version) error                                        // Install a specific runtime of the SDK
+	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
+	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
+	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
+	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
+	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
+	Unuse(scope env.UseScope) error                                       // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
 	InstalledList() []Version
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
@@ -454,9 +455,15 @@ func (e *VersionNotExistsError) Error() string {
 }
 
 func (b *impl) Use(version Version, scope env.UseScope) error {
-	logger.Debugf("Use SDK version: %s, scope: %v\n", string(version), scope)
+	// Default behavior: project scope uses link=true
+	return b.UseWithConfig(version, scope, false)
+}
 
-	// TODO: move to before
+// UseWithConfig uses a version with custom link configuration
+// unlink: if true, disables link for project scope (downgrade to session scope)
+func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) error {
+	logger.Debugf("Use SDK version: %s, scope: %v, unlink: %v\n", string(version), scope, unlink)
+
 	// Verify hook environment is available
 	if !env.IsHookEnv() {
 		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
@@ -474,10 +481,10 @@ func (b *impl) Use(version Version, scope env.UseScope) error {
 		return &VersionNotExistsError{Label: label}
 	}
 
-	return b.useInHook(resolvedVersion, scope)
+	return b.useInHook(resolvedVersion, scope, unlink)
 }
 
-func (b *impl) useInHook(version Version, scope env.UseScope) error {
+func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error {
 
 	runtimePackage, err := b.GetRuntimePackage(version)
 	if err != nil {
@@ -503,21 +510,22 @@ func (b *impl) useInHook(version Version, scope env.UseScope) error {
 
 	logger.Debugf("Load %v tool versions: %v\n", scope, vfoxToml.GetAllTools())
 
-	var useLink string
-	if scope == env.Project {
-		useLink = NoLink
+	// Determine link flag based on scope and unlink parameter
+	if scope == env.Project && unlink {
+		attr := pathmeta.Attr{
+			UnLinkAttrFlag: BoolYes,
+		}
+		// Update version record
+		vfoxToml.SetToolWithAttr(b.Name, string(version), attr)
+		if err := vfoxToml.Save(); err != nil {
+			return fmt.Errorf("failed to save tool versions, err:%w", err)
+		}
 	} else {
-		useLink = YesLink
-	}
-
-	attr := pathmeta.Attr{
-		LinkAttrFlag: useLink,
-	}
-
-	// Update version record
-	vfoxToml.SetToolWithAttr(b.Name, string(version), attr)
-	if err := vfoxToml.Save(); err != nil {
-		return fmt.Errorf("failed to save tool versions, err:%w", err)
+		// Update version record
+		vfoxToml.SetTool(b.Name, string(version))
+		if err := vfoxToml.Save(); err != nil {
+			return fmt.Errorf("failed to save tool versions, err:%w", err)
+		}
 	}
 
 	// Create symlinks for the specified scope
@@ -862,6 +870,23 @@ func (b *impl) Unuse(scope env.UseScope) error {
 		chain.Add(globalConfig, scope)
 
 	} else if scope == env.Project {
+		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
+		if err != nil {
+			return fmt.Errorf("failed to read project config: %w", err)
+		}
+
+		// Check if the SDK is currently set in project
+		if version, ok := projectConfig.GetToolVersion(b.Name); ok {
+			// Remove shims for the current version
+			if err := b.removeSymlinksForScope(Version(version), env.Project); err != nil {
+				logger.Debugf("Failed to remove project symlinks: %v\n", err)
+			}
+		}
+
+		// Remove from project config
+		projectConfig.RemoveTool(b.Name)
+		chain.Add(projectConfig, scope)
+	} else if scope == env.Session {
 		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
 		if err != nil {
 			return fmt.Errorf("failed to read project config: %w", err)
