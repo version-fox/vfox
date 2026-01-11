@@ -651,22 +651,12 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 // NewSdkManager create a new SdkManager
 func NewSdkManager() (*Manager, error) {
 	vfoxHomeDir := env.GetVfoxHome()
-	if len(vfoxHomeDir) == 0 {
-		userHomeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("get user home dir error: %w", err)
-		}
-		vfoxHomeDir = pathmeta.GetVfoxUserHomeDir(userHomeDir)
-	}
-
-	// Get shared root (by priority)
-	sharedRoot := env.GetVfoxRoot()
-	if sharedRoot == "" {
-		// use UserHome as sharedRoot if not set VFOX_ROOT
-		sharedRoot = vfoxHomeDir
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
 	currentDir := getWorkingDirectory()
-	meta, err := pathmeta.NewPathMeta(vfoxHomeDir, sharedRoot, currentDir, env.GetPid())
+	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 	if err != nil {
 		return nil, fmt.Errorf("init path meta failed: %w", err)
 	}

@@ -30,7 +30,6 @@ import (
 type UserPaths struct {
 	Home   string // ~/.vfox
 	Temp   string // ~/.vfox/tmp (session temporary)
-	Cache  string // ~/.vfox/cache (download cache)
 	Config string // ~/.vfox/config.yaml (user override config)
 }
 
@@ -58,15 +57,15 @@ type PathMeta struct {
 const (
 	HookCurTmpPath = "__VFOX_CURTMPPATH"
 
-	vfoxDirPrefix      = ".vfox"
-	pluginDirPrefix    = "plugins"   // Shared plugins directory
-	cacheDirPrefix     = "cache"     // User-level cache
-	tmpDirPrefix       = "tmp"       // User-level temp
-	installedDirPrefix = "installed" // Shared installed directory
-	configFilePrefix   = "config.yaml"
-	shimDirPrefix      = "sdks"
+	oldVfoxDirPrefix    = ".version-fox" // Old vfox dir prefix
+	vfoxDirPrefix       = ".vfox"
+	pluginDirPrefix     = "plugin" // Shared plugins directory
+	tmpDirPrefix        = "tmp"    // User-level temp
+	installedDirPrefix  = "cache"  // Shared installed directory
+	configFilePrefix    = "config.yaml"
+	symlinkSdkDirPrefix = "sdks"
 
-	ReadWriteAuth = 0700 // can write and read
+	ReadWriteAuth = 0755 // can write and read
 )
 
 func newTempPath(pid int) string {
@@ -78,13 +77,20 @@ func newTempPath(pid int) string {
 // NewPathMeta creates a new PathMeta instance based on the provided parameters and environment variables.
 // If not provide sharedRoot, it will use userHome as sharedRoot.
 func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, error) {
-
+	vfoxUserHome := filepath.Join(userHome, oldVfoxDirPrefix)
+	// Compatibility check for old directory
+	if !util.FileExists(vfoxUserHome) {
+		vfoxUserHome = filepath.Join(userHome, vfoxDirPrefix)
+	}
+	// Use userHome as sharedRoot if not provided
+	if len(sharedRoot) == 0 {
+		sharedRoot = vfoxUserHome
+	}
 	meta := &PathMeta{
 		User: UserPaths{
-			Home:   userHome,
-			Temp:   filepath.Join(userHome, tmpDirPrefix),
-			Cache:  filepath.Join(userHome, cacheDirPrefix),
-			Config: filepath.Join(userHome, configFilePrefix),
+			Home:   vfoxUserHome,
+			Temp:   filepath.Join(vfoxUserHome, tmpDirPrefix),
+			Config: filepath.Join(vfoxUserHome, configFilePrefix),
 		},
 		Shared: SharedPaths{
 			Root:     sharedRoot,
@@ -94,26 +100,20 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		},
 		Working: WorkingPaths{
 			Directory:     currentDir,
-			ProjectSdkDir: filepath.Join(vfoxDirPrefix, shimDirPrefix),
-			SessionSdkDir: generateSessionShimPath(filepath.Join(userHome, tmpDirPrefix), pid),
-			GlobalSdkDir:  filepath.Join(userHome, shimDirPrefix),
+			ProjectSdkDir: filepath.Join(vfoxDirPrefix, symlinkSdkDirPrefix),
+			SessionSdkDir: generateSessionShimPath(filepath.Join(vfoxUserHome, tmpDirPrefix), pid),
+			GlobalSdkDir:  filepath.Join(vfoxUserHome, symlinkSdkDirPrefix),
 		},
 		Executable: getExecutablePath(),
 	}
 
 	// Initialize necessary directories
 	_ = os.MkdirAll(meta.User.Temp, ReadWriteAuth)
-	_ = os.MkdirAll(meta.User.Cache, ReadWriteAuth)
 	_ = os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Installs, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Plugins, ReadWriteAuth)
 
 	return meta, nil
-}
-
-func GetVfoxUserHomeDir(UserHome string) string {
-
-	return filepath.Join(UserHome, vfoxDirPrefix)
 }
 
 func generateSessionShimPath(userTemp string, pid int) string {

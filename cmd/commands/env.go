@@ -27,9 +27,9 @@ import (
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
-	"github.com/version-fox/vfox/internal/env/shell"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shell"
 	"golang.org/x/sync/errgroup"
 )
 

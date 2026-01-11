@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
-	"github.com/version-fox/vfox/internal/env/shell"
+	"github.com/version-fox/vfox/internal/shell"
 )
 
 var Cd = &cli.Command{

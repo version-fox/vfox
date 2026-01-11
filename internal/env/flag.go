@@ -22,19 +22,9 @@ import (
 )
 
 const (
-	HomeFromEnv   = "VFOX_HOME"
-	PluginFromEnv = "VFOX_PLUGIN"
-	CacheFromEnv  = "VFOX_CACHE"
-	TempFromEnv   = "VFOX_TEMP"
-	RootFromEnv   = "VFOX_ROOT" // New: Shared root environment variable
-
-	HookFlag = "__VFOX_SHELL"
-	PidFlag  = "__VFOX_PID"
-
-	ProjectBinPathFlag = "__VFOX_PROJECT_BIN_PATH"
-	SessionBinPathFlag = "__VFOX_SESSION_BIN_PATH"
-	GlobalBinPathFlag  = "__VFOX_GLOBAL_BIN_PATH"
-	VfoxPwd            = "__VFOX_PWD"
+	HomeFromEnv = "VFOX_HOME"
+	HookFlag    = "__VFOX_SHELL"
+	PidFlag     = "__VFOX_PID"
 )
 
 func IsHookEnv() bool {
@@ -66,20 +56,4 @@ func GetPid() int {
 
 func GetVfoxHome() string {
 	return os.Getenv(HomeFromEnv)
-}
-
-func GetVfoxPlugin() string {
-	return os.Getenv(PluginFromEnv)
-}
-
-func GetVfoxCache() string {
-	return os.Getenv(CacheFromEnv)
-}
-
-func GetVfoxTemp() string {
-	return os.Getenv(TempFromEnv)
-}
-
-func GetVfoxRoot() string {
-	return os.Getenv(RootFromEnv)
 }
