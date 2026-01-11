@@ -1,10 +1,16 @@
 import { defineConfig } from 'vitepress'
 import { en } from './en'
 import { zh } from './zh'
+import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "vfox",
+  markdown: {
+    config: (md) => {
+      md.use(tabsMarkdownPlugin)
+    }
+  },
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
@@ -42,3 +48,4 @@ export default defineConfig({
     ],
   },
 })
+

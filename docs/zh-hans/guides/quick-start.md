@@ -1,58 +1,53 @@
 # 快速入门
 
-这里以`Nodejs`为例，介绍如何使用`vfox`。
+这里以 `Nodejs` 为例，介绍如何使用 `vfox`。
 
-## 1. 安装vfox
+## 1. 安装 vfox
 
 ### Windows
 
-::: details Scoop
+<Tabs>
+<TabItem label="Scoop">
 
 ```shell
 scoop install vfox
 ```
 
-:::
-
-::: details winget
+</TabItem>
+<TabItem label="winget">
 
 ```shell
 winget install vfox
 ```
 
-:::
+</TabItem>
+<TabItem label="Setup 安装器">
 
-::: details Setup安装器
-前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的`setup`安装器，然后按照安装向导进行安装。
-:::
+前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的 `setup` 安装器，然后按照安装向导进行安装。
 
-::: details 手动安装
-
-1. 在[Releases](https://github.com/version-fox/vfox/releases)下载最新版本的`zip`安装包
-2. 配置`PATH`环境变量，将`vfox`安装目录添加到`PATH`环境变量中。
-   :::
+</TabItem>
+</Tabs>
 
 ### Unix-like
 
-::: details Homebrew
+<Tabs>
+<TabItem label="Homebrew">
 
 ```shell
-$ brew install vfox
+brew install vfox
 ```
 
-:::
-
-::: details APT
+</TabItem>
+<TabItem label="APT (Debian/Ubuntu)">
 
 ```shell
- echo "deb [trusted=yes] https://apt.fury.io/versionfox/ /" | sudo tee /etc/apt/sources.list.d/versionfox.list
- sudo apt-get update
- sudo apt-get install vfox
+echo "deb [trusted=yes] https://apt.fury.io/versionfox/ /" | sudo tee /etc/apt/sources.list.d/versionfox.list
+sudo apt-get update
+sudo apt-get install vfox
 ```
 
-:::
-
-::: details YUM
+</TabItem>
+<TabItem label="YUM (CentOS/Fedora)">
 
 ```shell
 echo '[vfox]
@@ -64,247 +59,269 @@ gpgcheck=0' | sudo tee /etc/yum.repos.d/versionfox.repo
 sudo yum install vfox
 ```
 
-:::
-
-::: details 手动安装
+</TabItem>
+<TabItem label="安装脚本">
 
 ```shell
-$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash
 ```
 
 **用户级安装（无需 sudo）**
 
-如果您想将 `vfox` 安装到用户目录（`~/.local/bin`）而不是系统范围内，请使用 `--user` 标志。这对于没有 sudo 访问权限或系统目录为临时目录的环境（例如 Coder 工作区）特别有用：
+如果你想将 `vfox` 安装到用户目录（`~/.local/bin`）而不是系统范围内，可以使用 `--user` 标志。这对于没有 sudo 访问权限的环境特别有用：
 
 ```shell
-$ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user
 ```
 
 此命令将：
+
 - 将 `vfox` 安装到 `~/.local/bin`（无需 sudo）
 - 如果目录不存在，会自动创建
-- 如果需要，会提供将 `~/.local/bin` 添加到 `PATH` 的说明
+- 提供将 `~/.local/bin` 添加到 `PATH` 的说明
 
-:::
+</TabItem>
+</Tabs>
 
-## 2. 挂载`vfox`到你的`Shell`
+## 2. 挂载 vfox 到 Shell
 
-::: warning 注意!!!!!
-请从下面选择一条适合你Shell的命令执行!
-:::
+> [!WARNING] ⚠️注意
+> 请根据你使用的 Shell 类型，选择对应的配置方式
 
-::: details Bash
+<Tabs>
+<TabItem label="Bash">
 
 ```shell
 echo 'eval "$(vfox activate bash)"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-:::
-
-::: details ZSH
+</TabItem>
+<TabItem label="ZSH">
 
 ```shell
 echo 'eval "$(vfox activate zsh)"' >> ~/.zshrc
 ```
 
-:::
-
-::: details Fish
+</TabItem>
+<TabItem label="Fish">
 
 ```shell
 echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 ```
 
-:::
+</TabItem>
+<TabItem label="PowerShell">
 
-::: details PowerShell
+创建 PowerShell 配置：
 
-创建 PowerShell 配置:
-
-```shell
+```powershell
 if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
 
-如果 PowerShell 提示：`在此系统上禁止运行脚本`，那么请你**以管理员身份重新运行 PowerShell**输入如下命令
+如果 PowerShell 提示「在此系统上禁止运行脚本」，请**以管理员身份运行 PowerShell** 并执行：
 
-```shell
+```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
-# 之后输入 Y，按回车
-y
 ```
 
-:::
+输入 `Y` 后按回车确认。
 
-::: details Clink & Cmder
+</TabItem>
+<TabItem label="Clink & Cmder">
 
-1. 找到脚本存放路径:
-   ```shell
-   clink info | findstr scripts
-   ```
-2. 复制 [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) 到脚本目录下，`clink_vfox.lua`脚本只需放置在其中一个目录中，无需放入每个目录。
+1. 找到脚本存放路径：
+
+    ```shell
+    clink info | findstr scripts
+    ```
+
+2. 复制 [clink_vfox.lua](https://github.com/version-fox/vfox/blob/main/internal/shell/clink_vfox.lua) 到脚本目录
 3. 重启 Clink 或 Cmder
 
-:::
-
-::: details Nushell
+</TabItem>
+<TabItem label="Nushell">
 
 ```shell
 vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
-:::
+</TabItem>
+</Tabs>
 
-然后，打开一个新终端。
 
 ## 3. 添加插件
 
 **命令**: `vfox add <plugin-name>`
 
-安装了[vfox](https://github.com/version-fox/vfox)后，你还做不了任何事情，您**需要先安装相应的插件**。
+安装了 vfox 后，您还需要安装相应的插件才能管理 SDK。
 
-::: tip 注意
-你可以使用 `vfox available` 命令查看所有可用插件。
+::: tip 💡提示
+可以使用 `vfox available` 命令查看所有可用插件。
 :::
 
 ```bash
-$ vfox add nodejs
+vfox add nodejs
 ```
 
 ## 4. 安装运行时
 
-在插件成功安装之后, 你就可以安装对应版本的Nodejs了。
+在插件成功安装之后，您就可以安装对应版本的 Node.js 了。
 
 **命令**: `vfox install nodejs@<version>`
 
-我们将只安装最新可用的 `latest` 版本:
-
-```
-$ vfox install nodejs@latest
-```
-
-::: warning 版本问题
-`vfox` 强制使用准确的版本。`latest` 是一个通过交给插件来解析到执行时刻的实际版本号的行为, 是否支持取决于插件的实现。
-
-如果你**不知道具体版本号**, 可通过 `vfox search nodejs` 来查看所有可用版本。
-:::
-
-::: tip 自动安装
-`install`和 `search`命令会检测本地是否已经安装了插件，如果没有，它们会**自动安装插件**。
-:::
-
-当然,我们也可以安装指定版本:
-
 ```bash
-$ vfox install nodejs@21.5.0
+vfox install nodejs@21.5.0
 ```
+
+::: warning ⚠️ Latest版本说明
+`vfox` 强制使用准确的版本号。`latest` 是一个特殊标记，由插件解析为实际版本号，具体支持情况取决于插件实现。
+
+如果不确定具体版本号，可通过 `vfox search nodejs` 查看所有可用版本。
+:::
+
+::: tip 💡 自动安装插件
+`install` 和 `search` 命令会自动检测并安装缺失的插件。
+:::
 
 ## 5. 切换运行时
 
-**命令**: `vfox use [-p -g -s] nodejs[@<version>]`
+**命令**: `vfox use [-p -g -s] [--unlink] nodejs[@<version>]`
 
-`vfox` 支持三种作用域, 每个作用域生效的范围不同:
+`vfox` 支持三种作用域，版本优先级从高到低为：
 
-| 作用域   | 命令示例                  | 路径                                           | 作用范围         |
-|----------|---------------------------|----------------------------------------------|--------------|
-| Global  | `vfox use -g`     | `$HOME/.vfox/sdks`                          | 全局生效(用户级别）   |
-| Project | `vfox use -p`     | `$PWD/.vfox/sdks`                            | 项目目录内生效      |
-| Session | `vfox use -s`     | `$HOME/.vfox/tmp/<shell-pid>` | 当前Shell会话内生效 |
+**Project > Session > Global > System**
 
-::: warning 作用域范围原理
+### 作用域概览
 
-`vfox` 针对不同作用域，会在不同路径下生成对应的`sdks`目录来存放对应版本的运行时，并将这些路径添加到环境变量`PATH`中，从而实现不同作用域下的版本切换。
+| 作用域         | 命令            | SDK 路径                   | 作用范围        |
+|-------------|---------------|--------------------------|-------------|
+| **Project** | `vfox use -p` | `$PWD/.vfox/sdks`        | 当前项目目录      |
+| **Session** | `vfox use -s` | `~/.vfox/tmp/<pid>/sdks` | 当前 Shell 会话 |
+| **Global**  | `vfox use -g` | `~/.vfox/sdks`           | 全局生效        |
 
-举个例子:
-- 全局作用域: `$HOME/.vfox/sdks/nodejs`
-- 项目作用域: `$PWD/.vfox/sdks/nodejs`
-- 会话作用域: `$HOME/.vfox/tmp/<shell-pid>/nodejs`
+::: info 📖 工作原理
 
-在`PATH`中，`vfox`会将这些路径按作用域优先级顺序添加到`PATH`中:
+vfox 通过在不同作用域创建目录软链来指向实际 SDK 安装目录，并将这些路径按优先级添加到 `PATH` 环境变量中，实现版本切换。
 
-```shell
-$PWD/.vfox/sdks/nodejs: $HOME/.vfox/tmp/<shell-pid>/nodejs: $HOME/.vfox/sdks/nodejs: $PATH
+**PATH 优先级示例**：
+
+```bash
+# Project > Session > Global > System
+$PWD/.vfox/sdks/nodejs/bin:~/.vfox/tmp/<pid>/nodejs/bin:~/.vfox/sdks/nodejs/bin:/usr/bin:...
 ```
+
 :::
 
-### Project
+---
 
-**不同项目不同版本**
+### Project（项目作用域）
 
-```shell
+::: tip 💡 推荐
+用于项目开发，每个项目可以有独立的工具版本。
+:::
+
+**用法**：
+
+```bash
+# 在当前项目目录下使用 nodejs
+vfox use -p nodejs@20.9.0
+```
+
+**执行后，vfox 会做如下操作**：
+
+1. **创建目录软链**：在 `$PWD/.vfox/sdks/nodejs` 下创建符号链接，指向实际安装目录
+2. **更新 PATH**：将 `$PWD/.vfox/sdks/nodejs/bin` 插入到 `PATH` 的最前面
+3. **保存配置**：将版本信息写入 `.vfox.toml` 文件
+
+这样当你在该项目目录执行 `node` 命令时，Shell 会从 PATH 最前面查找到你的项目级 nodejs，确保版本符合项目要求。
+
+**可视化示例**：
+
+```bash
+# 1. 执行命令
 $ vfox use -p nodejs@20.9.0
-```
 
-当时你执行此命令后，`vfox`将会在当前目录下生成`.vfox/sdks/nodejs`目录软链到对应版本的运行时, 并将该路径添加到环境变量`PATH`中。
+# 2. 查看创建的符号链接
+$ ls -la .vfox/sdks/nodejs
+lrwxr-xr-x  1 user  staff  nodejs -> /Users/user/.vfox/cache/nodejs/v-20.9.0/nodejs-20.9.0
 
-```shell
-$ ls -alh .vfox/sdks/       
-drwxr-xr-x  3 lihan  staff    96B Jan 11 12:44 .
-drwxr-xr-x  3 lihan  staff    96B Jan 11 12:44 ..
-lrwxr-xr-x  1 lihan  staff    54B Jan 11 12:44 nodejs -> /Users/lihan/.vfox/cache/nodejs/v-20.9.0/nodejs-20.9.0
-
+# 3. 查看更新的 PATH
 $ echo $PATH
-/project/docs/.vfox/sdks/nodejs/bin:$PATH
-```
+/project/path/.vfox/sdks/nodejs/bin:/previous/paths:...
+#                  ↑ 项目级 nodejs 在最前面
 
-除此之外， 会将版本信息写入到当前目录下的`.vfox.toml`文件中:
-
-```toml
+# 4. 查看配置文件
+$ cat .vfox.toml
 [tools]
 nodejs = "20.9.0"
+
+# 5. 验证版本（使用的是项目级版本）
+$ node -v
+v20.9.0
 ```
 
-针对团队协作, 你只需将`.vfox.toml`文件提交到代码仓库中, **`.vfox`目录添加到`.gitignore`中**。
-
-::: danger 关于目录软链行为
-
-为了方便管理和隔离作用域, `vfox` 会在不同作用域下创建对应的目录软链到实际安装的运行时目录。
-
-如果你**不希望`vfox`在项目目录下创建软链**, 你可以通过`--unlink`来禁用该行为。 之后`vfox`只会在`.vfox.toml`中记录版本信息, 不会创建软链, 并在session级别生效。
-
-```shell
-$ vfox use -p --unlink nodejs@20.9.0
-```
-
-**强烈建议您，保持vfox默认行为!!!**
+::: warning 💡 强烈推荐
+将 `.vfox.toml` 提交到代码仓库，将 `.vfox` 目录添加到 `.gitignore`。这样团队成员可以共享版本配置。
 :::
 
-### Session
+::: danger ⚠️ 关于 --unlink 参数
 
-**不同Shell不同版本**
+如果不想在项目目录创建符号链接，可以使用 `--unlink` 参数：
 
-```shell
-$ vfox use -s nodejs
+```bash
+vfox use -p --unlink nodejs@20.9.0
 ```
 
-当前作用域的作用主要是满足**临时需求**，当你关闭当前终端时，`vfox` 会**自动切换回全局版本/项目版本**。
-
-::: tip
-默认配置在`$HOME/.version-fox/tmp/<shell-pid>/.vfox.toml` 文件中（临时目录）。
+**注意**：使用 `--unlink` 后，Project 作用域会降级为 Session 作用域（配置记录在 .vfox.toml 但不创建软链），**强烈建议保持默认行为**（创建软链）。
 :::
 
-### Global
+---
 
-**全局唯一**
+### Session（会话作用域）
 
-使用以下命令可以设置一个全局版本：
-```shell
-$ vfox use -g nodejs
+::: tip 💡 临时测试
+用于临时测试特定版本，关闭当前 Shell 窗口时自动失效。
+:::
+
+**用法**：
+
+```bash
+vfox use -s nodejs@18.0.0
 ```
 
-::: tip
-默认配置在`$HOME/.vfox/.vfox.toml`文件中进行管理。
+当关闭该 Shell 窗口时，临时目录及配置随之清理，不会影响其他 Shell 会话。
+
+
+---
+
+### Global（全局作用域）
+
+::: tip 💡 用户级默认版本
+用于设置用户级别的默认版本，所有项目都可使用（除非被 Project 或 Session 覆盖）。
 :::
+
+**用法**：
+
+```bash
+vfox use -g nodejs@21.5.0
+```
 
 ## 效果演示
 
-::: tip
-文字表达远不如图片来的更直观, 我们直接上效果图!
-:::
+文字表达不如图片直观，直接看效果演示！
 
 ![nodejs](/demo-full.gif)
 
-## 完成指南！
+## 完成快速入门！🎉
 
-恭喜你完成了 `vfox` 的快速上手 🎉 你现在可以管理你的项目的 `nodejs` 版本了。对于项目中的其他工具类型可以执行类似步骤即可！
+恭喜你完成了 `vfox` 的快速上手！现在你可以：
 
-`vfox` 还有更多命令需要熟悉，你可以通过运行 `vfox --help` 或者 `vfox` 来查看它们。
+- ✅ 快速安装和切换不同版本的开发工具
+- ✅ 为项目配置独立的工具版本
+- ✅ 临时测试特定的工具版本
+- ✅ 与团队共享一致的开发环境配置
+
+**下一步：**
+
+使用 `vfox --help` 查看更多命令和选项，或访问 [全部命令](../usage/all-commands.md) 了解更多功能。

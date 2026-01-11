@@ -1,6 +1,7 @@
 {
   "devDependencies": {
-    "vitepress": "^1.0.0"
+    "vitepress": "^1.0.0",
+    "vitepress-plugin-tabs": "^0.7.3"
   },
   "scripts": {
     "docs:dev": "vitepress dev",
