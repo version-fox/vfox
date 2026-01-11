@@ -52,7 +52,7 @@ type Sdk interface {
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
 	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
 	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
-	Unuse(scope env.UseScope) error                                       // Unuse the current runtime in a given scope
+	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
 	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
 	InstalledList() []Version
@@ -847,89 +847,26 @@ func (b *impl) Label(version Version) string {
 }
 
 // Unuse removes the version setting for the SDK from the specified scope
-func (b *impl) Unuse(scope env.UseScope) error {
-	// Create a config chain to manage all affected scopes
-	chain := env.NewVfoxTomlChain()
-
-	if scope == env.Global {
-		globalConfig, err := b.envContext.LoadVfoxTomlByScope(env.Global)
+func (b *impl) Unuse(scopes ...env.UseScope) error {
+	for _, scope := range scopes {
+		vfoxtoml, err := b.envContext.LoadVfoxTomlByScope(scope)
 		if err != nil {
-			return fmt.Errorf("failed to read global config: %w", err)
+			return fmt.Errorf("failed to read %s config: %w", scope, err)
 		}
-
 		// Check if the SDK is currently set globally
-		if version, ok := globalConfig.GetToolVersion(b.Name); ok {
+		if version, ok := vfoxtoml.GetToolVersion(b.Name); ok {
 			// Remove shims for the current version
-			if err := b.removeSymlinksForScope(Version(version), env.Global); err != nil {
+			if err := b.removeSymlinksForScope(Version(version), scope); err != nil {
 				logger.Debugf("Failed to remove global symlinks: %v\n", err)
 			}
 		}
-
-		// Remove from global config
-		globalConfig.RemoveTool(b.Name)
-		chain.Add(globalConfig, scope)
-
-	} else if scope == env.Project {
-		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
-		if err != nil {
-			return fmt.Errorf("failed to read project config: %w", err)
-		}
-
-		// Check if the SDK is currently set in project
-		if version, ok := projectConfig.GetToolVersion(b.Name); ok {
-			// Remove shims for the current version
-			if err := b.removeSymlinksForScope(Version(version), env.Project); err != nil {
-				logger.Debugf("Failed to remove project symlinks: %v\n", err)
-			}
-		}
-
-		// Remove from project config
-		projectConfig.RemoveTool(b.Name)
-		chain.Add(projectConfig, scope)
-	} else if scope == env.Session {
-		projectConfig, err := b.envContext.LoadVfoxTomlByScope(env.Project)
-		if err != nil {
-			return fmt.Errorf("failed to read project config: %w", err)
-		}
-
-		// Check if the SDK is currently set in project
-		if version, ok := projectConfig.GetToolVersion(b.Name); ok {
-			// Remove shims for the current version
-			if err := b.removeSymlinksForScope(Version(version), env.Project); err != nil {
-				logger.Debugf("Failed to remove project symlinks: %v\n", err)
-			}
-		}
-
-		// Remove from project config
-		projectConfig.RemoveTool(b.Name)
-		chain.Add(projectConfig, scope)
-	}
-
-	// For session scope, or in addition to global/project scope,
-	// also remove from the session level
-	sessionConfig, err := b.envContext.LoadVfoxTomlByScope(env.Session)
-	if err != nil {
-		return fmt.Errorf("failed to read session config: %w", err)
-	}
-
-	// Check if the SDK is currently set in session
-	if version, ok := sessionConfig.GetToolVersion(b.Name); ok {
-		// Remove shims for the current version
-		if err := b.removeSymlinksForScope(Version(version), env.Session); err != nil {
-			logger.Debugf("Failed to remove session symlinks: %v\n", err)
+		vfoxtoml.RemoveTool(b.Name)
+		// Save all modified configs
+		if err = vfoxtoml.Save(); err != nil {
+			return fmt.Errorf("failed to save configs: %w", err)
 		}
 	}
-
-	sessionConfig.RemoveTool(b.Name)
-	chain.Add(sessionConfig, scope)
-
-	// Save all modified configs
-	if err = chain.Save(); err != nil {
-		return fmt.Errorf("failed to save configs: %w", err)
-	}
-
 	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))
-
 	return nil
 }
 

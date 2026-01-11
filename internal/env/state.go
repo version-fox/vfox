@@ -31,6 +31,9 @@ type ConfigState struct {
 	// Last check time (Unix timestamp in seconds)
 	LastCheck int64 `json:"last_check"`
 
+	// Current project config path (to detect directory/project changes)
+	CurrentProjectPath string `json:"current_project_path,omitempty"`
+
 	// Config file modification times (Unix timestamps in seconds)
 	GlobalMtime  int64 `json:"global_mtime,omitempty"`
 	SessionMtime int64 `json:"session_mtime,omitempty"`
@@ -92,10 +95,17 @@ func (s *ConfigState) saveLocked() error {
 }
 
 // HasChanged checks if any config file has changed based on modification time
-// Returns true if any config file has been modified since last check
+// Returns true if any config file has been modified since last check, or if project directory changed
 func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	// Check if project path changed (directory changed)
+	currentProjectPath := configPaths[Project]
+	if currentProjectPath != s.CurrentProjectPath {
+		// Project directory or config file changed
+		return true, nil
+	}
 
 	// Check each config file
 	for scope, path := range configPaths {
@@ -139,6 +149,9 @@ func (s *ConfigState) Update(configPaths map[UseScope]string, output string) err
 	defer s.mu.Unlock()
 
 	s.LastCheck = time.Now().Unix()
+
+	// Update current project path
+	s.CurrentProjectPath = configPaths[Project]
 
 	// Update mtimes for all config files
 	for scope, path := range configPaths {

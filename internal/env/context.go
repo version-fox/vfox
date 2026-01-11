@@ -114,30 +114,15 @@ func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
 	// Get system paths
 	systemPaths := strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
 
-	// vfox paths to filter out
-	vfoxPaths := []string{
-		m.PathMeta.Working.ProjectSdkDir,
-		m.PathMeta.Working.SessionSdkDir,
-		m.PathMeta.Working.GlobalSdkDir,
-	}
-
 	cleanPaths := NewPaths(EmptyPaths)
 	for _, path := range systemPaths {
-		shouldRemove := false
-		for _, vfoxPath := range vfoxPaths {
-			// Use prefix matching to remove any path under vfox directories
-			// Ensure both paths are cleaned for proper comparison
-			cleanPath := filepath.Clean(path)
-			cleanVfoxPath := filepath.Clean(vfoxPath)
-			if cleanPath == cleanVfoxPath || strings.HasPrefix(cleanPath, cleanVfoxPath+string(filepath.Separator)) {
-				shouldRemove = true
-				logger.Debugf("Removing vfox path from system PATH: %s", path)
-				break
-			}
+		cleanPath := filepath.Clean(path)
+
+		if pathmeta.IsVfoxRelatedPath(cleanPath) {
+			logger.Debugf("Removing vfox path from system PATH: %s", path)
+			continue
 		}
-		if !shouldRemove {
-			cleanPaths.Add(path)
-		}
+		cleanPaths.Add(path)
 	}
 
 	return cleanPaths

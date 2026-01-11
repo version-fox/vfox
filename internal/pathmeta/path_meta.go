@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
@@ -68,6 +69,31 @@ const (
 	ReadWriteAuth = 0755 // can write and read
 )
 
+// IsVfoxRelatedPath checks if the given path is related to vfox
+func IsVfoxRelatedPath(path string) bool {
+	cleanPath := filepath.Clean(path)
+	parts := []string{oldVfoxDirPrefix, vfoxDirPrefix}
+
+	for _, part := range parts {
+		if containsPathSegment(cleanPath, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsPathSegment(path string, part string) bool {
+	// Split path by separator to check individual segments
+	separator := string(filepath.Separator)
+	segments := strings.Split(path, separator)
+	for _, segment := range segments {
+		if segment == part {
+			return true
+		}
+	}
+	return false
+}
+
 func newTempPath(pid int) string {
 	timestamp := util.GetBeginOfToday()
 	name := fmt.Sprintf("%d-%d", timestamp, pid)
@@ -100,7 +126,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		},
 		Working: WorkingPaths{
 			Directory:     currentDir,
-			ProjectSdkDir: filepath.Join(vfoxDirPrefix, symlinkSdkDirPrefix),
+			ProjectSdkDir: filepath.Join(currentDir, vfoxDirPrefix, symlinkSdkDirPrefix),
 			SessionSdkDir: generateSessionShimPath(filepath.Join(vfoxUserHome, tmpDirPrefix), pid),
 			GlobalSdkDir:  filepath.Join(vfoxUserHome, symlinkSdkDirPrefix),
 		},

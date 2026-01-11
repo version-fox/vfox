@@ -256,11 +256,18 @@ func (v *VfoxToml) SaveTo(dir string) error {
 }
 
 // SaveToPath saves the config to the specified full path
-// Does not create a file if the config is empty
+// If the config is empty:
+//   - If file doesn't exist: do nothing (don't create file)
+//   - If file exists: update it with empty [tools] section
 func (v *VfoxToml) SaveToPath(path string) error {
-	// Don't create a file if the config is empty
+	// If config is empty
 	if v.IsEmpty() {
-		return nil
+		// Check if file exists
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// File doesn't exist, nothing to do
+			return nil
+		}
+		// File exists, need to update it with empty config
 	}
 
 	data, err := v.MarshalTOML()

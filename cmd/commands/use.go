@@ -114,11 +114,11 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 	if cmd.IsSet("global") {
 		return env.Global
 	}
-	if cmd.IsSet("session") {
-		return env.Session
+	if cmd.IsSet("project") {
+		return env.Project
 	}
 	// Default to project if no scope specified
-	return env.Project
+	return env.Session
 }
 
 // resolveVersion resolves the version, with interactive selection if needed
