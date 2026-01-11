@@ -35,6 +35,7 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/plugin"
+	"github.com/version-fox/vfox/internal/shared/cache"
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
@@ -87,7 +88,7 @@ func (b *impl) Metadata() *Metadata {
 	}
 }
 
-func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
+func (b *impl) invokeAvailable(args []string) ([]*AvailableRuntimePackage, error) {
 	ctx := &plugin.AvailableHookCtx{
 		Args: args,
 	}
@@ -99,6 +100,49 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 		return nil, fmt.Errorf("plugin [Available] method error: %w", err)
 	}
 	return convertAvailableHookResultItem2AvailableRuntimePackage(b.Name, available), nil
+}
+
+func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
+	p := b.plugin
+	envCtx := b.envContext
+	cachePath := filepath.Join(p.InstalledPath, ".available.cache")
+	cacheDuration := envCtx.UserConfig.Cache.AvailableHookDuration
+	logger.Debugf("Available hook cache duration: %v\n", cacheDuration)
+	// Cache is disabled
+	if cacheDuration == 0 {
+		return b.invokeAvailable(args)
+	}
+
+	cacheKey := strings.Join(args, "##")
+	if cacheKey == "" {
+		cacheKey = "empty"
+	}
+
+	fileCache, err := cache.NewFileCache(cachePath)
+	if err == nil {
+		cacheValue, ok := fileCache.Get(cacheKey)
+		logger.Debugf("Available hook cache key: %s, hit: %+v \n", cacheKey, ok)
+		if ok {
+			var hookResult []*AvailableRuntimePackage
+			if err = cacheValue.Unmarshal(&hookResult); err == nil {
+				return hookResult, nil
+			}
+		}
+	}
+	result, err := b.invokeAvailable(args)
+	if err != nil {
+		return result, err
+	}
+	if result == nil {
+		fileCache.Set(cacheKey, nil, cache.ExpireTime(cacheDuration))
+	}
+	if value, err := cache.NewValue(result); err == nil {
+		logger.Debugf("Available hook cache set\n")
+		fileCache.Set(cacheKey, value, cache.ExpireTime(cacheDuration))
+		_ = fileCache.Close()
+	}
+
+	return result, nil
 }
 
 // Install installs a specific version of the SDK.
@@ -579,6 +623,9 @@ func (b *impl) Current() Version {
 func (b *impl) ParseLegacyFile(path string) (Version, error) {
 	legacyFilenames := b.plugin.Metadata.LegacyFilenames
 	if len(legacyFilenames) > 0 {
+		return "", nil
+	}
+	if !b.plugin.HasFunction("ParseLegacyFile") {
 		return "", nil
 	}
 	for _, filename := range legacyFilenames {
