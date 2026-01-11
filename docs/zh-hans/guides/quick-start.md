@@ -204,36 +204,26 @@ $ vfox install nodejs@21.5.0
 
 `vfox` 支持三种作用域, 每个作用域生效的范围不同:
 
-### Global
+| 作用域   | 命令示例                  | 路径                                           | 作用范围         |
+|----------|---------------------------|----------------------------------------------|--------------|
+| Global  | `vfox use -g`     | `$HOME/.vfox/sdks`                          | 全局生效(用户级别）   |
+| Project | `vfox use -p`     | `$PWD/.vfox/sdks`                            | 项目目录内生效      |
+| Session | `vfox use -s`     | `$HOME/.vfox/tmp/<shell-pid>` | 当前Shell会话内生效 |
 
-**全局唯一**
+::: warning 作用域范围原理
 
-使用以下命令可以设置一个全局版本：
+`vfox` 针对不同作用域，会在不同路径下生成对应的`sdks`目录来存放对应版本的运行时，并将这些路径添加到环境变量`PATH`中，从而实现不同作用域下的版本切换。
+
+举个例子:
+- 全局作用域: `$HOME/.vfox/sdks/nodejs`
+- 项目作用域: `$PWD/.vfox/sdks/nodejs`
+- 会话作用域: `$HOME/.vfox/tmp/<shell-pid>/nodejs`
+
+在`PATH`中，`vfox`会将这些路径按作用域优先级顺序添加到`PATH`中:
+
 ```shell
-$ vfox use -g nodejs
+$PWD/.vfox/sdks/nodejs: $HOME/.vfox/tmp/<shell-pid>/nodejs: $HOME/.vfox/sdks/nodejs: $PATH
 ```
-
-::: tip
-默认配置在`$HOME/.version-fox/.tool-versions`文件中进行管理。
-
-`$HOME/.version-fox/.tool-versions` 文件内容将会如下所示：
-
-```text
-nodejs 21.5.0
-```
-:::
-
-
-::: danger 执行之后不生效?
-请检查`$PATH`中, 是否存在**之前**通过其他方式安装的运行时!
-
-对于**Windows**用户:
-
-1.请确保系统环境变量`Path`中不存在**之前**通过其他方式安装的运行时!
-
-2.`vfox` 会自动将安装的运行时添加到**用户环境变量** `Path`中。
-
-3.如果你的`Path`中存在**之前**通过其他方式安装的运行时, 请手动删除!
 :::
 
 ### Project
@@ -241,24 +231,41 @@ nodejs 21.5.0
 **不同项目不同版本**
 
 ```shell
-$ vfox use -p nodejs
+$ vfox use -p nodejs@20.9.0
 ```
 
-当你进入到一个目录时，`vfox` 会**自动检测该目录下是否存在 `.tool-versions` 文件**，如果存在，`vfox` 会**自动切换到该项目指定的版本**。
+当时你执行此命令后，`vfox`将会在当前目录下生成`.vfox/sdks/nodejs`目录软链到对应版本的运行时, 并将该路径添加到环境变量`PATH`中。
 
-::: tip
+```shell
+$ ls -alh .vfox/sdks/       
+drwxr-xr-x  3 lihan  staff    96B Jan 11 12:44 .
+drwxr-xr-x  3 lihan  staff    96B Jan 11 12:44 ..
+lrwxr-xr-x  1 lihan  staff    54B Jan 11 12:44 nodejs -> /Users/lihan/.vfox/cache/nodejs/v-20.9.0/nodejs-20.9.0
 
-配置放置在 `$PWD/.tool-versions` 文件中（当前工作目录）。
+$ echo $PATH
+/project/docs/.vfox/sdks/nodejs/bin:$PATH
+```
 
-:::
+除此之外， 会将版本信息写入到当前目录下的`.vfox.toml`文件中:
 
-::: warning 默认作用域
+```toml
+[tools]
+nodejs = "20.9.0"
+```
 
-如果你不指定作用域，`vfox` 将会使用默认作用域。不同系统, 作用域不同:
+针对团队协作, 你只需将`.vfox.toml`文件提交到代码仓库中, **`.vfox`目录添加到`.gitignore`中**。
 
-对于**Windows**: 默认作用域为`Global`
+::: danger 关于目录软链行为
 
-对于**Unix-like**: 默认作用域为`Session`
+为了方便管理和隔离作用域, `vfox` 会在不同作用域下创建对应的目录软链到实际安装的运行时目录。
+
+如果你**不希望`vfox`在项目目录下创建软链**, 你可以通过`--unlink`来禁用该行为。 之后`vfox`只会在`.vfox.toml`中记录版本信息, 不会创建软链, 并在session级别生效。
+
+```shell
+$ vfox use -p --unlink nodejs@20.9.0
+```
+
+**强烈建议您，保持vfox默认行为!!!**
 :::
 
 ### Session
@@ -272,9 +279,21 @@ $ vfox use -s nodejs
 当前作用域的作用主要是满足**临时需求**，当你关闭当前终端时，`vfox` 会**自动切换回全局版本/项目版本**。
 
 ::: tip
-默认配置在`$HOME/.version-fox/tmp/<shell-pid>/.tool-versions` 文件中（临时目录）。
+默认配置在`$HOME/.version-fox/tmp/<shell-pid>/.vfox.toml` 文件中（临时目录）。
 :::
 
+### Global
+
+**全局唯一**
+
+使用以下命令可以设置一个全局版本：
+```shell
+$ vfox use -g nodejs
+```
+
+::: tip
+默认配置在`$HOME/.vfox/.vfox.toml`文件中进行管理。
+:::
 
 ## 效果演示
 
