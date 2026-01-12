@@ -20,19 +20,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/version-fox/vfox/internal/shared/cache"
 	"gopkg.in/yaml.v3"
 )
 
 func TestCacheDuration_MarshalYAML(t *testing.T) {
 	tests := []struct {
 		name    string
-		cd      CacheDuration
+		cd      cache.Duration
 		want    interface{}
 		wantErr bool
 	}{
-		{"Negative", CacheDuration(-1), -1, false},
-		{"Zero", CacheDuration(0), 0, false},
-		{"Positive", CacheDuration(time.Hour), "1h", false},
+		{"Negative", cache.Duration(-1), -1, false},
+		{"Zero", cache.Duration(0), 0, false},
+		{"Positive", cache.Duration(time.Hour), "1h", false},
 	}
 
 	for _, tt := range tests {
@@ -53,17 +54,17 @@ func TestCacheDuration_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		name    string
 		node    *yaml.Node
-		want    CacheDuration
+		want    cache.Duration
 		wantErr bool
 	}{
-		{"Negative", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "-1"}, CacheDuration(-1), false},
-		{"Zero", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "0"}, CacheDuration(0), false},
-		{"Positive", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1h"}, CacheDuration(time.Hour), false},
+		{"Negative", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "-1"}, cache.Duration(-1), false},
+		{"Zero", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "0"}, cache.Duration(0), false},
+		{"Positive", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1h"}, cache.Duration(time.Hour), false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cd := CacheDuration(0)
+			cd := cache.Duration(0)
 			if err := cd.UnmarshalYAML(tt.node); (err != nil) != tt.wantErr {
 				t.Errorf("UnmarshalYAML() error = %v, wantErr %v", err, tt.wantErr)
 			}

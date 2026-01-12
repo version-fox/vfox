@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/shared/cache"
 )
 
 func TestNewConfig(t *testing.T) {
@@ -40,7 +41,7 @@ func TestNewConfig(t *testing.T) {
 	if !c.LegacyVersionFile.Enable {
 		t.Fatal("legacy version file enable is invalid")
 	}
-	if c.Cache.AvailableHookDuration != config.CacheDuration(-1) {
+	if c.Cache.AvailableHookDuration != cache.Duration(-1) {
 		t.Fatal("cache available hook duration is invalid")
 	}
 }

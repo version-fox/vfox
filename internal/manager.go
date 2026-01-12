@@ -661,7 +661,12 @@ func NewSdkManager() (*Manager, error) {
 		return nil, fmt.Errorf("init path meta failed: %w", err)
 	}
 
-	c, err := config.NewConfig(meta.User.Home) // Config from user directory
+	// Load config with hierarchy: SharedRoot (VFOX_HOME) > User Home
+	// Shared config has higher priority and overrides user config
+	sharedConfigPath := filepath.Join(meta.Shared.Root, "config.yaml")
+	userConfigPath := filepath.Join(meta.User.Home, "config.yaml")
+
+	c, err := config.LoadConfigWithFallback(sharedConfigPath, userConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config failed: %w", err)
 	}

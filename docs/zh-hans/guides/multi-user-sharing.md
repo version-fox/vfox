@@ -1,17 +1,20 @@
 # 多用户共享
 
-在团队环境或服务器环境中，你可能希望多个用户共享同一套运行时SDK，以节省磁盘空间和简化管理。 
+在服务器环境中，你可能希望多个用户共享同一套运行时SDK，以节省磁盘空间和简化管理。 
 
 本指南介绍如何配置 vfox 以实现多用户共享 SDK。
 
 ## 工作原理
 
-vfox 采用**用户配置与 SDK 安装分离**的设计：
+vfox 采用**用户配置与 SDK 安装分离**的设计，非常适合多用户环境：
 
-- **共享目录**（`$VFOX_HOME`）：存放实际的 SDK 文件（`cache/`）和插件定义（`plugins/`），可以被多个用户共享
-- **用户目录**（`~/.vfox`）：存放每个用户的配置、版本选择和临时文件
+- **共享目录**（`$VFOX_HOME`）：存放所有 SDK 文件和插件定义，被所有用户共享
+- **用户目录**（`~/.vfox`）：存放每个用户的个人配置和版本选择
 
-每个用户可以有独立的版本选择和个人配置，但底层的 SDK 文件和插件定义是共享的。
+这样：
+- ✅ SDK 文件只需安装一次，所有用户共享使用，节省磁盘空间
+- ✅ 每个用户可以独立选择 SDK 版本和个人化配置
+- ✅ 管理员可以统一管理共享配置，用户可以灵活覆盖
 
 ## 设置共享 SDK
 
@@ -129,12 +132,64 @@ vfox install java@21
 vfox use -g java@21
 ```
 
+### 4. （可选）配置管理员默认值
+
+#### 配置文件层级
+
+vfox 1.0.0+ 支持**配置文件层级**，允许管理员在共享目录设置默认配置，用户可以灵活覆盖：
+
+```
+配置优先级（从高到低）：
+1. 用户配置 (~/.vfox/config.yaml)     - 用户个性化设置（可选）
+2. 共享配置 ($VFOX_HOME/config.yaml)  - 管理员设置的公司默认值（可选）
+3. 内置默认值                          - vfox 预设配置
+```
+
+#### 创建共享配置
+
+管理员可以在共享目录创建 `config.yaml` 文件设置公司级别的默认配置：
+
+```bash
+# 创建共享配置文件
+sudo tee /opt/vfox/config.yaml > /dev/null <<EOF
+# 公司级别的 vfox 配置
+
+proxy:
+  enable: true
+  url: http://proxy.company.com:8080
+
+registry:
+  address: https://npm.company.com/registry
+
+cache:
+  availableHookDuration: 24h
+EOF
+
+# 设置权限：管理员可写，其他用户只读
+sudo chmod 644 /opt/vfox/config.yaml
+```
+
+#### 用户配置方案
+
+用户可以根据需要选择以下三种方案：
+
+| 方案 | 描述 | 场景 |
+|------|------|------|
+| **继承公司配置** | 不创建 `~/.vfox/config.yaml` | 大多数用户，无特殊需求 |
+| **部分覆盖** | 创建 `~/.vfox/config.yaml`，只配置需要的项 | 某些用户有特殊代理或仓库需求 |
+| **完全自定义** | 创建 `~/.vfox/config.yaml`，设置所有项 | 少数用户需要完全自定义 |
+
+::: tip 💡 配置合并规则
+用户配置中的**非默认值**会覆盖共享配置，**未设置**的项会继承共享配置。这样既保证了公司统一管理，又给了用户充分的自定义空间。
+:::
+
 ## 架构说明
 
 设置 `VFOX_HOME=/opt/vfox` 后的目录结构：
 
 ```
 /opt/vfox/                          # 共享目录（所有用户共享）
+├── config.yaml                     # 共享配置（管理员设置，优先级高）
 ├── cache/                          # SDK 实际安装位置
 │   ├── java/
 │   │   └── v-21.0.0/
@@ -147,8 +202,8 @@ vfox use -g java@21
     └── nodejs/
 
 ~/.vfox/                            # 用户目录（每个用户独立）
+├── config.yaml                     # 用户个人配置（可选，覆盖共享配置）
 ├── .vfox.toml                      # 用户的版本选择
-├── config.yaml                     # 用户的个人配置
 ├── sdks/                           # 用户的符号链接
 │   ├── java -> /opt/vfox/cache/java/v-21.0.0/java-21.0.0
 │   └── nodejs -> /opt/vfox/cache/nodejs/v-20.9.0/nodejs-20.9.0
@@ -232,23 +287,10 @@ Move-Item -Path "$env:USERPROFILE\.vfox\plugins\*" -Destination "$vfoxPath\plugi
 </TabItem>
 </Tabs>
 
-## 验证共享设置
-
-验证 `VFOX_HOME` 是否正确设置：
-
-```bash
-# 检查环境变量
-echo $VFOX_HOME
-# 输出: /opt/vfox
-
-# 查看 SDK 安装位置
-vfox info java@21
-# 输出应包含: /opt/vfox/cache/java/v-21.0.0/java-21.0.0
-```
-
 ## 注意事项
 
 1. **权限问题**：SDK 安装后，其他用户需要至少有读权限才能使用
 2. **插件更新**：插件定义在共享目录，更新会影响所有用户
-3. **配置文件**：`~/.vfox/config.yaml` 仍然是每个用户独立的
+3. **环境变量**：确保所有用户都设置了 `VFOX_HOME` 环境变量，指向同一个共享目录
+4. **旧版本迁移**：vfox 1.0.0 之前用户目录名称是 `.version-fox`，迁移时需要注意
 
