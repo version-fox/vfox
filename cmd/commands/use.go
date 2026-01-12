@@ -104,7 +104,8 @@ func parseSdkArg(sdkArg string) (name string, version sdk.Version) {
 	parts := strings.Split(sdkArg, "@")
 	name = parts[0]
 	if len(parts) > 1 {
-		version = sdk.Version(parts[1])
+		// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0")
+		version = sdk.Version(strings.TrimPrefix(parts[1], "v"))
 	}
 	return
 }

@@ -84,7 +84,8 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			var version sdk.Version
 			if argsLen == 2 {
 				name = strings.ToLower(argArr[0])
-				version = sdk.Version(argArr[1])
+				// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0")
+				version = sdk.Version(strings.TrimPrefix(argArr[1], "v"))
 			} else {
 				name = strings.ToLower(argArr[0])
 				version = ""

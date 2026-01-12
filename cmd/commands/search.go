@@ -60,14 +60,14 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	for _, p := range result {
 		var value string
 		if p.Note != "" {
-			value = fmt.Sprintf("v%s (%s)", p.Version, p.Note)
+			value = fmt.Sprintf("%s (%s)", p.Version, p.Note)
 		} else {
-			value = fmt.Sprintf("v%s", p.Version)
+			value = fmt.Sprintf("%s", p.Version)
 		}
 		if len(p.Additions) != 0 {
 			var additional []string
 			for _, a := range p.Additions {
-				additional = append(additional, fmt.Sprintf("%s v%s", a.Name, a.Version))
+				additional = append(additional, fmt.Sprintf("%s %s", a.Name, a.Version))
 			}
 			value = fmt.Sprintf("%s [%s]", value, strings.Join(additional, ","))
 		}
