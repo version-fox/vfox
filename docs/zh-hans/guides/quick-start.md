@@ -174,10 +174,19 @@ vfox add nodejs
 vfox install nodejs@21.5.0
 ```
 
-::: warning ⚠️ Latest版本说明
-`vfox` 强制使用准确的版本号。`latest` 是一个特殊标记，由插件解析为实际版本号，具体支持情况取决于插件实现。
+::: warning ⚠️ Latest 版本说明
 
-如果不确定具体版本号，可通过 `vfox search nodejs` 查看所有可用版本。
+`latest` 是一个特殊标记，取插件返回的可用版本列表中的第一个版本（通常是最新版）。`install` 和 `use` 命令均支持此标记，但 **不推荐在生产环境使用**。
+
+```bash
+vfox install nodejs@latest
+vfox use -g nodejs@latest
+```
+
+**为什么不推荐？** `latest` 会指向当前最新版本，但新版本可能包含破坏性变更或不稳定特性，容易导致项目出现兼容性问题。
+
+::: tip 💡 推荐做法
+始终使用准确的版本号，以确保项目的稳定性和可复现性。可通过 `vfox search nodejs` 查询所有可用版本。
 :::
 
 ::: tip 💡 自动安装插件

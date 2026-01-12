@@ -98,6 +98,23 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			}
 			sdkMetadata := sdkSource.Metadata()
 
+			// Handle @latest tag
+			if version == "latest" {
+				availableVersions, err := sdkSource.Available([]string{})
+				if err != nil {
+					errorStore.AddAndShow(name, fmt.Errorf("failed to get available versions: %w", err))
+					continue
+				}
+				if len(availableVersions) == 0 {
+					errorStore.AddAndShow(name, fmt.Errorf("no available versions"))
+					continue
+				}
+				// Use the first available version (should be the latest)
+				latestVersion := availableVersions[0].Version
+				pterm.Printf("Using latest version: %s\n", pterm.LightGreen(latestVersion))
+				version = latestVersion
+			}
+
 			var resolvedVersion = manager.ResolveVersion(sdkMetadata.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {

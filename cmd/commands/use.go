@@ -123,6 +123,21 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 
 // resolveVersion resolves the version, with interactive selection if needed
 func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Version, name string) (sdk.Version, error) {
+	// Handle @latest tag
+	if version == "latest" {
+		availableVersions, err := sdkSource.Available([]string{})
+		if err != nil {
+			return "", fmt.Errorf("failed to get available versions for %s: %w", name, err)
+		}
+		if len(availableVersions) == 0 {
+			return "", fmt.Errorf("no available versions for %s", name)
+		}
+		// Use the first available version (should be the latest)
+		latestVersion := availableVersions[0].Version
+		pterm.Printf("Using latest version: %s\n", pterm.LightGreen(latestVersion))
+		version = latestVersion
+	}
+
 	// Try to resolve version first
 	resolvedVersion := manager.ResolveVersion(name, version)
 	if resolvedVersion != "" {
@@ -130,8 +145,8 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 	}
 
 	// If not resolved, try interactive selection
-	availableVersions := sdkSource.InstalledList()
-	if len(availableVersions) == 0 {
+	installedVersions := sdkSource.InstalledList()
+	if len(installedVersions) == 0 {
 		return "", fmt.Errorf("no versions available for %s", name)
 	}
 
@@ -140,8 +155,8 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 	}
 
 	// Convert versions to strings for selection
-	versionStrings := make([]string, len(availableVersions))
-	for i, v := range availableVersions {
+	versionStrings := make([]string, len(installedVersions))
+	for i, v := range installedVersions {
 		versionStrings[i] = string(v)
 	}
 
