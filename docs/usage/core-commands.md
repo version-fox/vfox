@@ -195,3 +195,82 @@ Upgrade `vfox` to the latest version.
 ```shell
 vfox upgrade
 ```
+
+## Exec <Badge type="tip" text=">= 1.0.0" vertical="middle" />
+
+Execute a command in a vfox managed environment.
+
+**Usage**
+
+```shell
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
+```
+
+`sdk-name`: SDK name
+
+`version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
+
+`command`: The command to execute
+
+`args`: Arguments to pass to the command
+
+**Description**
+
+The `exec` command allows you to temporarily execute commands in a specified SDK environment without modifying your current scope configuration. This is particularly useful for:
+
+- **IDE Integration**: Use project-specific SDK versions in IDEs like VS Code
+- **Script Execution**: Use specific SDK versions in CI/CD or build scripts
+- **Temporary Testing**: Test code with different SDK versions
+
+**Examples**
+
+```shell
+# Execute command with project-configured nodejs version
+vfox exec nodejs node -v
+
+# Execute command with specified version
+vfox exec nodejs@20.9.0 node -v
+
+# Run build in maven environment
+vfox exec maven@3.9.1 mvn clean install
+
+# Use alias x (short for exec)
+vfox x java@21 java -version
+
+# Execute command with multiple arguments
+vfox exec golang@1.21 go build -o myapp main.go
+```
+
+::: tip IDE Integration
+
+In VS Code, you can use the `exec` command to ensure your project uses the correct SDK version. For example, configure in `.vscode/tasks.json`:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run with Node.js",
+      "type": "shell",
+      "command": "vfox",
+      "args": ["x", "nodejs@20", "node", "${file}"]
+    }
+  ]
+}
+```
+
+:::
+
+::: tip Auto Install
+
+If the specified version is not installed, `exec` will automatically install it.
+
+:::
+
+::: warning Environment Variables
+
+The `exec` command sets the correct environment variables (such as PATH, JAVA_HOME, etc.) in a subprocess, but does not affect your current Shell session.
+
+:::

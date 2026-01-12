@@ -12,10 +12,11 @@ vfox install <sdk-name>@<version> Install the specified version of SDK
 vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox unuse [--global --project --session] <sdk-name>   Unset the SDK version from the specified scope
+vfox exec <sdk-name>[@<version>] <command> [args...]   Execute a command in vfox managed environment
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox config [<key>] [<value>]       Setup, view config
 vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
-vfox upgrade                    Upgrade vfox to the latest version 
+vfox upgrade                    Upgrade vfox to the latest version
 vfox help                      Show this help message
 ```

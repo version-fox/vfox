@@ -197,3 +197,82 @@ vfox cd [options] [<sdk-name>]
 ```shell
 vfox upgrade
 ```
+
+## Exec <Badge type="tip" text=">= 1.0.0" vertical="middle" />
+
+在 vfox 管理的环境中执行命令。
+
+**用法**
+
+```shell
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
+```
+
+`sdk-name`: SDK 名称
+
+`version`[可选]: 指定使用的版本。如不传，则使用当前作用域配置的版本。
+
+`command`: 要执行的命令
+
+`args`: 传递给命令的参数
+
+**说明**
+
+`exec` 命令允许您在指定的 SDK 环境中临时执行命令，而无需修改当前作用域的配置。这对于以下场景特别有用：
+
+- **IDE 集成**: 在 IDE（如 VS Code）中使用项目特定版本的 SDK
+- **脚本执行**: 在 CI/CD 或构建脚本中使用特定 SDK 版本
+- **临时测试**: 临时使用不同版本的 SDK 测试代码
+
+**示例**
+
+```shell
+# 使用项目配置的 nodejs 版本执行命令
+vfox exec nodejs node -v
+
+# 使用指定版本执行命令
+vfox exec nodejs@20.9.0 node -v
+
+# 在 maven 环境中执行构建
+vfox exec maven@3.9.1 mvn clean install
+
+# 使用别名 x（exec 的简写）
+vfox x java@21 java -version
+
+# 执行多个参数的命令
+vfox exec golang@1.21 go build -o myapp main.go
+```
+
+::: tip IDE 集成
+
+在 VS Code 中，您可以使用 `exec` 命令来确保项目使用正确版本的 SDK。例如，在 `.vscode/tasks.json` 中配置：
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run with Node.js",
+      "type": "shell",
+      "command": "vfox",
+      "args": ["x", "nodejs@20", "node", "${file}"]
+    }
+  ]
+}
+```
+
+:::
+
+::: tip 版本自动安装
+
+如果指定的版本尚未安装，`exec` 命令会自动安装它。
+
+:::
+
+::: warning 环境变量
+
+`exec` 命令会在子进程中设置正确的环境变量（如 PATH、JAVA_HOME 等），但不会影响当前 Shell 会话。
+
+:::

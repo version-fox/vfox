@@ -429,11 +429,7 @@ func (b *impl) EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error) {
 }
 
 func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
-	if !b.plugin.HasFunction("PreUse") {
-		logger.Debug("plugin does not have PreUse function")
-		return "", nil
-	}
-	installedSdks, err := b.getAllRuntimes()
+	installedSdks, _ := b.getAllRuntimes()
 	sdks := make(map[string]*plugin.InstalledPackageItem)
 
 	for _, sdk := range installedSdks {
@@ -450,19 +446,21 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 		Version:         string(version),
 		InstalledSdks:   sdks,
 	}
-	preUseResult, err := b.plugin.PreUse(preUseCtx)
-	if b.plugin.IsNoResultProvided(err) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("plugin [preUse] error: err:%w", err)
+
+	var newVersion string
+	if b.plugin.HasFunction("PreUse") {
+		preUseResult, err := b.plugin.PreUse(preUseCtx)
+		if b.plugin.IsNoResultProvided(err) {
+			// No result provided, continue with fuzzy matching
+		} else if err != nil {
+			return "", fmt.Errorf("plugin [preUse] error: err:%w", err)
+		} else {
+			newVersion = preUseResult.Version
+		}
 	}
 
-	newVersion := preUseResult.Version
-
-	// If the plugin does not return a version, it means that the plugin does
-	// not want to change the version or not implement the preUse function.
-	// We can simply fuzzy match the version based on the input version.
+	// If the plugin does not return a version (or doesn't have PreUse),
+	// fuzzy match the version based on the input version.
 	if newVersion == "" {
 		// Before fuzzy matching, perform exact matching first.
 		if b.CheckRuntimeExist(version) {
