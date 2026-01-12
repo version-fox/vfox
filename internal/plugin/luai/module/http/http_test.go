@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
-	"github.com/version-fox/vfox/internal/util"
+	"github.com/version-fox/vfox/internal/shared/util"
 
 	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
