@@ -451,6 +451,9 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 		InstalledSdks:   sdks,
 	}
 	preUseResult, err := b.plugin.PreUse(preUseCtx)
+	if b.plugin.IsNoResultProvided(err) {
+		return "", nil
+	}
 	if err != nil {
 		return "", fmt.Errorf("plugin [preUse] error: err:%w", err)
 	}
