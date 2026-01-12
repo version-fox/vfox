@@ -231,8 +231,9 @@ vfox use -p nodejs@20.9.0
 **执行后，vfox 会做如下操作**：
 
 1. **创建目录软链**：在 `$PWD/.vfox/sdks/nodejs` 下创建符号链接，指向实际安装目录
-2. **更新 PATH**：将 `$PWD/.vfox/sdks/nodejs/bin` 插入到 `PATH` 的最前面
-3. **保存配置**：将版本信息写入 `.vfox.toml` 文件
+2. **主动添加.gitignore**: 如果检测到存在 `.gitignore` 文件，vfox 会自动将 `.vfox/` 目录添加到忽略列表中，防止提交到代码仓库中
+3. **更新 PATH**：将 `$PWD/.vfox/sdks/nodejs/bin` 插入到 `PATH` 的最前面
+4. **保存配置**：将版本信息写入 `.vfox.toml` 文件
 
 这样当你在该项目目录执行 `node` 命令时，Shell 会从 PATH 最前面查找到你的项目级 nodejs，确保版本符合项目要求。
 

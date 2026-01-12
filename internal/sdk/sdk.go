@@ -547,6 +547,15 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error
 				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
 		}
+
+		// Add .vfox/ to .gitignore if needed
+		added, err := ensureVfoxInGitignore(b.envContext.PathMeta.Working.Directory)
+		if err != nil {
+			logger.Debugf("Failed to update .gitignore: %v\n", err)
+		}
+		if added {
+			pterm.Printf("Added '.vfox/' to .gitignore\n")
+		}
 	}
 
 	// Load config for the specified scope
@@ -953,4 +962,54 @@ func NewSdk(runtimeEnvContext *env.RuntimeEnvContext, pluginPath string) (Sdk, e
 		envContext:  runtimeEnvContext,
 		plugin:      plugin,
 	}, nil
+}
+
+// ensureVfoxInGitignore adds .vfox/ to .gitignore if needed
+// Returns (true, nil) if the entry was added, (false, nil) if it already existed or .gitignore doesn't exist
+func ensureVfoxInGitignore(projectDir string) (bool, error) {
+	gitignorePath := filepath.Join(projectDir, ".gitignore")
+
+	// Check if .gitignore exists
+	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
+		// .gitignore doesn't exist, don't create it
+		return false, nil
+	}
+
+	// Read existing content
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read .gitignore: %w", err)
+	}
+
+	contentStr := string(content)
+
+	// Check if .vfox/ or .vfox is already in the file
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == ".vfox/" || trimmed == ".vfox" {
+			// Already exists, no need to add
+			return false, nil
+		}
+	}
+
+	// Append .vfox/ to the file
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return false, fmt.Errorf("failed to open .gitignore: %w", err)
+	}
+	defer f.Close()
+
+	// Add newline if the file doesn't end with one
+	if len(contentStr) > 0 && !strings.HasSuffix(contentStr, "\n") {
+		if _, err := f.WriteString("\n"); err != nil {
+			return false, fmt.Errorf("failed to write to .gitignore: %w", err)
+		}
+	}
+
+	if _, err := f.WriteString(".vfox/\n"); err != nil {
+		return false, fmt.Errorf("failed to write to .gitignore: %w", err)
+	}
+
+	return true, nil
 }

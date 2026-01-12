@@ -3,6 +3,7 @@ package sdk
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/env"
@@ -325,4 +326,214 @@ func TestSdk_createSymlinksForScope_WithAdditions(t *testing.T) {
 			t.Errorf("Expected main runtime symlink to be created even if addition fails")
 		}
 	})
+}
+
+func TestEnsureVfoxInGitignore(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupGitignore func(string) error // Setup function to create .gitignore with specific content
+		wantAdded      bool               // Expected return value (true if added, false if not)
+		verifyContent  func(string)       // Function to verify the final content
+		expectError    bool
+	}{
+		{
+			name: "Add .vfox/ to gitignore when it doesn't exist",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("node_modules/\nbuild/\n"), 0644)
+			},
+			wantAdded: true,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				contentStr := string(content)
+				if !containsLine(contentStr, ".vfox/") {
+					t.Errorf("Expected .vfox/ to be added to gitignore")
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Don't add when .vfox/ already exists",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("node_modules/\n.vfox/\nbuild/\n"), 0644)
+			},
+			wantAdded: false,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				lines := countOccurrences(string(content), ".vfox/")
+				if lines != 1 {
+					t.Errorf("Expected .vfox/ to appear only once, got %d occurrences", lines)
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Don't add when .vfox (without slash) already exists",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("node_modules/\n.vfox\nbuild/\n"), 0644)
+			},
+			wantAdded: false,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				lines := countOccurrences(string(content), ".vfox")
+				if lines != 1 {
+					t.Errorf("Expected .vfox to appear only once, got %d occurrences", lines)
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Don't create .gitignore if it doesn't exist",
+			setupGitignore: func(projectDir string) error {
+				// Don't create .gitignore
+				return nil
+			},
+			wantAdded: false,
+			verifyContent: func(gitignorePath string) {
+				if _, err := os.Stat(gitignorePath); !os.IsNotExist(err) {
+					t.Errorf("Expected .gitignore to not exist")
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Handle empty .gitignore file",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte(""), 0644)
+			},
+			wantAdded: true,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				contentStr := string(content)
+				if !containsLine(contentStr, ".vfox/") {
+					t.Errorf("Expected .vfox/ to be added to empty gitignore")
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Handle .gitignore without trailing newline",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("node_modules/"), 0644)
+			},
+			wantAdded: true,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				contentStr := string(content)
+				if !containsLine(contentStr, ".vfox/") {
+					t.Errorf("Expected .vfox/ to be added")
+				}
+				// Verify proper newline was added
+				if contentStr != "node_modules/\n.vfox/\n" {
+					t.Errorf("Expected proper newline handling, got: %q", contentStr)
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Handle .gitignore with trailing newline",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("node_modules/\n"), 0644)
+			},
+			wantAdded: true,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				contentStr := string(content)
+				if !containsLine(contentStr, ".vfox/") {
+					t.Errorf("Expected .vfox/ to be added")
+				}
+			},
+			expectError: false,
+		},
+		{
+			name: "Handle .vfox/ with extra whitespace",
+			setupGitignore: func(projectDir string) error {
+				gitignorePath := filepath.Join(projectDir, ".gitignore")
+				return os.WriteFile(gitignorePath, []byte("  .vfox/  \n"), 0644)
+			},
+			wantAdded: false,
+			verifyContent: func(gitignorePath string) {
+				content, _ := os.ReadFile(gitignorePath)
+				lines := countOccurrences(string(content), ".vfox/")
+				if lines != 1 {
+					t.Errorf("Expected .vfox/ to appear only once (whitespace should match)")
+				}
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary project directory
+			tempDir := t.TempDir()
+			projectDir := filepath.Join(tempDir, "project")
+			err := os.MkdirAll(projectDir, 0755)
+			if err != nil {
+				t.Fatalf("Failed to create project dir: %v", err)
+			}
+
+			// Setup .gitignore as per test case
+			if tt.setupGitignore != nil {
+				if err := tt.setupGitignore(projectDir); err != nil {
+					t.Fatalf("Failed to setup gitignore: %v", err)
+				}
+			}
+
+			// Execute the function
+			added, err := ensureVfoxInGitignore(projectDir)
+
+			// Check error expectation
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+
+			// Check return value
+			if added != tt.wantAdded {
+				t.Errorf("Expected added=%v, got %v", tt.wantAdded, added)
+			}
+
+			// Verify content
+			gitignorePath := filepath.Join(projectDir, ".gitignore")
+			if tt.verifyContent != nil {
+				tt.verifyContent(gitignorePath)
+			}
+		})
+	}
+}
+
+// Helper function to check if a line exists in content
+func containsLine(content, line string) bool {
+	lines := splitLines(content)
+	for _, l := range lines {
+		if strings.TrimSpace(l) == strings.TrimSpace(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper function to count occurrences of a string (exact line match)
+func countOccurrences(content, search string) int {
+	lines := splitLines(content)
+	count := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == search {
+			count++
+		}
+	}
+	return count
+}
+
+// Helper function to split content into lines
+func splitLines(content string) []string {
+	return strings.Split(content, "\n")
 }
