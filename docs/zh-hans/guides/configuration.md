@@ -6,7 +6,7 @@
 如果你是首次运行`vfox`, 则会自动创建一个空的 config.yaml 文件。
 :::
 
-## 兼容版本文件 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+## 兼容版本文件 
 
 插件 **支持** 读取其他版本管理器的配置文件, 例如: Nodejs 的`nvm`的`.nvmrc`文件, Java 的`SDKMAN`的`.sdkmanrc`文件等。
 
@@ -84,7 +84,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## 缓存 <Badge type="tip" text=">= 0.5.0" vertical="middle" />
+## 缓存
 
 `vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。
 
@@ -103,7 +103,7 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
-## Config 命令 <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+## Config 命令 
 
 设置，查看配置
 

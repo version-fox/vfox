@@ -247,10 +247,6 @@ shared/* (utilities: logger, util, cache, shim)
 ## Environment Variables
 
 - `VFOX_HOME`: User home directory (default: `~/.vfox`)
-- `VFOX_ROOT`: Shared installation root (default: platform-specific)
-- `VFOX_PLUGIN`: Custom plugin path
-- `VFOX_CACHE`: Custom cache location
-- `VFOX_TEMP`: Custom temp directory
 
 ## Configuration Files
 
