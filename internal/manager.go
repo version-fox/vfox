@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/shirou/gopsutil/v4/process"
@@ -580,19 +581,42 @@ func (m *Manager) CleanTmp() {
 			if !file.IsDir() {
 				continue
 			}
-			timestamp, pid, ok := strings.Cut(file.Name(), "-")
+			dateStr, pid, ok := strings.Cut(file.Name(), "-")
 			if !ok {
 				continue
 			}
 			if _, ok = procExists[pid]; ok {
 				continue
 			}
-			i, err := strconv.ParseInt(timestamp, 10, 64)
-			if err != nil {
-				continue
-			}
-			if util.IsBeforeToday(i) {
-				_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
+
+			// Parse date string (format: YYYYMMDD) to check if it's before today
+			// The new format is like "20260113-123"
+			if len(dateStr) == 8 {
+				// Parse YYYYMMDD format
+				year, _ := strconv.ParseInt(dateStr[0:4], 10, 64)
+				month, _ := strconv.ParseInt(dateStr[4:6], 10, 64)
+				day, _ := strconv.ParseInt(dateStr[6:8], 10, 64)
+
+				// Create a time object from the parsed date
+				dirDate := time.Date(int(year), time.Month(month), int(day), 0, 0, 0, 0, time.Local)
+
+				// Get today's date at midnight
+				now := time.Now()
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+
+				// If directory date is before today, remove it
+				if dirDate.Before(today) {
+					_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
+				}
+			} else {
+				// Old format: try to parse as Unix timestamp
+				i, err := strconv.ParseInt(dateStr, 10, 64)
+				if err != nil {
+					continue
+				}
+				if util.IsBeforeToday(i) {
+					_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
+				}
 			}
 		}
 	}

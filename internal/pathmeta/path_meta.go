@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
@@ -95,8 +96,9 @@ func containsPathSegment(path string, part string) bool {
 }
 
 func newTempPath(pid int) string {
-	timestamp := util.GetBeginOfToday()
-	name := fmt.Sprintf("%d-%d", timestamp, pid)
+	now := time.Now()
+	dateStr := now.Format("20060102")
+	name := fmt.Sprintf("%s-%d", dateStr, pid)
 	return name
 }
 
