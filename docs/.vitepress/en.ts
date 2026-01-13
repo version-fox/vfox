@@ -51,6 +51,7 @@ function sidebar(): DefaultTheme.Sidebar {
                 {text: 'What is vfox?', link: '/guides/intro'},
                 {text: 'Quick Start', link: '/guides/quick-start'},
                 {text: 'Configuration', link: '/guides/configuration'},
+                {text: 'Multi-User Sharing', link: '/guides/multi-user-sharing'},
                 {text: 'FAQ', link: '/guides/faq'},
             ]
         },
@@ -59,7 +60,6 @@ function sidebar(): DefaultTheme.Sidebar {
             items: [
                 {text: 'Core', link: '/usage/core-commands'},
                 {text: 'Plugins', link: '/usage/plugins-commands'},
-                {text: 'Shims & PATH', link: '/usage/shims-path'},
                 {text: 'All Commands', link: '/usage/all-commands'},
             ]
         },
@@ -91,7 +91,6 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: 'Misc',
             items: [
-                {text: 'Comparison to asdf', link: '/misc/vs-asdf'},
             ]
         },
     ]

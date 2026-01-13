@@ -216,7 +216,7 @@ function PLUGIN:PreUse(ctx)
 end
 ```
 
-### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+### ParseLegacyFile
 
 解析其他配置文件，以确定工具的版本。例如，`nvm` 的 `.nvmrc` 文件、`SDKMAN` 的 `.sdkmanrc` 文件等。
 
@@ -258,7 +258,7 @@ function PLUGIN:ParseLegacyFile(ctx)
 end
 ```
 
-### PreUninstall <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+### PreUninstall
 
 在卸载 SDK 之前执行的钩子函数。如果插件需要在卸载之前执行一些操作，可以实现这个钩子函数。例如清理缓存、删除配置文件等。
 

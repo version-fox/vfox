@@ -37,7 +37,7 @@ features:
     details: "Support for existing version files .tool-versions, .nvmrc, .node-version, .sdkmanrc for smooth migration!"
     icon: ⏮
   - title: "One Config File"
-    details: ".vfox.toml manages all tools, runtime environments and their versions."
+    details: ".vfox.toml/vfox.toml manages all tools, runtime environments and their versions."
     icon: 📄
 ---
 

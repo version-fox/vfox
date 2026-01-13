@@ -68,7 +68,6 @@ function sidebar(): DefaultTheme.Sidebar {
             items: [
                 {text: '核心', link: '/zh-hans/usage/core-commands'},
                 {text: '插件', link: '/zh-hans/usage/plugins-commands'},
-                {text: '垫片 & PATH', link: '/zh-hans/usage/shims-path'},
                 {text: '所有命令', link: '/zh-hans/usage/all-commands'},
             ]
         },
@@ -100,7 +99,6 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '其他',
             items: [
-                {text: '与asdf-vm对比', link: '/zh-hans/misc/vs-asdf'},
             ]
         },
     ]

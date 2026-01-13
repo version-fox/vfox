@@ -40,7 +40,7 @@ var Install = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
-			Usage:   "Install all SDK versions recorded in .tool-versions",
+			Usage:   "Install all SDK versions recorded in .vfox.toml",
 		},
 		&cli.BoolFlag{
 			Name:    "yes",

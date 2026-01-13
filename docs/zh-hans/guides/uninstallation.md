@@ -208,7 +208,7 @@ rm -rf ~/.version-fox
 - 已安装的 SDK 版本
 - 插件文件
 - 配置文件
-- 全局 `.tool-versions` 文件
+- 全局 `.vfox.toml` 文件
 - 缓存和临时文件
 
 ## 验证卸载
@@ -233,6 +233,6 @@ vfox --version
 
 ### 通过 vfox 安装的 SDK 仍然出现在 PATH 中
 
-- 检查当前目录或主目录中是否有 `.tool-versions` 文件
+- 检查当前目录或主目录中是否有 `.vfox.toml` 文件
 - 按照上述步骤 3 中的说明删除 vfox 数据目录
 - 在 Windows 上，手动检查您的用户环境变量并删除 vfox 添加的任何与 SDK 相关的路径

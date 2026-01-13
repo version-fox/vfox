@@ -52,7 +52,7 @@ vfox i <sdk-name>@<version>
 
 **选项**
 
-- `-a, --all`: 安装 .tool-versions 中记录的所有 SDK 版本
+- `-a, --all`: 安装 .vfox.toml 中记录的所有 SDK 版本
 - `-y, --yes`: 直接安装，跳过确认提示
 
 ::: tip 自动安装
@@ -103,7 +103,7 @@ vfox u [options] <sdk-name>[@<version>]
 
 :::
 
-## Unuse <Badge type="tip" text=">= 0.9.0" vertical="middle" />
+## Unuse
 
 从指定作用域取消设置运行时版本
 
@@ -188,7 +188,7 @@ vfox cd [options] [<sdk-name>]
 - `-p, --plugin`: 在插件目录下启动 shell。
 
 
-## Upgrade <Badge type="tip" text=">= 0.4.2" vertical="middle" />
+## Upgrade
 
 升级 `vfox` 到最新版本。
 

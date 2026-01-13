@@ -24,7 +24,6 @@
 - 在您切换项目时, 帮您**自动切换**运行时版本
 - 支持现有配置文件 `.node-version`、`.nvmrc`、`.sdkmanrc`，以方便迁移
 - 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
-- **比 `asdf-vm` 更快**，并提供更简单的命令和真正的跨平台统一。参见 [与asdf-vm对比](https://vfox.dev/zh-hans/misc/vs-asdf.html)。
 
 ## 演示
 

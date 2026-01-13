@@ -1,57 +1,45 @@
 # Introduction
 
-If you switch between development projects which expect different environments, specifically different runtime versions or ambient libraries,
-or you are tired of all kinds of cumbersome environment configurations, `vfox` is the ideal choice for you.
+If you frequently switch between projects that require different runtime environments or runtime versions, or are tired of complicated environment configuration, `vfox` is your best choice.
 
-`vfox` is a cross-platform, extensible version manager. It supports **native Windows**, and of course **Unix-like**!
-With it, you can **quickly install and switch** different environment.
+`vfox` is a cross-platform, extensible universal version manager that supports **Windows (native)** and **Unix-like** systems, enabling you to **quickly install and switch** development environments.
 
-It saves all tool version information in a file named `.tool-versions`, so you can share this information in your
-project to ensure that everyone on your team is using the same tool versions.
+It saves all tool version information in a `.vfox.toml` file, making it convenient to share configuration across projects and ensuring team members use the same tool versions.
 
-Traditional work requires multiple cli version managers, each with its own API, configuration files, and
-implementation (e.g., `$PATH` operations, shims, environment variables, etc.). `vfox` provides a single interactive way
-and configuration file to simplify the development workflow and can be extended to all tools and runtime environments
-through a simple plugin interface.
+Traditional solutions require installing multiple version managers (such as `nvm`, `fvm`, `sdkman`, `asdf-vm`, etc.), each with different APIs, configuration files, and implementations (involving `$PATH` operations, shims, environment variables, etc.). `vfox` provides a unified interaction method and configuration file to simplify the workflow, and can be extended to any tool and runtime environment through a simple plugin interface.
 
-## Why use vfox?
+## Why Choose vfox?
 
-- **cross-platform support** (**Windows**, Linux, macOS)
-- **consistent commands** to manage all your languages
-- supports **different versions for different projects, different shells, and globally**.
-- simple **plugin system** to add support for your runtime of choice
-- **automatically switches** runtime versions as you traverse your project
-- support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
-- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
-- **Faster than `asdf-vm`**, and provides simpler commands and true cross-platform unification.
-  See [Comparison to asdf](../misc/vs-asdf.md)。
+- 💻 **Cross-platform support**: **Windows (native)**, Linux, macOS
+- 🎯 **Flexible version scopes**: **Project-level**, **Session-level**, and **Global** version management
+- 🔌 **Simple plugin system**: Easily extend support for any language
+- 🔄 **Intelligent version switching**: Automatically switches to the appropriate version when entering a project directory
+- 🔗 **Configuration file compatibility**: Supports existing formats like `.node-version`, `.nvmrc`, `.sdkmanrc`
+- 🐚 **Full shell support**: Bash, ZSH, Fish, PowerShell, Clink, and more with command completion
 
-## Supported Shell
+## Supported Shells
 
 | Shell      | Support | Note                                                                             |
 |------------|---------|----------------------------------------------------------------------------------|
-| Powershell | ✅       |                                                                                  |
-| GitBash    | ✅       | [Issue](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
+| PowerShell | ✅       |                                                                                  |
+| Git Bash   | ✅       | [FAQ](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
 | Bash       | ✅       |                                                                                  |
 | ZSH        | ✅       |                                                                                  |
 | Fish       | ✅       |                                                                                  |
-| CMD        | ✅       | Only Support `Global` Scope. Not Recommend!!!                                    |
+| CMD        | ✅       | ⚠️ Only supports Global scope, not recommended                                  |
 | Clink      | ✅       |                                                                                  |
 | Cmder      | ✅       |                                                                                  |
 | Nushell    | ✅       |                                                                                  |
 
-
-
 ## Contributors
 
-
 > [!TIP]
-> Thanks to the following contributors for their contributions.🎉🎉🙏🙏
+> Thanks to all contributors for their support and contributions to this project! 🎉🙏
 
-#### [vfox](https://github.com/version-fox/vfox)
+### Main Repository
 
-![plugins](https://contrib.rocks/image?repo=version-fox/vfox)
+![contributors](https://contrib.rocks/image?repo=version-fox/vfox)
 
-#### [Public Registry](https://github.com/version-fox/vfox-plugins)
+### Plugins Repository
 
-![plugins](https://contrib.rocks/image?repo=version-fox/vfox-plugins))
+![contributors](https://contrib.rocks/image?repo=version-fox/vfox-plugins)

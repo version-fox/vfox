@@ -50,7 +50,7 @@ vfox i <sdk-name>@<version>
 
 **Options**
 
-- `-a, --all`: Install all SDK versions recorded in .tool-versions
+- `-a, --all`: Install all SDK versions recorded in .vfox.toml
 - `-y, --yes`: Quick installation, skip interactive prompts​
 
 ::: tip
@@ -101,7 +101,7 @@ vfox u [options] <sdk-name>[@<version>]
 `Unix-like`: `Session` scope
 :::
 
-## Unuse <Badge type="tip" text=">= 0.9.0" vertical="middle" />
+## Unuse
 
 Unset the runtime version from a specific scope.
 
@@ -186,7 +186,7 @@ vfox cd [options] [<sdk-name>]
 
 - `-p, --plugin`: Launch a shell in the plugin directory.
 
-## Upgrade <Badge type="tip" text=">= 0.4.2" vertical="middle" />
+## Upgrade
 
 Upgrade `vfox` to the latest version.
 

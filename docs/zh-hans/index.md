@@ -34,10 +34,10 @@ features:
     details: "支持 Powershell、Bash、ZSH、Fish、Clink和Nushell，并提供补全功能。"
     icon: 🐚
   - title: 向后兼容
-    details: "支持从现有配置文件.nvmrc、.node-version、.sdkmanrc平滑迁移！"
+    details: "支持从现有配置文件.tool-versions、.nvmrc、.node-version、.sdkmanrc平滑迁移！"
     icon: ⏮
   - title: "一个配置文件"
-    details: "一个可共享的 .tool-versions 配置文件管理所有工具、运行环境及其版本。"
+    details: "一个可共享的 .vfox.toml/vfox.toml 配置文件管理所有工具、运行环境及其版本。"
     icon: 📄
 ---
 

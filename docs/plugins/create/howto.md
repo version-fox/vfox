@@ -224,7 +224,7 @@ function PLUGIN:PreUse(ctx)
 end
 ```
 
-### ParseLegacyFile <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+### ParseLegacyFile
 
 This hook is used to parse other configuration files to determine the version of the tool. For example, the
 `.nvmrc` file of `nvm`, the `.sdkmanrc` file of `SDKMAN`, etc.
@@ -265,7 +265,7 @@ function PLUGIN:ParseLegacyFile(ctx)
 end
 ```
 
-### PreUninstall <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+### PreUninstall
 
 This is called before the SDK is uninstalled. If the plugin needs to perform some operations before
 uninstalling, it can implement this hook function. For example, cleaning up the cache, deleting configuration files, etc.

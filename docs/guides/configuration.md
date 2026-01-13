@@ -33,8 +33,8 @@ legacyVersionFile:
 
 ::: warning
 
-1. If both `.tool-versions` and other version manager's configuration files (`.nvmrc`, `.sdkmanrc`, etc.) exist in the
-   directory, `vfox` **priority read** the `.tool-versions` file.
+1. If both `.vfox.toml` and other version manager's configuration files (`.nvmrc`, `.sdkmanrc`, etc.) exist in the
+   directory, `vfox` **priority read** the `.vfox.toml` file.
 2. Enabling this feature may cause `vfox` to refresh environment variables slightly slower, **please enable it according
    to your needs**.
 
@@ -86,7 +86,7 @@ registry:
 - https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
   :::
 
-## Cache Settings <Badge type="tip" text=">= 0.5.0" vertical="middle" />
+## Cache Settings
 
 `vfox` will cache the results of the `search` command (`available` hook) by default to reduce the number of network requests. The default
 cache time is `12h`.
@@ -106,7 +106,7 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
-## Config Command <Badge type="tip" text=">= 0.4.0" vertical="middle" />
+## Config Command
 
 Setup, view config
 

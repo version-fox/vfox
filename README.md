@@ -28,8 +28,6 @@ and switch between different environment you need via the command line.
 - **automatically switches** runtime versions as you traverse your project
 - support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
 - shell completion available for common shells (Bash, ZSH, Powershell, Clink)
-- **it's faster than `asdf-vm`, and offers more simple commands and genuine cross-platform unification.**
-  see [Comparison with asdf](https://vfox.dev/misc/vs-asdf.html)
 
 ## Demo
 

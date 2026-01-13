@@ -208,7 +208,7 @@ This directory contains:
 - Installed SDK versions
 - Plugin files
 - Configuration files
-- Global `.tool-versions` file
+- Global `.vfox.toml` file
 - Cache and temporary files
 
 ## Verify Uninstallation
@@ -233,6 +233,6 @@ Both commands should return "command not found" or similar error messages.
 
 ### SDKs installed via vfox still appear in PATH
 
-- Check if you have a `.tool-versions` file in your current directory or home directory
+- Check if you have a `.vfox.toml` file in your current directory or home directory
 - Remove the vfox data directory as described in step 3 above
 - On Windows, manually check your user environment variables and remove any SDK-related paths that were added by vfox
