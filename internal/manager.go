@@ -72,20 +72,31 @@ type Manager struct {
 // LookupSdk lookup sdk by name
 // Loads SDK plugins and generates env keys based on the tool versions in the chain
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
+	logger.Debugf("Looking up SDK: %s\n", name)
+
 	if s, ok := m.openSdks[name]; ok {
+		logger.Debugf("SDK %s found in cache\n", name)
 		return s, nil
 	}
 
 	// Query plugin directly from shared root
 	pluginPath := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, strings.ToLower(name))
+	logger.Debugf("Checking plugin path: %s\n", pluginPath)
+
 	if !util.FileExists(pluginPath) {
+		logger.Debugf("SDK %s not found at: %s\n", name, pluginPath)
 		return nil, NotFoundError{Msg: fmt.Sprintf("%s not installed", name)}
 	}
+
+	logger.Debugf("Loading SDK %s from: %s\n", name, pluginPath)
 	s, err := sdk.NewSdk(m.RuntimeEnvContext, pluginPath)
 	if err != nil {
+		logger.Debugf("Failed to load SDK %s: %v\n", name, err)
 		return nil, err
 	}
+
 	m.openSdks[strings.ToLower(name)] = s
+	logger.Debugf("SDK %s loaded and cached successfully\n", name)
 	return s, nil
 }
 
@@ -107,9 +118,13 @@ func (m *Manager) ResolveVersion(sdkName string, version sdk.Version) sdk.Versio
 }
 
 func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, error) {
+	logger.Debugf("Looking up SDK with auto-install option: %s (autoConfirm=%v)\n", name, autoConfirm)
+
 	source, err := m.LookupSdk(name)
 	if err != nil {
 		if errors.As(err, &NotFoundError{}) {
+			logger.Debugf("SDK %s not found, attempting auto-install\n", name)
+
 			if autoConfirm {
 				fmt.Printf("[%s] not added yet, automatically proceeding with installation.\n", pterm.LightBlue(name))
 			} else if util.IsNonInteractiveTerminal() {
@@ -127,6 +142,7 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, 
 				}
 			}
 			// TODO: need to optimize
+			logger.Debugf("Fetching plugin manifest for: %s\n", name)
 			manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
 			if err != nil {
 				if errors.Is(err, ManifestNotFound) {
@@ -134,6 +150,7 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, 
 				}
 				return nil, err
 			}
+			logger.Debugf("Adding plugin: %s (downloadUrl=%s)\n", manifest.Name, manifest.DownloadUrl)
 			if err = m.Add(manifest.Name, manifest.DownloadUrl, ""); err != nil {
 				return nil, err
 			}
@@ -141,19 +158,23 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, 
 		}
 		return nil, fmt.Errorf("%s not supported, error: %w", name, err)
 	} else {
+		logger.Debugf("SDK %s already installed\n", name)
 		return source, nil
 	}
 }
 
 func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 	dir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
+	logger.Debugf("Loading all SDKs from: %s\n", dir)
 
 	if !util.FileExists(dir) {
+		logger.Debugf("Plugins directory does not exist: %s\n", dir)
 		return []sdk.Sdk{}, nil // Return empty if shared root does not exist
 	}
 
 	files, err := os.ReadDir(dir)
 	if err != nil {
+		logger.Debugf("Failed to read plugins directory: %v\n", err)
 		return nil, fmt.Errorf("read plugins directory error: %w", err)
 	}
 
@@ -164,10 +185,14 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 		path := filepath.Join(dir, sdkName)
 
 		if f.IsDir() {
+			logger.Debugf("Loading SDK: %s from %s\n", sdkName, path)
 			s, err := sdk.NewSdk(m.RuntimeEnvContext, path)
 			if err == nil {
 				sdkSlice = append(sdkSlice, s)
 				m.openSdks[strings.ToLower(sdkName)] = s
+				logger.Debugf("SDK %s loaded successfully\n", sdkName)
+			} else {
+				logger.Debugf("Failed to load SDK %s: %v\n", sdkName, err)
 			}
 		} else if strings.HasSuffix(sdkName, ".lua") {
 			// Compatible with old format
@@ -179,6 +204,7 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 		return sdkSlice[j].Metadata().Name > sdkSlice[i].Metadata().Name
 	})
 
+	logger.Debugf("Loaded %d SDKs\n", len(sdkSlice))
 	return sdkSlice, nil
 }
 
@@ -189,27 +215,36 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) Remove(pluginName string) error {
+	logger.Debugf("Removing plugin: %s\n", pluginName)
+
 	// TODO: check write permission
 	source, err := m.LookupSdk(pluginName)
 	if err != nil {
+		logger.Debugf("Plugin %s not found: %v\n", pluginName, err)
 		return err
 	}
 
 	if err = source.Unuse(env.Global); err != nil {
+		logger.Debugf("Failed to unuse plugin %s: %v\n", pluginName, err)
 		return err
 	}
 	sdkMetadata := source.Metadata()
 	pterm.Printf("Removing %s plugin...\n", sdkMetadata.PluginInstalledPath)
+	logger.Debugf("Removing plugin directory: %s\n", sdkMetadata.PluginInstalledPath)
 	err = os.RemoveAll(sdkMetadata.PluginInstalledPath)
 	if err != nil {
+		logger.Debugf("Failed to remove plugin directory: %v\n", err)
 		return fmt.Errorf("remove failed, err: %w", err)
 	}
 	pterm.Printf("Removing %s sdk...\n", sdkMetadata.SdkInstalledPath)
+	logger.Debugf("Removing SDK directory: %s\n", sdkMetadata.SdkInstalledPath)
 	if err = os.RemoveAll(sdkMetadata.SdkInstalledPath); err != nil {
+		logger.Debugf("Failed to remove SDK directory: %v\n", err)
 		return err
 	}
 	// clear legacy filenames
 	if len(sdkMetadata.PluginMetadata.LegacyFilenames) > 0 {
+		logger.Debugf("Clearing legacy filenames for: %s\n", sdkMetadata.Name)
 		lfr, err := m.loadLegacyFileRecord()
 		if err != nil {
 			return err
@@ -220,12 +255,16 @@ func (m *Manager) Remove(pluginName string) error {
 		}
 	}
 	pterm.Printf("Remove %s plugin successfully! \n", pterm.LightGreen(pluginName))
+	logger.Debugf("Plugin %s removed successfully\n", pluginName)
 	return nil
 }
 
 func (m *Manager) Update(pluginName string) error {
+	logger.Debugf("Updating plugin: %s\n", pluginName)
+
 	source, err := m.LookupSdk(pluginName)
 	if err != nil {
+		logger.Debugf("Plugin %s not found: %v\n", pluginName, err)
 		return fmt.Errorf("%s plugin not installed", pluginName)
 	}
 	sdkMetadata := source.Metadata()
@@ -263,8 +302,10 @@ func (m *Manager) Update(pluginName string) error {
 		downloadUrl = registryManifest.DownloadUrl
 
 	}
+	logger.Debugf("Installing plugin update from: %s\n", downloadUrl)
 	tempPlugin, err := m.installPluginToTemp(downloadUrl)
 	if err != nil {
+		logger.Debugf("Failed to install plugin to temp: %v\n", err)
 		return err
 	}
 	defer func() {
@@ -283,11 +324,14 @@ func (m *Manager) Update(pluginName string) error {
 	}
 	defer func() {
 		if success {
+			logger.Debugf("Removing backup: %s\n", backupPath)
 			_ = os.RemoveAll(backupPath)
 		} else {
+			logger.Debugf("Restoring from backup: %s\n", backupPath)
 			_ = os.Rename(backupPath, sdkMetadata.PluginInstalledPath)
 		}
 	}()
+	logger.Debugf("Moving updated plugin from %s to %s\n", tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath)
 	if err = os.Rename(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
 	}
@@ -310,6 +354,7 @@ func (m *Manager) Update(pluginName string) error {
 	tempPlugin.ShowNotes()
 
 	pterm.Printf("Update %s plugin successfully! version: %s \n", pterm.Green(pluginName), pterm.Blue(tempPlugin.Version))
+	logger.Debugf("Plugin %s updated to version %s\n", pluginName, tempPlugin.Version)
 
 	// It's probably an old format plugin, just a reminder.
 	if tempPlugin.UpdateUrl != "" && tempPlugin.ManifestUrl != "" {
@@ -321,29 +366,37 @@ func (m *Manager) Update(pluginName string) error {
 
 // fetchPluginManifest fetch plugin from registry by manifest url
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
+	logger.Debugf("Fetching plugin manifest from: %s\n", url)
+
 	resp, err := m.RuntimeEnvContext.HttpClient().Get(url)
 	if err != nil {
+		logger.Debugf("Failed to fetch manifest: %v\n", err)
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
+		logger.Debugf("Manifest not found (404): %s\n", url)
 		return nil, ManifestNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
+		logger.Debugf("Unexpected status code %d when fetching manifest\n", resp.StatusCode)
 		return nil, fmt.Errorf("fetch manifest error, status code: %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		logger.Debugf("Failed to read manifest body: %v\n", err)
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
 	var plugin RegistryPluginManifest
 	if err = json.Unmarshal(body, &plugin); err != nil {
+		logger.Debugf("Failed to parse manifest JSON: %v\n", err)
 		return nil, fmt.Errorf("parse plugin error: %w", err)
 	}
 	logger.Debugf("Manifest found, name: %s, version: %s,  downloadUrl: %s \n", plugin.Name, plugin.Version, plugin.DownloadUrl)
 
 	// Check if the plugin is compatible with the current runtime
 	if plugin.MinRuntimeVersion != "" && util.CompareVersion(plugin.MinRuntimeVersion, RuntimeVersion) > 0 {
+		logger.Debugf("Plugin requires vfox >= %s, current version: %s\n", plugin.MinRuntimeVersion, RuntimeVersion)
 		return nil, fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(plugin.MinRuntimeVersion))
 	}
 	return &plugin, nil
@@ -351,8 +404,11 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 
 // downloadPlugin download plugin from downloadUrl to plugin home directory.
 func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
+	logger.Debugf("Downloading plugin from: %s\n", downloadUrl)
+
 	req, err := http.NewRequest("GET", downloadUrl, nil)
 	if err != nil {
+		logger.Debugf("Failed to create HTTP request: %v\n", err)
 		return "", err
 	}
 	resp, err := m.RuntimeEnvContext.HttpClient().Do(req)
@@ -361,29 +417,36 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		if errors.As(err, &urlErr) {
 			var netErr net.Error
 			if errors.As(urlErr.Err, &netErr) && netErr.Timeout() {
+				logger.Debugf("Request timeout when downloading plugin\n")
 				return "", errors.New("request timeout")
 			}
 		}
+		logger.Debugf("Failed to download plugin: %v\n", err)
 		return "", err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
+		logger.Debugf("Plugin not found (404): %s\n", downloadUrl)
 		return "", fmt.Errorf("plugin not found at %s", downloadUrl)
 	}
 
 	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, filepath.Base(downloadUrl))
+	logger.Debugf("Saving plugin to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		logger.Debugf("Failed to create file: %v\n", err)
 		return "", err
 	}
 	defer f.Close()
 	fmt.Printf("Downloading %s... \n", filepath.Base(downloadUrl))
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
+		logger.Debugf("Failed to write plugin file: %v\n", err)
 		return "", err
 	}
+	logger.Debugf("Plugin downloaded successfully: %s\n", path)
 	return path, nil
 }
 
@@ -398,34 +461,43 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 //	vfox add --source /path/to/plugin.zip
 //	vfox add --source /path/to/plugin.zip --alias node [nodejs]
 func (m *Manager) Add(pluginName, url, alias string) error {
+	logger.Debugf("Adding plugin: name=%s, url=%s, alias=%s\n", pluginName, url, alias)
+
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
 	if strings.Contains(pluginName, "/") {
 		pluginName = strings.Split(pluginName, "/")[1]
+		logger.Debugf("Normalized plugin name to: %s\n", pluginName)
 	}
 	pluginPath := url
 	pname := pluginName
 	if len(alias) > 0 {
 		pname = alias
+		logger.Debugf("Using alias: %s\n", alias)
 	}
 	var installPath string
 	// first quick check.
 	if pname != "" {
 		installPath = filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, pname)
 		if util.FileExists(installPath) {
+			logger.Debugf("Plugin %s already exists at: %s\n", pname, installPath)
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
 	}
 	// official plugin
 	if len(url) == 0 {
 		fmt.Printf("Fetching %s manifest... \n", pterm.Green(pluginName))
+		logger.Debugf("Fetching official plugin manifest for: %s\n", pluginName)
 		pluginManifest, err := m.fetchPluginManifest(m.GetRegistryAddress(pluginName + ".json"))
 		if err != nil {
 			return err
 		}
 		pluginPath = pluginManifest.DownloadUrl
+		logger.Debugf("Official plugin download URL: %s\n", pluginPath)
 	}
+	logger.Debugf("Installing plugin to temp from: %s\n", pluginPath)
 	tempPlugin, err := m.installPluginToTemp(pluginPath)
 	if err != nil {
+		logger.Debugf("Failed to install plugin to temp: %v\n", err)
 		return err
 	}
 	defer func() {
@@ -441,7 +513,9 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
 	}
+	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
 	if err = os.Rename(tempPlugin.InstalledPath, installPath); err != nil {
+		logger.Debugf("Failed to move plugin: %v\n", err)
 		return fmt.Errorf("install plugin error: %w", err)
 	}
 
@@ -467,6 +541,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	tempPlugin.ShowNotes()
 
 	pterm.Printf("Add %s plugin successfully! \n", pterm.LightGreen(pname))
+	logger.Debugf("Plugin %s added successfully\n", pname)
 	return nil
 }
 
@@ -476,8 +551,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 //	1.only support .lua or .zip file type plugin.
 //	2.install plugin to temp dir first, then validate the plugin, if success, return *LuaPlugin
 func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
+	logger.Debugf("Installing plugin to temp from: %s\n", path)
+
 	ext := filepath.Ext(path)
 	if ext != ".lua" && ext != ".zip" {
+		logger.Debugf("Unsupported plugin type: %s\n", ext)
 		return nil, fmt.Errorf("unsupported %s type wrapper to install, only support .lua or .zip", ext)
 	}
 	localPath := path
@@ -496,8 +574,10 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 	success := false
 	tempInstallPath, err := os.MkdirTemp(m.RuntimeEnvContext.PathMeta.User.Temp, "vfox-")
 	if err != nil {
+		logger.Debugf("Failed to create temp directory: %v\n", err)
 		return nil, fmt.Errorf("install wrapper error: %w", err)
 	}
+	logger.Debugf("Created temp install path: %s\n", tempInstallPath)
 	defer func() {
 		if !success {
 			_ = os.RemoveAll(tempInstallPath)
@@ -507,28 +587,34 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 	if ext == ".lua" {
 		logger.Debugf("Moving wrapper %s to %s \n", localPath, tempInstallPath)
 		if err = os.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
+			logger.Debugf("Failed to move lua plugin: %v\n", err)
 			return nil, fmt.Errorf("install wrapper error: %w", err)
 		}
 	} else {
 		logger.Debugf("Unpacking wrapper %s to %s \n", localPath, tempInstallPath)
 		if err = util.NewDecompressor(localPath).Decompress(tempInstallPath); err != nil {
+			logger.Debugf("Failed to decompress plugin: %v\n", err)
 			return nil, fmt.Errorf("install wrapper error: %w", err)
 		}
 	}
 
 	// validate the wrapper
 	fmt.Printf("Validating %s ...\n", localPath)
+	logger.Debugf("Validating plugin at: %s\n", tempInstallPath)
 
 	wrapper, err := plugin.CreatePlugin(tempInstallPath, m.RuntimeEnvContext)
 	if err != nil {
+		logger.Debugf("Plugin validation failed: %v\n", err)
 		return nil, fmt.Errorf("validate wrapper failed: %w", err)
 	}
 	// Check if the wrapper is compatible with the current runtime
 	if wrapper.MinRuntimeVersion != "" && util.CompareVersion(wrapper.MinRuntimeVersion, RuntimeVersion) > 0 {
+		logger.Debugf("Plugin requires vfox >= %s, current version: %s\n", wrapper.MinRuntimeVersion, RuntimeVersion)
 		return nil, fmt.Errorf("check failed: this wrapper is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(wrapper.MinRuntimeVersion))
 	}
 
 	success = true
+	logger.Debugf("Plugin installed to temp successfully: %s\n", wrapper.Name)
 
 	return wrapper, nil
 }

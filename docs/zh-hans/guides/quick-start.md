@@ -201,6 +201,10 @@ vfox use -g nodejs@latest
 
 **Project > Session > Global > System**
 
+::: info 📌 默认行为
+**vfox 默认是 Session 级别**，如果不指定 `-p`（项目级）或 `-g`（全局）标志，直接使用 `vfox use` 命令等同于 `vfox use -s`。关闭 Shell 会话时，Session 级别的配置会自动清理销毁。
+:::
+
 ### 作用域概览
 
 | 作用域         | 命令            | SDK 路径                   | 作用范围        |
@@ -300,7 +304,12 @@ vfox use -p --unlink nodejs@20.9.0
 vfox use -s nodejs@18.0.0
 ```
 
-当关闭该 Shell 窗口时，临时目录及配置随之清理，不会影响其他 Shell 会话。
+::: warning 📝 重要提醒
+- **会话级别作用域**：`vfox use -s` 只在当前 Shell 会话内生效
+- **自动清理**：关闭 Shell 窗口/会话时，临时目录及配置随之自动清理
+- **不影响其他会话**：变更仅对当前会话有效，不会影响其他 Shell 会话或全局设置
+:::
+
 
 
 ---

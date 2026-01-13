@@ -202,6 +202,10 @@ Always use exact version numbers to ensure project stability and reproducibility
 
 **Project > Session > Global > System**
 
+::: info 📌 Default Behavior
+**vfox defaults to Session level**, if you don't specify `-p` (project level) or `-g` (global) flags, using `vfox use` command is equivalent to `vfox use -s`. When you close the shell session, the Session level configuration is automatically cleaned up and destroyed.
+:::
+
 ### Scope Overview
 
 | Scope | Command | SDK Path | Effective Range |
@@ -301,8 +305,13 @@ For temporarily testing a specific version, automatically expires when you close
 vfox use -s nodejs@18.0.0
 ```
 
-When you close the Shell window, the temporary directory and configuration are cleaned up automatically, not affecting other Shell sessions.
+::: warning 📝 Important Reminder
+- **Session-level scoping**: `vfox use -s` only takes effect within the current shell session
+- **Automatic cleanup**: When you close the shell window/session, the temporary directory and configuration are automatically cleaned up
+- **Not affecting other sessions**: Changes only apply to the current session and do not affect other shell sessions or global settings
+:::
 
+When you close the Shell window, the temporary directory and configuration are cleaned up automatically, not affecting other Shell sessions.
 ---
 
 ### Global (Global Scope)

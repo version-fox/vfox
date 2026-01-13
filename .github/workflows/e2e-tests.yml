@@ -1,0 +1,114 @@
+name: vfox E2E Test
+
+on: [push]
+
+jobs:
+  test-windows:
+    name: Test on Windows
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        go-version: ['1.24']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check Go installation
+        run: go version
+
+      - name: Check PowerShell version
+        shell: pwsh
+        run: $PSVersionTable.PSVersion
+
+      - name: Run E2E Tests (PowerShell)
+        shell: pwsh
+        run: |
+          cd ${{ github.workspace }}
+          $ErrorActionPreference = "Stop"
+          
+          # Run the E2E test script
+          & .\scripts\e2e-test.ps1 -Verbose
+        env:
+          VFOX_HOME: ${{ runner.temp }}\.vfox
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows-${{ matrix.go-version }}
+          path: ${{ runner.temp }}\.vfox
+
+  test-unix:
+    name: Test on Unix
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go-version: ['1.24']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Check Go installation
+        run: go version
+
+      - name: Run E2E Tests (Bash)
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          chmod +x ./scripts/e2e-test.sh
+          ./scripts/e2e-test.sh
+        env:
+          VFOX_HOME: ${{ runner.temp }}/.vfox
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.go-version }}
+          path: ${{ runner.temp }}/.vfox
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [test-windows, test-unix]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Print summary
+        run: |
+          echo "E2E Tests Summary"
+          echo "================"
+          echo "Windows tests: $(ls -d test-results-windows-* 2>/dev/null | wc -l) platform(s)"
+          echo "Unix tests: $(ls -d test-results-* 2>/dev/null | grep -v windows | wc -l) platform(s)"
+          echo ""
+          echo "All test artifacts have been uploaded."
+
+      - name: Check test results
+        if: failure()
+        run: |
+          echo "Some tests failed. Please check the artifacts above."
+          exit 1
+
+

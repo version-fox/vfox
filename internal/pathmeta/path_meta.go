@@ -84,9 +84,13 @@ func IsVfoxRelatedPath(path string) bool {
 }
 
 func containsPathSegment(path string, part string) bool {
+	// Normalize path to use system separator
+	// This handles both Unix-style (/) and Windows-style (\) paths
+	normalizedPath := filepath.FromSlash(path)
+
 	// Split path by separator to check individual segments
 	separator := string(filepath.Separator)
-	segments := strings.Split(path, separator)
+	segments := strings.Split(normalizedPath, separator)
 	for _, segment := range segments {
 		if segment == part {
 			return true

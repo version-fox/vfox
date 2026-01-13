@@ -150,19 +150,24 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 // For additional runtimes, it will be installed to {InstallPath}/v-{main_version}/add-{addition_name}-{addition_version}
 func (b *impl) Install(version Version) error {
 	label := b.Label(version)
+	logger.Debugf("Installing SDK: %s\n", label)
+
 	if b.CheckRuntimeExist(version) {
 		fmt.Printf("%s is already installed\n", label)
+		logger.Debugf("SDK %s already exists\n", label)
 		return nil
 	}
 
 	ctx := &plugin.PreInstallHookCtx{
 		Version: string(version),
 	}
+	logger.Debugf("Calling PreInstall hook for %s\n", label)
 	installInfo, err := b.plugin.PreInstall(ctx)
 	if b.plugin.IsNoResultProvided(err) {
 		return fmt.Errorf("no installable runtime provided")
 	}
 	if err != nil {
+		logger.Debugf("PreInstall hook failed for %s: %v\n", label, err)
 		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
 	}
 	if installInfo == nil {
@@ -176,12 +181,15 @@ func (b *impl) Install(version Version) error {
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
 	label = b.Label(sdkVersion)
+	logger.Debugf("Resolved version: %s\n", sdkVersion)
 	if b.CheckRuntimeExist(sdkVersion) {
 		fmt.Printf("%s is already installed\n", label)
+		logger.Debugf("SDK %s already exists after version resolution\n", label)
 		return nil
 	}
 	success := false
 	newDirPath := b.packagePath(sdkVersion)
+	logger.Debugf("Installing to path: %s\n", newDirPath)
 
 	sigs := make(chan os.Signal, 1)
 
@@ -240,6 +248,7 @@ func (b *impl) Install(version Version) error {
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
+	logger.Debugf("SDK %s installed successfully\n", label)
 	useCommand := fmt.Sprintf("vfox use %s", label)
 	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
 
@@ -349,15 +358,22 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 
 func (b *impl) Uninstall(version Version) (err error) {
 	label := b.Label(version)
+	logger.Debugf("Uninstalling SDK: %s\n", label)
+
 	if !b.CheckRuntimeExist(version) {
+		logger.Debugf("SDK %s not installed\n", label)
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
 	path := b.packagePath(version)
+	logger.Debugf("Uninstalling from path: %s\n", path)
+
 	sdkPackage, err := b.GetRuntimePackage(version)
 	if err != nil {
+		logger.Debugf("Failed to get runtime package for %s: %v\n", label, err)
 		return
 	}
 	if b.plugin.HasFunction("PreUninstall") {
+		logger.Debugf("Calling PreUninstall hook for %s\n", label)
 		// Give the plugin a chance before actually uninstalling targeted version.
 		main := convertRuntime2InstalledPackageItem(sdkPackage.Runtime)
 		sdkInfo := map[string]*plugin.InstalledPackageItem{}
@@ -371,22 +387,27 @@ func (b *impl) Uninstall(version Version) (err error) {
 		}
 		err = b.plugin.PreUninstall(preUninstallCtx)
 		if err != nil {
+			logger.Debugf("PreUninstall hook failed for %s: %v\n", label, err)
 			return
 		}
 	}
 
 	// If the version to be uninstalled is currently in use, unuse it first.
 	if b.Current() == version {
+		logger.Debugf("SDK %s is currently in use, unusing it first\n", label)
 		if err = b.Unuse(env.Global); err != nil {
 			return err
 		}
 	}
 
+	logger.Debugf("Removing directory: %s\n", path)
 	err = os.RemoveAll(path)
 	if err != nil {
+		logger.Debugf("Failed to remove directory: %v\n", err)
 		return
 	}
 	pterm.Printf("Uninstalled %s successfully!\n", label)
+	logger.Debugf("SDK %s uninstalled successfully\n", label)
 	return
 }
 
@@ -511,18 +532,23 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 
 	// Verify hook environment is available
 	if !env.IsHookEnv() {
+		logger.Debugf("Hook environment not available\n")
 		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
 	}
 
 	// Resolve version with preUse hook
+	logger.Debugf("Resolving version with preUse hook for %s\n", version)
 	resolvedVersion, err := b.preUse(version, scope)
 	if err != nil {
+		logger.Debugf("Failed to resolve version: %v\n", err)
 		return err
 	}
+	logger.Debugf("Resolved version: %s\n", resolvedVersion)
 
 	// Verify version exists
 	label := b.Label(resolvedVersion)
 	if !b.CheckRuntimeExist(resolvedVersion) {
+		logger.Debugf("SDK %s not installed\n", label)
 		return &VersionNotExistsError{Label: label}
 	}
 
@@ -530,18 +556,21 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 }
 
 func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error {
+	logger.Debugf("Using SDK in hook: version=%s, scope=%v, unlink=%v\n", version, scope, unlink)
 
 	runtimePackage, err := b.GetRuntimePackage(version)
 	if err != nil {
-		logger.Debugf("Failed to get runtime package for %s: %v", b.Label(version), err)
+		logger.Debugf("Failed to get runtime package for %s: %v\n", b.Label(version), err)
 		return ErrRuntimeNotFound
 	}
 
 	// Ensure .vfox directory exists for project scope
 	if env.Project == scope {
 		if !util.FileExists(b.envContext.PathMeta.Working.ProjectSdkDir) {
+			logger.Debugf("Creating project SDK directory: %s\n", b.envContext.PathMeta.Working.ProjectSdkDir)
 			err := os.MkdirAll(b.envContext.PathMeta.Working.ProjectSdkDir, pathmeta.ReadWriteAuth)
 			if err != nil {
+				logger.Debugf("Failed to create project SDK directory: %v\n", err)
 				return fmt.Errorf("failed to create .vfox directory: %w", err)
 			}
 		}
@@ -553,12 +582,15 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error
 		}
 		if added {
 			pterm.Printf("Added '.vfox/' to .gitignore\n")
+			logger.Debugf("Added .vfox/ to .gitignore\n")
 		}
 	}
 
 	// Load config for the specified scope
+	logger.Debugf("Loading config for scope: %v\n", scope)
 	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(scope)
 	if err != nil {
+		logger.Debugf("Failed to load config for scope %v: %v\n", scope, err)
 		return err
 	}
 
@@ -566,28 +598,34 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error
 
 	// Determine link flag based on scope and unlink parameter
 	if scope == env.Project && unlink {
+		logger.Debugf("Setting unlink flag for project scope\n")
 		attr := pathmeta.Attr{
 			UnLinkAttrFlag: BoolYes,
 		}
 		// Update version record
 		vfoxToml.SetToolWithAttr(b.Name, string(version), attr)
 		if err := vfoxToml.Save(); err != nil {
+			logger.Debugf("Failed to save tool versions: %v\n", err)
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
 		}
 	} else {
 		// Update version record
 		vfoxToml.SetTool(b.Name, string(version))
 		if err := vfoxToml.Save(); err != nil {
+			logger.Debugf("Failed to save tool versions: %v\n", err)
 			return fmt.Errorf("failed to save tool versions, err:%w", err)
 		}
 	}
 
 	// Create symlinks for the specified scope
+	logger.Debugf("Creating symlinks for scope: %v\n", scope)
 	if err := b.createSymlinksForScope(runtimePackage, scope); err != nil {
+		logger.Debugf("Failed to create symlinks: %v\n", err)
 		return fmt.Errorf("failed to create symlinks, err:%w", err)
 	}
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
+	logger.Debugf("Successfully using SDK: %s\n", b.Label(version))
 	return nil
 }
 
