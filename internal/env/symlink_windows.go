@@ -29,10 +29,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const (
-	fsctlSetReparsePoint = 589990
-)
-
 // CreateDirSymlink creates a directory junction on Windows systems
 // Junctions don't require administrator privileges
 func CreateDirSymlink(target, link string) error {
@@ -88,7 +84,8 @@ func CreateDirSymlink(target, link string) error {
 		0,
 		nil,
 		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS,
+		// FILE_FLAG_OPEN_REPARSE_POINT tells Windows we want the junction itself, not its target
+		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
 		0,
 	)
 	if err != nil {
@@ -108,7 +105,7 @@ func CreateDirSymlink(target, link string) error {
 	var bytesReturned uint32
 	err = windows.DeviceIoControl(
 		handle,
-		fsctlSetReparsePoint,
+		windows.FSCTL_SET_REPARSE_POINT,
 		&data[0],
 		uint32(len(data)),
 		nil,
