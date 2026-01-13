@@ -35,7 +35,7 @@ func (f *FileOperation) symlink(L *lua.LState) int {
 	// TODO check
 	err := os.Symlink(filepath.Join(f.rootPath, src), filepath.Join(f.rootPath, dest))
 	if err != nil {
-		L.RaiseError(err.Error())
+		L.RaiseError("%s", err.Error())
 		return 0
 	}
 	L.Push(lua.LTrue)

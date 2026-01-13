@@ -136,11 +136,11 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			}
 
 			if actualNumArgs < expectedMinArgs {
-				L.RaiseError(fmt.Sprintf("expected at least %d arguments for %s, got %d", expectedMinArgs, goFuncType.String(), actualNumArgs))
+				L.RaiseError("expected at least %d arguments for %s, got %d", expectedMinArgs, goFuncType.String(), actualNumArgs)
 				return 0 // Should not reach here due to RaiseError
 			}
 			if !isVariadic && actualNumArgs != numIn {
-				L.RaiseError(fmt.Sprintf("expected %d arguments for %s, got %d", numIn, goFuncType.String(), actualNumArgs))
+				L.RaiseError("expected %d arguments for %s, got %d", numIn, goFuncType.String(), actualNumArgs)
 				return 0 // Should not reach here due to RaiseError
 			}
 

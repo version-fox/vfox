@@ -92,7 +92,7 @@ func selectionEach(L *lua.LState) int {
 			Protect: true,
 		}, lua.LNumber(i+1), ud)
 		if err != nil {
-			L.RaiseError(err.Error())
+			L.RaiseError("%s", err.Error())
 		}
 	})
 	return 0
@@ -102,7 +102,7 @@ func newHtmlDocument(L *lua.LState) int {
 	checkString := L.CheckString(1)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(checkString))
 	if err != nil {
-		L.RaiseError(err.Error())
+		L.RaiseError("%s", err.Error())
 		return 0
 	}
 	doc.Text()
@@ -146,7 +146,7 @@ func selectionHtml(state *lua.LState) int {
 	s := checkSelection(state)
 	ret, err := s.Html()
 	if err != nil {
-		state.RaiseError(err.Error())
+		state.RaiseError("%s", err.Error())
 		return 0
 	}
 	state.Push(lua.LString(ret))
