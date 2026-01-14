@@ -10,3 +10,4 @@ coverage.out
 **/.available.cache
 
 .vfox/vfox
+/vfox

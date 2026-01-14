@@ -90,3 +90,31 @@ func TestPreInstallPackageItem_Checksum(t *testing.T) {
 		}
 	})
 }
+
+func TestInstalledPackageItem_Note(t *testing.T) {
+	t.Run("InstalledPackageItem includes Note field", func(t *testing.T) {
+		item := &InstalledPackageItem{
+			Name:    "test-sdk",
+			Version: "1.0.0",
+			Path:    "/path/to/sdk",
+			Note:    "This is a test note",
+		}
+
+		if item.Note != "This is a test note" {
+			t.Errorf("Expected note 'This is a test note', got '%s'", item.Note)
+		}
+	})
+
+	t.Run("InstalledPackageItem with empty Note", func(t *testing.T) {
+		item := &InstalledPackageItem{
+			Name:    "test-sdk",
+			Version: "1.0.0",
+			Path:    "/path/to/sdk",
+			Note:    "",
+		}
+
+		if item.Note != "" {
+			t.Errorf("Expected empty note, got '%s'", item.Note)
+		}
+	})
+}
