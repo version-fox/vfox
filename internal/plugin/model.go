@@ -36,6 +36,14 @@ func (p *PreInstallPackageItem) Label() string {
 	return p.Name + "@" + p.Version
 }
 
+// Checksum returns the checksum for this package, or NoneChecksum if no checksum is provided
+func (p *PreInstallPackageItem) Checksum() *shared.Checksum {
+	if p.CheckSumItem == nil {
+		return shared.NoneChecksum
+	}
+	return p.CheckSumItem.Checksum()
+}
+
 type CheckSumItem struct {
 	Sha256 string `json:"sha256"`
 	Sha512 string `json:"sha512"`

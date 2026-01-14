@@ -5,6 +5,8 @@ go 1.24.0
 require (
 	atomicgo.dev/cursor v0.2.0
 	atomicgo.dev/keyboard v0.2.9
+	github.com/BurntSushi/toml v1.6.0
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/bodgit/sevenzip v1.5.1
 	github.com/lithammer/fuzzysearch v1.1.8
@@ -15,6 +17,7 @@ require (
 	github.com/urfave/cli/v3 v3.4.1
 	github.com/yuin/gopher-lua v1.1.1
 	golang.org/x/crypto v0.35.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.30.0
 	golang.org/x/term v0.29.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -22,8 +25,6 @@ require (
 
 require (
 	atomicgo.dev/schedule v0.1.0 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
@@ -48,6 +49,5 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
