@@ -220,6 +220,7 @@ func (b *impl) Install(version Version) error {
 		Name:    mainSdk.Name,
 		Version: mainSdk.Version,
 		Path:    path,
+		Note:    mainSdk.Note,
 	}
 	if len(installInfo.Addition) > 0 {
 		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Addition))
@@ -232,6 +233,7 @@ func (b *impl) Install(version Version) error {
 				Name:    oSdk.Name,
 				Version: oSdk.Version,
 				Path:    path,
+				Note:    oSdk.Note,
 			}
 		}
 	}

@@ -115,6 +115,7 @@ type InstalledPackageItem struct {
 	Path    string `json:"path"`
 	Version string `json:"version"`
 	Name    string `json:"name"`
+	Note    string `json:"note"` // optional, additional note from PreInstall
 }
 
 type EnvKeysHookCtx struct {
