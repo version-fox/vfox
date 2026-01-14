@@ -20,6 +20,7 @@ package commands
 
 import (
 	"os"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -63,17 +64,18 @@ func runAsAdmin() error {
 	args := ""
 	if len(os.Args) > 1 {
 		// Join all arguments starting from index 1
-		for i, arg := range os.Args[1:] {
-			if i > 0 {
-				args += " "
-			}
-			// Quote arguments that contain spaces
-			if len(arg) > 0 && (arg[0] == '-' || !containsSpace(arg)) {
-				args += arg
+		quotedArgs := make([]string, 0, len(os.Args)-1)
+		for _, arg := range os.Args[1:] {
+			// Quote arguments that contain spaces or special characters
+			if strings.ContainsAny(arg, " \t\n\"") {
+				// Escape quotes and wrap in quotes
+				escaped := strings.ReplaceAll(arg, "\"", "\\\"")
+				quotedArgs = append(quotedArgs, "\""+escaped+"\"")
 			} else {
-				args += "\"" + arg + "\""
+				quotedArgs = append(quotedArgs, arg)
 			}
 		}
+		args = strings.Join(quotedArgs, " ")
 	}
 
 	verb := "runas"
@@ -94,13 +96,4 @@ func runAsAdmin() error {
 	}
 	os.Exit(0)
 	return nil
-}
-
-func containsSpace(s string) bool {
-	for _, c := range s {
-		if c == ' ' {
-			return true
-		}
-	}
-	return false
 }
