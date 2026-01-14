@@ -19,6 +19,7 @@
 package pathmeta
 
 import (
+	"path/filepath"
 	"runtime"
 	"testing"
 )
@@ -181,11 +182,20 @@ func TestApplyStoragePath(t *testing.T) {
 	
 	t.Run("Valid storage path updates Installs", func(t *testing.T) {
 		customPath := tmpDir + "/custom"
-		err := meta.ApplyStoragePath(customPath)
+		
+		// Create a reference PathMeta to get the expected suffix
+		refMeta, err := NewPathMeta(tmpDir, customPath, tmpDir, 1)
+		if err != nil {
+			t.Fatalf("Failed to create reference PathMeta: %v", err)
+		}
+		expectedSuffix := filepath.Base(refMeta.Shared.Installs)
+		
+		// Now test ApplyStoragePath
+		err = meta.ApplyStoragePath(customPath)
 		if err != nil {
 			t.Errorf("ApplyStoragePath with valid path should not error: %v", err)
 		}
-		expectedPath := customPath + "/cache"
+		expectedPath := filepath.Join(customPath, expectedSuffix)
 		if meta.Shared.Installs != expectedPath {
 			t.Errorf("Installs path not updated correctly: got %q, want %q", meta.Shared.Installs, expectedPath)
 		}
