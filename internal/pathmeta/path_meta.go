@@ -171,3 +171,21 @@ func getExecutablePath() string {
 	}
 	return exePath
 }
+
+// ApplyStoragePath applies the storage path from config to update the Installs path
+// If storagePath is empty, the current Installs path is unchanged
+func (p *PathMeta) ApplyStoragePath(storagePath string) error {
+	if storagePath == "" {
+		return nil
+	}
+	
+	// Update the Installs path to use the configured storage path
+	p.Shared.Installs = filepath.Join(storagePath, installedDirPrefix)
+	
+	// Ensure the directory exists
+	if err := os.MkdirAll(p.Shared.Installs, ReadWriteAuth); err != nil {
+		return fmt.Errorf("failed to create storage directory: %w", err)
+	}
+	
+	return nil
+}

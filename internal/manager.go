@@ -781,6 +781,13 @@ func NewSdkManager() (*Manager, error) {
 		return nil, fmt.Errorf("load config failed: %w", err)
 	}
 
+	// Apply storage.sdkPath from config to PathMeta
+	if c.Storage != nil && c.Storage.SdkPath != "" {
+		if err := meta.ApplyStoragePath(c.Storage.SdkPath); err != nil {
+			return nil, fmt.Errorf("failed to apply storage path: %w", err)
+		}
+	}
+
 	return &Manager{
 		RuntimeEnvContext: &env.RuntimeEnvContext{
 			UserConfig:        c,
