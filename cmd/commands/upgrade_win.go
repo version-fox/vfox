@@ -61,17 +61,15 @@ func runAsAdmin() error {
 
 	// Build arguments string from os.Args (skip the executable name)
 	// This ensures all flags like --debug are passed through
-	if len(os.Args) <= 1 {
-		// No arguments to pass
-		return syscall.Errno(87) // ERROR_INVALID_PARAMETER
+	args := ""
+	if len(os.Args) > 1 {
+		// Join all arguments starting from index 1
+		quotedArgs := make([]string, 0, len(os.Args)-1)
+		for _, arg := range os.Args[1:] {
+			quotedArgs = append(quotedArgs, escapeArg(arg))
+		}
+		args = strings.Join(quotedArgs, " ")
 	}
-
-	// Join all arguments starting from index 1
-	quotedArgs := make([]string, 0, len(os.Args)-1)
-	for _, arg := range os.Args[1:] {
-		quotedArgs = append(quotedArgs, escapeArg(arg))
-	}
-	args := strings.Join(quotedArgs, " ")
 
 	verb := "runas"
 	cwd, _ := syscall.UTF16PtrFromString(".")
@@ -92,7 +90,7 @@ func runAsAdmin() error {
 	// Exit the current process since we've successfully launched the elevated one
 	// This function never returns normally after successful elevation
 	os.Exit(0)
-	panic("unreachable") // never reached, but satisfies the compiler
+	return nil // unreachable but required for compilation
 }
 
 // escapeArg escapes a command-line argument according to Windows rules.
