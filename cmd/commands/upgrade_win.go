@@ -66,14 +66,7 @@ func runAsAdmin() error {
 		// Join all arguments starting from index 1
 		quotedArgs := make([]string, 0, len(os.Args)-1)
 		for _, arg := range os.Args[1:] {
-			// Quote arguments that contain spaces or special characters
-			if strings.ContainsAny(arg, " \t\n\"") {
-				// Escape quotes and wrap in quotes
-				escaped := strings.ReplaceAll(arg, "\"", "\\\"")
-				quotedArgs = append(quotedArgs, "\""+escaped+"\"")
-			} else {
-				quotedArgs = append(quotedArgs, arg)
-			}
+			quotedArgs = append(quotedArgs, escapeArg(arg))
 		}
 		args = strings.Join(quotedArgs, " ")
 	}
@@ -94,6 +87,47 @@ func runAsAdmin() error {
 	if ret <= 32 {
 		return syscall.Errno(ret)
 	}
+	// Exit the current process since we've successfully launched the elevated one
 	os.Exit(0)
-	return nil
+	return nil // unreachable, but required by function signature
+}
+
+// escapeArg escapes a command-line argument according to Windows rules.
+// Based on https://docs.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
+func escapeArg(arg string) string {
+	// If the argument doesn't contain special characters, return as-is
+	if !strings.ContainsAny(arg, " \t\n\"") {
+		return arg
+	}
+
+	// Build the escaped argument
+	var b strings.Builder
+	b.WriteByte('"')
+
+	for i := 0; i < len(arg); i++ {
+		numBackslashes := 0
+
+		// Count consecutive backslashes
+		for i < len(arg) && arg[i] == '\\' {
+			i++
+			numBackslashes++
+		}
+
+		if i == len(arg) {
+			// Backslashes at the end need to be doubled (they precede the closing quote)
+			b.WriteString(strings.Repeat("\\", numBackslashes*2))
+			break
+		} else if arg[i] == '"' {
+			// Backslashes before a quote need to be doubled, and the quote needs to be escaped
+			b.WriteString(strings.Repeat("\\", numBackslashes*2))
+			b.WriteString("\\\"")
+		} else {
+			// Regular backslashes (not before a quote) are literal
+			b.WriteString(strings.Repeat("\\", numBackslashes))
+			b.WriteByte(arg[i])
+		}
+	}
+
+	b.WriteByte('"')
+	return b.String()
 }
