@@ -275,11 +275,15 @@ func envFlag(cmd *cli.Command) error {
 	scopePriority := []env.UseScope{env.Project, env.Session, env.Global}
 	finalEnvs.MergeByScopePriority(envsByScope, scopePriority)
 
-	// 8. Build final PATH with proper priority: Project > Session > Global > Cleaned System PATH
-	// Get clean system PATH (removes all vfox-managed paths)
+	// 8. Build final PATH with proper priority: Project > Session > Global > User-added > Cleaned System PATH
+	// Get user-added paths (paths added by user after vfox activation)
+	userAddedPaths := runtimeEnvContext.GetUserAddedPaths()
+
+	// Get clean system PATH (removes all vfox-managed paths and user-added paths)
 	cleanSystemPaths := runtimeEnvContext.CleanSystemPaths()
 
-	// Merge in priority order: vfox paths (already sorted by scope) > clean system paths
+	// Merge in priority order: vfox paths (already sorted by scope) > user-added paths > clean system paths
+	finalEnvs.Paths.Merge(userAddedPaths)
 	finalEnvs.Paths.Merge(cleanSystemPaths)
 
 	// 9. Export environment variables

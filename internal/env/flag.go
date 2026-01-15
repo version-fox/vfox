@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	HomeFromEnv = "VFOX_HOME"
-	HookFlag    = "__VFOX_SHELL"
-	PidFlag     = "__VFOX_PID"
+	HomeFromEnv      = "VFOX_HOME"
+	HookFlag         = "__VFOX_SHELL"
+	PidFlag          = "__VFOX_PID"
+	OriginalPathFlag = "__VFOX_ORIGINAL_PATH"
 )
 
 func IsHookEnv() bool {

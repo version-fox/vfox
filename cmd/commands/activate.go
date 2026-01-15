@@ -171,6 +171,16 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	pathStr := finalEnvs.Paths.String()
 	exportEnvs["PATH"] = &pathStr
 
+	// Store the original PATH before vfox modifications so we can detect user additions later
+	// Only store if not already set (i.e., on first activation)
+	originalPath := os.Getenv(env.OriginalPathFlag)
+	if originalPath == "" {
+		// Get the clean system PATH (without vfox paths) as the original
+		originalPath = cleanSystemPaths.String()
+		exportEnvs[env.OriginalPathFlag] = &originalPath
+		logger.Debugf("Storing original PATH: %s", originalPath)
+	}
+
 	// Export __VFOX_CURTMFPATH so that vfox env can use the same session directory
 	// This ensures state cache works across multiple vfox env calls in the same session
 	curTmpPath := runtimeEnvContext.PathMeta.Working.SessionSdkDir
