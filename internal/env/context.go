@@ -163,7 +163,7 @@ func (m *RuntimeEnvContext) GetUserAddedPaths() *Paths {
 	return userPaths
 }
 
-// CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
+// CleanSystemPaths returns system PATH with all vfox-managed paths removed (segment match).
 // This ensures the system PATH is clean before adding vfox paths back in priority order.
 func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
 	// Get system paths

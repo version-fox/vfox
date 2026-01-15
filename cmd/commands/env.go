@@ -279,7 +279,7 @@ func envFlag(cmd *cli.Command) error {
 	// Get user-added paths (paths added by user after vfox activation)
 	userAddedPaths := runtimeEnvContext.GetUserAddedPaths()
 
-	// Get clean system PATH (removes all vfox-managed paths and user-added paths)
+	// Get clean system PATH (removes only vfox-managed paths, preserves non-vfox paths)
 	cleanSystemPaths := runtimeEnvContext.CleanSystemPaths()
 
 	// Merge in priority order: vfox paths (already sorted by scope) > user-added paths > clean system paths
