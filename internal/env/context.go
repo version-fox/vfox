@@ -108,62 +108,7 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 	return linkDir
 }
 
-// GetUserAddedPaths returns paths that the user has added to PATH after vfox activation.
-// It compares the current PATH with the original PATH (stored during activation) and returns
-// paths that are:
-// 1. In the current PATH
-// 2. NOT in the original PATH
-// 3. NOT vfox-managed paths
-func (m *RuntimeEnvContext) GetUserAddedPaths() *Paths {
-	userPaths := NewPaths(EmptyPaths)
-
-	// Get original PATH from environment (set during activation)
-	originalPath := os.Getenv(OriginalPathFlag)
-	if originalPath == "" {
-		// No original path stored, return empty
-		logger.Debugf("No original PATH found, skipping user path detection")
-		return userPaths
-	}
-
-	// Parse original and current paths
-	originalPaths := strings.Split(originalPath, string(os.PathListSeparator))
-	currentPaths := strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
-
-	// Create a set of original paths for quick lookup
-	originalPathSet := make(map[string]bool)
-	for _, path := range originalPaths {
-		if path != "" {
-			originalPathSet[filepath.Clean(path)] = true
-		}
-	}
-
-	// Find paths in current PATH that are NOT in original PATH and NOT vfox-managed
-	for _, path := range currentPaths {
-		if path == "" {
-			continue
-		}
-
-		cleanPath := filepath.Clean(path)
-
-		// Skip if it was in the original PATH
-		if originalPathSet[cleanPath] {
-			continue
-		}
-
-		// Skip if it's a vfox-managed path
-		if pathmeta.IsVfoxRelatedPath(cleanPath) {
-			continue
-		}
-
-		// This is a user-added path!
-		logger.Debugf("Detected user-added path: %s", path)
-		userPaths.Add(path)
-	}
-
-	return userPaths
-}
-
-// CleanSystemPaths returns system PATH with all vfox-managed paths removed (segment match).
+// CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
 // This ensures the system PATH is clean before adding vfox paths back in priority order.
 func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
 	// Get system paths
