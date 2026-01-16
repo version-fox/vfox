@@ -128,17 +128,15 @@ func newString(s string) *string {
 func TestNushellActivate(t *testing.T) {
 	tests := []struct {
 		name           string
-		config         ActivateConfig
+		selfPath       string
+		enablePidCheck bool
 		expectedInFile []string
 		notInFile      []string
 	}{
 		{
-			name: "EnablePidCheck true",
-			config: ActivateConfig{
-				SelfPath:       "/usr/local/bin/vfox",
-				Args:           []string{t.TempDir()},
-				EnablePidCheck: true,
-			},
+			name:           "EnablePidCheck true",
+			selfPath:       "/usr/local/bin/vfox",
+			enablePidCheck: true,
 			expectedInFile: []string{
 				"^'/usr/local/bin/vfox' activate nushell",
 				"# Check if PID changed (e.g., in tmux new pane)",
@@ -153,12 +151,9 @@ func TestNushellActivate(t *testing.T) {
 			},
 		},
 		{
-			name: "EnablePidCheck false",
-			config: ActivateConfig{
-				SelfPath:       "/opt/vfox/bin/vfox",
-				Args:           []string{t.TempDir()},
-				EnablePidCheck: false,
-			},
+			name:           "EnablePidCheck false",
+			selfPath:       "/opt/vfox/bin/vfox",
+			enablePidCheck: false,
 			expectedInFile: []string{
 				"^'/opt/vfox/bin/vfox' activate nushell",
 				"def --env updateVfoxEnvironment [] {",
@@ -176,8 +171,16 @@ func TestNushellActivate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create temp directory for this specific test run
+			tmpDir := t.TempDir()
+			config := ActivateConfig{
+				SelfPath:       tt.selfPath,
+				Args:           []string{tmpDir},
+				EnablePidCheck: tt.enablePidCheck,
+			}
+
 			n := nushell{}
-			script, err := n.Activate(tt.config)
+			script, err := n.Activate(config)
 			if err != nil {
 				t.Fatalf("Activate() returned error: %v", err)
 			}
@@ -188,7 +191,7 @@ func TestNushellActivate(t *testing.T) {
 			}
 
 			// Read the generated vfox.nu file
-			targetPath := filepath.Join(tt.config.Args[0], "vfox.nu")
+			targetPath := filepath.Join(tmpDir, "vfox.nu")
 			content, err := os.ReadFile(targetPath)
 			if err != nil {
 				t.Fatalf("Failed to read generated file: %v", err)
