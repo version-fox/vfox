@@ -216,3 +216,63 @@ func TestClose_NoRaceCondition(t *testing.T) {
 	// Call Close (should not panic even with empty cache)
 	manager.Close()
 }
+
+// TestLookupSdk_SimulateActivateScenario simulates the exact scenario from activate.go
+// where multiple goroutines lookup different SDKs concurrently
+func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
+	// Create a temporary directory structure for testing
+	tmpDir := t.TempDir()
+	userHome := filepath.Join(tmpDir, "user_home")
+	vfoxHome := filepath.Join(tmpDir, "vfox_home")
+	currentDir := tmpDir
+
+	// Create necessary directories
+	os.MkdirAll(userHome, 0755)
+	os.MkdirAll(vfoxHome, 0755)
+
+	// Create PathMeta
+	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
+	if err != nil {
+		t.Fatalf("Failed to create PathMeta: %v", err)
+	}
+
+	// Create plugins directory
+	pluginsDir := meta.Shared.Plugins
+	os.MkdirAll(pluginsDir, 0755)
+
+	// Create Manager
+	manager := &Manager{
+		RuntimeEnvContext: &env.RuntimeEnvContext{
+			UserConfig:        &config.Config{},
+			CurrentWorkingDir: currentDir,
+			PathMeta:          meta,
+			RuntimeVersion:    "test",
+		},
+		openSdks: make(map[string]sdk.Sdk),
+	}
+
+	// Simulate the activate.go scenario with multiple SDKs being looked up concurrently
+	// This is what was causing the concurrent map writes error
+	sdkNames := []string{"nodejs", "python", "java", "go", "ruby", "rust"}
+	
+	var wg sync.WaitGroup
+	wg.Add(len(sdkNames))
+
+	for _, sdkName := range sdkNames {
+		sdkName := sdkName // Capture loop variable
+		go func() {
+			defer wg.Done()
+			// Each goroutine tries to lookup a different SDK
+			// This simulates the errgroup in activate.go
+			_, err := manager.LookupSdk(sdkName)
+			// We expect errors since these SDKs don't exist
+			// But we should not panic or race
+			if err == nil {
+				t.Errorf("Expected error for non-existent SDK %s, got nil", sdkName)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
