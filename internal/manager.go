@@ -820,6 +820,7 @@ func NewSdkManager() (*Manager, error) {
 			RuntimeVersion:    RuntimeVersion,
 		},
 		openSdks: make(map[string]sdk.Sdk),
+		// mu is intentionally zero-initialized (Go's zero-value mutex is ready to use)
 	}, nil
 }
 

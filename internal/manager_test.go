@@ -28,6 +28,10 @@ import (
 	"github.com/version-fox/vfox/internal/sdk"
 )
 
+// Note: In these tests, Manager instances are created without explicitly
+// initializing the mu field. This is intentional and valid in Go, as the
+// zero-value of sync.RWMutex is ready to use.
+
 // TestLookupSdk_ConcurrentAccess tests that concurrent calls to LookupSdk
 // do not cause race conditions or panics
 func TestLookupSdk_ConcurrentAccess(t *testing.T) {
