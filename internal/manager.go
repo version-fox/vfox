@@ -196,6 +196,7 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 
 	for _, f := range files {
 		sdkName := f.Name()
+		normalizedName := strings.ToLower(sdkName)
 		path := filepath.Join(dir, sdkName)
 
 		if f.IsDir() {
@@ -206,7 +207,7 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 				
 				// Add to cache with write lock
 				m.mu.Lock()
-				m.openSdks[strings.ToLower(sdkName)] = s
+				m.openSdks[normalizedName] = s
 				m.mu.Unlock()
 				
 				logger.Debugf("SDK %s loaded successfully\n", sdkName)
