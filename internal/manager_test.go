@@ -115,7 +115,10 @@ func TestLookupSdk_ConcurrentCacheHits(t *testing.T) {
 
 	// Pre-populate the cache with a nil SDK (for testing purposes)
 	// In real usage, this would be a valid SDK object
+	// Use proper locking to avoid race conditions in the test itself
+	manager.mu.Lock()
 	manager.openSdks["test"] = nil
+	manager.mu.Unlock()
 
 	// Test concurrent cache reads
 	const numGoroutines = 20

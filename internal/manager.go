@@ -76,9 +76,12 @@ type Manager struct {
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	logger.Debugf("Looking up SDK: %s\n", name)
 
+	// Normalize the name for cache lookup
+	normalizedName := strings.ToLower(name)
+	
 	// Check cache with read lock
 	m.mu.RLock()
-	s, ok := m.openSdks[name]
+	s, ok := m.openSdks[normalizedName]
 	m.mu.RUnlock()
 	
 	if ok {
@@ -87,7 +90,7 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	}
 
 	// Query plugin directly from shared root
-	pluginPath := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, strings.ToLower(name))
+	pluginPath := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, normalizedName)
 	logger.Debugf("Checking plugin path: %s\n", pluginPath)
 
 	if !util.FileExists(pluginPath) {
@@ -104,7 +107,7 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 
 	// Add to cache with write lock
 	m.mu.Lock()
-	m.openSdks[strings.ToLower(name)] = s
+	m.openSdks[normalizedName] = s
 	m.mu.Unlock()
 	
 	logger.Debugf("SDK %s loaded and cached successfully\n", name)
@@ -225,8 +228,10 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 }
 
 func (m *Manager) Close() {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	// Use write lock to ensure no other operations are in progress
+	// while we're closing SDK handlers
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	
 	for _, handler := range m.openSdks {
 		handler.Close()
