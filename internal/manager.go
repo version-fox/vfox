@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -67,6 +68,7 @@ type Arg struct {
 type Manager struct {
 	RuntimeEnvContext *env.RuntimeEnvContext // runtime environment context
 	openSdks          map[string]sdk.Sdk
+	mu                sync.RWMutex // protects openSdks map
 }
 
 // LookupSdk lookup sdk by name
@@ -74,13 +76,21 @@ type Manager struct {
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	logger.Debugf("Looking up SDK: %s\n", name)
 
-	if s, ok := m.openSdks[name]; ok {
+	// Normalize the name for cache lookup
+	normalizedName := strings.ToLower(name)
+	
+	// Check cache with read lock
+	m.mu.RLock()
+	s, ok := m.openSdks[normalizedName]
+	m.mu.RUnlock()
+	
+	if ok {
 		logger.Debugf("SDK %s found in cache\n", name)
 		return s, nil
 	}
 
 	// Query plugin directly from shared root
-	pluginPath := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, strings.ToLower(name))
+	pluginPath := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, normalizedName)
 	logger.Debugf("Checking plugin path: %s\n", pluginPath)
 
 	if !util.FileExists(pluginPath) {
@@ -95,7 +105,11 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 		return nil, err
 	}
 
-	m.openSdks[strings.ToLower(name)] = s
+	// Add to cache with write lock
+	m.mu.Lock()
+	m.openSdks[normalizedName] = s
+	m.mu.Unlock()
+	
 	logger.Debugf("SDK %s loaded and cached successfully\n", name)
 	return s, nil
 }
@@ -182,6 +196,7 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 
 	for _, f := range files {
 		sdkName := f.Name()
+		normalizedName := strings.ToLower(sdkName)
 		path := filepath.Join(dir, sdkName)
 
 		if f.IsDir() {
@@ -189,7 +204,12 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 			s, err := sdk.NewSdk(m.RuntimeEnvContext, path)
 			if err == nil {
 				sdkSlice = append(sdkSlice, s)
-				m.openSdks[strings.ToLower(sdkName)] = s
+				
+				// Add to cache with write lock
+				m.mu.Lock()
+				m.openSdks[normalizedName] = s
+				m.mu.Unlock()
+				
 				logger.Debugf("SDK %s loaded successfully\n", sdkName)
 			} else {
 				logger.Debugf("Failed to load SDK %s: %v\n", sdkName, err)
@@ -209,6 +229,11 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 }
 
 func (m *Manager) Close() {
+	// Use write lock to ensure no other operations are in progress
+	// while we're closing SDK handlers
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
 	for _, handler := range m.openSdks {
 		handler.Close()
 	}
@@ -796,6 +821,7 @@ func NewSdkManager() (*Manager, error) {
 			RuntimeVersion:    RuntimeVersion,
 		},
 		openSdks: make(map[string]sdk.Sdk),
+		// mu is intentionally zero-initialized (Go's zero-value mutex is ready to use)
 	}, nil
 }
 
