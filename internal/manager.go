@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -67,6 +68,7 @@ type Arg struct {
 type Manager struct {
 	RuntimeEnvContext *env.RuntimeEnvContext // runtime environment context
 	openSdks          map[string]sdk.Sdk
+	mu                sync.RWMutex // protects openSdks map
 }
 
 // LookupSdk lookup sdk by name
@@ -74,7 +76,12 @@ type Manager struct {
 func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	logger.Debugf("Looking up SDK: %s\n", name)
 
-	if s, ok := m.openSdks[name]; ok {
+	// Check cache with read lock
+	m.mu.RLock()
+	s, ok := m.openSdks[name]
+	m.mu.RUnlock()
+	
+	if ok {
 		logger.Debugf("SDK %s found in cache\n", name)
 		return s, nil
 	}
@@ -95,7 +102,11 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 		return nil, err
 	}
 
+	// Add to cache with write lock
+	m.mu.Lock()
 	m.openSdks[strings.ToLower(name)] = s
+	m.mu.Unlock()
+	
 	logger.Debugf("SDK %s loaded and cached successfully\n", name)
 	return s, nil
 }
@@ -189,7 +200,12 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 			s, err := sdk.NewSdk(m.RuntimeEnvContext, path)
 			if err == nil {
 				sdkSlice = append(sdkSlice, s)
+				
+				// Add to cache with write lock
+				m.mu.Lock()
 				m.openSdks[strings.ToLower(sdkName)] = s
+				m.mu.Unlock()
+				
 				logger.Debugf("SDK %s loaded successfully\n", sdkName)
 			} else {
 				logger.Debugf("Failed to load SDK %s: %v\n", sdkName, err)
@@ -209,6 +225,9 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 }
 
 func (m *Manager) Close() {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
 	for _, handler := range m.openSdks {
 		handler.Close()
 	}
