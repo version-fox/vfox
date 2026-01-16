@@ -1,11 +1,13 @@
 package shell
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/version-fox/vfox/internal/env"
 )
@@ -72,10 +74,21 @@ func (n nushell) Activate(config ActivateConfig) (string, error) {
 	// write file to config
 	targetPath := filepath.Join(config.Args[0], "vfox.nu")
 
-	nushellConfig := strings.ReplaceAll(nushellConfig, "\n", env.Newline)
-	nushellConfig = strings.ReplaceAll(nushellConfig, "{{.SelfPath}}", config.SelfPath)
+	// Parse and execute the template with the config
+	tmpl, err := template.New("nushell").Parse(nushellConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
 
-	if err := os.WriteFile(targetPath, []byte(nushellConfig), 0755); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, config); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Replace newlines with platform-specific newlines
+	nushellConfigContent := strings.ReplaceAll(buf.String(), "\n", env.Newline)
+
+	if err := os.WriteFile(targetPath, []byte(nushellConfigContent), 0755); err != nil {
 		return "", fmt.Errorf("failed to write file: %s", err)
 	}
 
