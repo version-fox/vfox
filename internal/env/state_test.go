@@ -272,3 +272,64 @@ func TestConfigState_GetCachedOutput(t *testing.T) {
 		t.Errorf("GetCachedOutput() = %q, want %q", output, "export TEST=value")
 	}
 }
+
+func TestConfigState_HasChanged_PathChanged(t *testing.T) {
+	// Save original PATH
+	origPath := os.Getenv("PATH")
+	defer func() {
+		os.Setenv("PATH", origPath)
+	}()
+
+	tmpDir := t.TempDir()
+	stateFile := filepath.Join(tmpDir, "state.json")
+	configFile := filepath.Join(tmpDir, ".vfox.toml")
+
+	// Create config file
+	err := os.WriteFile(configFile, []byte("test"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+
+	// Set initial PATH
+	initialPath := "/usr/bin:/bin"
+	os.Setenv("PATH", initialPath)
+
+	// Create state and update with current mtime and PATH
+	state := NewConfigState(stateFile)
+	configPaths := map[UseScope]string{
+		Global: configFile,
+	}
+
+	err = state.Update(configPaths, "export PATH=/test")
+	if err != nil {
+		t.Fatalf("Update() failed: %v", err)
+	}
+
+	// Verify cached PATH
+	if state.CachedPath != initialPath {
+		t.Errorf("CachedPath = %q, want %q", state.CachedPath, initialPath)
+	}
+
+	// Check if changed (should be false, PATH and configs are the same)
+	changed, err := state.HasChanged(configPaths)
+	if err != nil {
+		t.Fatalf("HasChanged() failed: %v", err)
+	}
+	if changed {
+		t.Error("HasChanged() should return false when nothing has changed")
+	}
+
+	// User manually adds a path
+	modifiedPath := "/home/user/bin:/usr/bin:/bin"
+	os.Setenv("PATH", modifiedPath)
+
+	// Check if changed (should be true, PATH changed)
+	changed, err = state.HasChanged(configPaths)
+	if err != nil {
+		t.Fatalf("HasChanged() failed: %v", err)
+	}
+	if !changed {
+		t.Error("HasChanged() should return true when PATH has changed")
+	}
+}
+

@@ -39,6 +39,9 @@ type ConfigState struct {
 	SessionMtime int64 `json:"session_mtime,omitempty"`
 	ProjectMtime int64 `json:"project_mtime,omitempty"`
 
+	// Cached PATH value (to detect user-made PATH changes)
+	CachedPath string `json:"cached_path,omitempty"`
+
 	// Cached env output (shell script)
 	CachedOutput string `json:"cached_output,omitempty"`
 
@@ -95,7 +98,7 @@ func (s *ConfigState) saveLocked() error {
 }
 
 // HasChanged checks if any config file has changed based on modification time
-// Returns true if any config file has been modified since last check, or if project directory changed
+// Returns true if any config file has been modified since last check, or if project directory changed, or if PATH changed
 func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -104,6 +107,13 @@ func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) 
 	currentProjectPath := configPaths[Project]
 	if currentProjectPath != s.CurrentProjectPath {
 		// Project directory or config file changed
+		return true, nil
+	}
+
+	// Check if PATH has changed since last cache
+	currentPath := os.Getenv(PathVarName)
+	if currentPath != s.CachedPath {
+		// User has modified PATH since last cache
 		return true, nil
 	}
 
@@ -143,7 +153,7 @@ func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) 
 	return false, nil
 }
 
-// Update updates the state with new config mtimes and cached output
+// Update updates the state with new config mtimes, current PATH, and cached output
 func (s *ConfigState) Update(configPaths map[UseScope]string, output string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -175,6 +185,8 @@ func (s *ConfigState) Update(configPaths map[UseScope]string, output string) err
 		}
 	}
 
+	// Store current PATH to detect user-made changes later
+	s.CachedPath = os.Getenv(PathVarName)
 	s.CachedOutput = output
 
 	return s.saveLocked()
