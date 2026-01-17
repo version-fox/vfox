@@ -1,11 +1,13 @@
 package shell
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/version-fox/vfox/internal/env"
 )
@@ -39,7 +41,7 @@ export-env {
 
   # Add a pre_prompt hook that calls the above "updateVfoxEnvironment" function.
   $env.config = ($env.config | upsert hooks.pre_prompt {
-    let currentValue = ($env.config | get -o hooks.pre_prompt)
+    let currentValue = ($env.config | get -i hooks.pre_prompt)
     if $currentValue == null {
       [{updateVfoxEnvironment}]
     } else {
@@ -69,12 +71,30 @@ func (n nushell) Activate(config ActivateConfig) (string, error) {
 		return "", fmt.Errorf("config path is required")
 	}
 
+	// Parse and execute the template
+	tmpl, err := template.New("nushell").Parse(nushellConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	templateData := struct {
+		SelfPath       string
+		EnablePidCheck bool
+	}{
+		SelfPath:       config.SelfPath,
+		EnablePidCheck: config.EnablePidCheck,
+	}
+
+	if err := tmpl.Execute(&buf, templateData); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Replace newlines for platform compatibility
+	nushellConfig := strings.ReplaceAll(buf.String(), "\n", env.Newline)
+
 	// write file to config
 	targetPath := filepath.Join(config.Args[0], "vfox.nu")
-
-	nushellConfig := strings.ReplaceAll(nushellConfig, "\n", env.Newline)
-	nushellConfig = strings.ReplaceAll(nushellConfig, "{{.SelfPath}}", config.SelfPath)
-
 	if err := os.WriteFile(targetPath, []byte(nushellConfig), 0755); err != nil {
 		return "", fmt.Errorf("failed to write file: %s", err)
 	}
