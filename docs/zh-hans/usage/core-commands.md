@@ -205,9 +205,9 @@ vfox upgrade
 **用法**
 
 ```shell
-vfox exec <sdk-name>[@<version>] <command> [args...]
+vfox exec <sdk-name>[@<version>] -- <command> [args...]
 
-vfox x <sdk-name>[@<version>] <command> [args...]
+vfox x <sdk-name>[@<version>] -- <command> [args...]
 ```
 
 `sdk-name`: SDK 名称
@@ -229,20 +229,16 @@ vfox x <sdk-name>[@<version>] <command> [args...]
 **示例**
 
 ```shell
-# 使用项目配置的 nodejs 版本执行命令
-vfox exec nodejs node -v
 
 # 使用指定版本执行命令
-vfox exec nodejs@20.9.0 node -v
+vfox exec nodejs@20.9.0 -- node -v
 
 # 在 maven 环境中执行构建
-vfox exec maven@3.9.1 mvn clean install
+vfox exec maven@3.9.1 -- mvn clean install
 
 # 使用别名 x（exec 的简写）
-vfox x java@21 java -version
+vfox x maven@3.9.1 -- mvn clean
 
-# 执行多个参数的命令
-vfox exec golang@1.21 go build -o myapp main.go
 ```
 
 ::: tip IDE 集成
@@ -257,7 +253,7 @@ vfox exec golang@1.21 go build -o myapp main.go
       "label": "Run with Node.js",
       "type": "shell",
       "command": "vfox",
-      "args": ["x", "nodejs@20", "node", "${file}"]
+      "args": ["x", "nodejs@20", "--", "node", "${file}"]
     }
   ]
 }

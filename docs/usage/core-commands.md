@@ -203,9 +203,9 @@ Execute a command in a vfox managed environment.
 **Usage**
 
 ```shell
-vfox exec <sdk-name>[@<version>] <command> [args...]
+vfox exec <sdk-name>[@<version>] -- <command> [args...]
 
-vfox x <sdk-name>[@<version>] <command> [args...]
+vfox x <sdk-name>[@<version>] -- <command> [args...]
 ```
 
 `sdk-name`: SDK name
@@ -227,20 +227,15 @@ The `exec` command allows you to temporarily execute commands in a specified SDK
 **Examples**
 
 ```shell
-# Execute command with project-configured nodejs version
-vfox exec nodejs node -v
-
 # Execute command with specified version
-vfox exec nodejs@20.9.0 node -v
+vfox exec nodejs@20.9.0 -- node -v
 
 # Run build in maven environment
-vfox exec maven@3.9.1 mvn clean install
+vfox exec maven@3.9.1 -- mvn clean install
 
 # Use alias x (short for exec)
-vfox x java@21 java -version
+vfox x maven@3.9.1 -- mvn clean
 
-# Execute command with multiple arguments
-vfox exec golang@1.21 go build -o myapp main.go
 ```
 
 ::: tip IDE Integration
@@ -255,7 +250,7 @@ In VS Code, you can use the `exec` command to ensure your project uses the corre
       "label": "Run with Node.js",
       "type": "shell",
       "command": "vfox",
-      "args": ["x", "nodejs@20", "node", "${file}"]
+      "args": ["x", "nodejs@20", "--", "node", "${file}"]
     }
   ]
 }
