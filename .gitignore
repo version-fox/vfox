@@ -9,5 +9,4 @@ coverage.out
 **/available.cache
 **/.available.cache
 
-.vfox/vfox
-/vfox
+.vfox
