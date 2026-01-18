@@ -13,6 +13,10 @@ vfox search <sdk-name> [...optionArgs]
 `sdk-name`: SDK name, such as `nodejs`, `custom-node`.
 `optionArgs`: Additional arguments for the search command. NOTE: Whether it is supported or not depends on the plugin.
 
+**Options**
+
+- `--skip-cache`: Skip reading and writing the available cache for this search.
+
 ::: warning Cache
 
 `vfox` will cache the results of the `search` command to reduce the number of network requests. The default cache time is `12h`.

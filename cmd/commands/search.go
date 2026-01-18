@@ -32,13 +32,19 @@ import (
 )
 
 var Search = &cli.Command{
-	Name:     "search",
-	Usage:    "Search a version of the target SDK",
+	Name:  "search",
+	Usage: "Search a version of the target SDK",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "skip-cache",
+			Usage: "Skip available cache for this search",
+		},
+	},
 	Action:   searchCmd,
 	Category: CategorySDK,
 }
 
-func RunSearch(sdkName string, availableArgs []string) error {
+func RunSearch(sdkName string, availableArgs []string, skipCache bool) error {
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return err
@@ -48,7 +54,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
 	}
-	result, err := source.Available(availableArgs)
+	result, err := source.Available(availableArgs, skipCache)
 	if err != nil {
 		return fmt.Errorf("plugin [Available] method error: %w", err)
 	}
@@ -131,5 +137,5 @@ func searchCmd(ctx context.Context, cmd *cli.Command) error {
 	if sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	return RunSearch(sdkName, cmd.Args().Tail())
+	return RunSearch(sdkName, cmd.Args().Tail(), cmd.Bool("skip-cache"))
 }

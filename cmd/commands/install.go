@@ -101,7 +101,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 
 			// Handle @latest tag
 			if version == "latest" {
-				availableVersions, err := sdkSource.Available([]string{})
+				availableVersions, err := sdkSource.Available([]string{}, false)
 				if err != nil {
 					errorStore.AddAndShow(name, fmt.Errorf("failed to get available versions: %w", err))
 					continue
@@ -124,7 +124,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 				}
 				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
-					err := RunSearch(name, []string{})
+					err := RunSearch(name, []string{}, false)
 					if err != nil {
 						errorStore.AddAndShow(name, err)
 					}

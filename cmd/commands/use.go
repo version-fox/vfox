@@ -126,7 +126,7 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Version, name string) (sdk.Version, error) {
 	// Handle @latest tag
 	if version == "latest" {
-		availableVersions, err := sdkSource.Available([]string{})
+		availableVersions, err := sdkSource.Available([]string{}, false)
 		if err != nil {
 			return "", fmt.Errorf("failed to get available versions for %s: %w", name, err)
 		}

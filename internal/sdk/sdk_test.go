@@ -5,9 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/cache"
 )
 
 func TestSdk_CreateSymlinksForScope(t *testing.T) {
@@ -326,6 +329,106 @@ func TestSdk_createSymlinksForScope_WithAdditions(t *testing.T) {
 			t.Errorf("Expected main runtime symlink to be created even if addition fails")
 		}
 	})
+}
+
+func TestSdk_AvailableSkipCache(t *testing.T) {
+	tempDir := t.TempDir()
+	pluginDir := filepath.Join(tempDir, "test-sdk")
+	writeTestPlugin(t, pluginDir)
+
+	meta, err := pathmeta.NewPathMeta(
+		filepath.Join(tempDir, "home"),
+		filepath.Join(tempDir, "shared"),
+		filepath.Join(tempDir, "project"),
+		os.Getpid(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create path meta: %v", err)
+	}
+
+	runtimeEnvContext := &env.RuntimeEnvContext{
+		UserConfig: &config.Config{
+			Proxy:             config.EmptyProxy,
+			Storage:           config.EmptyStorage,
+			Registry:          config.EmptyRegistry,
+			LegacyVersionFile: config.EmptyLegacyVersionFile,
+			Cache: &config.Cache{
+				AvailableHookDuration: cache.Duration(time.Hour),
+			},
+		},
+		CurrentWorkingDir: meta.Working.Directory,
+		PathMeta:          meta,
+		RuntimeVersion:    "test",
+	}
+
+	source, err := NewSdk(runtimeEnvContext, pluginDir)
+	if err != nil {
+		t.Fatalf("Failed to create sdk: %v", err)
+	}
+
+	result, err := source.Available([]string{"test"}, false)
+	if err != nil {
+		t.Fatalf("Available failed: %v", err)
+	}
+	firstNote := availableNote(t, result)
+
+	time.Sleep(time.Second)
+
+	result, err = source.Available([]string{"test"}, true)
+	if err != nil {
+		t.Fatalf("Available failed: %v", err)
+	}
+	skipNote := availableNote(t, result)
+	if firstNote == skipNote {
+		t.Fatalf("Expected skip-cache to bypass cached result")
+	}
+
+	result, err = source.Available([]string{"test"}, false)
+	if err != nil {
+		t.Fatalf("Available failed: %v", err)
+	}
+	cachedNote := availableNote(t, result)
+	if cachedNote != firstNote {
+		t.Fatalf("Expected cached note %q, got %q", firstNote, cachedNote)
+	}
+}
+
+func writeTestPlugin(t *testing.T, pluginDir string) {
+	t.Helper()
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatalf("Failed to create plugin dir: %v", err)
+	}
+	pluginSource := []byte(`PLUGIN = {
+  name = "test-sdk",
+  version = "0.0.1",
+  description = "test"
+}
+
+function PLUGIN:Available(ctx)
+  return {
+    { version = "1.0.0", note = tostring(os.time()) }
+  }
+end
+
+function PLUGIN:PreInstall(ctx)
+  return { version = ctx.version, url = "" }
+end
+
+function PLUGIN:EnvKeys(ctx)
+  return {}
+end
+`)
+	if err := os.WriteFile(filepath.Join(pluginDir, "main.lua"), pluginSource, 0644); err != nil {
+		t.Fatalf("Failed to write plugin: %v", err)
+	}
+}
+
+func availableNote(t *testing.T, result []*AvailableRuntimePackage) string {
+	t.Helper()
+	if len(result) == 0 || result[0] == nil || result[0].AvailableRuntime == nil {
+		t.Fatalf("Expected available results")
+	}
+	return result[0].Note
 }
 
 func TestEnsureVfoxInGitignore(t *testing.T) {

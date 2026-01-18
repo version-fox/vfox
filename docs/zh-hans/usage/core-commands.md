@@ -13,6 +13,10 @@ vfox search <sdk-name> [...optionArgs]
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
 `optionArgs`: 搜索命令的附加参数。注意：是否支持取决于插件。
 
+**选项**
+
+- `--skip-cache`: 跳过本次搜索的可用缓存读写。
+
 ::: warning 缓存
 
 `vfox`会缓存`search`的结果, 默认缓存时间为`12h`。

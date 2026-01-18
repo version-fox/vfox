@@ -47,15 +47,15 @@ const (
 
 // Sdk interface defines the methods for managing software development kits (SDKs).
 type Sdk interface {
-	Install(version Version) error                                        // Install a specific runtime of the SDK
-	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
-	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
-	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
-	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
-	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
-	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
-	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
-	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
+	Install(version Version) error                                               // Install a specific runtime of the SDK
+	Uninstall(version Version) error                                             // Uninstall a specific runtime of the SDK
+	Available(args []string, skipCache bool) ([]*AvailableRuntimePackage, error) // List available runtime of the SDK
+	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)                   // Get environment variables for a specific runtime of the SDK
+	Use(version Version, scope env.UseScope) error                               // Use a specific runtime in a given scope
+	UseWithConfig(version Version, scope env.UseScope, unlink bool) error        // Use with link configuration
+	Unuse(scopes ...env.UseScope) error                                          // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error)                  // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                                      // Check if a specific runtime version is installed
 	InstalledList() []Version
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
@@ -102,14 +102,14 @@ func (b *impl) invokeAvailable(args []string) ([]*AvailableRuntimePackage, error
 	return convertAvailableHookResultItem2AvailableRuntimePackage(b.Name, available), nil
 }
 
-func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
+func (b *impl) Available(args []string, skipCache bool) ([]*AvailableRuntimePackage, error) {
 	p := b.plugin
 	envCtx := b.envContext
 	cachePath := filepath.Join(p.InstalledPath, ".available.cache")
 	cacheDuration := envCtx.UserConfig.Cache.AvailableHookDuration
 	logger.Debugf("Available hook cache duration: %v\n", cacheDuration)
 	// Cache is disabled
-	if cacheDuration == 0 {
+	if skipCache || cacheDuration == 0 {
 		return b.invokeAvailable(args)
 	}
 
