@@ -18,6 +18,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -43,22 +44,32 @@ func availableCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	data := pterm.TableData{
-		{"NAME", "OFFICIAL", "HOMEPAGE", "DESCRIPTION"},
-	}
+
+	pterm.Println(pterm.Bold.Sprint("AVAILABLE PLUGINS"))
+	pterm.Println()
+
+	maxNameLen := 0
 	for _, item := range available {
-		official := pterm.LightRed("NO")
-		if strings.HasPrefix(item.Homepage, "https://github.com/version-fox/") {
-			official = pterm.LightGreen("YES")
+		if len(item.Name) > maxNameLen {
+			maxNameLen = len(item.Name)
 		}
-		data = append(data, []string{item.Name, official, item.Homepage, item.Desc})
+	}
+	nameWidth := maxNameLen + 2
+
+	for _, item := range available {
+		isOfficial := strings.HasPrefix(item.Homepage, "https://github.com/version-fox/")
+
+		official := pterm.LightRed("✗")
+		if isOfficial {
+			official = pterm.LightGreen("✓")
+		}
+
+		nameCol := fmt.Sprintf("%-*s", nameWidth, item.Name)
+		pterm.Printf("  %s %s  %s\n", pterm.FgCyan.Sprint(nameCol), official, pterm.FgLightWhite.Sprint(item.Homepage))
 	}
 
-	_ = pterm.DefaultTable.
-		WithHasHeader().
-		WithSeparator("\t ").
-		WithData(data).Render()
-	pterm.Printf("Please use %s to install plugins\n", pterm.LightBlue("vfox add <plugin name>"))
+	pterm.Println()
+	pterm.Printf("  %s\n", pterm.FgGray.Sprint("Use 'vfox add <plugin>' to install"))
 	return nil
 
 }
