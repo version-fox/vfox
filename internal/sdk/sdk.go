@@ -456,7 +456,7 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 	sdks := make(map[string]*plugin.InstalledPackageItem)
 
 	for _, sdk := range installedSdks {
-		sdks[sdk.Runtime.Name] = &plugin.InstalledPackageItem{
+		sdks[string(sdk.Runtime.Version)] = &plugin.InstalledPackageItem{
 			Name:    sdk.Runtime.Name,
 			Version: string(sdk.Runtime.Version),
 			Path:    sdk.PackagePath,

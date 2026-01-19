@@ -197,11 +197,13 @@ function PLUGIN:PreUse(ctx)
     --- 用户之前环境中设置的版本
     local previousVersion = ctx.previousVersion
 
-    --- 已安装的 SDK 信息
-    local sdkInfo = ctx.installedSdks['version']
+    --- 已安装的 SDK 信息（使用版本字符串作为键）
+    --- 例如，如果你安装了版本 "1.19.2"，使用：
+    --- local sdkInfo = ctx.installedSdks['1.19.2']
+    local sdkInfo = ctx.installedSdks[version]
     local path = sdkInfo.path
     local name = sdkInfo.name
-    local version = sdkInfo.version
+    local sdkVersion = sdkInfo.version
 
     --- 当前工作目录
     local cwd = ctx.cwd
@@ -211,7 +213,7 @@ function PLUGIN:PreUse(ctx)
 
     --- 返回版本信息
     return {
-        version = version,
+        version = sdkVersion,
     }
 end
 ```

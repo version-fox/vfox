@@ -4,11 +4,13 @@
 function PLUGIN:PreUse(ctx)
     --- user input version
     local version = ctx.version
-    --- installed sdks
-    local sdkInfo = ctx.installedSdks['xxxx']
-    local path = sdkInfo.path
-    local name = sdkInfo.name
-    local sdkVersion = sdkInfo.version
+    --- installed sdks - now keyed by version string
+    local sdkInfo = ctx.installedSdks['1.0.0']
+    if sdkInfo then
+        local path = sdkInfo.path
+        local name = sdkInfo.name
+        local sdkVersion = sdkInfo.version
+    end
 
     --- working directory
     local cwd = ctx.cwd

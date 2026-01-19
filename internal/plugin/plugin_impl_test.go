@@ -310,9 +310,10 @@ func testHookFunc(t *testing.T, factory func() (*internal.Manager, *plugin.Wrapp
 		if err != nil {
 			t.Fatal(err)
 		}
+		// installedSdks should be keyed by version string, not SDK name
 		installedSdks := map[string]*plugin.InstalledPackageItem{
-			"xxxx": {
-				Name:    "xxxx",
+			"1.0.0": {
+				Name:    "java",
 				Version: "1.0.0",
 				Path:    "/test/path",
 			},

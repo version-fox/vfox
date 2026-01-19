@@ -204,11 +204,13 @@ function PLUGIN:PreUse(ctx)
     --- user current used version
     local previousVersion = ctx.previousVersion
 
-    --- installed sdks
-    local sdkInfo = ctx.installedSdks['version']
+    --- installed sdks (keyed by version string)
+    --- For example, if you have version "1.19.2" installed, use:
+    --- local sdkInfo = ctx.installedSdks['1.19.2']
+    local sdkInfo = ctx.installedSdks[version]
     local path = sdkInfo.path
     local name = sdkInfo.name
-    local version = sdkInfo.version
+    local sdkVersion = sdkInfo.version
 
     --- working directory
     local cwd = ctx.cwd
@@ -219,7 +221,7 @@ function PLUGIN:PreUse(ctx)
 
     --- return the version information
     return {
-        version = version,
+        version = sdkVersion,
     }
 end
 ```
