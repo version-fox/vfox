@@ -111,19 +111,43 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 // CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
 // This ensures the system PATH is clean before adding vfox paths back in priority order.
 func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
-	// Get system paths
+	_, cleanPaths := m.SplitSystemPaths()
+	return cleanPaths
+}
+
+// SplitSystemPaths splits the current PATH into two parts:
+// 1. prefixPaths: paths that appear BEFORE the first vfox-managed path (user-injected, highest priority)
+// 2. cleanPaths: remaining non-vfox paths (lower priority than vfox)
+//
+// This preserves the priority of paths like Python virtual environments that users activate
+// after vfox has set up the environment.
+func (m *RuntimeEnvContext) SplitSystemPaths() (prefixPaths *Paths, cleanPaths *Paths) {
 	systemPaths := strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
 
-	cleanPaths := NewPaths(EmptyPaths)
+	prefixPaths = NewPaths(EmptyPaths)
+	cleanPaths = NewPaths(EmptyPaths)
+
+	foundVfoxPath := false
 	for _, path := range systemPaths {
+		if path == "" {
+			continue
+		}
 		cleanPath := filepath.Clean(path)
 
 		if pathmeta.IsVfoxRelatedPath(cleanPath) {
 			logger.Debugf("Removing vfox path from system PATH: %s", path)
+			foundVfoxPath = true
 			continue
 		}
-		cleanPaths.Add(path)
+
+		if !foundVfoxPath {
+			// Path appears before first vfox path - it's user-injected (e.g., virtualenv)
+			prefixPaths.Add(path)
+		} else {
+			// Path appears after first vfox path - normal system path
+			cleanPaths.Add(path)
+		}
 	}
 
-	return cleanPaths
+	return prefixPaths, cleanPaths
 }
