@@ -39,6 +39,7 @@ import (
 	"github.com/version-fox/vfox/internal/shared/cache"
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
+	"github.com/version-fox/vfox/internal/shell"
 )
 
 const (
@@ -533,11 +534,19 @@ func (b *impl) Use(version Version, scope env.UseScope) error {
 func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) error {
 	logger.Debugf("Use SDK version: %s, scope: %v, unlink: %v\n", string(version), scope, unlink)
 
-	// Verify hook environment is available (allow cmd global on Windows even without hook)
+	// Verify hook environment is available
 	hookEnv := env.IsHookEnv()
-	if !hookEnv && !(runtime.GOOS == "windows" && scope == env.Global) {
-		logger.Debugf("Hook environment not available\n")
-		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
+	if !hookEnv {
+		if runtime.GOOS == "windows" {
+			// On Windows without hook, force global scope
+			if scope != env.Global {
+				pterm.Printf("Warning: The current shell lacks hook support. Switching to global scope automatically.\n")
+				scope = env.Global
+			}
+		} else {
+			logger.Debugf("Hook environment not available\n")
+			return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
+		}
 	}
 
 	// Resolve version with preUse hook
@@ -607,6 +616,17 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 
 	logger.Debugf("Load %v tool versions: %v\n", scope, vfoxToml.GetAllTools())
 
+	// On Windows global scope, remove old version's registry entries before adding new ones
+	if runtime.GOOS == "windows" && scope == env.Global {
+		if oldVersion, ok := vfoxToml.GetToolVersion(b.Name); ok && oldVersion != string(version) {
+			oldEnvs, err := b.EnvKeysForScope(Version(oldVersion), scope)
+			if err == nil && oldEnvs != nil {
+				logger.Debugf("Removing old version %s registry entries\n", oldVersion)
+				_ = env.RemoveEnvsFromRegistry(oldEnvs)
+			}
+		}
+	}
+
 	// Determine link flag based on scope and unlink parameter
 	if scope == env.Project && unlink {
 		logger.Debugf("Setting unlink flag for project scope\n")
@@ -635,7 +655,8 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 		return fmt.Errorf("failed to create symlinks, err:%w", err)
 	}
 
-	if runtime.GOOS == "windows" && scope == env.Global && !hookEnv {
+	// On Windows, always update registry for global scope so GUI apps can pick up the PATH
+	if runtime.GOOS == "windows" && scope == env.Global {
 		if err := env.ApplyEnvsToRegistry(envs); err != nil {
 			logger.Debugf("Failed to apply registry envs: %v\n", err)
 			pterm.Warning.Printf("Failed to apply global registry environment: %v\n", err)
@@ -646,6 +667,12 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	logger.Debugf("Successfully using SDK: %s\n", b.Label(version))
+
+	// In non-hook environment, spawn a new shell so the user can use the new version immediately
+	if !hookEnv {
+		return shell.Open(os.Getppid())
+	}
+
 	return nil
 }
 
