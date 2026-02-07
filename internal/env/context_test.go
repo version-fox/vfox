@@ -78,8 +78,8 @@ func TestSplitSystemPaths(t *testing.T) {
 				"/usr/local/bin",
 				"/usr/bin",
 			}, ":"),
-			wantPrefix: []string{"/home/user/venv/bin", "/usr/local/bin", "/usr/bin"},
-			wantClean:  []string{},
+			wantPrefix: []string{},
+			wantClean:  []string{"/home/user/venv/bin", "/usr/local/bin", "/usr/bin"},
 		},
 		{
 			name: "project vfox path (.vfox directory)",

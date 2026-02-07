@@ -127,6 +127,30 @@ func (m *RuntimeEnvContext) SplitSystemPaths() (prefixPaths *Paths, cleanPaths *
 	prefixPaths = NewPaths(EmptyPaths)
 	cleanPaths = NewPaths(EmptyPaths)
 
+	// First pass: check if there are any vfox paths
+	hasVfoxPath := false
+	for _, path := range systemPaths {
+		if path == "" {
+			continue
+		}
+		if pathmeta.IsVfoxRelatedPath(filepath.Clean(path)) {
+			hasVfoxPath = true
+			break
+		}
+	}
+
+	// If no vfox paths, all paths are clean system paths (no user-injected paths to preserve)
+	if !hasVfoxPath {
+		for _, path := range systemPaths {
+			if path == "" {
+				continue
+			}
+			cleanPaths.Add(path)
+		}
+		return prefixPaths, cleanPaths
+	}
+
+	// Second pass: split by first vfox path
 	foundVfoxPath := false
 	for _, path := range systemPaths {
 		if path == "" {
