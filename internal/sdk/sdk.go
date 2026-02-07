@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -532,8 +533,9 @@ func (b *impl) Use(version Version, scope env.UseScope) error {
 func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) error {
 	logger.Debugf("Use SDK version: %s, scope: %v, unlink: %v\n", string(version), scope, unlink)
 
-	// Verify hook environment is available
-	if !env.IsHookEnv() {
+	// Verify hook environment is available (allow cmd global on Windows even without hook)
+	hookEnv := env.IsHookEnv()
+	if !hookEnv && !(runtime.GOOS == "windows" && scope == env.Global) {
 		logger.Debugf("Hook environment not available\n")
 		return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
 	}
@@ -554,16 +556,23 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 		return &VersionNotExistsError{Label: label}
 	}
 
-	return b.useInHook(resolvedVersion, scope, unlink)
+	return b.useInHook(resolvedVersion, scope, unlink, hookEnv)
 }
 
-func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error {
+func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookEnv bool) error {
 	logger.Debugf("Using SDK in hook: version=%s, scope=%v, unlink=%v\n", version, scope, unlink)
 
 	runtimePackage, err := b.GetRuntimePackage(version)
 	if err != nil {
 		logger.Debugf("Failed to get runtime package for %s: %v\n", b.Label(version), err)
 		return ErrRuntimeNotFound
+	}
+
+	// Gather env keys early so we can update the registry if needed
+	envs, err := b.EnvKeysForScope(version, scope)
+	if err != nil {
+		logger.Debugf("Failed to generate env keys for registry update: %v\n", err)
+		return err
 	}
 
 	// Ensure .vfox directory exists for project scope
@@ -624,6 +633,15 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool) error
 	if err := b.createSymlinksForScope(runtimePackage, scope); err != nil {
 		logger.Debugf("Failed to create symlinks: %v\n", err)
 		return fmt.Errorf("failed to create symlinks, err:%w", err)
+	}
+
+	if runtime.GOOS == "windows" && scope == env.Global && !hookEnv {
+		if err := env.ApplyEnvsToRegistry(envs); err != nil {
+			logger.Debugf("Failed to apply registry envs: %v\n", err)
+			pterm.Warning.Printf("Failed to apply global registry environment: %v\n", err)
+		} else {
+			pterm.Println(pterm.LightCyan("Applied global environment variables to Windows registry."))
+		}
 	}
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
@@ -952,9 +970,18 @@ func (b *impl) Unuse(scopes ...env.UseScope) error {
 		}
 		// Check if the SDK is currently set globally
 		if version, ok := vfoxtoml.GetToolVersion(b.Name); ok {
+			var registryEnv *env.Envs
+			if runtime.GOOS == "windows" && scope == env.Global {
+				registryEnv, _ = b.EnvKeysForScope(Version(version), scope)
+			}
 			// Remove shims for the current version
 			if err := b.removeSymlinksForScope(Version(version), scope); err != nil {
 				logger.Debugf("Failed to remove global symlinks: %v\n", err)
+			}
+			if registryEnv != nil {
+				if err := env.RemoveEnvsFromRegistry(registryEnv); err != nil {
+					logger.Debugf("Failed to remove registry envs: %v\n", err)
+				}
 			}
 		}
 		vfoxtoml.RemoveTool(b.Name)
