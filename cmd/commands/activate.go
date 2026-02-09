@@ -148,12 +148,21 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	scopePriority := []env.UseScope{env.Project, env.Session, env.Global}
 	finalEnvs.MergeByScopePriority(envsByScope, scopePriority)
 
-	// 3. Build final PATH with proper priority: Project > Session > Global > Cleaned System PATH
-	// Get clean system PATH (removes all vfox-managed paths)
-	cleanSystemPaths := runtimeEnvContext.CleanSystemPaths()
+	// 3. Build final PATH with proper priority:
+	// User-injected paths (e.g., virtualenv) > Project > Session > Global > Cleaned System PATH
+	//
+	// SplitSystemPaths separates:
+	// - prefixPaths: paths appearing BEFORE first vfox path (user-injected, highest priority)
+	// - cleanSystemPaths: remaining non-vfox paths (lowest priority)
+	prefixPaths, cleanSystemPaths := runtimeEnvContext.SplitSystemPaths()
 
-	// Merge in priority order: vfox paths (already sorted by scope) > clean system paths
-	finalEnvs.Paths.Merge(cleanSystemPaths)
+	// Build final path order: prefix > vfox > clean system
+	// We need to prepend prefixPaths to maintain their highest priority
+	newPaths := env.NewPaths(env.EmptyPaths)
+	newPaths.Merge(prefixPaths)
+	newPaths.Merge(finalEnvs.Paths)
+	newPaths.Merge(cleanSystemPaths)
+	finalEnvs.Paths = newPaths
 
 	// 4. Export environment variables
 	// Note: This step must be the first.
