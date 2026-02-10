@@ -344,7 +344,7 @@ func (m *Manager) Update(pluginName string) error {
 	success := false
 	backupPath := sdkMetadata.PluginInstalledPath + "-bak"
 	logger.Debugf("Backup %s plugin to %s \n", sdkMetadata.PluginInstalledPath, backupPath)
-	if err = os.Rename(sdkMetadata.PluginInstalledPath, backupPath); err != nil {
+	if err = util.Rename(sdkMetadata.PluginInstalledPath, backupPath); err != nil {
 		return fmt.Errorf("backup %s plugin failed, err: %w", sdkMetadata.PluginInstalledPath, err)
 	}
 	defer func() {
@@ -353,11 +353,11 @@ func (m *Manager) Update(pluginName string) error {
 			_ = os.RemoveAll(backupPath)
 		} else {
 			logger.Debugf("Restoring from backup: %s\n", backupPath)
-			_ = os.Rename(backupPath, sdkMetadata.PluginInstalledPath)
+			_ = util.Rename(backupPath, sdkMetadata.PluginInstalledPath)
 		}
 	}()
 	logger.Debugf("Moving updated plugin from %s to %s\n", tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath)
-	if err = os.Rename(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
+	if err = util.Rename(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
 	}
 
@@ -539,7 +539,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		}
 	}
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
-	if err = os.Rename(tempPlugin.InstalledPath, installPath); err != nil {
+	if err = util.Rename(tempPlugin.InstalledPath, installPath); err != nil {
 		logger.Debugf("Failed to move plugin: %v\n", err)
 		return fmt.Errorf("install plugin error: %w", err)
 	}
@@ -611,7 +611,7 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 	// make a directory to store the wrapper and rename the wrapper file to main.lua
 	if ext == ".lua" {
 		logger.Debugf("Moving wrapper %s to %s \n", localPath, tempInstallPath)
-		if err = os.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
+		if err = util.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
 			logger.Debugf("Failed to move lua plugin: %v\n", err)
 			return nil, fmt.Errorf("install wrapper error: %w", err)
 		}
