@@ -57,6 +57,80 @@ func CopyFile(src, dst string) error {
 	return nil
 }
 
+// copyDir recursively copies a directory tree
+func copyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	// Create destination directory with same permissions
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := CopyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+			// Preserve file permissions
+			if info, err := os.Stat(srcPath); err == nil {
+				os.Chmod(dstPath, info.Mode())
+			}
+		}
+	}
+
+	return nil
+}
+
+// Rename renames (moves) a file or directory, handling cross-drive operations on Windows.
+// It first attempts a direct rename using os.Rename. If that fails (e.g., cross-drive on Windows),
+// it falls back to copy-and-delete.
+func Rename(src, dst string) error {
+	// First try a direct rename (fast, works on same filesystem)
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	// If rename failed, check if source exists
+	srcInfo, statErr := os.Stat(src)
+	if statErr != nil {
+		return statErr
+	}
+
+	// Copy source to destination
+	if srcInfo.IsDir() {
+		if err := copyDir(src, dst); err != nil {
+			return err
+		}
+	} else {
+		if err := CopyFile(src, dst); err != nil {
+			return err
+		}
+		// Preserve file permissions
+		if err := os.Chmod(dst, srcInfo.Mode()); err != nil {
+			return err
+		}
+	}
+
+	// Remove source after successful copy
+	return os.RemoveAll(src)
+}
+
 // MoveFiles Move a folder or file to a specified directory
 func MoveFiles(src, targetDir string) error {
 	info, err := os.Stat(src)
