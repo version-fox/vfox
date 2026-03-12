@@ -510,6 +510,76 @@ func TestEnsureVfoxInGitignore(t *testing.T) {
 	}
 }
 
+// TestUseWithConfig_NoHookEnv verifies that UseWithConfig behaves correctly
+// when the shell hook environment is not active (e.g., in Docker RUN commands).
+// Global scope should be allowed; session and project scopes should return an error.
+func TestUseWithConfig_NoHookEnv(t *testing.T) {
+	// Ensure __VFOX_SHELL is unset for this test
+	orig := os.Getenv(env.HookFlag)
+	os.Unsetenv(env.HookFlag)
+	defer func() {
+		if orig != "" {
+			os.Setenv(env.HookFlag, orig)
+		}
+	}()
+
+	tempDir := t.TempDir()
+	pathMeta := &pathmeta.PathMeta{
+		User: pathmeta.UserPaths{
+			Home: filepath.Join(tempDir, "user"),
+		},
+		Shared: pathmeta.SharedPaths{
+			Installs: filepath.Join(tempDir, "shared", "installs"),
+		},
+		Working: pathmeta.WorkingPaths{
+			Directory:     filepath.Join(tempDir, "project"),
+			ProjectSdkDir: filepath.Join(tempDir, "project", ".vfox", "sdk"),
+			SessionSdkDir: filepath.Join(tempDir, "session", "sdk"),
+			GlobalSdkDir:  filepath.Join(tempDir, "user", "sdk"),
+		},
+	}
+
+	runtimeEnvContext := &env.RuntimeEnvContext{
+		PathMeta: pathMeta,
+	}
+
+	sdkImpl := &impl{
+		Name:        "test-sdk",
+		envContext:  runtimeEnvContext,
+		InstallPath: filepath.Join(pathMeta.Shared.Installs, "test-sdk"),
+	}
+
+	// Session and project scopes must return a hook error when __VFOX_SHELL is not set.
+	for _, scope := range []env.UseScope{env.Session, env.Project} {
+		scope := scope
+		t.Run(scope.String()+" scope returns hook error without hook env", func(t *testing.T) {
+			err := sdkImpl.UseWithConfig("1.0.0", scope, false)
+			if err == nil || !strings.Contains(err.Error(), "vfox requires hook support") {
+				t.Errorf("scope=%v: expected 'vfox requires hook support' error, got: %v", scope, err)
+			}
+		})
+	}
+
+	// Global scope must NOT return a hook error when __VFOX_SHELL is not set.
+	// It should proceed past the hook check (it will fail later with a missing plugin/version
+	// error since this is a minimal test fixture, but NOT with the hook-support error).
+	t.Run("global scope does not return hook error without hook env", func(t *testing.T) {
+		var gotHookErr bool
+		func() {
+			// The call will panic or return an error due to the missing plugin in the test
+			// fixture — that is acceptable. We only care that it is NOT a hook-support error.
+			defer func() { recover() }() //nolint:errcheck
+			err := sdkImpl.UseWithConfig("1.0.0", env.Global, false)
+			if err != nil && strings.Contains(err.Error(), "vfox requires hook support") {
+				gotHookErr = true
+			}
+		}()
+		if gotHookErr {
+			t.Error("global scope must not return 'vfox requires hook support' error when hook env is not set")
+		}
+	})
+}
+
 // Helper function to check if a line exists in content
 func containsLine(content, line string) bool {
 	lines := splitLines(content)
