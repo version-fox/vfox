@@ -543,7 +543,11 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 				pterm.Printf("Warning: The current shell lacks hook support. Switching to global scope automatically.\n")
 				scope = env.Global
 			}
-		} else {
+		} else if scope != env.Global {
+			// On non-Windows, only global scope is allowed without hook support.
+			// Session and project scopes require shell hooks to propagate environment variables.
+			// Global scope only writes a config file and creates symlinks, so it works fine
+			// in non-interactive environments such as Docker RUN commands.
 			logger.Debugf("Hook environment not available\n")
 			return fmt.Errorf("vfox requires hook support. Please ensure vfox is properly initialized with 'vfox activate'")
 		}
@@ -668,8 +672,14 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	logger.Debugf("Successfully using SDK: %s\n", b.Label(version))
 
-	// In non-hook environment, spawn a new shell so the user can use the new version immediately
+	// In non-hook environment, spawn a new shell so the user can use the new version immediately.
+	// For global scope, spawning a shell is unnecessary because the version is persisted via
+	// config file and symlinks — no shell-session state needs to be updated.
 	if !hookEnv {
+		if scope == env.Global {
+			pterm.Printf("Please start a new shell session or run 'eval \"$(vfox activate <shell>)\"' to use the new version.\n")
+			return nil
+		}
 		return shell.Open(os.Getppid())
 	}
 
