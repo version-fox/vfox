@@ -17,13 +17,17 @@
 package util
 
 import (
+	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 )
+
+var renamePath = os.Rename
 
 func FileExists(filename string) bool {
 	_, err := os.Stat(filename)
@@ -55,6 +59,33 @@ func CopyFile(src, dst string) error {
 	}
 
 	return nil
+}
+
+// MovePath moves a file or directory to the target path.
+// If a cross-device rename fails, it falls back to copy and remove.
+func MovePath(src, dst string) error {
+	if err := renamePath(src, dst); err == nil {
+		return nil
+	} else if !isCrossDeviceRenameError(err) {
+		return err
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if info.IsDir() {
+		if err := copyDir(src, dst); err != nil {
+			return err
+		}
+	} else {
+		if err := copySingleFile(src, dst, info.Mode()); err != nil {
+			return err
+		}
+	}
+
+	return os.RemoveAll(src)
 }
 
 // MoveFiles Move a folder or file to a specified directory
@@ -126,4 +157,67 @@ func MkSymlink(oldname, newname string) (err error) {
 		}
 	}
 	return os.Symlink(oldname, newname)
+}
+
+func isCrossDeviceRenameError(err error) bool {
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) {
+		err = linkErr.Err
+	}
+
+	if errors.Is(err, syscall.EXDEV) {
+		return true
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "cross-device link") ||
+		strings.Contains(msg, "different disk drive") ||
+		strings.Contains(msg, "not same device")
+}
+
+func copyDir(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, info.Mode().Perm()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+			continue
+		}
+
+		fileInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if err := copySingleFile(srcPath, dstPath, fileInfo.Mode()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func copySingleFile(src, dst string, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+	if err := CopyFile(src, dst); err != nil {
+		return err
+	}
+	return ChangeModeIfNot(dst, mode)
 }

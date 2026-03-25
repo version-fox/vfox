@@ -78,12 +78,12 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 
 	// Normalize the name for cache lookup
 	normalizedName := strings.ToLower(name)
-	
+
 	// Check cache with read lock
 	m.mu.RLock()
 	s, ok := m.openSdks[normalizedName]
 	m.mu.RUnlock()
-	
+
 	if ok {
 		logger.Debugf("SDK %s found in cache\n", name)
 		return s, nil
@@ -109,7 +109,7 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 	m.mu.Lock()
 	m.openSdks[normalizedName] = s
 	m.mu.Unlock()
-	
+
 	logger.Debugf("SDK %s loaded and cached successfully\n", name)
 	return s, nil
 }
@@ -204,12 +204,12 @@ func (m *Manager) LoadAllSdk() ([]sdk.Sdk, error) {
 			s, err := sdk.NewSdk(m.RuntimeEnvContext, path)
 			if err == nil {
 				sdkSlice = append(sdkSlice, s)
-				
+
 				// Add to cache with write lock
 				m.mu.Lock()
 				m.openSdks[normalizedName] = s
 				m.mu.Unlock()
-				
+
 				logger.Debugf("SDK %s loaded successfully\n", sdkName)
 			} else {
 				logger.Debugf("Failed to load SDK %s: %v\n", sdkName, err)
@@ -233,7 +233,7 @@ func (m *Manager) Close() {
 	// while we're closing SDK handlers
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	for _, handler := range m.openSdks {
 		handler.Close()
 	}
@@ -357,7 +357,7 @@ func (m *Manager) Update(pluginName string) error {
 		}
 	}()
 	logger.Debugf("Moving updated plugin from %s to %s\n", tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath)
-	if err = os.Rename(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
+	if err = util.MovePath(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
 	}
 
@@ -539,7 +539,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		}
 	}
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
-	if err = os.Rename(tempPlugin.InstalledPath, installPath); err != nil {
+	if err = util.MovePath(tempPlugin.InstalledPath, installPath); err != nil {
 		logger.Debugf("Failed to move plugin: %v\n", err)
 		return fmt.Errorf("install plugin error: %w", err)
 	}
