@@ -224,6 +224,19 @@ The `exec` command allows you to temporarily execute commands in a specified SDK
 - **Script Execution**: Use specific SDK versions in CI/CD or build scripts
 - **Temporary Testing**: Test code with different SDK versions
 
+::: tip Non-Interactive Environments
+
+For Docker, CI/CD, and other non-interactive shells, prefer `vfox exec` instead of relying on `vfox activate`.
+
+`activate` integrates vfox through shell hooks, while `exec` prepares the SDK environment explicitly for the subprocess you are running.
+
+```shell
+vfox exec nodejs@24.14.0 -- npm install -g pnpm
+vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
+```
+
+:::
+
 **Examples**
 
 ```shell

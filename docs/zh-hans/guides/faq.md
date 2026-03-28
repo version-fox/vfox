@@ -11,6 +11,21 @@
 
 请按照[快速入门#_2-挂载vfox到你的shell](./quick-start.md#_2-挂载vfox到你的shell)步骤进行手动挂载。
 
+## 在 Docker、CI/CD 或其他非交互 Shell 中应该怎么使用 vfox？
+
+推荐优先使用 `vfox exec`。
+
+`vfox activate` 的工作方式是安装 Shell Hook，这更适合交互式 Shell。在 Docker 构建步骤、CI Job 以及其他非交互 Shell 中，这些 Hook 通常不会自动触发。
+
+推荐示例：
+
+```bash
+vfox exec nodejs@24.14.0 -- npm install -g pnpm
+vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
+```
+
+如果你希望把版本选择持久化到 Global、Project 或 Session 作用域，请使用 `vfox use`。如果你希望某条命令立刻在正确的 SDK 环境中执行，请使用 `vfox exec`。
+
 
 ## GitBash下`use`和`search`命令无法进行选择?
 

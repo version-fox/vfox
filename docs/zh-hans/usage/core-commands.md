@@ -226,6 +226,19 @@ vfox x <sdk-name>[@<version>] -- <command> [args...]
 - **脚本执行**: 在 CI/CD 或构建脚本中使用特定 SDK 版本
 - **临时测试**: 临时使用不同版本的 SDK 测试代码
 
+::: tip 非交互环境
+
+在 Docker、CI/CD 和其他非交互 Shell 中，推荐优先使用 `vfox exec`，而不是依赖 `vfox activate`。
+
+`activate` 通过 Shell Hook 集成 vfox，而 `exec` 会为当前子进程显式准备好 SDK 环境。
+
+```shell
+vfox exec nodejs@24.14.0 -- npm install -g pnpm
+vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
+```
+
+:::
+
 **示例**
 
 ```shell
