@@ -19,6 +19,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
@@ -59,10 +60,16 @@ func runAsAdmin() error {
 	}
 
 	verb := "runas"
-	cwd, _ := syscall.UTF16PtrFromString(".")
-	arg, _ := syscall.UTF16PtrFromString(SelfUpgradeName)
+	cwd, err := syscall.UTF16PtrFromString(".")
+	if err != nil {
+		return err
+	}
+	arg, err := syscall.UTF16PtrFromString(SelfUpgradeName)
+	if err != nil {
+		return err
+	}
 	run := windows.NewLazySystemDLL("shell32.dll").NewProc("ShellExecuteW")
-	run.Call(
+	ret, _, callErr := run.Call(
 		0,
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(verb))),
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(exePath))),
@@ -70,6 +77,35 @@ func runAsAdmin() error {
 		uintptr(unsafe.Pointer(cwd)),
 		1,
 	)
+	if err := validateElevationLaunchResult(ret); err != nil {
+		if callErr != windows.ERROR_SUCCESS {
+			return fmt.Errorf("%w: %v", err, callErr)
+		}
+		return err
+	}
 	os.Exit(0)
 	return nil
+}
+
+func validateElevationLaunchResult(code uintptr) error {
+	if code > 32 {
+		return nil
+	}
+
+	switch code {
+	case 0:
+		return fmt.Errorf("failed to request administrator privileges: out of memory")
+	case 2:
+		return fmt.Errorf("failed to request administrator privileges: file not found")
+	case 3:
+		return fmt.Errorf("failed to request administrator privileges: path not found")
+	case 5:
+		return fmt.Errorf("failed to request administrator privileges: access denied or elevation was canceled")
+	case 8:
+		return fmt.Errorf("failed to request administrator privileges: not enough memory")
+	case 32:
+		return fmt.Errorf("failed to request administrator privileges: DLL not found")
+	default:
+		return fmt.Errorf("failed to request administrator privileges: ShellExecuteW returned code %d", code)
+	}
 }
