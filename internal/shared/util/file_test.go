@@ -46,6 +46,10 @@ func TestMovePathFallsBackOnCrossDeviceRename(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(nestedDir, "config.txt"), []byte("ok"), 0600); err != nil {
 		t.Fatalf("failed to write nested file: %v", err)
 	}
+	sourceInfo, err := os.Stat(filepath.Join(nestedDir, "config.txt"))
+	if err != nil {
+		t.Fatalf("failed to stat source nested file: %v", err)
+	}
 
 	if err := MovePath(srcDir, dstDir); err != nil {
 		t.Fatalf("MovePath returned error: %v", err)
@@ -67,8 +71,8 @@ func TestMovePathFallsBackOnCrossDeviceRename(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to stat moved nested file: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("expected nested file mode 0600, got %o", info.Mode().Perm())
+	if info.Mode().Perm() != sourceInfo.Mode().Perm() {
+		t.Fatalf("expected nested file mode %o, got %o", sourceInfo.Mode().Perm(), info.Mode().Perm())
 	}
 }
 
