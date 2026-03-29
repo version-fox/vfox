@@ -205,14 +205,16 @@ vfox upgrade
 **用法**
 
 ```shell
-vfox exec <sdk-name>[@<version>] -- <command> [args...]
+vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
-vfox x <sdk-name>[@<version>] -- <command> [args...]
+vfox x <sdk-name>[@<version>]... -- <command> [args...]
 ```
 
 `sdk-name`: SDK 名称
 
 `version`[可选]: 指定使用的版本。如不传，则使用当前作用域配置的版本。
+
+可以在 `--` 之前连续指定多个 SDK。它们会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
 
 `command`: 要执行的命令
 
@@ -245,6 +247,9 @@ vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 
 # 使用指定版本执行命令
 vfox exec nodejs@20.9.0 -- node -v
+
+# 同时指定多个 SDK 执行命令
+vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g @qwen-code/qwen-code@latest
 
 # 在 maven 环境中执行构建
 vfox exec maven@3.9.1 -- mvn clean install

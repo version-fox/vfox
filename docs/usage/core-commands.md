@@ -203,14 +203,16 @@ Execute a command in a vfox managed environment.
 **Usage**
 
 ```shell
-vfox exec <sdk-name>[@<version>] -- <command> [args...]
+vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
-vfox x <sdk-name>[@<version>] -- <command> [args...]
+vfox x <sdk-name>[@<version>]... -- <command> [args...]
 ```
 
 `sdk-name`: SDK name
 
 `version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
+
+You can specify multiple SDKs before `--`. They are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
 
 `command`: The command to execute
 
@@ -242,6 +244,9 @@ vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 ```shell
 # Execute command with specified version
 vfox exec nodejs@20.9.0 -- node -v
+
+# Execute command with multiple SDKs
+vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g @qwen-code/qwen-code@latest
 
 # Run build in maven environment
 vfox exec maven@3.9.1 -- mvn clean install

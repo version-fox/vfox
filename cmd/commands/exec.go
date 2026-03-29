@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -29,109 +30,199 @@ import (
 	"github.com/version-fox/vfox/internal/sdk"
 )
 
+type execSDKSpec struct {
+	Name    string
+	Version sdk.Version
+}
+
+const (
+	execCommandName  = "exec"
+	execCommandAlias = "x"
+)
+
 var Exec = &cli.Command{
-	Name:    "exec",
-	Aliases: []string{"x"},
+	Name:    execCommandName,
+	Aliases: []string{execCommandAlias},
 	Usage:   "Execute a command in vfox managed environment",
 	Action:  execCmd,
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args()
-	if args.Len() < 2 {
-		return fmt.Errorf("usage: vfox exec <sdk>[@<version>] <command> [args...]\nExample: vfox exec node@20 -- node -v")
+	sdkSpecs, command, cmdArgs, err := parseExecInvocation(cmd.Args().Slice(), os.Args)
+	if err != nil {
+		return err
+	}
+	return executeInVfoxEnv(sdkSpecs, command, cmdArgs)
+}
+
+func parseExecInvocation(parsedArgs, rawArgs []string) ([]execSDKSpec, string, []string, error) {
+	if len(parsedArgs) < 2 {
+		return nil, "", nil, execUsageError()
 	}
 
-	// 1. Parse sdk@version (first argument)
-	firstArg := args.First()
-	parts := strings.Split(firstArg, "@")
-	sdkName := parts[0]
-	var sdkVersion sdk.Version
-	if len(parts) > 1 {
-		sdkVersion = sdk.Version(strings.TrimPrefix(parts[1], "v"))
+	rawExecArgs := rawExecArgs(rawArgs)
+	if separatorIndex := slices.Index(rawExecArgs, "--"); separatorIndex >= 0 {
+		sdkArgs := rawExecArgs[:separatorIndex]
+		commandArgs := rawExecArgs[separatorIndex+1:]
+		if len(sdkArgs) == 0 || len(commandArgs) == 0 {
+			return nil, "", nil, execUsageError()
+		}
+
+		sdkSpecs := make([]execSDKSpec, 0, len(sdkArgs))
+		for _, sdkArg := range sdkArgs {
+			spec, err := parseExecSDKSpec(sdkArg)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			sdkSpecs = append(sdkSpecs, spec)
+		}
+		return sdkSpecs, commandArgs[0], commandArgs[1:], nil
 	}
 
-	// 2. Second argument is the command, rest are command arguments
-	command := args.Get(1)
-	cmdArgs := args.Slice()[2:]
+	if len(parsedArgs) > 2 && strings.Contains(parsedArgs[1], "@") {
+		return nil, "", nil, fmt.Errorf("multiple SDKs require '--' before the command\n%s", execUsageLine())
+	}
 
-	// 3. Execute the command
-	return executeInVfoxEnv(sdkName, sdkVersion, command, cmdArgs)
+	spec, err := parseExecSDKSpec(parsedArgs[0])
+	if err != nil {
+		return nil, "", nil, err
+	}
+	return []execSDKSpec{spec}, parsedArgs[1], parsedArgs[2:], nil
+}
+
+func rawExecArgs(rawArgs []string) []string {
+	for i := 1; i < len(rawArgs); i++ {
+		if rawArgs[i] == execCommandName || rawArgs[i] == execCommandAlias {
+			return rawArgs[i+1:]
+		}
+	}
+	return nil
+}
+
+func parseExecSDKSpec(arg string) (execSDKSpec, error) {
+	arg = strings.TrimSpace(arg)
+	if arg == "" {
+		return execSDKSpec{}, execUsageError()
+	}
+
+	parts := strings.SplitN(arg, "@", 2)
+	spec := execSDKSpec{Name: parts[0]}
+	if spec.Name == "" {
+		return execSDKSpec{}, fmt.Errorf("invalid SDK spec %q", arg)
+	}
+	if len(parts) == 2 {
+		spec.Version = sdk.Version(strings.TrimPrefix(parts[1], "v"))
+	}
+	return spec, nil
+}
+
+func execUsageLine() string {
+	return "usage: vfox exec <sdk>[@<version>]... -- <command> [args...]\nExample: vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g pnpm"
+}
+
+func execUsageError() error {
+	return fmt.Errorf("%s", execUsageLine())
 }
 
 // executeInVfoxEnv executes a command in vfox managed environment
-func executeInVfoxEnv(sdkName string, sdkVersion sdk.Version, command string, cmdArgs []string) error {
+func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) error {
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return fmt.Errorf("failed to create sdk manager: %w", err)
 	}
 	defer manager.Close()
 
-	// Lookup SDK
-	sdkSource, err := manager.LookupSdk(sdkName)
-	if err != nil {
-		return fmt.Errorf("%s not supported, error: %w", sdkName, err)
-	}
-
-	// If version is not specified, try to get it from current scope
-	var resolvedVersion sdk.Version
-	if sdkVersion == "" {
-		// Get version from scope chain: Global > Session > Project
-		chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(
-			env.Global, env.Session, env.Project,
-		)
+	sdkEnvs := make([]*env.Envs, 0, len(sdkSpecs))
+	for _, sdkSpec := range sdkSpecs {
+		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return err
 		}
-
-		version, _, ok := chain.GetToolVersion(sdkName)
-		if !ok || version == "" {
-			return fmt.Errorf("no version configured for %s. Please use 'vfox use' to set a version first", sdkName)
-		}
-		resolvedVersion = sdk.Version(version)
-	} else {
-		// Use the user-specified version
-		resolvedVersion = sdkVersion
-
-		// Check if installed, auto-install if not
-		if !sdkSource.CheckRuntimeExist(resolvedVersion) {
-			fmt.Printf("SDK %s@%s not found, installing...\n", sdkName, resolvedVersion)
-			if err := sdkSource.Install(resolvedVersion); err != nil {
-				return fmt.Errorf("failed to install %s@%s: %w", sdkName, resolvedVersion, err)
-			}
-		}
+		sdkEnvs = append(sdkEnvs, specEnvs)
 	}
 
-	// Get environment variables
-	// Note: Using EnvKeys to get the runtime package paths
-	runtimePackage, err := sdkSource.GetRuntimePackage(resolvedVersion)
-	if err != nil {
-		return fmt.Errorf("failed to get runtime package for %s@%s: %w", sdkName, resolvedVersion, err)
-	}
-	envKeys, err := sdkSource.EnvKeys(runtimePackage)
-	if err != nil {
-		return fmt.Errorf("failed to get env keys for %s@%s: %w", sdkName, resolvedVersion, err)
-	}
+	mergedEnvs := mergeExecEnvsByPriority(sdkEnvs)
+	applyExecSystemPaths(manager.RuntimeEnvContext, mergedEnvs)
 
-	// Build environment variable map
-	envMap := make(map[string]string)
-
-	// Add PATH from envKeys.Paths
-	if envKeys.Paths != nil && envKeys.Paths.Slice() != nil {
-		paths := envKeys.Paths.Slice()
-		pathStr := strings.Join(paths, string(os.PathListSeparator))
-		envMap["PATH"] = pathStr
-	}
-
-	// Add other variables from envKeys.Variables
-	for key, value := range envKeys.Variables {
+	envMap := make(map[string]string, len(mergedEnvs.Variables)+1)
+	for key, value := range mergedEnvs.Variables {
 		if value != nil {
 			envMap[key] = *value
 		}
 	}
-
-	// Execute command
+	envMap["PATH"] = mergedEnvs.Paths.String()
 	return executeCommand(command, cmdArgs, envMap)
+}
+
+func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Envs, error) {
+	sdkSource, err := manager.LookupSdk(sdkSpec.Name)
+	if err != nil {
+		return nil, fmt.Errorf("%s not supported, error: %w", sdkSpec.Name, err)
+	}
+
+	resolvedVersion, err := resolveExecSDKVersion(manager, sdkSpec)
+	if err != nil {
+		return nil, err
+	}
+	if sdkSpec.Version != "" && !sdkSource.CheckRuntimeExist(resolvedVersion) {
+		fmt.Printf("SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
+		if err := sdkSource.Install(resolvedVersion); err != nil {
+			return nil, fmt.Errorf("failed to install %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
+		}
+	}
+
+	runtimePackage, err := sdkSource.GetRuntimePackage(resolvedVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get runtime package for %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
+	}
+
+	envKeys, err := sdkSource.EnvKeys(runtimePackage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get env keys for %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
+	}
+	return envKeys, nil
+}
+
+func resolveExecSDKVersion(manager *internal.Manager, sdkSpec execSDKSpec) (sdk.Version, error) {
+	if sdkSpec.Version != "" {
+		return sdkSpec.Version, nil
+	}
+
+	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+
+	version, _, ok := chain.GetToolVersion(sdkSpec.Name)
+	if !ok || version == "" {
+		return "", fmt.Errorf("no version configured for %s. Please use 'vfox use' to set a version first", sdkSpec.Name)
+	}
+	return sdk.Version(version), nil
+}
+
+func mergeExecEnvsByPriority(envsByPriority []*env.Envs) *env.Envs {
+	merged := env.NewEnvs()
+	for _, sdkEnvs := range envsByPriority {
+		if sdkEnvs == nil {
+			continue
+		}
+		merged.Paths.Merge(sdkEnvs.Paths)
+	}
+	for i := len(envsByPriority) - 1; i >= 0; i-- {
+		if sdkEnvs := envsByPriority[i]; sdkEnvs != nil {
+			merged.Variables.Merge(sdkEnvs.Variables)
+		}
+	}
+	return merged
+}
+
+func applyExecSystemPaths(runtimeEnvContext *env.RuntimeEnvContext, sdkEnvs *env.Envs) {
+	if sdkEnvs == nil {
+		return
+	}
+	prefixPaths, cleanSystemPaths := runtimeEnvContext.SplitSystemPaths()
+	sdkEnvs.Paths.Merge(prefixPaths)
+	sdkEnvs.Paths.Merge(cleanSystemPaths)
 }
 
 // executeCommand executes a command in the specified environment
