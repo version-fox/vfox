@@ -116,18 +116,8 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 创建 PowerShell 配置：
 
 ```powershell
-if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force | Out-Null }
-$vfoxLine = 'Invoke-Expression "$(vfox activate pwsh)"'
-$profileContent = Get-Content -Path $PROFILE -Raw
-if ($profileContent -notmatch [regex]::Escape($vfoxLine)) {
-  if ($profileContent.Length -gt 0 -and -not $profileContent.EndsWith("`r`n") -and -not $profileContent.EndsWith("`n")) {
-    Add-Content -Path $PROFILE -Value ""
-  }
-  Add-Content -Path $PROFILE -Value $vfoxLine
-}
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
-
-这段脚本可以重复执行。它会避免重复写入 vfox 激活行，并确保该行写入到新的一行中。
 
 如果 PowerShell 提示「在此系统上禁止运行脚本」，请**以管理员身份运行 PowerShell** 并执行：
 

@@ -116,18 +116,8 @@ echo 'vfox activate fish | source' >> ~/.config/fish/config.fish
 Create PowerShell configuration:
 
 ```powershell
-if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force | Out-Null }
-$vfoxLine = 'Invoke-Expression "$(vfox activate pwsh)"'
-$profileContent = Get-Content -Path $PROFILE -Raw
-if ($profileContent -notmatch [regex]::Escape($vfoxLine)) {
-  if ($profileContent.Length -gt 0 -and -not $profileContent.EndsWith("`r`n") -and -not $profileContent.EndsWith("`n")) {
-    Add-Content -Path $PROFILE -Value ""
-  }
-  Add-Content -Path $PROFILE -Value $vfoxLine
-}
+if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }; Add-Content -Path $PROFILE -Value 'Invoke-Expression "$(vfox activate pwsh)"'
 ```
-
-This snippet is safe to run multiple times. It avoids duplicating the vfox activation line and ensures it is written on a new line.
 
 If PowerShell prompts "cannot be loaded because the execution of scripts is disabled on this system", **run PowerShell as Administrator** and execute:
 
