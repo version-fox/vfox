@@ -128,7 +128,7 @@ vfox unuse [options] <sdk-name>
 :::
 
 ::: warning 效果
-使用 `unuse` 后，SDK 将不再在指定作用域中处于活动状态。如果 SDK 在其他作用域中配置，那些将根据 vfox 的作用域层次结构优先生效（Session > Project > Global）。
+使用 `unuse` 后，SDK 将不再在指定作用域中处于活动状态。如果 SDK 在其他作用域中配置，那些将根据 vfox 的作用域层次结构优先生效（Project > Session > Global）。
 :::
 
 ## Uninstall

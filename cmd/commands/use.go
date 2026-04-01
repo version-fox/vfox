@@ -46,12 +46,12 @@ var Use = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "project",
 			Aliases: []string{"p"},
-			Usage:   "Used with the current directory (default)",
+			Usage:   "Used with the current directory",
 		},
 		&cli.BoolFlag{
 			Name:    "session",
 			Aliases: []string{"s"},
-			Usage:   "Used with the current shell session",
+			Usage:   "Used with the current shell session (default)",
 		},
 		&cli.BoolFlag{
 			Name:  "unlink",
@@ -118,7 +118,7 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 	if cmd.IsSet("project") {
 		return env.Project
 	}
-	// Default to project if no scope specified
+	// Default to session if no scope specified
 	return env.Session
 }
 

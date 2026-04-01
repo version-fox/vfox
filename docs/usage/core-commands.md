@@ -127,7 +127,7 @@ vfox unuse [options] <sdk-name>
 :::
 
 ::: warning Effect
-After using `unuse`, the SDK will no longer be active in the specified scope. If the SDK is configured in other scopes, those will take precedence according to vfox's scope hierarchy (Session > Project > Global).
+After using `unuse`, the SDK will no longer be active in the specified scope. If the SDK is configured in other scopes, those will take precedence according to vfox's scope hierarchy (Project > Session > Global).
 :::
 
 ## Uninstall

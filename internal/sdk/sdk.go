@@ -717,7 +717,7 @@ func (b *impl) Current() Version {
 // It returns the first valid version found.
 func (b *impl) ParseLegacyFile(path string) (Version, error) {
 	legacyFilenames := b.plugin.Metadata.LegacyFilenames
-	if len(legacyFilenames) > 0 {
+	if len(legacyFilenames) == 0 {
 		return "", nil
 	}
 	if !b.plugin.HasFunction("ParseLegacyFile") {

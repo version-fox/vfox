@@ -203,7 +203,9 @@ Always use exact version numbers to ensure project stability and reproducibility
 **Project > Session > Global > System**
 
 ::: info 📌 Default Behavior
-**vfox defaults to Session level**, if you don't specify `-p` (project level) or `-g` (global) flags, using `vfox use` command is equivalent to `vfox use -s`. When you close the shell session, the Session level configuration is automatically cleaned up and destroyed.
+**On Unix-like systems, vfox defaults to Session level**. If you don't specify `-p` (project level) or `-g` (global) flags, using `vfox use` command is equivalent to `vfox use -s`. When you close the shell session, the Session level configuration is automatically cleaned up and destroyed.
+
+**On Windows, vfox defaults to Global level** because shell hook support is not available in the same way, so `vfox use` without an explicit scope behaves like `vfox use -g`.
 :::
 
 ### Scope Overview
@@ -222,7 +224,7 @@ vfox creates directory symlinks in different scopes pointing to actual SDK insta
 
 ```bash
 # Project > Session > Global > System
-$PWD/.vfox/sdks/nodejs/bin:~/.vfox/tmp/<pid>/nodejs/bin:~/.vfox/sdks/nodejs/bin:/usr/bin:...
+$PWD/.vfox/sdks/nodejs/bin:~/.vfox/tmp/<pid>/sdks/nodejs/bin:~/.vfox/sdks/nodejs/bin:/usr/bin:...
 ```
 
 :::
