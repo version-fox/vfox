@@ -69,6 +69,16 @@ storage:
   sdkPath: /tmp
 ```
 
+`storage.sdkPath` is the root directory used to store SDKs. For example, if `sdkPath` is `/tmp`, Node.js will be installed under `/tmp/nodejs/`.
+
+::: warning Compatibility Note
+`v1.0.2` to `v1.0.7` incorrectly treated `storage.sdkPath` as a shared root and installed SDKs under `sdkPath/cache/<sdk>`.
+
+This behavior has been corrected to match `v0.10.x`. Existing SDKs under the incorrect `cache` path are still temporarily supported. New installs use the correct layout `sdkPath/<sdk>`.
+
+If both `sdkPath/<sdk>` and `sdkPath/cache/<sdk>` exist, `vfox` will prefer `sdkPath/<sdk>`.
+:::
+
 ## Plugin Registry Address
 
 `vfox` will default to retrieve plugins from [plugins registry](https://version-fox.github.io/vfox-plugins).

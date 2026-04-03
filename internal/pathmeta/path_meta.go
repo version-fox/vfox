@@ -178,14 +178,14 @@ func (p *PathMeta) ApplyStoragePath(storagePath string) error {
 	if storagePath == "" {
 		return nil
 	}
-	
+
 	// Update the Installs path to use the configured storage path
-	p.Shared.Installs = filepath.Join(storagePath, installedDirPrefix)
-	
+	p.Shared.Installs = filepath.Join(storagePath)
+
 	// Ensure the directory exists
 	if err := os.MkdirAll(p.Shared.Installs, ReadWriteAuth); err != nil {
 		return fmt.Errorf("failed to create storage directory: %w", err)
 	}
-	
+
 	return nil
 }

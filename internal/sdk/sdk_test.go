@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
 )
@@ -507,6 +508,61 @@ func TestEnsureVfoxInGitignore(t *testing.T) {
 				tt.verifyContent(gitignorePath)
 			}
 		})
+	}
+}
+
+func TestNewSdk_PrefersPrimaryInstallPath(t *testing.T) {
+	tempDir := t.TempDir()
+	installRoot := filepath.Join(tempDir, "sdks")
+	pluginPath := filepath.Join("..", "plugin", "testdata", "plugins", "java_with_metadata")
+
+	primaryInstallPath := filepath.Join(installRoot, "java_with_metadata")
+	legacyInstallPath := filepath.Join(installRoot, "cache", "java_with_metadata")
+
+	if err := os.MkdirAll(primaryInstallPath, 0755); err != nil {
+		t.Fatalf("Failed to create primary install path: %v", err)
+	}
+	if err := os.MkdirAll(legacyInstallPath, 0755); err != nil {
+		t.Fatalf("Failed to create legacy install path: %v", err)
+	}
+
+	source, err := NewSdk(&env.RuntimeEnvContext{
+		UserConfig:     config.DefaultConfig,
+		PathMeta:       &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Installs: installRoot}},
+		RuntimeVersion: "test",
+	}, pluginPath)
+	if err != nil {
+		t.Fatalf("NewSdk returned error: %v", err)
+	}
+	defer source.Close()
+
+	if got := source.Metadata().SdkInstalledPath; got != primaryInstallPath {
+		t.Fatalf("SdkInstalledPath = %q, want %q", got, primaryInstallPath)
+	}
+}
+
+func TestNewSdk_FallsBackToLegacyInstallPath(t *testing.T) {
+	tempDir := t.TempDir()
+	installRoot := filepath.Join(tempDir, "sdks")
+	pluginPath := filepath.Join("..", "plugin", "testdata", "plugins", "java_with_metadata")
+
+	legacyInstallPath := filepath.Join(installRoot, "cache", "java_with_metadata")
+	if err := os.MkdirAll(legacyInstallPath, 0755); err != nil {
+		t.Fatalf("Failed to create legacy install path: %v", err)
+	}
+
+	source, err := NewSdk(&env.RuntimeEnvContext{
+		UserConfig:     config.DefaultConfig,
+		PathMeta:       &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Installs: installRoot}},
+		RuntimeVersion: "test",
+	}, pluginPath)
+	if err != nil {
+		t.Fatalf("NewSdk returned error: %v", err)
+	}
+	defer source.Close()
+
+	if got := source.Metadata().SdkInstalledPath; got != legacyInstallPath {
+		t.Fatalf("SdkInstalledPath = %q, want %q", got, legacyInstallPath)
 	}
 }
 

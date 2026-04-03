@@ -1048,6 +1048,14 @@ func NewSdk(runtimeEnvContext *env.RuntimeEnvContext, pluginPath string) (Sdk, e
 		strings.ToLower(sdkName),
 	)
 
+	if !util.FileExists(installPath) {
+		// compatibility bug path introduced in v1.0.2
+		newVar := filepath.Join(runtimeEnvContext.PathMeta.Shared.Installs, "cache", strings.ToLower(sdkName))
+		if util.FileExists(newVar) {
+			installPath = newVar
+		}
+	}
+
 	return &impl{
 		Name:        sdkName,
 		InstallPath: installPath,

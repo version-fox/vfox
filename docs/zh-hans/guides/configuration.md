@@ -66,6 +66,16 @@ storage:
   sdkPath: /tmp
 ```
 
+`storage.sdkPath` 表示 SDK 的根目录。例如当 `sdkPath` 为 `/tmp` 时，Node.js 会安装到 `/tmp/nodejs/`。
+
+::: warning 兼容性说明
+`v1.0.2` 到 `v1.0.7` 错误地将 `storage.sdkPath` 当成 shared root 使用，导致 SDK 被安装到 `sdkPath/cache/<sdk>`。
+
+现在该行为已经修正，重新与 `v0.10.x` 保持一致。对于已经落在错误 `cache` 路径下的 SDK，`vfox` 仍会临时兼容；新安装会使用正确布局 `sdkPath/<sdk>`。
+
+如果 `sdkPath/<sdk>` 和 `sdkPath/cache/<sdk>` 同时存在，`vfox` 会优先使用 `sdkPath/<sdk>`。
+:::
+
 ## 插件注册表地址
 
 `vfox`默认从[插件仓库](https://version-fox.github.io/vfox-plugins)检索插件。
