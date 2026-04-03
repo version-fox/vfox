@@ -19,6 +19,7 @@
 package pathmeta
 
 import (
+	"path/filepath"
 	"runtime"
 	"testing"
 )
@@ -159,15 +160,15 @@ func TestContainsPathSegment(t *testing.T) {
 func TestApplyStoragePath(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
-	
+
 	// Create a PathMeta instance with default paths
 	meta := &PathMeta{
 		Shared: SharedPaths{
 			Root:     tmpDir,
-			Installs: tmpDir + "/default/cache",
+			Installs: filepath.Join(tmpDir, "default", "cache"),
 		},
 	}
-	
+
 	t.Run("Empty storage path does not change Installs", func(t *testing.T) {
 		originalInstalls := meta.Shared.Installs
 		err := meta.ApplyStoragePath("")
@@ -178,9 +179,9 @@ func TestApplyStoragePath(t *testing.T) {
 			t.Errorf("Installs path changed when it shouldn't: got %q, want %q", meta.Shared.Installs, originalInstalls)
 		}
 	})
-	
+
 	t.Run("Valid storage path updates Installs", func(t *testing.T) {
-		customPath := tmpDir + "/custom"
+		customPath := filepath.Join(tmpDir, "custom")
 
 		// Now test ApplyStoragePath
 		err := meta.ApplyStoragePath(customPath)
