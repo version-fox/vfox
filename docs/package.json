@@ -9,6 +9,6 @@
     "docs:preview": "vitepress preview"
   },
   "dependencies": {
-    "axios": "^1.8.4"
+    "axios": "^1.15.0"
   }
 }
