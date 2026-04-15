@@ -194,12 +194,12 @@ func TestNushellActivateWithPidCheck(t *testing.T) {
 				t.Error("SelfPath was not properly replaced")
 			}
 
-			// Verify that get -i is used (not get -o)
-			if strings.Contains(contentStr, "get -o hooks.pre_prompt") {
-				t.Error("Found incorrect 'get -o', should be 'get -i'")
+			// Verify that get -o is used (not get -i)
+			if strings.Contains(contentStr, "get -i hooks.pre_prompt") {
+				t.Error("Found outdated 'get -i', should be 'get -o'")
 			}
-			if !strings.Contains(contentStr, "get -i hooks.pre_prompt") {
-				t.Error("Missing correct 'get -i hooks.pre_prompt'")
+			if !strings.Contains(contentStr, "get -o hooks.pre_prompt") {
+				t.Error("Missing correct 'get -o hooks.pre_prompt'")
 			}
 
 			// Check for PID check block presence/absence
