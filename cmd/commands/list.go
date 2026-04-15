@@ -55,7 +55,7 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 			name := s.Metadata().Name
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
 			for _, version := range s.InstalledList() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: "v" + string(version)})
+				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: string(version)})
 			}
 		}
 		// Generate tree from LeveledList.
@@ -76,9 +76,9 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	for _, version := range list {
 		if version == curVersion {
-			pterm.Println("->", fmt.Sprintf("v%s", version), pterm.LightGreen("<— current"))
+			pterm.Println("->", fmt.Sprintf("%s", version), pterm.LightGreen("<— current"))
 		} else {
-			pterm.Println("->", fmt.Sprintf("v%s", version))
+			pterm.Println("->", fmt.Sprintf("%s", version))
 		}
 	}
 	return nil
