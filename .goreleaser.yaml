@@ -1,4 +1,5 @@
 # .goreleaser.yaml
+version: 2
 project_name: vfox
 
 before:
@@ -190,13 +191,12 @@ nfpms:
 
 signs:
   - cmd: cosign
-    certificate: "${artifact}.pem"
+    signature: "${artifact}.sigstore.json"
     output: true
     artifacts: checksum
     args:
       - sign-blob
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - --yes
 
