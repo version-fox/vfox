@@ -43,3 +43,12 @@ func TestIsInheritedHookSessionDetectsPidMismatchWithoutShellFlag(t *testing.T) 
 		t.Fatal("IsInheritedHookSession() = false, want true when inherited pid differs from parent process")
 	}
 }
+
+func TestGetPidUsesHookPidEvenWhenCalledFromSubshell(t *testing.T) {
+	t.Setenv(HookFlag, "bash")
+	t.Setenv(PidFlag, "123")
+
+	if got := GetPid(); got != 123 {
+		t.Fatalf("GetPid() = %d, want hook pid 123", got)
+	}
+}

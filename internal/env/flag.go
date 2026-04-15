@@ -65,7 +65,7 @@ func IsInheritedHookSession() bool {
 }
 
 func GetPid() int {
-	if IsHookEnv() && !IsInheritedHookSession() {
+	if IsHookEnv() {
 		if pid := os.Getenv(PidFlag); pid != "" {
 			p, _ := strconv.Atoi(pid) // Convert pid from string to int
 			return p

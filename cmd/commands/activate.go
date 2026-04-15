@@ -48,6 +48,9 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	if name == "" {
 		return cli.Exit("shell name is required", 1)
 	}
+	if env.IsInheritedHookSession() {
+		_ = os.Unsetenv(pathmeta.HookCurTmpPath)
+	}
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return err

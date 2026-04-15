@@ -791,9 +791,6 @@ func NewSdkManager() (*Manager, error) {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
 	currentDir := getWorkingDirectory()
-	if env.IsInheritedHookSession() {
-		_ = os.Unsetenv(pathmeta.HookCurTmpPath)
-	}
 	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 	if err != nil {
 		return nil, fmt.Errorf("init path meta failed: %w", err)
