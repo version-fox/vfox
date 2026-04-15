@@ -29,7 +29,8 @@ type zsh struct{}
 var Zsh = zsh{}
 
 const zshHook = `
-if [[ -z "$__VFOX_PID" || -z "$__VFOX_SHELL" ]]; then
+if [[ -z "$__VFOX_PID" || "$__VFOX_PID" != "$$" || "$__VFOX_SHELL" != "zsh" ]]; then
+  unset __VFOX_CURTMPPATH;
   {{.EnvContent}}
 
   export __VFOX_PID=$$;

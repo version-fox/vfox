@@ -43,8 +43,29 @@ func IsMultiplexerEnvironment() bool {
 	return os.Getenv("TMUX") != ""
 }
 
+// IsIDEEnvironmentResolution detects shells launched by IDEs only to read the
+// shell environment. Those shells should not publish vfox hook session state.
+func IsIDEEnvironmentResolution() bool {
+	return os.Getenv("VSCODE_RESOLVING_ENVIRONMENT") != "" ||
+		os.Getenv("INTELLIJ_ENVIRONMENT_READER") != ""
+}
+
+// IsInheritedHookSession reports whether vfox hook state was inherited from a
+// different shell process.
+func IsInheritedHookSession() bool {
+	pid := os.Getenv(PidFlag)
+	if pid == "" {
+		return false
+	}
+	p, err := strconv.Atoi(pid)
+	if err != nil {
+		return false
+	}
+	return p != os.Getppid()
+}
+
 func GetPid() int {
-	if IsHookEnv() {
+	if IsHookEnv() && !IsInheritedHookSession() {
 		if pid := os.Getenv(PidFlag); pid != "" {
 			p, _ := strconv.Atoi(pid) // Convert pid from string to int
 			return p

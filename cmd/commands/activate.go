@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -189,34 +190,61 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	vfoxPath := runtimeEnvContext.PathMeta.Executable
 	vfoxPath = strings.Replace(vfoxPath, "\\", "/", -1)
+
+	script, err := renderActivateScript(name, vfoxPath, cmd.Args().Tail(), exportEnvs, env.IsMultiplexerEnvironment())
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(cmd.Writer, script)
+	return err
+}
+
+func renderActivateScript(name, selfPath string, args []string, exportEnvs env.Vars, enablePidCheck bool) (string, error) {
 	s := shell.NewShell(name)
 	if s == nil {
-		return fmt.Errorf("unknown target shell %s", name)
+		return "", fmt.Errorf("unknown target shell %s", name)
+	}
+
+	if env.IsIDEEnvironmentResolution() {
+		exportOnly := make(env.Vars, len(exportEnvs))
+		for k, v := range exportEnvs {
+			switch k {
+			case env.PidFlag, env.HookFlag, pathmeta.HookCurTmpPath:
+				continue
+			default:
+				exportOnly[k] = v
+			}
+		}
+		return s.Export(exportOnly), nil
 	}
 
 	exportStr := s.Export(exportEnvs)
 	str, err := s.Activate(
 		shell.ActivateConfig{
-			SelfPath:       vfoxPath,
-			Args:           cmd.Args().Tail(),
-			EnablePidCheck: env.IsMultiplexerEnvironment(),
+			SelfPath:       selfPath,
+			Args:           args,
+			EnablePidCheck: enablePidCheck,
 		},
 	)
 	if err != nil {
-		return err
+		return "", err
 	}
 	hookTemplate, err := template.New("hook").Parse(str)
 	if err != nil {
-		return nil
+		return "", err
 	}
 	tmpCtx := struct {
 		SelfPath       string
 		EnvContent     string
 		EnablePidCheck bool
 	}{
-		SelfPath:       vfoxPath,
+		SelfPath:       selfPath,
 		EnvContent:     exportStr,
-		EnablePidCheck: env.IsMultiplexerEnvironment(),
+		EnablePidCheck: enablePidCheck,
 	}
-	return hookTemplate.Execute(cmd.Writer, tmpCtx)
+	var buf bytes.Buffer
+	if err := hookTemplate.Execute(&buf, tmpCtx); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

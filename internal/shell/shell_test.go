@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -102,5 +103,23 @@ func TestCommonShellPaths(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestZshActivateReinitializesInheritedSession(t *testing.T) {
+	script, err := Zsh.Activate(ActivateConfig{SelfPath: "/usr/bin/vfox"})
+	if err != nil {
+		t.Fatalf("Activate() failed: %v", err)
+	}
+
+	wantSnippets := []string{
+		`"$__VFOX_PID" != "$$"`,
+		`"$__VFOX_SHELL" != "zsh"`,
+		`unset __VFOX_CURTMPPATH`,
+	}
+	for _, snippet := range wantSnippets {
+		if !strings.Contains(script, snippet) {
+			t.Fatalf("zsh hook missing %q:\n%s", snippet, script)
+		}
 	}
 }
