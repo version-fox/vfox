@@ -218,6 +218,17 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 				exportOnly[k] = v
 			}
 		}
+		// Explicitly unset hook session vars so they cannot be inherited by the
+		// IDE process. When VSCode (or other IDEs) resolves the shell
+		// environment, it spawns a login shell that inherits its own
+		// process.env. If the IDE itself was launched from a terminal where
+		// vfox was already activated, those vars leak through the captured
+		// environment into every integrated terminal, causing them to reuse
+		// the parent shell's session directory and cached state and breaking
+		// per-project version activation.
+		exportOnly[env.HookFlag] = nil
+		exportOnly[env.PidFlag] = nil
+		exportOnly[pathmeta.HookCurTmpPath] = nil
 		return s.Export(exportOnly), nil
 	}
 
