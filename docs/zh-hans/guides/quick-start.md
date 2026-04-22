@@ -80,6 +80,20 @@ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | b
 - 如果目录不存在，会自动创建
 - 提供将 `~/.local/bin` 添加到 `PATH` 的说明
 
+**安装指定版本**
+
+默认情况下安装脚本会安装最新的 GitHub Release。如果想安装指定版本，可以使用 `--version` 参数（版本号可带或不带前缀 `v`）：
+
+```shell
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --version 0.5.6
+```
+
+`--version` 可以与 `--user` 组合使用，例如：
+
+```shell
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user --version 0.5.6
+```
+
 </TabItem>
 </Tabs>
 

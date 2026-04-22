@@ -3,18 +3,41 @@
 main() {
   # Parse command-line arguments
   USER_INSTALL=false
-  for arg in "$@"; do
-    case "$arg" in
+  VERSION=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
       --user)
         USER_INSTALL=true
+        shift
+        ;;
+      --version)
+        if [ -z "$2" ]; then
+          echo "Error: --version requires a value (e.g. --version 0.5.6 or --version v0.5.6)"
+          exit 1
+        fi
+        VERSION="$2"
+        shift 2
+        ;;
+      --version=*)
+        VERSION="${1#--version=}"
+        if [ -z "$VERSION" ]; then
+          echo "Error: --version requires a value (e.g. --version=0.5.6)"
+          exit 1
+        fi
+        shift
         ;;
       *)
-        echo "Unknown argument: $arg"
-        echo "Usage: $0 [--user]"
+        echo "Unknown argument: $1"
+        echo "Usage: $0 [--user] [--version <version>]"
         exit 1
         ;;
     esac
   done
+
+  # Strip a leading 'v' from a user-supplied version (we add it back when needed)
+  if [ -n "$VERSION" ]; then
+    VERSION="${VERSION#v}"
+  fi
 
   # Detect if running in Termux
   IS_TERMUX=false
@@ -55,8 +78,14 @@ main() {
     exit 1
   fi
 
-  # Get the latest version
-  if [ -n "${GITHUB_TOKEN}" ]; then
+  # Get the version: use the user-specified one if provided, otherwise fetch latest
+  if [ -n "$VERSION" ]; then
+    if [ -n "${GITHUB_TOKEN}" ]; then
+      API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/tags/v${VERSION}")
+    else
+      API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/tags/v${VERSION}")
+    fi
+  elif [ -n "${GITHUB_TOKEN}" ]; then
     API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest")
   else
     API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest")
@@ -69,11 +98,16 @@ main() {
     exit 1
   fi
 
-  VERSION=$(echo "$API_RESPONSE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
-  if [ -z "$VERSION" ]; then
-    echo "Failed to get the latest version. Please check your network connection and try again."
+  RESOLVED_VERSION=$(echo "$API_RESPONSE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
+  if [ -z "$RESOLVED_VERSION" ]; then
+    if [ -n "$VERSION" ]; then
+      echo "Failed to find vfox version v${VERSION} on GitHub. Please verify the version exists at https://github.com/version-fox/vfox/releases."
+    else
+      echo "Failed to get the latest version. Please check your network connection and try again."
+    fi
     exit 1
   fi
+  VERSION="$RESOLVED_VERSION"
   echo "Installing vfox v$VERSION ..."
 
   # Check if the OS is supported
