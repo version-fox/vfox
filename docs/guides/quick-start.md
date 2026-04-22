@@ -80,6 +80,20 @@ This will:
 - Automatically create the directory if it doesn't exist
 - Provide instructions to add `~/.local/bin` to your `PATH`
 
+**Install a Specific Version**
+
+By default the script installs the latest GitHub release. To install a specific version, use the `--version` flag (with or without the leading `v`):
+
+```shell
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --version 0.5.6
+```
+
+`--version` can be combined with `--user`, for example:
+
+```shell
+curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user --version 0.5.6
+```
+
 </TabItem>
 </Tabs>
 
