@@ -212,7 +212,7 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly := make(env.Vars, len(exportEnvs))
 		for k, v := range exportEnvs {
 			switch k {
-			case env.PidFlag, env.HookFlag, pathmeta.HookCurTmpPath:
+			case env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath:
 				continue
 			default:
 				exportOnly[k] = v
@@ -225,9 +225,12 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		// vfox was already activated, those vars leak through the captured
 		// environment into every integrated terminal, causing them to reuse
 		// the parent shell's session directory and cached state and breaking
-		// per-project version activation.
+		// per-project version activation. __VFOX_INITIALIZED has the same
+		// problem for PowerShell: if it leaks through, integrated terminals
+		// skip prompt-hook registration entirely.
 		exportOnly[env.HookFlag] = nil
 		exportOnly[env.PidFlag] = nil
+		exportOnly[env.InitializedFlag] = nil
 		exportOnly[pathmeta.HookCurTmpPath] = nil
 		return s.Export(exportOnly), nil
 	}

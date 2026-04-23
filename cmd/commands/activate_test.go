@@ -28,7 +28,7 @@ func TestRenderActivateScriptForIDEEnvironmentResolutionSkipsHookSessionState(t 
 	}
 	// Hook session vars must be unset (not just omitted) so they cannot leak
 	// from the IDE's parent shell into every integrated terminal.
-	for _, key := range []string{env.PidFlag, env.HookFlag, pathmeta.HookCurTmpPath} {
+	for _, key := range []string{env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath} {
 		want := "unset " + key + ";"
 		if !strings.Contains(got, want) {
 			t.Fatalf("IDE environment resolution script should unset %q, got:\n%s", key, got)
