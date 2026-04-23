@@ -89,9 +89,8 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	// Process SDKs concurrently using errgroup
 	g, _ := errgroup.WithContext(ctx)
 
-	for sdkName, version := range allTools {
+	for sdkName := range allTools {
 		sdkName := sdkName // Capture loop variable
-		version := version // Capture loop variable
 
 		g.Go(func() error {
 			// Lookup SDK
@@ -101,10 +100,8 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 				return nil // Continue processing other SDKs
 			}
 
-			sdkVersion := sdk.Version(version)
-
-			// Get tool config with scope information (searches by priority)
-			toolConfig, scope, ok := chain.GetToolConfig(sdkName)
+			// Resolve to the highest-priority installed version across scopes
+			toolConfig, scope, sdkVersion, ok := resolveInstalledToolConfig(chain, sdkObj, sdkName)
 			if !ok {
 				return nil
 			}
@@ -121,14 +118,14 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 			// Create symlinks if needed (internal logic checks if symlink already exists)
 			if err := sdkObj.CreateSymlinksForScope(sdkVersion, actualScope); err != nil {
 				logger.Debugf("Failed to create symlinks for %s@%s (scope: %s): %v",
-					sdkName, version, actualScope.String(), err)
+					sdkName, sdkVersion, actualScope.String(), err)
 				return nil // Continue processing other SDKs
 			}
 
 			// Get environment variables pointing to symlinks
 			sdkEnvs, err := sdkObj.EnvKeysForScope(sdkVersion, actualScope)
 			if err != nil {
-				logger.Debugf("Failed to get env keys for %s@%s: %v", sdkName, version, err)
+				logger.Debugf("Failed to get env keys for %s@%s: %v", sdkName, sdkVersion, err)
 				return nil // Continue processing other SDKs
 			}
 

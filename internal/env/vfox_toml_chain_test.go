@@ -196,6 +196,40 @@ func TestVfoxTomlChain(t *testing.T) {
 		}
 	})
 
+	t.Run("GetToolConfigsByPriority", func(t *testing.T) {
+		chain := NewVfoxTomlChain()
+
+		globalConfig := pathmeta.NewVfoxToml()
+		globalConfig.SetTool("golang", "1.26.0")
+
+		sessionConfig := pathmeta.NewVfoxToml()
+		sessionConfig.SetTool("golang", "1.25.0")
+
+		projectConfig := pathmeta.NewVfoxToml()
+		projectConfig.SetTool("golang", "1.24.0")
+
+		chain.Add(globalConfig, Global)
+		chain.Add(sessionConfig, Session)
+		chain.Add(projectConfig, Project)
+
+		configs := chain.GetToolConfigsByPriority("golang")
+		if len(configs) != 3 {
+			t.Fatalf("Expected 3 configs, got %d", len(configs))
+		}
+
+		if configs[0].Scope != Project || configs[0].Config.Version != "1.24.0" {
+			t.Fatalf("Expected project config first, got scope=%s version=%s", configs[0].Scope.String(), configs[0].Config.Version)
+		}
+
+		if configs[1].Scope != Session || configs[1].Config.Version != "1.25.0" {
+			t.Fatalf("Expected session config second, got scope=%s version=%s", configs[1].Scope.String(), configs[1].Config.Version)
+		}
+
+		if configs[2].Scope != Global || configs[2].Config.Version != "1.26.0" {
+			t.Fatalf("Expected global config third, got scope=%s version=%s", configs[2].Scope.String(), configs[2].Config.Version)
+		}
+	})
+
 	t.Run("GetTool not found", func(t *testing.T) {
 		chain := NewVfoxTomlChain()
 

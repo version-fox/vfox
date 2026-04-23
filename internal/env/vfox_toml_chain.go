@@ -26,6 +26,12 @@ type chainItem struct {
 	scope  UseScope
 }
 
+// ScopedToolConfig bundles a tool configuration with its scope.
+type ScopedToolConfig struct {
+	Config *pathmeta.ToolConfig
+	Scope  UseScope
+}
+
 // VfoxTomlChain is a chain of VfoxToml configs, supporting multi-config merging
 type VfoxTomlChain []*chainItem
 
@@ -101,6 +107,26 @@ func (c *VfoxTomlChain) GetToolVersion(name string) (string, UseScope, bool) {
 		return config.Version, scope, true
 	}
 	return "", Global, false
+}
+
+// GetToolConfigsByPriority returns all tool configs from high to low priority.
+func (c *VfoxTomlChain) GetToolConfigsByPriority(name string) []ScopedToolConfig {
+	result := make([]ScopedToolConfig, 0, len(*c))
+	for i := len(*c) - 1; i >= 0; i-- {
+		item := (*c)[i]
+		if item == nil || item.config == nil {
+			continue
+		}
+		config, ok := item.config.Tools.Get(name)
+		if !ok {
+			continue
+		}
+		result = append(result, ScopedToolConfig{
+			Config: config,
+			Scope:  item.scope,
+		})
+	}
+	return result
 }
 
 // GetByIndex returns the config at the specified index
