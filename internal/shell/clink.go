@@ -18,6 +18,7 @@ package shell
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
 )
@@ -48,5 +49,16 @@ func (b clink) Export(envs env.Vars) (out string) {
 }
 
 func (b clink) set(key, value string) string {
-	return fmt.Sprintf("set \"%s=%s\"\n", key, value)
+	return fmt.Sprintf("set \"%s=%s\"\n", escapeCmdSet(key), escapeCmdSet(value))
+}
+
+func escapeCmdSet(value string) string {
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return strings.NewReplacer(
+		"^", "^^",
+		"\"", "^\"",
+		"%", "%%",
+		"!", "^!",
+	).Replace(value)
 }
