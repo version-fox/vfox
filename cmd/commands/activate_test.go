@@ -23,9 +23,19 @@ func TestRenderActivateScriptForIDEEnvironmentResolutionSkipsHookSessionState(t 
 		t.Fatalf("renderActivateScript() failed: %v", err)
 	}
 
-	for _, forbidden := range []string{env.PidFlag, env.HookFlag, pathmeta.HookCurTmpPath, "_vfox_hook"} {
-		if strings.Contains(got, forbidden) {
-			t.Fatalf("IDE environment resolution script contains %q:\n%s", forbidden, got)
+	if strings.Contains(got, "_vfox_hook") {
+		t.Fatalf("IDE environment resolution script should not register hook:\n%s", got)
+	}
+	// Hook session vars must be unset (not just omitted) so they cannot leak
+	// from the IDE's parent shell into every integrated terminal.
+	for _, key := range []string{env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath} {
+		want := "unset " + key + ";"
+		if !strings.Contains(got, want) {
+			t.Fatalf("IDE environment resolution script should unset %q, got:\n%s", key, got)
+		}
+		// And it must never re-export them.
+		if strings.Contains(got, "export "+key+"=") {
+			t.Fatalf("IDE environment resolution script should not export %q, got:\n%s", key, got)
 		}
 	}
 

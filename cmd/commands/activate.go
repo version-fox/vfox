@@ -212,12 +212,26 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly := make(env.Vars, len(exportEnvs))
 		for k, v := range exportEnvs {
 			switch k {
-			case env.PidFlag, env.HookFlag, pathmeta.HookCurTmpPath:
+			case env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath:
 				continue
 			default:
 				exportOnly[k] = v
 			}
 		}
+		// Explicitly unset hook session vars so they cannot be inherited by the
+		// IDE process. When VSCode (or other IDEs) resolves the shell
+		// environment, it spawns a login shell that inherits its own
+		// process.env. If the IDE itself was launched from a terminal where
+		// vfox was already activated, those vars leak through the captured
+		// environment into every integrated terminal, causing them to reuse
+		// the parent shell's session directory and cached state and breaking
+		// per-project version activation. __VFOX_INITIALIZED has the same
+		// problem for PowerShell: if it leaks through, integrated terminals
+		// skip prompt-hook registration entirely.
+		exportOnly[env.HookFlag] = nil
+		exportOnly[env.PidFlag] = nil
+		exportOnly[env.InitializedFlag] = nil
+		exportOnly[pathmeta.HookCurTmpPath] = nil
 		return s.Export(exportOnly), nil
 	}
 
