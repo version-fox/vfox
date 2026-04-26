@@ -17,8 +17,6 @@
 package shell
 
 import (
-	"fmt"
-
 	"github.com/version-fox/vfox/internal/env"
 )
 
@@ -76,10 +74,6 @@ func (z zsh) Export(envs env.Vars) (out string) {
 }
 
 func (z zsh) export(key, value string) string {
-	// Use double quotes for PATH-like variables to avoid unnecessary ANSI-C quoting
-	if key == "PATH" {
-		return fmt.Sprintf("export %s=\"%s\";", key, value)
-	}
 	return "export " + z.escape(key) + "=" + z.escape(value) + ";"
 }
 
