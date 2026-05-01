@@ -295,12 +295,10 @@ loop:
 			continue
 		}
 
-		parts := strings.Split(header.Name, "/")
-		if len(parts) > 1 {
-			parts = parts[1:]
+		target, err := safeTarTarget(dest, header.Name)
+		if err != nil {
+			return err
 		}
-		fname := strings.Join(parts, "/")
-		target := filepath.Join(dest, fname)
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -310,7 +308,9 @@ loop:
 				}
 			}
 		case tar.TypeReg:
-			_ = os.MkdirAll(filepath.Dir(target), 0755)
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -336,6 +336,31 @@ loop:
 		}
 	}
 	return nil
+}
+
+func safeTarTarget(dest string, name string) (string, error) {
+	normalizedPath := strings.ReplaceAll(name, "\\", "/")
+	parts := strings.Split(normalizedPath, "/")
+	if len(parts) > 1 {
+		parts = parts[1:]
+	}
+	fname := filepath.Clean(strings.Join(parts, "/"))
+	if fname == "." {
+		return dest, nil
+	}
+	if !filepath.IsLocal(fname) {
+		return "", fmt.Errorf("archive entry %q is outside destination", name)
+	}
+
+	target := filepath.Join(dest, fname)
+	rel, err := filepath.Rel(dest, target)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive entry %q is outside destination", name)
+	}
+	return target, nil
 }
 
 type ZipDecompressor struct {

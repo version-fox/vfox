@@ -57,6 +57,42 @@ func TestZstdTarDecompressor(t *testing.T) {
 	tempDir := t.TempDir()
 	archivePath := filepath.Join(tempDir, "test.tar.zst")
 	dest := filepath.Join(tempDir, "dest")
+	body := "Hello, zstd!"
+
+	writeZstdTar(t, archivePath, "test.txt", body)
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(decompressedFile)) != body {
+		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
+	}
+}
+
+func TestZstdTarDecompressorRejectsPathTraversal(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.zst")
+	dest := filepath.Join(tempDir, "dest")
+
+	writeZstdTar(t, archivePath, "root/../../evil.txt", "evil")
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err == nil {
+		t.Fatal("Expected path traversal archive entry to fail")
+	}
+	if _, err := os.Stat(filepath.Join(tempDir, "evil.txt")); !os.IsNotExist(err) {
+		t.Fatalf("Expected no file outside destination, got err %v", err)
+	}
+}
+
+func writeZstdTar(t *testing.T, archivePath string, name string, body string) {
+	t.Helper()
 
 	file, err := os.Create(archivePath)
 	if err != nil {
@@ -69,9 +105,8 @@ func TestZstdTarDecompressor(t *testing.T) {
 	}
 	tw := tar.NewWriter(zw)
 
-	body := "Hello, zstd!"
 	err = tw.WriteHeader(&tar.Header{
-		Name: "root/test.txt",
+		Name: name,
 		Mode: 0600,
 		Size: int64(len(body)),
 	})
@@ -89,19 +124,6 @@ func TestZstdTarDecompressor(t *testing.T) {
 	}
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
-	}
-
-	decompressor := NewDecompressor(archivePath)
-	if err := decompressor.Decompress(dest); err != nil {
-		t.Fatalf("Failed to decompress: %v", err)
-	}
-
-	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.TrimSpace(string(decompressedFile)) != body {
-		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
 	}
 }
 
