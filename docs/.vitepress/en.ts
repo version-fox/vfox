@@ -78,12 +78,13 @@ function sidebar(): DefaultTheme.Sidebar {
                     text: 'Library',
                     items:[
                         {text: 'http', link: '/plugins/library/http'},
-                        {text: 'html', link: '/plugins/library/html'},
-                        {text: 'json', link: '/plugins/library/json'},
-                        {text: 'strings', link: '/plugins/library/strings'},
-                        {text: 'archiver', link: '/plugins/library/archiver'},
-                    ]
-                },
+                         {text: 'html', link: '/plugins/library/html'},
+                         {text: 'json', link: '/plugins/library/json'},
+                         {text: 'strings', link: '/plugins/library/strings'},
+                         {text: 'archiver', link: '/plugins/library/archiver'},
+                         {text: 'hash', link: '/plugins/library/hash'},
+                     ]
+                 },
 
                 {text: 'Available Plugins', link: '/plugins/available'},
             ]

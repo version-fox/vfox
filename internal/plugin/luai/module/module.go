@@ -19,6 +19,7 @@ package module
 import (
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/hash"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/html"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/json"
@@ -36,4 +37,5 @@ func Preload(L *lua.LState, options *PreloadOptions) {
 	html.Preload(L)
 	string.Preload(L)
 	archiver.Preload(L)
+	hash.Preload(L)
 }
