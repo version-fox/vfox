@@ -26,7 +26,7 @@ import (
 
 func TestHashModule(t *testing.T) {
 	tempDir := t.TempDir()
-	testFile := filepath.Join(tempDir, "archive.tar.gz")
+	testFile := filepath.Join(tempDir, "sample-file.txt")
 	if err := os.WriteFile(testFile, []byte("hello world"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestHashModuleErrors(t *testing.T) {
 	`
 
 	tempDir := t.TempDir()
-	testFile := filepath.Join(tempDir, "archive.tar.gz")
+	testFile := filepath.Join(tempDir, "sample-file.txt")
 	if err := os.WriteFile(testFile, []byte("hello world"), 0644); err != nil {
 		t.Fatal(err)
 	}

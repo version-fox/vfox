@@ -122,12 +122,16 @@ func pushFileVerify(L *lua.LState, filepath, expected, algorithm string) int {
 	return 1
 }
 
-func DigestFile(filepath, algorithm string) (string, error) {
+func DigestFile(filepath, algorithm string) (digest string, err error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
 	hasher, err := newHash(algorithm)
 	if err != nil {
