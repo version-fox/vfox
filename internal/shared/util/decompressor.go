@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/bodgit/sevenzip"
+	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 )
 
@@ -205,6 +206,81 @@ func (b *Bzip2TarDecompressor) Decompress(dest string) error {
 	bzr := bzip2.NewReader(file)
 	tr := tar.NewReader(bzr)
 
+	var symlinks []symlink
+
+loop:
+	for {
+		header, err := tr.Next()
+		switch {
+		case err == io.EOF:
+			break loop
+		case err != nil:
+			return err
+		case header == nil:
+			continue
+		}
+
+		parts := strings.Split(header.Name, "/")
+		if len(parts) > 1 {
+			parts = parts[1:]
+		}
+		fname := strings.Join(parts, "/")
+		target := filepath.Join(dest, fname)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+		case tar.TypeReg:
+			_ = os.MkdirAll(filepath.Dir(target), 0755)
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+			f.Close()
+		case tar.TypeSymlink:
+			symlinks = append(symlinks, symlink{header.Linkname, target})
+		}
+	}
+
+	for _, s := range symlinks {
+		dir := filepath.Dir(s.newname)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+		}
+		if err = os.Symlink(s.oldname, s.newname); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type ZstdTarDecompressor struct {
+	src string
+}
+
+func (z *ZstdTarDecompressor) Decompress(dest string) error {
+	file, err := os.Open(z.src)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	zr, err := zstd.NewReader(file)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+
+	tr := tar.NewReader(zr)
 	var symlinks []symlink
 
 loop:
@@ -522,6 +598,11 @@ func NewDecompressor(src string) Decompressor {
 	}
 	if strings.HasSuffix(filename, ".tar.bz2") {
 		return &Bzip2TarDecompressor{
+			src: src,
+		}
+	}
+	if strings.HasSuffix(filename, ".tar.zst") || strings.HasSuffix(filename, ".tzst") {
+		return &ZstdTarDecompressor{
 			src: src,
 		}
 	}

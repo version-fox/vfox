@@ -17,7 +17,13 @@
 package util
 
 import (
+	"archive/tar"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 func TestNewDecompressor(t *testing.T) {
@@ -31,9 +37,71 @@ func TestNewDecompressor(t *testing.T) {
 		t.Errorf("Expected ZipDecompressor, got %T", zipDecompressor)
 	}
 
+	zstdTarDecompressor := NewDecompressor("test.tar.zst")
+	if _, ok := zstdTarDecompressor.(*ZstdTarDecompressor); !ok {
+		t.Errorf("Expected ZstdTarDecompressor, got %T", zstdTarDecompressor)
+	}
+
+	tzstDecompressor := NewDecompressor("test.tzst")
+	if _, ok := tzstDecompressor.(*ZstdTarDecompressor); !ok {
+		t.Errorf("Expected ZstdTarDecompressor, got %T", tzstDecompressor)
+	}
+
 	unknownDecompressor := NewDecompressor("test.unknown")
 	if unknownDecompressor != nil {
 		t.Errorf("Expected nil, got %T", unknownDecompressor)
+	}
+}
+
+func TestZstdTarDecompressor(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.zst")
+	dest := filepath.Join(tempDir, "dest")
+
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zw, err := zstd.NewWriter(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tw := tar.NewWriter(zw)
+
+	body := "Hello, zstd!"
+	err = tw.WriteHeader(&tar.Header{
+		Name: "root/test.txt",
+		Mode: 0600,
+		Size: int64(len(body)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte(body)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(decompressedFile)) != body {
+		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
 	}
 }
 
