@@ -86,13 +86,13 @@ function sidebar(): DefaultTheme.Sidebar {
                     text: '标准库',
                     items:[
                         {text: 'http', link: '/zh-hans/plugins/library/http'},
-                         {text: 'html', link: '/zh-hans/plugins/library/html'},
-                         {text: 'json', link: '/zh-hans/plugins/library/json'},
-                         {text: 'strings', link: '/zh-hans/plugins/library/strings'},
-                         {text: 'archiver', link: '/zh-hans/plugins/library/archiver'},
-                         {text: 'hash', link: '/zh-hans/plugins/library/hash'},
-                     ]
-                 }, 
+                        {text: 'html', link: '/zh-hans/plugins/library/html'},
+                        {text: 'json', link: '/zh-hans/plugins/library/json'},
+                        {text: 'strings', link: '/zh-hans/plugins/library/strings'},
+                        {text: 'archiver', link: '/zh-hans/plugins/library/archiver'},
+                        {text: 'hash', link: '/zh-hans/plugins/library/hash'},
+                    ]
+                }, 
 
                 {text: '可用插件', link: '/zh-hans/plugins/available'},
             ]
