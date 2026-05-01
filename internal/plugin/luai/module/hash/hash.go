@@ -142,8 +142,10 @@ func DigestFile(filepath, algorithm string) (string, error) {
 func newHash(algorithm string) (gohash.Hash, error) {
 	switch normalizeAlgorithm(algorithm) {
 	case "md5":
+		// MD5 is supported only for compatibility with upstream sources that publish legacy checksums.
 		return md5.New(), nil
 	case "sha1":
+		// SHA-1 is supported only for compatibility; prefer SHA-256 or SHA-512 for new integrations.
 		return sha1.New(), nil
 	case "sha256":
 		return sha256.New(), nil
