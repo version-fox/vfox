@@ -296,7 +296,7 @@ loop:
 			continue
 		}
 
-		target, err := safeTarTarget(dest, header.Name, rootFolderInTar)
+		target, err := safeZstdTarTarget(dest, header.Name, rootFolderInTar)
 		if err != nil {
 			return err
 		}
@@ -317,9 +317,12 @@ loop:
 				return err
 			}
 			if _, err := io.Copy(f, tr); err != nil {
+				_ = f.Close()
 				return err
 			}
-			f.Close()
+			if err := f.Close(); err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
@@ -380,7 +383,7 @@ func findRootFolderInZstdTar(tarFilePath string) string {
 	return firstElement
 }
 
-func safeTarTarget(dest string, name string, rootFolderInTar string) (string, error) {
+func safeZstdTarTarget(dest string, name string, rootFolderInTar string) (string, error) {
 	normalizedPath := strings.ReplaceAll(name, "\\", "/")
 	if strings.HasPrefix(normalizedPath, "/") {
 		return "", fmt.Errorf("archive entry %q is outside destination", name)
