@@ -340,13 +340,21 @@ loop:
 
 func safeTarTarget(dest string, name string) (string, error) {
 	normalizedPath := strings.ReplaceAll(name, "\\", "/")
+	if strings.HasPrefix(normalizedPath, "/") {
+		return "", fmt.Errorf("archive entry %q is outside destination", name)
+	}
+	normalizedPath = strings.Trim(normalizedPath, "/")
+	if normalizedPath == "" {
+		return "", fmt.Errorf("archive entry %q is empty", name)
+	}
+
 	parts := strings.Split(normalizedPath, "/")
 	if len(parts) > 1 {
 		parts = parts[1:]
 	}
 	fname := filepath.Clean(strings.Join(parts, "/"))
 	if fname == "." {
-		return dest, nil
+		return "", fmt.Errorf("archive entry %q is empty", name)
 	}
 	if !filepath.IsLocal(fname) {
 		return "", fmt.Errorf("archive entry %q is outside destination", name)
