@@ -268,6 +268,7 @@ type ZstdTarDecompressor struct {
 }
 
 func (z *ZstdTarDecompressor) Decompress(dest string) error {
+	rootFolderInTar := findRootFolderInZstdTar(z.src)
 	file, err := os.Open(z.src)
 	if err != nil {
 		return err
@@ -295,7 +296,7 @@ loop:
 			continue
 		}
 
-		target, err := safeTarTarget(dest, header.Name)
+		target, err := safeTarTarget(dest, header.Name, rootFolderInTar)
 		if err != nil {
 			return err
 		}
@@ -338,7 +339,48 @@ loop:
 	return nil
 }
 
-func safeTarTarget(dest string, name string) (string, error) {
+func findRootFolderInZstdTar(tarFilePath string) string {
+	file, err := os.Open(tarFilePath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	zr, err := zstd.NewReader(file)
+	if err != nil {
+		return ""
+	}
+	defer zr.Close()
+
+	tr := tar.NewReader(zr)
+	var firstElement string
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil || header == nil {
+			return ""
+		}
+
+		normalizedPath := strings.Trim(strings.ReplaceAll(header.Name, "\\", "/"), "/")
+		if normalizedPath == "" || strings.HasPrefix(normalizedPath, ".DS_Store") || strings.HasPrefix(normalizedPath, "__MACOSX") {
+			continue
+		}
+
+		currentFirstElement := strings.Split(normalizedPath, "/")[0]
+		if firstElement != "" && firstElement != currentFirstElement {
+			return ""
+		}
+		if firstElement == "" {
+			firstElement = currentFirstElement
+		}
+	}
+	return firstElement
+}
+
+func safeTarTarget(dest string, name string, rootFolderInTar string) (string, error) {
 	normalizedPath := strings.ReplaceAll(name, "\\", "/")
 	if strings.HasPrefix(normalizedPath, "/") {
 		return "", fmt.Errorf("archive entry %q is outside destination", name)
@@ -349,7 +391,7 @@ func safeTarTarget(dest string, name string) (string, error) {
 	}
 
 	parts := strings.Split(normalizedPath, "/")
-	if len(parts) > 1 {
+	if len(parts) > 1 && rootFolderInTar != "" && parts[0] == rootFolderInTar {
 		parts = parts[1:]
 	}
 	fname := filepath.Clean(strings.Join(parts, "/"))

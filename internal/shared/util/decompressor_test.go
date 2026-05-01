@@ -75,6 +75,28 @@ func TestZstdTarDecompressor(t *testing.T) {
 	}
 }
 
+func TestZstdTarDecompressorStripsCommonRootFolder(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.zst")
+	dest := filepath.Join(tempDir, "dest")
+	body := "Hello from root!"
+
+	writeZstdTar(t, archivePath, "root/test.txt", body)
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(decompressedFile)) != body {
+		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
+	}
+}
+
 func TestZstdTarDecompressorRejectsPathTraversal(t *testing.T) {
 	tempDir := t.TempDir()
 	archivePath := filepath.Join(tempDir, "test.tar.zst")
@@ -106,9 +128,10 @@ func writeZstdTar(t *testing.T, archivePath string, name string, body string) {
 	tw := tar.NewWriter(zw)
 
 	err = tw.WriteHeader(&tar.Header{
-		Name: name,
-		Mode: 0600,
-		Size: int64(len(body)),
+		Name:     name,
+		Mode:     0600,
+		Size:     int64(len(body)),
+		Typeflag: tar.TypeReg,
 	})
 	if err != nil {
 		t.Fatal(err)
