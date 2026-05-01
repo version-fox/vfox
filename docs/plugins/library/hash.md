@@ -2,6 +2,8 @@
 
 The `hash` library calculates file digests and verifies downloaded files in Lua plugins.
 
+Prefer SHA-256 or SHA-512 for new integrations. MD5 and SHA-1 are supported only for compatibility with upstream sources that do not publish stronger checksums.
+
 **Usage**
 
 ```lua
