@@ -4,6 +4,8 @@
 例如：
 
 **Usage**
+
+```lua
 local archiver = require("vfox.archiver")
 local err = archiver.decompress("testdata/test.zip", "testdata/test")
 ```
