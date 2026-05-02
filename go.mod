@@ -9,6 +9,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/bodgit/sevenzip v1.5.1
+	github.com/klauspost/compress v1.17.7
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/pterm/pterm v0.12.79
 	github.com/schollz/progressbar/v3 v3.14.2
@@ -36,7 +37,6 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
