@@ -113,6 +113,23 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
+## Gitignore 设置 <Badge type="tip" text=">= 1.0.10" vertical="middle" />
+
+当你执行 `vfox use <sdk>@<version> -p` (项目作用域) 时, `vfox` 会在项目根目录创建 `.vfox/` 目录, 并且默认会向项目已有的 `.gitignore` 中追加一行 `.vfox/` (如果项目没有 `.gitignore`, 则不会自动创建)。
+
+如果你是通过 [全局 gitignore](https://git-scm.com/docs/gitignore) (`core.excludesfile`) 来管理 `.vfox/`, 不希望 `vfox` 修改项目的 `.gitignore`, 可以关闭此行为:
+
+```yaml
+gitignore:
+  enable: true # 设置为 false 可关闭自动更新 .gitignore
+```
+
+通过命令关闭:
+
+```shell
+vfox config gitignore.enable false
+```
+
 ## Config 命令 
 
 设置，查看配置

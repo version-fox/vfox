@@ -596,13 +596,15 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 		}
 
 		// Add .vfox/ to .gitignore if needed
-		added, err := ensureVfoxInGitignore(b.envContext.PathMeta.Working.Directory)
-		if err != nil {
-			logger.Debugf("Failed to update .gitignore: %v\n", err)
-		}
-		if added {
-			pterm.Printf("Added '.vfox/' to .gitignore\n")
-			logger.Debugf("Added .vfox/ to .gitignore\n")
+		if b.envContext.UserConfig.Gitignore.Enable {
+			added, err := ensureVfoxInGitignore(b.envContext.PathMeta.Working.Directory)
+			if err != nil {
+				logger.Debugf("Failed to update .gitignore: %v\n", err)
+			}
+			if added {
+				pterm.Printf("Added '.vfox/' to .gitignore\n")
+				logger.Debugf("Added .vfox/ to .gitignore\n")
+			}
 		}
 	}
 

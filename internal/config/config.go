@@ -31,6 +31,7 @@ type Config struct {
 	Registry          *Registry          `yaml:"registry"`
 	LegacyVersionFile *LegacyVersionFile `yaml:"legacyVersionFile"`
 	Cache             *Cache             `yaml:"cache"`
+	Gitignore         *Gitignore         `yaml:"gitignore"`
 }
 
 const filename = "config.yaml"
@@ -42,6 +43,7 @@ var (
 		Registry:          EmptyRegistry,
 		LegacyVersionFile: EmptyLegacyVersionFile,
 		Cache:             EmptyCache,
+		Gitignore:         EmptyGitignore,
 	}
 )
 
@@ -77,6 +79,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Cache == nil {
 		config.Cache = EmptyCache
+	}
+	if config.Gitignore == nil {
+		config.Gitignore = EmptyGitignore
 	}
 	return config, nil
 
@@ -128,6 +133,9 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 	// Merge Cache: user overrides shared
 	result.Cache = mergeCache(sharedConfig.Cache, userConfig.Cache)
 
+	// Merge Gitignore: user overrides shared
+	result.Gitignore = mergeGitignore(sharedConfig.Gitignore, userConfig.Gitignore)
+
 	// Apply defaults to any remaining nil fields
 	return ensureDefaults(result)
 }
@@ -151,6 +159,9 @@ func ensureDefaults(c *Config) *Config {
 	}
 	if c.Cache == nil {
 		c.Cache = EmptyCache
+	}
+	if c.Gitignore == nil {
+		c.Gitignore = EmptyGitignore
 	}
 	return c
 }
@@ -219,6 +230,19 @@ func mergeCache(shared, user *Cache) *Cache {
 	}
 	// User has a non-default cache setting, or both are default
 	return user
+}
+
+// mergeGitignore merges gitignore configs with user taking precedence.
+// If user config is non-nil, it is used as-is (so users can explicitly
+// disable the auto-update by setting enable: false).
+func mergeGitignore(shared, user *Gitignore) *Gitignore {
+	if user != nil {
+		return user
+	}
+	if shared != nil {
+		return shared
+	}
+	return EmptyGitignore
 }
 
 // Helper functions to check if config is empty

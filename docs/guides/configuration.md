@@ -116,6 +116,23 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
+## Gitignore Settings <Badge type="tip" text=">= 1.0.10" vertical="middle" />
+
+When you run `vfox use <sdk>@<version> -p` (project scope), `vfox` creates a `.vfox/` directory at the project root and, by default, appends `.vfox/` to the project's existing `.gitignore` (it will not create a new `.gitignore` if one is absent).
+
+If you manage `.vfox/` through a [global gitignore](https://git-scm.com/docs/gitignore) (`core.excludesfile`) and prefer that `vfox` not touch the project's `.gitignore`, you can disable this behavior:
+
+```yaml
+gitignore:
+  enable: true # set to false to disable auto-updating .gitignore
+```
+
+To disable via command:
+
+```shell
+vfox config gitignore.enable false
+```
+
 ## Config Command
 
 Setup, view config
