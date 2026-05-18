@@ -116,7 +116,7 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
-## Gitignore Settings <Badge type="tip" text=">= 1.0.10" vertical="middle" />
+## Gitignore Settings <Badge type="tip" text=">= 1.0.12" vertical="middle" />
 
 When you run `vfox use <sdk>@<version> -p` (project scope), `vfox` creates a `.vfox/` directory at the project root and, by default, appends `.vfox/` to the project's existing `.gitignore` (it will not create a new `.gitignore` if one is absent).
 

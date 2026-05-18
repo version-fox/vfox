@@ -113,7 +113,7 @@ cache:
 `$HOME/.version-fox/plugins/<plugin-name>/available.cache`
 :::
 
-## Gitignore 设置 <Badge type="tip" text=">= 1.0.10" vertical="middle" />
+## Gitignore 设置 <Badge type="tip" text=">= 1.0.12" vertical="middle" />
 
 当你执行 `vfox use <sdk>@<version> -p` (项目作用域) 时, `vfox` 会在项目根目录创建 `.vfox/` 目录, 并且默认会向项目已有的 `.gitignore` 中追加一行 `.vfox/` (如果项目没有 `.gitignore`, 则不会自动创建)。
 
