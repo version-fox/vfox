@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/ulikunitz/xz"
 )
 
 func TestNewDecompressor(t *testing.T) {
@@ -45,6 +46,11 @@ func TestNewDecompressor(t *testing.T) {
 	tzstDecompressor := NewDecompressor("test.tzst")
 	if _, ok := tzstDecompressor.(*ZstdTarDecompressor); !ok {
 		t.Errorf("Expected ZstdTarDecompressor, got %T", tzstDecompressor)
+	}
+
+	xzTarDecompressor := NewDecompressor("test.tar.xz")
+	if _, ok := xzTarDecompressor.(*XZTarDecompressor); !ok {
+		t.Errorf("Expected XZTarDecompressor, got %T", xzTarDecompressor)
 	}
 
 	unknownDecompressor := NewDecompressor("test.unknown")
@@ -143,6 +149,151 @@ func writeZstdTar(t *testing.T, archivePath string, name string, body string) {
 		t.Fatal(err)
 	}
 	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestXZTarDecompressor(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.xz")
+	dest := filepath.Join(tempDir, "dest")
+	body := "Hello, xz!"
+
+	writeXzTar(t, archivePath, "test.txt", body)
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(decompressedFile)) != body {
+		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
+	}
+}
+
+func TestXZTarDecompressorStripsCommonRootFolder(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.xz")
+	dest := filepath.Join(tempDir, "dest")
+	body := "Hello from root!"
+
+	writeXzTar(t, archivePath, "root/test.txt", body)
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	decompressedFile, err := os.ReadFile(filepath.Join(dest, "test.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(decompressedFile)) != body {
+		t.Errorf("Expected %q, got %q", body, string(decompressedFile))
+	}
+}
+
+func TestXZTarDecompressorMultipleFiles(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.xz")
+	dest := filepath.Join(tempDir, "dest")
+
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	xw, err := xz.NewWriter(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tw := tar.NewWriter(xw)
+
+	files := []struct {
+		Name, Body string
+	}{
+		{"root/a.txt", "content-a"},
+		{"root/b.txt", "content-b"},
+		{"root/sub/c.txt", "content-c"},
+	}
+	for _, f := range files {
+		err = tw.WriteHeader(&tar.Header{
+			Name:     f.Name,
+			Mode:     0600,
+			Size:     int64(len(f.Body)),
+			Typeflag: tar.TypeReg,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(f.Body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := xw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err != nil {
+		t.Fatalf("Failed to decompress: %v", err)
+	}
+
+	for _, f := range files {
+		// root/ prefix is stripped by decompressor
+		stripped := strings.TrimPrefix(f.Name, "root/")
+		content, err := os.ReadFile(filepath.Join(dest, stripped))
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", stripped, err)
+		}
+		if string(content) != f.Body {
+			t.Errorf("File %s: expected %q, got %q", stripped, f.Body, string(content))
+		}
+	}
+}
+
+func writeXzTar(t *testing.T, archivePath string, name string, body string) {
+	t.Helper()
+
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xw, err := xz.NewWriter(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tw := tar.NewWriter(xw)
+
+	err = tw.WriteHeader(&tar.Header{
+		Name:     name,
+		Mode:     0600,
+		Size:     int64(len(body)),
+		Typeflag: tar.TypeReg,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte(body)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := xw.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := file.Close(); err != nil {

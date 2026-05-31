@@ -19,6 +19,7 @@ package util
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
@@ -127,12 +128,12 @@ func (g *XZTarDecompressor) Decompress(dest string) error {
 		return err
 	}
 	defer file.Close()
-	gzr, err := xz.NewReader(file)
+	xzr, err := xz.NewReader(bufio.NewReader(file))
 	if err != nil {
 		return err
 	}
 
-	tr := tar.NewReader(gzr)
+	tr := tar.NewReader(xzr)
 	var symlinks []symlink
 loop:
 	for {
