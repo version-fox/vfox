@@ -17,25 +17,24 @@
 package module
 
 import (
+	"testing"
+
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/file"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/html"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/json"
-	"github.com/version-fox/vfox/internal/plugin/luai/module/string"
 	lua "github.com/yuin/gopher-lua"
 )
 
-type PreloadOptions struct {
-	Config *config.Config
-}
+func TestPreloadIncludesFileModule(t *testing.T) {
+	L := lua.NewState()
+	defer L.Close()
 
-func Preload(L *lua.LState, options *PreloadOptions) {
-	http.Preload(L, options.Config.Proxy)
-	json.Preload(L)
-	html.Preload(L)
-	string.Preload(L)
-	archiver.Preload(L)
-	file.Preload(L, "")
+	Preload(L, &PreloadOptions{Config: config.DefaultConfig})
+	if err := L.DoString(`
+		local file = require("file")
+		assert(type(file.copy) == "function")
+		assert(type(file.remove) == "function")
+		assert(type(file.move) == "function")
+		assert(type(file.symlink) == "function")
+	`); err != nil {
+		t.Fatal(err)
+	}
 }

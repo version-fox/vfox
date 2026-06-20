@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package html
+package file
 
 import (
 	"os"
@@ -23,27 +23,71 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const luaFileTypeName = "file_operation"
-
 type FileOperation struct {
 	rootPath string
+}
+
+func (f *FileOperation) path(path string) string {
+	return filepath.Join(f.rootPath, path)
+}
+
+func raiseOnError(L *lua.LState, err error) {
+	if err != nil {
+		L.RaiseError("%s", err.Error())
+	}
+}
+
+func returnTrue(L *lua.LState) int {
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (f *FileOperation) copy(L *lua.LState) int {
+	src := L.CheckString(1)
+	dest := L.CheckString(2)
+	info, err := os.Stat(f.path(src))
+	raiseOnError(L, err)
+	if info.IsDir() {
+		raiseOnError(L, os.CopyFS(f.path(dest), os.DirFS(f.path(src))))
+		return returnTrue(L)
+	}
+	content, err := os.ReadFile(f.path(src))
+	raiseOnError(L, err)
+	raiseOnError(L, os.WriteFile(f.path(dest), content, info.Mode().Perm()))
+	return returnTrue(L)
+}
+
+func (f *FileOperation) remove(L *lua.LState) int {
+	path := L.CheckString(1)
+	info, err := os.Lstat(f.path(path))
+	raiseOnError(L, err)
+	if info.IsDir() {
+		raiseOnError(L, os.RemoveAll(f.path(path)))
+	} else {
+		raiseOnError(L, os.Remove(f.path(path)))
+	}
+	return returnTrue(L)
+}
+
+func (f *FileOperation) move(L *lua.LState) int {
+	src := L.CheckString(1)
+	dest := L.CheckString(2)
+	raiseOnError(L, os.Rename(f.path(src), f.path(dest)))
+	return returnTrue(L)
 }
 
 func (f *FileOperation) symlink(L *lua.LState) int {
 	src := L.CheckString(1)
 	dest := L.CheckString(2)
-	// TODO check
-	err := os.Symlink(filepath.Join(f.rootPath, src), filepath.Join(f.rootPath, dest))
-	if err != nil {
-		L.RaiseError("%s", err.Error())
-		return 0
-	}
-	L.Push(lua.LTrue)
-	return 1
+	raiseOnError(L, os.Symlink(f.path(src), f.path(dest)))
+	return returnTrue(L)
 }
 
 func (f *FileOperation) luaMap() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
+		"copy":    f.copy,
+		"remove":  f.remove,
+		"move":    f.move,
 		"symlink": f.symlink,
 	}
 }
