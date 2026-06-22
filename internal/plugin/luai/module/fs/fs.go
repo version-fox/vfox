@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package file
+package fs
 
 import (
 	"os"
@@ -23,11 +23,11 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type FileOperation struct {
+type Operation struct {
 	rootPath string
 }
 
-func (f *FileOperation) path(path string) string {
+func (f *Operation) path(path string) string {
 	return filepath.Join(f.rootPath, path)
 }
 
@@ -42,7 +42,7 @@ func returnTrue(L *lua.LState) int {
 	return 1
 }
 
-func (f *FileOperation) copy(L *lua.LState) int {
+func (f *Operation) copy(L *lua.LState) int {
 	src := L.CheckString(1)
 	dest := L.CheckString(2)
 	info, err := os.Stat(f.path(src))
@@ -57,7 +57,7 @@ func (f *FileOperation) copy(L *lua.LState) int {
 	return returnTrue(L)
 }
 
-func (f *FileOperation) remove(L *lua.LState) int {
+func (f *Operation) remove(L *lua.LState) int {
 	path := L.CheckString(1)
 	info, err := os.Lstat(f.path(path))
 	raiseOnError(L, err)
@@ -69,21 +69,26 @@ func (f *FileOperation) remove(L *lua.LState) int {
 	return returnTrue(L)
 }
 
-func (f *FileOperation) move(L *lua.LState) int {
+func (f *Operation) move(L *lua.LState) int {
 	src := L.CheckString(1)
 	dest := L.CheckString(2)
-	raiseOnError(L, os.Rename(f.path(src), f.path(dest)))
+	srcPath := f.path(src)
+	destPath := f.path(dest)
+	if info, err := os.Stat(destPath); err == nil && info.IsDir() {
+		destPath = filepath.Join(destPath, filepath.Base(srcPath))
+	}
+	raiseOnError(L, os.Rename(srcPath, destPath))
 	return returnTrue(L)
 }
 
-func (f *FileOperation) symlink(L *lua.LState) int {
+func (f *Operation) symlink(L *lua.LState) int {
 	src := L.CheckString(1)
 	dest := L.CheckString(2)
 	raiseOnError(L, os.Symlink(f.path(src), f.path(dest)))
 	return returnTrue(L)
 }
 
-func (f *FileOperation) luaMap() map[string]lua.LGFunction {
+func (f *Operation) luaMap() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"copy":    f.copy,
 		"remove":  f.remove,
@@ -92,7 +97,7 @@ func (f *FileOperation) luaMap() map[string]lua.LGFunction {
 	}
 }
 
-func (f *FileOperation) loader(L *lua.LState) int {
+func (f *Operation) loader(L *lua.LState) int {
 	t := L.NewTable()
 	L.SetFuncs(t, f.luaMap())
 	L.Push(t)
@@ -100,6 +105,6 @@ func (f *FileOperation) loader(L *lua.LState) int {
 }
 
 func Preload(L *lua.LState, rootPath string) {
-	operation := &FileOperation{rootPath: rootPath}
-	L.PreloadModule("file", operation.loader)
+	operation := &Operation{rootPath: rootPath}
+	L.PreloadModule("fs", operation.loader)
 }

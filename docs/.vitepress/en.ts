@@ -82,7 +82,7 @@ function sidebar(): DefaultTheme.Sidebar {
                         {text: 'json', link: '/plugins/library/json'},
                         {text: 'strings', link: '/plugins/library/strings'},
                         {text: 'archiver', link: '/plugins/library/archiver'},
-                        {text: 'file', link: '/plugins/library/file'},
+                        {text: 'fs', link: '/plugins/library/fs'},
                     ]
                 },
 

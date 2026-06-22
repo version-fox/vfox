@@ -29,11 +29,11 @@ func TestPreloadIncludesFileModule(t *testing.T) {
 
 	Preload(L, &PreloadOptions{Config: config.DefaultConfig})
 	if err := L.DoString(`
-		local file = require("file")
-		assert(type(file.copy) == "function")
-		assert(type(file.remove) == "function")
-		assert(type(file.move) == "function")
-		assert(type(file.symlink) == "function")
+		local fs = require("fs")
+		assert(type(fs.copy) == "function")
+		assert(type(fs.remove) == "function")
+		assert(type(fs.move) == "function")
+		assert(type(fs.symlink) == "function")
 	`); err != nil {
 		t.Fatal(err)
 	}
