@@ -264,6 +264,22 @@ func TestXZTarDecompressorMultipleFiles(t *testing.T) {
 	}
 }
 
+func TestXZTarDecompressorRejectsPathTraversal(t *testing.T) {
+	tempDir := t.TempDir()
+	archivePath := filepath.Join(tempDir, "test.tar.xz")
+	dest := filepath.Join(tempDir, "dest")
+
+	writeXzTar(t, archivePath, "root/../../evil.txt", "evil")
+
+	decompressor := NewDecompressor(archivePath)
+	if err := decompressor.Decompress(dest); err == nil {
+		t.Fatal("Expected path traversal archive entry to fail")
+	}
+	if _, err := os.Stat(filepath.Join(tempDir, "evil.txt")); !os.IsNotExist(err) {
+		t.Fatalf("Expected no file outside destination, got err %v", err)
+	}
+}
+
 func writeXzTar(t *testing.T, archivePath string, name string, body string) {
 	t.Helper()
 
