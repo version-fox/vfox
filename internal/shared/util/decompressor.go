@@ -81,6 +81,9 @@ loop:
 		fname := strings.Join(parts, "/")
 
 		target := filepath.Join(dest, fname)
+		if err := ensureWithinDest(dest, target); err != nil {
+			return err
+		}
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
@@ -156,6 +159,9 @@ loop:
 		fname := strings.Join(parts, "/")
 
 		target := filepath.Join(dest, fname)
+		if err := ensureWithinDest(dest, target); err != nil {
+			return err
+		}
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
@@ -227,6 +233,9 @@ loop:
 		}
 		fname := strings.Join(parts, "/")
 		target := filepath.Join(dest, fname)
+		if err := ensureWithinDest(dest, target); err != nil {
+			return err
+		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -384,6 +393,22 @@ func findRootFolderInZstdTar(tarFilePath string) string {
 	return firstElement
 }
 
+// ensureWithinDest verifies that target does not escape dest via ".." path
+// components, guarding against archive path traversal (Zip Slip).
+func ensureWithinDest(dest, target string) error {
+	rel, err := filepath.Rel(dest, target)
+	if err != nil {
+		// filepath.Rel fails when the paths share no common base (for
+		// example different volumes or UNC paths on Windows). Treat that as
+		// an escape rather than leaking the low-level error to the caller.
+		return fmt.Errorf("archive entry %q is outside destination", target)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("archive entry %q is outside destination", target)
+	}
+	return nil
+}
+
 func safeZstdTarTarget(dest string, name string, rootFolderInTar string) (string, error) {
 	normalizedPath := strings.ReplaceAll(name, "\\", "/")
 	if strings.HasPrefix(normalizedPath, "/") {
@@ -493,6 +518,9 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 	fname := strings.Join(parts, "/")
 
 	fpath := filepath.Join(dest, fname)
+	if err := ensureWithinDest(dest, fpath); err != nil {
+		return err
+	}
 	if f.FileInfo().IsDir() || isDir(fname) {
 		err := os.MkdirAll(fpath, os.ModePerm)
 		if err != nil {
@@ -625,6 +653,9 @@ func (s *SevenZipDecompressor) extractFile(f *sevenzip.File, dest string, rootFo
 	fname := strings.Join(parts, "/")
 
 	fpath := filepath.Join(dest, fname)
+	if err := ensureWithinDest(dest, fpath); err != nil {
+		return err
+	}
 	if f.FileInfo().IsDir() || isDir(fname) {
 		err := os.MkdirAll(fpath, os.ModePerm)
 		if err != nil {
