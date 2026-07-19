@@ -398,7 +398,10 @@ func findRootFolderInZstdTar(tarFilePath string) string {
 func ensureWithinDest(dest, target string) error {
 	rel, err := filepath.Rel(dest, target)
 	if err != nil {
-		return err
+		// filepath.Rel fails when the paths share no common base (for
+		// example different volumes or UNC paths on Windows). Treat that as
+		// an escape rather than leaking the low-level error to the caller.
+		return fmt.Errorf("archive entry %q is outside destination", target)
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return fmt.Errorf("archive entry %q is outside destination", target)

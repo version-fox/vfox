@@ -436,3 +436,20 @@ func writeXzTar(t *testing.T, archivePath string, name string, body string) {
 //		}
 //	}
 //}
+
+func TestEnsureWithinDestWrapsRelError(t *testing.T) {
+	// filepath.Rel fails when target cannot be made relative to dest (for
+	// example an absolute target against a relative dest, or different
+	// volumes on Windows). ensureWithinDest must return the consistent
+	// "outside destination" error instead of leaking the low-level Rel error.
+	err := ensureWithinDest("relative/dest", "/abs/target")
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "outside destination") {
+		t.Errorf("expected an outside destination error, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "Rel:") {
+		t.Errorf("raw filepath.Rel error leaked to caller: %v", err)
+	}
+}
