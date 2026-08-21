@@ -26,6 +26,21 @@ winget install vfox
 前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的 `setup` 安装器，然后按照安装向导进行安装。
 
 </TabItem>
+<TabItem label="MSIX 安装包">
+
+前往 [Releases](https://github.com/version-fox/vfox/releases) 页面下载最新版本的 `.msixbundle` 安装包，然后通过[应用安装程序](https://learn.microsoft.com/windows/msix/app-installer/installing-apps-pkg)或 PowerShell 进行安装：
+
+```powershell
+Add-AppxPackage -Path .\vfox_<version>_windows.msixbundle
+```
+
+安装包会为 `vfox.exe` 注册[应用执行别名](https://learn.microsoft.com/windows/apps/desktop/modernize/desktop-to-uwp-extensions)，因此安装完成后 `vfox` 命令即可直接使用，无需手动配置 PATH。要求 Windows 10（1809+）或 Windows Server 2025 及以上版本。
+
+::: warning ⚠️ 关于未签名包
+目前发布的 `.msixbundle` 安装包是未签名的，Windows 会拒绝安装未签名包。请先使用自己的证书对安装包重新签名，详细步骤参见 [MSIX 安装包](./msix.md)。
+:::
+
+</TabItem>
 </Tabs>
 
 ### Unix-like

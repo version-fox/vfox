@@ -112,6 +112,15 @@ func downloadFile(c *http.Client, filepath string, url string) error {
 }
 
 func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
+	}
+	// An MSIX-installed vfox lives in the read-only WindowsApps directory;
+	// self-upgrading cannot replace the binary there.
+	if runtime.GOOS == "windows" && strings.Contains(strings.ToLower(exePath), `\windowsapps\`) {
+		return cli.Exit("vfox was installed as an MSIX package and cannot self-upgrade. Install a newer .msixbundle to upgrade.", 1)
+	}
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return err
@@ -131,10 +140,6 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	if err = RequestPermission(); err != nil {
 		return err
-	}
-	exePath, err := os.Executable()
-	if err != nil {
-		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
 	}
 	exeDir, exeName := filepath.Split(exePath)
 	binURL, diffURL := generateUrls(currVersion, latestVersion)
