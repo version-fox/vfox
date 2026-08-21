@@ -25,7 +25,7 @@ Windows refuses to install unsigned packages. Re-sign the bundle with your own c
 
 The build cannot perform signing on behalf of users. At install time Windows verifies the signer against certificates trusted on the target machine, so a certificate generated during packaging is treated the same as no signature at all. In addition, MSIX requires an upgrade package to be signed with the same certificate as the installed one; per-build certificates would therefore break upgrades. Signing with a long-lived certificate of your own is a one-time operation: once the certificate is trusted, subsequent versions install without extra steps.
 
-First create a self-signed code-signing certificate whose subject matches the package publisher (`CN=VersionFox`) and import it into the trusted store:
+First create a self-signed code-signing certificate whose subject matches the package publisher (`CN=VersionFox`) and import it into the trusted store. Importing into `Cert:\LocalMachine\TrustedPeople` requires an elevated (administrator) PowerShell session:
 
 ```powershell
 $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=VersionFox" `
@@ -72,4 +72,4 @@ Local packaging requires Windows, the [Windows SDK](https://developer.microsoft.
 ./packaging/msix/make-msix.ps1 -Version 1.2.3
 ```
 
-Artifacts are written to `packaging/msix/Output/`; `assets/`, `staging/` and `build/` are scratch directories and gitignored. Prerelease suffixes are normalized to four-part versions (`1.2.3-rc1` → `1.2.3.0`).
+Artifacts are written to `packaging/msix/Output/`; `assets/`, `staging/` and `build/` are scratch directories and gitignored. Only stable versions without prerelease or build metadata are supported; they are normalized to four-part versions (`1.2.3` → `1.2.3.0`).

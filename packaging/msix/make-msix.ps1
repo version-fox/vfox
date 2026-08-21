@@ -27,9 +27,9 @@
     with SignTool; the certificate subject must exactly match -Publisher.
 
 .PARAMETER Version
-    vfox version to encode in the manifest, e.g. "1.2.3" or "1.2.3-rc1".
-    Prerelease suffixes are stripped and normalized to a four-part MSIX
-    version (1.2.3 -> 1.2.3.0).
+    Stable vfox version to encode in the manifest, e.g. "1.2.3". Prerelease
+    or build metadata segments are rejected; the value is normalized to a
+    four-part MSIX version (1.2.3 -> 1.2.3.0).
 
 .PARAMETER OutputDir / WorkDir
     Artifact and scratch directories. Default to <script>/Output and <script>/staging.
@@ -73,8 +73,12 @@ function Assert-NativeSuccess {
 function ConvertTo-MsixVersion {
     param([string]$Raw)
 
-    # Strip leading 'v', prerelease (-rc1) and metadata (+build) segments.
-    $core = ($Raw -replace '^[vV]', '') -split '[-+]' | Select-Object -First 1
+    # Strip a leading 'v'. Prerelease (-rc1) and metadata (+build) segments
+    # cannot be represented in the four-part MSIX version and are rejected.
+    $core = $Raw -replace '^[vV]', ''
+    if ($core -match '[-+]') {
+        throw "Unsupported version '$Raw': MSIX packages require a stable version without prerelease or build metadata."
+    }
     $parts = @($core -split '\.' | ForEach-Object { [int]$_ })
     if ($parts.Count -gt 3) {
         throw "Unsupported version '$Raw': at most three numeric segments are expected"
@@ -134,7 +138,7 @@ function Invoke-SourceBuild {
             $env:GOOS = "windows"
             $env:GOARCH = $a.GoArch
             $env:CGO_ENABLED = "0"
-            go build -trimpath -ldflags "-s -w -X main.version=$Version" -o (Join-Path $outDir "vfox.exe") .
+            go build -trimpath -ldflags "-s -w -X github.com/version-fox/vfox/internal.RuntimeVersion=$Version" -o (Join-Path $outDir "vfox.exe") .
             Assert-NativeSuccess -Step "go build ($($a.GoArch))"
             Write-Host "Built $($a.Name): $(Join-Path $outDir 'vfox.exe')"
         }
@@ -193,7 +197,9 @@ foreach ($entry in $selected) {
     $manifest = $manifestTemplate
     $manifest = $manifest.Replace("@@VERSION@@", $msixVersion)
     $manifest = $manifest.Replace("@@ARCHITECTURE@@", $arch)
-    $manifest = $manifest.Replace("@@PUBLISHER@@", $Publisher)
+    # Escape XML entities: the publisher comes from a certificate subject and
+    # may contain &, <, > or quotes.
+    $manifest = $manifest.Replace("@@PUBLISHER@@", [System.Security.SecurityElement]::Escape($Publisher))
     Set-Content -Path (Join-Path $stage "AppxManifest.xml") -Value $manifest -Encoding UTF8 -NoNewline
 
     $packagePath = Join-Path $OutputDir ("vfox_{0}_windows_{1}.msix" -f $Version, $arch)

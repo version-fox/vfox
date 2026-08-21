@@ -16,4 +16,6 @@
 
 package internal
 
-const RuntimeVersion = "1.0.11"
+// RuntimeVersion is overridden at link time by the release and packaging
+// pipelines (-X github.com/version-fox/vfox/internal.RuntimeVersion=<version>).
+var RuntimeVersion = "1.0.11"

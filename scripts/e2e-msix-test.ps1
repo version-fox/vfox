@@ -45,6 +45,7 @@ $RepoRoot = Split-Path $PSScriptRoot -Parent
 $TestVersion = "9.9.9"
 $PfxPassword = "vfox-e2e-password"
 $PublisherSubject = "CN=VersionFox"
+$PackageIdentityName = "VersionFox.vfox"
 
 $TEST_COUNT = 0
 $PASSED = 0
@@ -52,6 +53,7 @@ $FAILED = 0
 
 $InstalledPackage = $null
 $E2ECert = $null
+$pfxPath = $null
 
 function Write-Banner {
     param([string]$Title, [ConsoleColor]$Color = [ConsoleColor]::White)
@@ -101,6 +103,12 @@ try {
     # Export-PfxCertificate requires the target directory to exist.
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 
+    # Fail fast instead of clobbering an existing installation: cleanup only
+    # removes what this run installs.
+    if ($null -ne (Get-AppxPackage -Name $PackageIdentityName -ErrorAction SilentlyContinue)) {
+        throw "A package with identity '$PackageIdentityName' is already installed. Uninstall it first to avoid clobbering your installation."
+    }
+
     # ------------------------------------------------------------------
     # Step 1: Create ephemeral code-signing certificate
     # ------------------------------------------------------------------
@@ -114,7 +122,10 @@ try {
         -NotAfter (Get-Date).AddDays(3) `
         -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
 
-    $pfxPath = Join-Path $OutputDir "vfox-e2e.pfx"
+    # Keep the PFX (private key) outside of $OutputDir: that directory is
+    # uploaded as a CI artifact and must never contain signing material.
+    $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+    $pfxPath = Join-Path $tempRoot "vfox-e2e-$PID.pfx"
     $securePassword = ConvertTo-SecureString -String $PfxPassword -Force -AsPlainText
     Export-PfxCertificate -Cert $E2ECert -FilePath $pfxPath -Password $securePassword | Out-Null
     Write-Host "Certificate created: $($E2ECert.Thumbprint)" -ForegroundColor Green
@@ -153,7 +164,7 @@ try {
     Write-Host "Certificate imported into TrustedPeople"
 
     Add-AppxPackage -Path $bundlePath
-    $InstalledPackage = Get-AppxPackage -Name "*vfox*"
+    $InstalledPackage = Get-AppxPackage -Name $PackageIdentityName
     if ($null -eq $InstalledPackage) {
         throw "Package was not registered after Add-AppxPackage"
     }
@@ -179,7 +190,7 @@ try {
 
     Run-Test "Package registered with normalized version" `
         {
-            $pkg = Get-AppxPackage -Name "*vfox*"
+            $pkg = Get-AppxPackage -Name $PackageIdentityName
             if ($null -eq $pkg) { "PACKAGE_NOT_FOUND" }
             elseif ($pkg.Version -eq "$TestVersion.0" -and $pkg.Publisher -eq $PublisherSubject) {
                 "VERSION_OK"
@@ -239,15 +250,15 @@ try {
 
     Run-Test "Uninstall removes the package and alias" `
         {
-            $pkg = Get-AppxPackage -Name "*vfox*"
+            $pkg = Get-AppxPackage -Name $PackageIdentityName
             if ($null -eq $pkg) { return "PACKAGE_NOT_FOUND_BEFORE_UNINSTALL" }
             Remove-AppxPackage -Package $pkg.PackageFullName
             $script:InstalledPackage = $null
             $deadline = (Get-Date).AddSeconds(30)
-            while ((Get-AppxPackage -Name "*vfox*") -and (Get-Date) -lt $deadline) {
+            while ((Get-AppxPackage -Name $PackageIdentityName) -and (Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 500
             }
-            if ((Get-AppxPackage -Name "*vfox*")) { return "PACKAGE_STILL_REGISTERED" }
+            if ((Get-AppxPackage -Name $PackageIdentityName)) { return "PACKAGE_STILL_REGISTERED" }
             if (Test-Path $aliasPath) { return "ALIAS_STILL_EXISTS" }
             return "UNINSTALL_OK"
         } `
@@ -260,14 +271,19 @@ catch {
 finally {
     Write-Banner "Cleanup"
 
-    if ($null -ne (Get-AppxPackage -Name "*vfox*" -ErrorAction SilentlyContinue)) {
-        Get-AppxPackage -Name "*vfox*" | Remove-AppxPackage -ErrorAction SilentlyContinue
+    # Only remove the package installed by this run (exact identity), never
+    # an unrelated package that happens to match a wildcard.
+    if ($null -ne $InstalledPackage) {
+        Remove-AppxPackage -Package $InstalledPackage.PackageFullName -ErrorAction SilentlyContinue
         Write-Host "Removed leftover AppX package" -ForegroundColor Yellow
     }
     if ($null -ne $E2ECert) {
         Remove-Item -Path "Cert:\CurrentUser\My\$($E2ECert.Thumbprint)" -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "Cert:\LocalMachine\TrustedPeople\$($E2ECert.Thumbprint)" -Force -ErrorAction SilentlyContinue
         Write-Host "Removed ephemeral certificate" -ForegroundColor Yellow
+    }
+    if ($null -ne $pfxPath -and (Test-Path $pfxPath)) {
+        Remove-Item -Path $pfxPath -Force -ErrorAction SilentlyContinue
     }
 }
 

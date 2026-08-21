@@ -25,7 +25,7 @@ Windows 会拒绝安装未签名包。安装前请先使用自己的证书对安
 
 构建过程无法代替用户完成签名。Windows 在安装时校验签名证书是否属于目标机器信任的证书，打包阶段生成的临时证书与不签名效果相同；此外 MSIX 要求升级包与已安装包使用同一证书签名，每次构建使用不同证书会导致无法覆盖升级。因此应使用一张长期持有的证书完成签名：证书受信任后，后续版本均可直接安装。
 
-首次操作需创建一张主题与包发布者（`CN=VersionFox`）一致的自签名代码签名证书，并导入本机受信任存储：
+首次操作需创建一张主题与包发布者（`CN=VersionFox`）一致的自签名代码签名证书，并导入本机受信任存储。导入 `Cert:\LocalMachine\TrustedPeople` 需要以管理员身份运行 PowerShell：
 
 ```powershell
 $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=VersionFox" `
@@ -72,4 +72,4 @@ Get-AppxPackage *vfox* | Remove-AppxPackage
 ./packaging/msix/make-msix.ps1 -Version 1.2.3
 ```
 
-产物输出到 `packaging/msix/Output/`；`assets/`、`staging/`、`build/` 为临时目录，均已 gitignore。预发布后缀会归一化为四段版本号（`1.2.3-rc1` → `1.2.3.0`）。
+产物输出到 `packaging/msix/Output/`；`assets/`、`staging/`、`build/` 为临时目录，均已 gitignore。仅支持不含预发布或构建元数据后缀的正式版本，并会归一化为四段版本号（`1.2.3` → `1.2.3.0`）。
