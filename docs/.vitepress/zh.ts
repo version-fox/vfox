@@ -90,6 +90,7 @@ function sidebar(): DefaultTheme.Sidebar {
                         {text: 'json', link: '/zh-hans/plugins/library/json'},
                         {text: 'strings', link: '/zh-hans/plugins/library/strings'},
                         {text: 'archiver', link: '/zh-hans/plugins/library/archiver'},
+                        {text: 'fs', link: '/zh-hans/plugins/library/fs'},
                     ]
                 }, 
 

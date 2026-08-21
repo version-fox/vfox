@@ -14,29 +14,27 @@
  *    limitations under the License.
  */
 
-package html
+package module
 
 import (
 	"testing"
 
+	"github.com/version-fox/vfox/internal/config"
 	lua "github.com/yuin/gopher-lua"
 )
 
-func TestRequire(t *testing.T) {
-	const str = `	
-	local file = require("file")
-	assert(type(file) == "table")
-	assert(type(file.symlink) == "function")
-	`
-	evalLua(str, t)
-}
+func TestPreloadIncludesFileModule(t *testing.T) {
+	L := lua.NewState()
+	defer L.Close()
 
-func evalLua(str string, t *testing.T) {
-	s := lua.NewState()
-	defer s.Close()
-	Preload(s, "")
-	if err := s.DoString(str); err != nil {
-		t.Error(err)
+	Preload(L, &PreloadOptions{Config: config.DefaultConfig})
+	if err := L.DoString(`
+		local fs = require("fs")
+		assert(type(fs.copy) == "function")
+		assert(type(fs.remove) == "function")
+		assert(type(fs.move) == "function")
+		assert(type(fs.symlink) == "function")
+	`); err != nil {
+		t.Fatal(err)
 	}
-
 }
