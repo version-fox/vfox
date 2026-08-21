@@ -11,3 +11,11 @@ coverage.out
 
 .vfox
 .gocache
+
+# MSIX packaging artifacts
+packaging/msix/Output/
+packaging/msix/staging/
+packaging/msix/assets/
+packaging/msix/build/
+packaging/msix/signing.pfx
+/msix-e2e-out/
