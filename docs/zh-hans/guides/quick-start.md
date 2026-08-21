@@ -94,6 +94,16 @@ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | b
 curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user --version 0.5.6
 ```
 
+**使用镜像源安装**
+
+如果 GitHub 访问速度较慢或被限制，可以通过代理镜像下载安装脚本和 vfox 文件。将 `https://gh-proxy.org/` 替换为你可用的镜像地址：
+
+```shell
+curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --vfox-installer-github-base-url="https://gh-proxy.org/https://github.com"
+```
+
+注意：安装脚本本身也托管在 GitHub，因此 curl 需要通过镜像下载脚本；参数 `--vfox-installer-github-base-url` 则控制脚本执行后 vfox 二进制文件和 API 请求的下载地址。对于 gh-proxy 这类镜像，参数值应包含被代理的 GitHub 主机（例如 `https://gh-proxy.org/https://github.com`）。
+
 </TabItem>
 </Tabs>
 

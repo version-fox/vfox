@@ -94,6 +94,16 @@ curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | b
 curl -sSL https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --user --version 0.5.6
 ```
 
+**Install from a Mirror/Proxy**
+
+If GitHub access is slow or restricted, you can use a proxy/mirror to download both the install script and vfox binaries. Replace `https://gh-proxy.org/` with your available mirror URL:
+
+```shell
+curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/version-fox/vfox/main/install.sh | bash -s -- --vfox-installer-github-base-url="https://gh-proxy.org/https://github.com"
+```
+
+Note: the install script itself is also hosted on GitHub, so curl needs to go through the mirror to fetch it; the `--vfox-installer-github-base-url` flag then controls where vfox binaries and API requests are downloaded from. For gh-proxy style mirrors, the parameter value must include the proxied GitHub host (e.g. `https://gh-proxy.org/https://github.com`).
+
 </TabItem>
 </Tabs>
 

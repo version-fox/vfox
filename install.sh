@@ -4,6 +4,8 @@ main() {
   # Parse command-line arguments
   USER_INSTALL=false
   VERSION=""
+  GITHUB_BASE_URL="https://github.com"
+  GITHUB_API_URL="https://api.github.com"
   while [ $# -gt 0 ]; do
     case "$1" in
       --user)
@@ -26,9 +28,16 @@ main() {
         fi
         shift
         ;;
+      --vfox-installer-github-base-url=*)
+        GITHUB_BASE_URL="${1#--vfox-installer-github-base-url=}"
+        GITHUB_BASE_URL="${GITHUB_BASE_URL%/}"
+        GITHUB_API_URL="${GITHUB_BASE_URL//github.com/api.github.com}"
+        GITHUB_API_URL="${GITHUB_API_URL%/}"
+        shift
+        ;;
       *)
         echo "Unknown argument: $1"
-        echo "Usage: $0 [--user] [--version <version>]"
+        echo "Usage: $0 [--user] [--version <version>] [--vfox-installer-github-base-url=<url>]"
         exit 1
         ;;
     esac
@@ -70,9 +79,11 @@ main() {
   if command -v curl &> /dev/null
   then
     DOWNLOAD_CMD="curl -LO"
+    API_CMD="curl --silent"
   elif command -v wget &> /dev/null
   then
     DOWNLOAD_CMD="wget"
+    API_CMD="wget -qO-"
   else
     echo "Neither curl nor wget was found. Please install one of them and try again."
     exit 1
@@ -81,14 +92,14 @@ main() {
   # Get the version: use the user-specified one if provided, otherwise fetch latest
   if [ -n "$VERSION" ]; then
     if [ -n "${GITHUB_TOKEN}" ]; then
-      API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/tags/v${VERSION}")
+      API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/tags/v${VERSION}")
     else
-      API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/tags/v${VERSION}")
+      API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/tags/v${VERSION}")
     fi
   elif [ -n "${GITHUB_TOKEN}" ]; then
-    API_RESPONSE=$(curl --silent --header "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/version-fox/vfox/releases/latest")
+      API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
   else
-    API_RESPONSE=$(curl --silent "https://api.github.com/repos/version-fox/vfox/releases/latest")
+      API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
   fi
 
   # Check if the response contains an error message
@@ -101,7 +112,7 @@ main() {
   RESOLVED_VERSION=$(echo "$API_RESPONSE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c 2-)
   if [ -z "$RESOLVED_VERSION" ]; then
     if [ -n "$VERSION" ]; then
-      echo "Failed to find vfox version v${VERSION} on GitHub. Please verify the version exists at https://github.com/version-fox/vfox/releases."
+      echo "Failed to find vfox version v${VERSION} on GitHub. Please verify the version exists at ${GITHUB_BASE_URL}/version-fox/vfox/releases."
     else
       echo "Failed to get the latest version. Please check your network connection and try again."
     fi
@@ -127,8 +138,8 @@ main() {
   FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
   TAR_FILE="${FILENAME}.tar.gz"
 
-  echo https://github.com/version-fox/vfox/releases/download/v$VERSION/$TAR_FILE
-  $DOWNLOAD_CMD https://github.com/version-fox/vfox/releases/download/v$VERSION/$TAR_FILE
+  echo "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
+  $DOWNLOAD_CMD "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
 
 
   tar -zxvf $TAR_FILE
