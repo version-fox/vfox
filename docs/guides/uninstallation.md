@@ -131,6 +131,16 @@ winget uninstall vfox
 
 :::
 
+::: details MSIX Bundle
+
+```powershell
+Get-AppxPackage *vfox* | Remove-AppxPackage
+```
+
+Alternatively open **Settings** > **Apps** > **Installed apps**, select **vfox** and click **Uninstall**. Uninstalling also removes the `vfox` app execution alias.
+
+:::
+
 ::: details Manual Installation
 
 1. Delete the directory where you extracted vfox

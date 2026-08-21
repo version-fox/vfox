@@ -126,6 +126,7 @@ sdk.EnvKeysForScope(version, env.Project)
 | **Paths** | `internal/pathmeta/path_meta.go` |
 | **Environment** | `internal/env/env.go` (scope-aware merging) |
 | **Config** | `internal/config/config.go` |
+| **Windows MSIX packaging** | `packaging/msix/` (manifest template, `make-msix.ps1`, `gen-assets.ps1`; docs at `docs/guides/msix.md`; release via `compile-msix.yml`, e2e via `scripts/e2e-msix-test.ps1`) |
 
 ## KEY DEPENDENCIES
 - `github.com/urfave/cli/v3` - CLI framework

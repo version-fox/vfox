@@ -26,6 +26,21 @@ winget install vfox
 Go to the [Releases](https://github.com/version-fox/vfox/releases) page to download the latest version of the `setup` installer, then follow the installation wizard to install.
 
 </TabItem>
+<TabItem label="MSIX Bundle">
+
+Go to the [Releases](https://github.com/version-fox/vfox/releases) page to download the latest version of the `.msixbundle` package, then install it with [App Installer](https://learn.microsoft.com/windows/msix/app-installer/installing-apps-pkg) or PowerShell:
+
+```powershell
+Add-AppxPackage -Path .\vfox_<version>_windows.msixbundle
+```
+
+The package registers an [app execution alias](https://learn.microsoft.com/windows/apps/desktop/modernize/desktop-to-uwp-extensions) for `vfox.exe`, so the `vfox` command is available on PATH after installation without further configuration. Requires Windows 10 (1809+) or Windows Server 2025+.
+
+::: warning ⚠️ Unsigned Packages
+Release `.msixbundle` artifacts are currently unsigned, and Windows blocks installation of unsigned packages. Re-sign the bundle with your own certificate first; see [MSIX Bundle](./msix.md) for the detailed steps.
+:::
+
+</TabItem>
 </Tabs>
 
 ### Unix-like
