@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/urfave/cli/v3"
@@ -209,6 +210,12 @@ func envFlag(cmd *cli.Command) error {
 	}
 	var mu sync.Mutex
 
+	type sdkScopedEnvs struct {
+		scope env.UseScope
+		envs  *env.Envs
+	}
+	results := make(map[string]*sdkScopedEnvs, len(allTools))
+
 	// Process SDKs concurrently using errgroup
 	g, _ := errgroup.WithContext(context.Background())
 
@@ -252,9 +259,10 @@ func envFlag(cmd *cli.Command) error {
 				return nil // Continue processing other SDKs
 			}
 
-			// Collect envs by scope to ensure proper PATH priority (thread-safe)
+			// Collect the result per SDK; merging happens after g.Wait()
+			// in a deterministic order (thread-safe)
 			mu.Lock()
-			envsByScope[actualScope].Merge(sdkEnvs)
+			results[sdkName] = &sdkScopedEnvs{scope: actualScope, envs: sdkEnvs}
 			mu.Unlock()
 
 			return nil
@@ -264,6 +272,22 @@ func envFlag(cmd *cli.Command) error {
 	// Wait for all SDK processing to complete
 	if err := g.Wait(); err != nil {
 		return err
+	}
+
+	// Merge per-SDK envs in deterministic (sorted-by-name) order.
+	// Goroutine completion order is scheduling-dependent: merging inside the
+	// goroutines reshuffles same-scope PATH entries between rebuilds, so the
+	// emitted PATH almost never equals the PATH recorded in env-state.json
+	// (cached_path), permanently invalidating the cache once the caller
+	// eval's the output. Scope priority is untouched — only the ordering of
+	// same-scope entries (previously random) is fixed.
+	names := make([]string, 0, len(results))
+	for name := range results {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		envsByScope[results[name].scope].Merge(results[name].envs)
 	}
 
 	// 7. Merge envs by scope priority: Project > Session > Global
