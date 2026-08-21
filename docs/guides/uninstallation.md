@@ -158,10 +158,16 @@ brew uninstall vfox
 sudo apt-get remove vfox
 ```
 
-To also remove the repository configuration:
+To also remove the repository configuration (legacy format):
 
 ```shell
 sudo rm /etc/apt/sources.list.d/versionfox.list
+```
+
+If using DEB822 format:
+
+```shell
+sudo rm /etc/apt/sources.list.d/versionfox.sources
 ```
 
 :::

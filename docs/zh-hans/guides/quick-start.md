@@ -47,6 +47,20 @@ sudo apt-get install vfox
 ```
 
 </TabItem>
+<TabItem label="DEB822 (Debian/Ubuntu)">
+
+```shell
+sudo tee /etc/apt/sources.list.d/versionfox.sources <<EOF
+Types: deb
+URIs: https://apt.fury.io/versionfox/
+Suites: /
+Signed-By: /dev/null
+EOF
+sudo apt-get update -o Acquire::AllowReleaseNoSignature=true -o Acquire::AllowInsecureRepositories=true
+sudo apt-get install vfox --allow-unauthenticated
+```
+
+</TabItem>
 <TabItem label="YUM (CentOS/Fedora)">
 
 ```shell
