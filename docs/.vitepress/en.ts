@@ -94,6 +94,7 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: 'Misc',
             items: [
+                {text: 'MSIX Bundle', link: '/guides/msix'},
             ]
         },
     ]
