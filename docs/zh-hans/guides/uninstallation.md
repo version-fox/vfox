@@ -158,10 +158,16 @@ brew uninstall vfox
 sudo apt-get remove vfox
 ```
 
-同时删除仓库配置：
+同时删除仓库配置（传统格式）：
 
 ```shell
 sudo rm /etc/apt/sources.list.d/versionfox.list
+```
+
+如果使用 DEB822 格式：
+
+```shell
+sudo rm /etc/apt/sources.list.d/versionfox.sources
 ```
 
 :::
