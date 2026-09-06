@@ -253,3 +253,75 @@ func TestOperationsValidateArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestSymlinkRelativeSourceInSubdirectory(t *testing.T) {
+	root := t.TempDir()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Error(err)
+		}
+	})
+	writeFile(t, "source.txt", "content", 0600)
+	if err := os.Mkdir("links", 0755); err != nil {
+		t.Fatal(err)
+	}
+	runLua(t, "", `assert(require("fs").symlink("source.txt", "links/link.txt"))`)
+	assertFileContent(t, "links/link.txt", "content")
+}
+
+func TestCopyDirectoryPreservesSymlinks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "source", "actual"), "content", 0700)
+	if err := os.Symlink("actual", filepath.Join(root, "source", "link")); err != nil {
+		t.Fatal(err)
+	}
+	runLua(t, root, `assert(require("fs").copy("source", "destination"))`)
+	assertFileContent(t, filepath.Join(root, "destination", "link"), "content")
+	target, err := os.Readlink(filepath.Join(root, "destination", "link"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target != "actual" {
+		t.Fatalf("link target = %q, want actual", target)
+	}
+
+}
+
+func TestCopyDirectorySymlinkSourceAndNestedLinks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "source", "nested", "data"), "keep", 0700)
+	for name, target := range map[string]string{"dir-link": "nested", "dangling": "missing"} {
+		if err := os.Symlink(target, filepath.Join(root, "source", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("source", filepath.Join(root, "source-link")); err != nil {
+		t.Fatal(err)
+	}
+	runLua(t, root, `assert(require("fs").copy("source-link", "destination"))`)
+	for name, want := range map[string]string{"dir-link": "nested", "dangling": "missing"} {
+		got, err := os.Readlink(filepath.Join(root, "destination", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("%s target = %q, want %q", name, got, want)
+		}
+	}
+	assertFileContent(t, filepath.Join(root, "destination", "nested", "data"), "keep")
+}
+
+func TestCopyDirectoryDoesNotOverwriteFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "source", "data"), "new", 0600)
+	writeFile(t, filepath.Join(root, "destination", "data"), "keep", 0600)
+	runLua(t, root, `assert(not pcall(require("fs").copy, "source", "destination"))`)
+	assertFileContent(t, filepath.Join(root, "destination", "data"), "keep")
+}

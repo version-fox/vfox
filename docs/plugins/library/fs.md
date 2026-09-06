@@ -20,3 +20,5 @@ fs.symlink(source_path, link_path)
 ```
 
 Paths may be absolute or relative to the current `vfox` process. Every operation returns `true` on success and raises a Lua error on failure. Directory copies and removals are recursive. Like `mv`, `move` renames when its destination is a new path and moves the source under its original basename when the destination is an existing directory.
+
+Directory copies preserve symbolic links, including their stored targets, without traversing them. The source path passed to `symlink` is resolved relative to the current process directory, even when the link is created in a subdirectory.

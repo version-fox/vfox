@@ -17,6 +17,8 @@
 package fs
 
 import (
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -48,13 +50,65 @@ func (f *Operation) copy(L *lua.LState) int {
 	info, err := os.Stat(f.path(src))
 	raiseOnError(L, err)
 	if info.IsDir() {
-		raiseOnError(L, os.CopyFS(f.path(dest), os.DirFS(f.path(src))))
+		raiseOnError(L, copyDirectory(f.path(src), f.path(dest)))
 		return returnTrue(L)
 	}
 	content, err := os.ReadFile(f.path(src))
 	raiseOnError(L, err)
 	raiseOnError(L, os.WriteFile(f.path(dest), content, info.Mode().Perm()))
 	return returnTrue(L)
+}
+
+// copyDirectory preserves symlinks without following them, including on Go 1.24.
+// Like os.CopyFS, it does not overwrite existing files.
+func copyDirectory(src, dest string) error {
+	// The source itself may name a directory through a symlink.
+	src, err := filepath.EvalSymlinks(src)
+	if err != nil {
+		return err
+	}
+	return filepath.WalkDir(src, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dest, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0777)
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			link, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(link, target)
+		}
+		if !entry.Type().IsRegular() {
+			return &os.PathError{Op: "copy", Path: path, Err: os.ErrInvalid}
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		input, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer input.Close()
+		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666|info.Mode().Perm())
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(output, input)
+		closeErr := output.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		return closeErr
+	})
 }
 
 func (f *Operation) remove(L *lua.LState) int {
@@ -84,7 +138,9 @@ func (f *Operation) move(L *lua.LState) int {
 func (f *Operation) symlink(L *lua.LState) int {
 	src := L.CheckString(1)
 	dest := L.CheckString(2)
-	raiseOnError(L, os.Symlink(f.path(src), f.path(dest)))
+	srcPath, err := filepath.Abs(f.path(src))
+	raiseOnError(L, err)
+	raiseOnError(L, os.Symlink(srcPath, f.path(dest)))
 	return returnTrue(L)
 }
 
