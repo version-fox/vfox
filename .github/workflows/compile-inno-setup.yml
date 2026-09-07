@@ -26,9 +26,25 @@ jobs:
           github-token: NO_NEED
           result-encoding: string
           script: return "${{ github.ref }}".substring(11)
+      - name: Get latest Inno Setup release asset
+        id: inno-setup-release
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const release = await github.rest.repos.getLatestRelease({
+              owner: "jrsoftware",
+              repo: "issrc",
+            });
+            const asset = release.data.assets.find((a) => a.name.endsWith("-x64.exe"));
+            if (!asset) {
+              throw new Error("Could not find Inno Setup x64 installer asset in latest release");
+            }
+            return asset.browser_download_url;
       - name: Install Inno Setup
         run: |
-          curl --retry 10 --retry-all-errors -L -o installer.exe https://jrsoftware.org/download.php/is.exe
+          curl --retry 10 --retry-all-errors -L -o installer.exe "${{ steps.inno-setup-release.outputs.result }}"
           ./installer.exe /verysilent /allusers /dir=inst
           sleep 60
       - name: Download version-fox packages
