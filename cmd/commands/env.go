@@ -192,7 +192,7 @@ func envFlag(cmd *cli.Command) error {
 
 	// 5. Fast path: return cached output if no changes
 	if !changed {
-		cachedOutput := state.GetCachedOutput()
+		cachedOutput := state.GetCachedOutput(shellName)
 		if cachedOutput != "" {
 			logger.Debugf("Using cached output")
 			fmt.Print(cachedOutput)
@@ -329,7 +329,7 @@ func envFlag(cmd *cli.Command) error {
 	exportStr := s.Export(exportEnvs)
 
 	// 10. Update state with new output
-	if err := state.Update(configPaths, exportStr); err != nil {
+	if err := state.Update(configPaths, exportStr, shellName); err != nil {
 		logger.Debugf("Failed to update state: %v", err)
 	}
 

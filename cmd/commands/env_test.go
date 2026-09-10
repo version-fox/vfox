@@ -18,6 +18,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,7 +41,11 @@ func TestEnvCommandProcess(t *testing.T) {
 		return
 	}
 	app := &cli.Command{Name: "vfox", Commands: []*cli.Command{Env}}
-	if err := app.Run(context.Background(), []string{"vfox", "env", "-s", "zsh"}); err != nil {
+	shellName := os.Getenv("VFOX_TEST_TARGET_SHELL")
+	if shellName == "" {
+		shellName = "zsh"
+	}
+	if err := app.Run(context.Background(), []string{"vfox", "env", "-s", shellName}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -105,7 +110,7 @@ end
 	return f
 }
 
-func (f *envCommandFixture) run(t *testing.T) string {
+func (f *envCommandFixture) runOutput(t *testing.T) string {
 	t.Helper()
 	exe, err := os.Executable()
 	if err != nil {
@@ -119,6 +124,12 @@ func (f *envCommandFixture) run(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("env command: %v\n%s", err, output)
 	}
+	return string(output)
+}
+
+func (f *envCommandFixture) run(t *testing.T) string {
+	t.Helper()
+	output := []byte(f.runOutput(t))
 	match := regexp.MustCompile(`export PATH="([^"]*)"`).FindSubmatch(output)
 	if match == nil {
 		t.Fatalf("missing PATH export: %s", output)
@@ -196,5 +207,60 @@ func TestEnvCacheHitsAfterApplyingPath(t *testing.T) {
 	}
 	if got := f.calls(t); !reflect.DeepEqual(got, calls) {
 		t.Fatalf("cache hits evaluated SDK hooks again: %q", got)
+	}
+}
+
+func TestEnvCacheRespectsTargetShell(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	for i, target := range []struct{ name, prefix string }{
+		{"pwsh", "$env:PATH="}, {"fish", "set -x -g PATH "}, {"bash", "export PATH="}, {"pwsh", "$env:PATH="},
+	} {
+		t.Setenv("VFOX_TEST_TARGET_SHELL", target.name)
+		output := f.runOutput(t)
+		if !strings.HasPrefix(output, target.prefix) {
+			t.Fatalf("shell %s: unexpected output %q", target.name, output)
+		}
+		calls := f.calls(t)
+		for _, log := range calls {
+			if log != strings.Repeat("called\n", i+1) {
+				t.Fatalf("shell switch did not recalculate hooks: %q", log)
+			}
+		}
+		// Shell names are case-insensitive, including when looking up cached output.
+		t.Setenv("VFOX_TEST_TARGET_SHELL", strings.ToUpper(target.name))
+		if got := f.runOutput(t); got != output {
+			t.Fatalf("cached output = %q, want %q", got, output)
+		}
+		if got := f.calls(t); !reflect.DeepEqual(got, calls) {
+			t.Fatal("same shell evaluated hooks again")
+		}
+	}
+}
+
+func TestEnvCacheWithoutShellIsInvalidated(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	f.run(t)
+	data, err := os.ReadFile(f.state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(data, &state); err != nil {
+		t.Fatal(err)
+	}
+	delete(state, "cached_shell")
+	state["cached_output"] = "old shell script"
+	data, err = json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f.state, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	f.run(t)
+	for _, log := range f.calls(t) {
+		if log != "called\ncalled\n" {
+			t.Fatalf("old cache did not recalculate hooks: %q", log)
+		}
 	}
 }

@@ -94,7 +94,7 @@ func TestConfigState_HasChanged_NoChange(t *testing.T) {
 		Global: configFile,
 	}
 
-	err = state.Update(configPaths, "export PATH=/test")
+	err = state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestConfigState_HasChanged_FileModified(t *testing.T) {
 		Global: configFile,
 	}
 
-	err = state.Update(configPaths, "export PATH=/test")
+	err = state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestConfigState_HasChanged_FileDeleted(t *testing.T) {
 		Global: configFile,
 	}
 
-	err = state.Update(configPaths, "export PATH=/test")
+	err = state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestConfigState_HasChanged_EmptyPath(t *testing.T) {
 	}
 
 	// Update with empty path
-	err := state.Update(configPaths, "export PATH=/test")
+	err := state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestConfigState_Update_MultipleScopes(t *testing.T) {
 		Project: projectFile,
 	}
 
-	err = state.Update(configPaths, "export PATH=/test")
+	err = state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -260,16 +260,25 @@ func TestConfigState_Update_MultipleScopes(t *testing.T) {
 }
 
 func TestConfigState_GetCachedOutput(t *testing.T) {
-	tmpDir := t.TempDir()
-	stateFile := filepath.Join(tmpDir, "state.json")
-
-	state := NewConfigState(stateFile)
-	state.CachedOutput = "export TEST=value"
-
-	// Get cached output
-	output := state.GetCachedOutput()
-	if output != "export TEST=value" {
-		t.Errorf("GetCachedOutput() = %q, want %q", output, "export TEST=value")
+	for _, tc := range []struct{ name, cachedShell, targetShell, want string }{
+		{"same shell", "bash", "bash", "export TEST=value"},
+		{"case insensitive", "bash", "BASH", "export TEST=value"},
+		{"different shell", "pwsh", "fish", ""},
+		{"legacy cache", "", "bash", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := NewConfigState(filepath.Join(t.TempDir(), "state.json"))
+			if err := state.Update(nil, "export TEST=value", tc.cachedShell); err != nil {
+				t.Fatal(err)
+			}
+			loaded := NewConfigState(state.stateFilePath)
+			if err := loaded.Load(); err != nil {
+				t.Fatal(err)
+			}
+			if got := loaded.GetCachedOutput(tc.targetShell); got != tc.want {
+				t.Errorf("GetCachedOutput(%q) = %q, want %q", tc.targetShell, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -300,7 +309,7 @@ func TestConfigState_HasChanged_PathChanged(t *testing.T) {
 		Global: configFile,
 	}
 
-	err = state.Update(configPaths, "export PATH=/test")
+	err = state.Update(configPaths, "export PATH=/test", "bash")
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
@@ -332,4 +341,3 @@ func TestConfigState_HasChanged_PathChanged(t *testing.T) {
 		t.Error("HasChanged() should return true when PATH has changed")
 	}
 }
-

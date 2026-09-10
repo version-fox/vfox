@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -41,6 +42,9 @@ type ConfigState struct {
 
 	// Cached PATH value (to detect user-made PATH changes)
 	CachedPath string `json:"cached_path,omitempty"`
+
+	// Target shell used to render CachedOutput. Empty for legacy cache files.
+	CachedShell string `json:"cached_shell,omitempty"`
 
 	// Cached env output (shell script)
 	CachedOutput string `json:"cached_output,omitempty"`
@@ -154,7 +158,7 @@ func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) 
 }
 
 // Update updates the state with new config mtimes, current PATH, and cached output
-func (s *ConfigState) Update(configPaths map[UseScope]string, output string) error {
+func (s *ConfigState) Update(configPaths map[UseScope]string, output, shellName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -188,14 +192,19 @@ func (s *ConfigState) Update(configPaths map[UseScope]string, output string) err
 	// Store current PATH to detect user-made changes later
 	s.CachedPath = os.Getenv(PathVarName)
 	s.CachedOutput = output
+	s.CachedShell = strings.ToLower(shellName)
 
 	return s.saveLocked()
 }
 
-// GetCachedOutput returns the cached env output
-func (s *ConfigState) GetCachedOutput() string {
+// GetCachedOutput returns output only for the requested shell. Legacy caches
+// without a shell must be regenerated.
+func (s *ConfigState) GetCachedOutput(shellName string) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.CachedShell == "" || s.CachedShell != strings.ToLower(shellName) {
+		return ""
+	}
 	return s.CachedOutput
 }
 
