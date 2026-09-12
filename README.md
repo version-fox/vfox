@@ -27,7 +27,7 @@ and switch between different environment you need via the command line.
 - simple **plugin system** to add support for your runtime of choice
 - **automatically switches** runtime versions as you traverse your project
 - support for existing config files `.node-version`, `.nvmrc`, `.sdkmanrc` for easy migration
-- shell completion available for common shells (Bash, ZSH, Powershell, Clink)
+- shell completion available for common shells (Bash, ZSH, Fish, Powershell, Clink)
 
 ## Demo
 
@@ -61,6 +61,15 @@ vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > Remember to restart your shell to apply the changes.
+
+Fish completion suggests commands and options. Homebrew, DEB, and RPM packages
+install it automatically. For archive or source installations, run the following
+from the extracted archive or repository directory:
+
+```fish
+mkdir -p ~/.config/fish/completions
+cp completions/vfox.fish ~/.config/fish/completions/vfox.fish
+```
 
 #### 3. Add an SDK plugin
 

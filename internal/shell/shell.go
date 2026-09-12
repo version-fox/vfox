@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/process"
+
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/shared/logger"
 )
@@ -68,6 +70,33 @@ func Open(pid int) error {
 		return fmt.Errorf("open a new shell failed, err:%w", err)
 	}
 
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("open a new shell failed, err:%w", err)
+	}
+	// Scoop launches vfox through a same-named executable shim. Follow the
+	// native parent chain past those launchers, without assuming a shell name
+	// or treating an inherited/MSYS hook PID as a native process ID.
+	for {
+		executable, err := p.Exe()
+		if err != nil {
+			// Command-line lookup below remains usable on platforms where
+			// querying the process executable is unavailable.
+			break
+		}
+		if !strings.EqualFold(filepath.Base(executable), filepath.Base(self)) {
+			break
+		}
+		parent, err := p.Parent()
+		if err != nil {
+			return fmt.Errorf("find shell above vfox launcher %d: %w", p.Pid, err)
+		}
+		if parent.Pid <= 0 || parent.Pid == p.Pid {
+			return fmt.Errorf("cannot find shell above vfox launcher %d", p.Pid)
+		}
+		p = parent
+	}
+
 	cmdSlice, err := p.CmdlineSlice()
 	if err != nil {
 		return fmt.Errorf("open a new shell failed, err:%w", err)
@@ -86,6 +115,11 @@ func Open(pid int) error {
 
 	// Remove leading '-' from shell name (login shell indicator)
 	shellName := cmdSlice[0]
+	if executable, err := p.Exe(); err == nil && executable != "" {
+		// The native executable path also avoids ambiguous command-line
+		// quoting when the shell is installed under a path with spaces.
+		shellName = executable
+	}
 	if strings.HasPrefix(shellName, "-") {
 		shellName = shellName[1:]
 	}

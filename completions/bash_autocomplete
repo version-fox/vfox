@@ -25,7 +25,7 @@ __vfox_bash_autocomplete() {
     else
       requestComp="${words[*]} --generate-shell-completion"
     fi
-    opts=$(eval "${requestComp}" 2>/dev/null)
+    opts=$(SHELL=bash eval "${requestComp}" 2>/dev/null)
     COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
     return 0
   fi

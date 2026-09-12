@@ -23,7 +23,7 @@
 - 简单的 **插件系统** 来添加对你选择的语言的支持
 - 在您切换项目时, 帮您**自动切换**运行时版本
 - 支持现有配置文件 `.node-version`、`.nvmrc`、`.sdkmanrc`，以方便迁移
-- 支持常用Shell(Powershell、Bash、ZSH),并提供补全功能
+- 支持常用 Shell（Powershell、Bash、ZSH、Fish、Clink），并提供补全功能
 
 ## 演示
 
@@ -56,6 +56,14 @@ vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > 请记住重启你的 Shell 以应用更改。
+
+Fish 补全支持命令和选项。Homebrew、DEB 和 RPM 软件包会自动安装补全脚本。
+如果通过压缩包或源码安装，请在解压后的目录或仓库目录中运行：
+
+```fish
+mkdir -p ~/.config/fish/completions
+cp completions/vfox.fish ~/.config/fish/completions/vfox.fish
+```
 
 #### 3.添加插件
 ```bash 

@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v3"
+
 	"github.com/version-fox/vfox/cmd/commands"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/shared/logger"
@@ -64,11 +65,7 @@ func newCmd() *cmd {
 	app.Version = version
 	app.Description = "vfox is a cross-platform version manager, extendable via plugins. It allows you to quickly install and switch between different environment you need via the command line."
 	app.Suggest = true
-	app.ShellComplete = func(ctx context.Context, cmd *cli.Command) {
-		for _, command := range cmd.Commands {
-			_, _ = fmt.Fprintln(cmd.Writer, command.Name)
-		}
-	}
+	app.ShellComplete = completeCommand
 
 	debugFlags := &cli.BoolFlag{
 		Name:  "debug",
@@ -101,6 +98,9 @@ func newCmd() *cmd {
 		commands.Config,
 		commands.Exec,
 		commands.Cd,
+	}
+	for _, command := range app.Commands {
+		command.ShellComplete = completeCommand
 	}
 
 	return &cmd{app: app, version: version}
