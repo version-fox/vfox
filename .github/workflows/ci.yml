@@ -1,6 +1,6 @@
 name: VersionFox CI
 
-on: [push]
+on: [push, workflow_dispatch]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -31,3 +31,31 @@ jobs:
           go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
+
+  windows-regressions:
+    name: Windows shell and interrupted installation regressions
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MSYS
+          install: zsh
+      - name: Exercise native Windows processes and MSYS2 zsh
+        shell: pwsh
+        env:
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+          VFOX_TEST_MSYS_ZSH: '1'
+        run: |
+          $env:PATH = "$env:MSYS2_LOCATION\usr\bin;$env:PATH"
+          go test ./internal/env -run 'TestWindowsPathFormatByShell|TestMSYSZshPATH' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test ./internal/shell -run TestOpenSkipsVfoxShim -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test ./internal/sdk -run '^TestInstall' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
