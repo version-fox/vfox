@@ -29,7 +29,8 @@ const PathVarName = "Path"
 
 func (p *Paths) String() string {
 
-	if os.Getenv(HookFlag) == "bash" {
+	shell := strings.ToLower(os.Getenv(HookFlag))
+	if shell == "bash" || shell == "zsh" {
 		pps := p.Slice()
 		paths := make([]string, 0)
 		for _, path := range pps {
