@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - uses: msys2/setup-msys2@v2
@@ -59,3 +59,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test ./internal/sdk -run '^TestInstall' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  fish-completion:
+    name: Fish completion integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install Fish
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y fish
+      - name: Exercise native Fish completions
+        run: |
+          command -v fish
+          fish --version
+          go test ./cmd -run '^TestFishCompletion$' -count=1 -v

@@ -8,9 +8,9 @@ _vfox() {
 	local current
 	current=${words[-1]}
 	if [[ "$current" == "-"* ]]; then
-		opts=("${(@f)$(${words[@]:0:#words[@]-1} ${current} --generate-shell-completion)}")
+		opts=("${(@f)$(SHELL=zsh ${words[@]:0:#words[@]-1} ${current} --generate-shell-completion)}")
 	else
-		opts=("${(@f)$(${words[@]:0:#words[@]-1} --generate-shell-completion)}")
+		opts=("${(@f)$(SHELL=zsh ${words[@]:0:#words[@]-1} --generate-shell-completion)}")
 	fi
 
 	if [[ "${opts[1]}" != "" ]]; then
