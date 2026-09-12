@@ -18,10 +18,12 @@ package luai
 
 import (
 	_ "embed"
+	"fmt"
 	"strings"
 
-	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	lua "github.com/yuin/gopher-lua"
+
+	"github.com/version-fox/vfox/internal/plugin/luai/module"
 )
 
 //go:embed fixtures/preload.lua
@@ -63,8 +65,12 @@ func (vm *LuaVM) ReturnedValue() *lua.LTable {
 	return table
 }
 
-func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...lua.LValue) (*lua.LTable, error) {
+func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...lua.LValue) (lua.LValue, error) {
 	function := pluginObj.RawGetString(funcName)
+	fn, ok := function.(*lua.LFunction)
+	if !ok {
+		return nil, fmt.Errorf("[%s] must be a function, got %s", funcName, function.Type())
+	}
 
 	// In Lua, when a function is called with colon syntax (object:method()),
 	// the object itself is implicitly passed as the first argument.
@@ -73,14 +79,16 @@ func (vm *LuaVM) CallFunction(pluginObj *lua.LTable, funcName string, _args ...l
 	args := append([]lua.LValue{pluginObj}, _args...)
 
 	if err := vm.Instance.CallByParam(lua.P{
-		Fn:      function.(*lua.LFunction),
+		Fn:      fn,
 		NRet:    1,
 		Protect: true,
 	}, args...); err != nil {
 		return nil, err
 	}
 
-	return vm.ReturnedValue(), nil
+	value := vm.Instance.Get(-1)
+	vm.Instance.Pop(1)
+	return value, nil
 }
 
 func (vm *LuaVM) Close() {

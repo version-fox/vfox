@@ -17,6 +17,11 @@
 package module
 
 import (
+	"io"
+	nethttp "net/http"
+
+	lua "github.com/yuin/gopher-lua"
+
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/fs"
@@ -24,15 +29,23 @@ import (
 	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/json"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/string"
-	lua "github.com/yuin/gopher-lua"
 )
 
 type PreloadOptions struct {
-	Config *config.Config
+	Config        *config.Config
+	HTTPTransport func(nethttp.RoundTripper) nethttp.RoundTripper
+	Output        io.Writer
 }
 
 func Preload(L *lua.LState, options *PreloadOptions) {
-	http.Preload(L, options.Config.Proxy, options.Config.Plugin.HTTP)
+	cfg := options.Config
+	if cfg == nil {
+		cfg = config.DefaultConfig
+	}
+	http.PreloadWithOptions(L, cfg.Proxy, cfg.Plugin.HTTP, http.Options{
+		WrapTransport: options.HTTPTransport,
+		Output:        options.Output,
+	})
 	json.Preload(L)
 	html.Preload(L)
 	string.Preload(L)

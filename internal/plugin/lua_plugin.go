@@ -19,9 +19,10 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
+
+	lua "github.com/yuin/gopher-lua"
 
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/plugin/luai"
@@ -29,16 +30,17 @@ import (
 	"github.com/version-fox/vfox/internal/plugin/luai/module"
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
-	lua "github.com/yuin/gopher-lua"
 )
 
 type LuaPlugin struct {
-	vm        *luai.LuaVM
-	pluginObj *lua.LTable
+	vm          *luai.LuaVM
+	pluginObj   *lua.LTable
+	development bool
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
-	return l.pluginObj.RawGetString(name) != lua.LNil
+	_, ok := l.pluginObj.RawGetString(name).(*lua.LFunction)
+	return ok
 }
 
 func (l *LuaPlugin) Close() {
@@ -62,7 +64,7 @@ func (l *LuaPlugin) Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem
 	var hookResult []*AvailableHookResultItem
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
 	}
 
 	return hookResult, nil
@@ -83,7 +85,7 @@ func (l *LuaPlugin) PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, e
 	hookResult := PreInstallHookResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
 	}
 	return &hookResult, nil
 }
@@ -98,14 +100,17 @@ func (l *LuaPlugin) EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, erro
 	if err != nil {
 		return nil, err
 	}
-	if table == nil || table.Type() == lua.LTNil || table.Len() == 0 {
+	if table == nil || table.Type() == lua.LTNil {
 		return nil, ErrNoResultProvide
 	}
 
 	var hookResult []*EnvKeysHookResultItem
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
+	}
+	if len(hookResult) == 0 {
+		return nil, ErrNoResultProvide
 	}
 	return hookResult, nil
 }
@@ -126,7 +131,7 @@ func (l *LuaPlugin) PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error) {
 	hookResult := PreUseHookResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
 	}
 	return &hookResult, nil
 }
@@ -167,13 +172,15 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFi
 	hookResult := ParseLegacyFileResult{}
 	err = codec.Unmarshal(table, &hookResult)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal the return value: " + err.Error())
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
 	}
 	return &hookResult, nil
 }
 
-func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (*lua.LTable, error) {
-	logger.Debugf("CallFunction: %s\n", funcName)
+func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (lua.LValue, error) {
+	if !l.development {
+		logger.Debugf("CallFunction: %s\n", funcName)
+	}
 
 	table, err := l.vm.CallFunction(l.pluginObj, funcName, args...)
 
@@ -185,9 +192,21 @@ func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaP
 	if err := vm.Prepare(&module.PreloadOptions{
 		Config: envCtx.UserConfig,
 	}); err != nil {
+		vm.Close()
 		return nil, nil, err
 	}
+	p, metadata, err := loadLuaPlugin(vm, pluginDirPath, RuntimeInfo{
+		OsType: string(util.GetOSType()), ArchType: string(util.GetArchType()),
+		Version: envCtx.RuntimeVersion, PluginDirPath: pluginDirPath,
+	})
+	if err != nil {
+		vm.Close()
+	}
+	return p, metadata, err
+}
 
+// loadLuaPlugin loads into a prepared VM. Its caller owns the VM on failure.
+func loadLuaPlugin(vm *luai.LuaVM, pluginDirPath string, runtime RuntimeInfo) (*LuaPlugin, *Metadata, error) {
 	mainPath := filepath.Join(pluginDirPath, "main.lua")
 	// main.lua first
 	if util.FileExists(mainPath) {
@@ -219,22 +238,17 @@ func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaP
 				continue
 			}
 			if err := vm.Instance.DoFile(hp); err != nil {
-				return nil, nil, fmt.Errorf("failed to load [%s] hook function: %s", hf.Name, err.Error())
+				return nil, nil, fmt.Errorf("failed to load [%s] hook function: %w", hf.Name, err)
 			}
 		}
 	}
 
 	// !!!! Must be set after loading the script to prevent overwriting!
 	// set OS_TYPE and ARCH_TYPE
-	vm.Instance.SetGlobal(luai.OsType, lua.LString(util.GetOSType()))
-	vm.Instance.SetGlobal(luai.ArchType, lua.LString(util.GetArchType()))
+	vm.Instance.SetGlobal(luai.OsType, lua.LString(runtime.OsType))
+	vm.Instance.SetGlobal(luai.ArchType, lua.LString(runtime.ArchType))
 
-	r, err := codec.Marshal(vm.Instance, RuntimeInfo{
-		OsType:        string(util.GetOSType()),
-		ArchType:      string(util.GetArchType()),
-		Version:       envCtx.RuntimeVersion,
-		PluginDirPath: pluginDirPath,
-	})
+	r, err := codec.Marshal(vm.Instance, runtime)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,14 +258,23 @@ func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaP
 	if pluginObj.Type() == lua.LTNil {
 		return nil, nil, fmt.Errorf("plugin object not found")
 	}
-	PLUGIN := pluginObj.(*lua.LTable)
+	PLUGIN, ok := pluginObj.(*lua.LTable)
+	if !ok {
+		return nil, nil, fmt.Errorf("PLUGIN must be a table, got %s", pluginObj.Type())
+	}
+	for _, hook := range HookFuncMap {
+		value := PLUGIN.RawGetString(hook.Name)
+		if value != lua.LNil && value.Type() != lua.LTFunction {
+			return nil, nil, fmt.Errorf("[%s] must be a function, got %s", hook.Name, value.Type())
+		}
+	}
 	pluginInfo := &Metadata{}
 	if err = codec.Unmarshal(PLUGIN, pluginInfo); err != nil {
 		return nil, nil, err
 	}
 
 	navigator, err := codec.Marshal(vm.Instance, codec.Navigator{
-		UserAgent: luai.ComputeUserAgent(envCtx.RuntimeVersion, pluginInfo.Name, pluginInfo.Version),
+		UserAgent: luai.ComputeUserAgent(runtime.Version, pluginInfo.Name, pluginInfo.Version),
 	})
 	if err != nil {
 		return nil, nil, err

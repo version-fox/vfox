@@ -39,7 +39,7 @@ type cmd struct {
 
 func (c *cmd) Execute(args []string) {
 	if err := c.app.Run(context.Background(), args); err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -93,6 +93,7 @@ func newCmd() *cmd {
 		commands.Upgrade,
 		commands.Remove,
 		commands.Add,
+		commands.Plugin,
 		commands.Activate,
 		commands.Env,
 		commands.Config,

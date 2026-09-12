@@ -18,6 +18,7 @@ package codec
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 
@@ -86,21 +87,46 @@ func indirect(v reflect.Value) reflect.Value {
 	return v
 }
 
-func storeLiteral(value reflect.Value, lvalue lua.LValue) {
+func storeLiteral(value reflect.Value, lvalue lua.LValue) error {
 	value = indirect(value)
-
+	mismatch := func() error {
+		return fmt.Errorf("cannot unmarshal %s into %s", lvalue.Type(), value.Type())
+	}
 	switch value.Kind() {
 	case reflect.String:
+		// Retain the existing Lua scalar-to-string conversion, including numbers.
+		if lvalue.Type() != lua.LTString && lvalue.Type() != lua.LTNumber && lvalue.Type() != lua.LTBool {
+			return mismatch()
+		}
 		value.SetString(lvalue.String())
 	case reflect.Bool:
-		value.SetBool(bool(lvalue.(lua.LBool)))
+		v, ok := lvalue.(lua.LBool)
+		if !ok {
+			return mismatch()
+		}
+		value.SetBool(bool(v))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		value.SetInt(int64(lvalue.(lua.LNumber)))
+		v, ok := lvalue.(lua.LNumber)
+		if !ok {
+			return mismatch()
+		}
+		value.SetInt(int64(v))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		value.SetUint(uint64(lvalue.(lua.LNumber)))
+		v, ok := lvalue.(lua.LNumber)
+		if !ok {
+			return mismatch()
+		}
+		value.SetUint(uint64(v))
 	case reflect.Float32, reflect.Float64:
-		value.SetFloat(float64(lvalue.(lua.LNumber)))
+		v, ok := lvalue.(lua.LNumber)
+		if !ok {
+			return mismatch()
+		}
+		value.SetFloat(float64(v))
+	default:
+		return mismatch()
 	}
+	return nil
 }
 
 func objectInterface(lvalue *lua.LTable) any {
@@ -148,143 +174,121 @@ func arrayInterface(lvalue *lua.LTable) any {
 }
 
 func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
-	reflected = indirect(reflected)
-
-	switch value.Type() {
-	case lua.LTTable:
-
+	if !reflected.IsValid() || !reflected.CanSet() {
+		return errors.New("unmarshal: destination cannot be set")
+	}
+	if value == nil || value == lua.LNil {
 		switch reflected.Kind() {
-		case reflect.Interface:
-			// Decoding into nil interface? Switch to non-reflect code.
-			if reflected.NumMethod() == 0 {
-				result := valueInterface(value)
-				reflected.Set(reflect.ValueOf(result))
-			}
-		// map[T1]T2 where T1 is string or an integer type
-		case reflect.Map:
-			t := reflected.Type()
-			keyType := t.Key()
-			// Map key must either have string kind, have an integer kind
-			switch keyType.Kind() {
-			case reflect.String,
-				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			default:
-				return errors.New("unmarshal: unsupported map key type " + keyType.String())
-			}
-
-			if reflected.IsNil() {
-				reflected.Set(reflect.MakeMap(t))
-			}
-
-			var mapElem reflect.Value
-
-			value.(*lua.LTable).ForEach(func(key, value lua.LValue) {
-				// Figure out field corresponding to key.
-				var subv reflect.Value
-
-				elemType := t.Elem()
-				if !mapElem.IsValid() {
-					mapElem = reflect.New(elemType).Elem()
-				} else {
-					mapElem.SetZero()
-				}
-
-				subv = mapElem
-
-				unmarshalWorker(value, subv)
-
-				var kv reflect.Value
-				switch keyType.Kind() {
-				case reflect.String:
-					kv = reflect.New(keyType).Elem()
-					kv.SetString(key.String())
-				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					s := key.String()
-					n, err := strconv.ParseInt(s, 10, 64)
-					if err != nil {
-						break
-					}
-					kv = reflect.New(keyType).Elem()
-					kv.SetInt(n)
-				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-					s := key.String()
-					n, err := strconv.ParseUint(s, 10, 64)
-					if err != nil {
-						break
-					}
-					kv = reflect.New(keyType).Elem()
-					kv.SetUint(n)
-				default:
-					panic("unmarshal: Unexpected key type") // should never occur
-				}
-				if kv.IsValid() {
-					reflected.SetMapIndex(kv, subv)
-				}
-
-			})
-		case reflect.Slice:
-			i := 0
-
-			value.(*lua.LTable).ForEach(func(key, value lua.LValue) {
-				// Expand slice length, growing the slice if necessary.
-				if i >= reflected.Cap() {
-					reflected.Grow(1)
-				}
-				if i >= reflected.Len() {
-					reflected.SetLen(i + 1)
-				}
-				if i < reflected.Len() {
-					// Decode into element.
-					unmarshalWorker(value, reflected.Index(i))
-				} else {
-					unmarshalWorker(value, reflect.Value{})
-				}
-				i++
-			})
-
-			// Truncate slice if necessary.
-			if i < reflected.Len() {
-				reflected.SetLen(i)
-			}
-
-			if i == 0 {
-				reflected.Set(reflect.MakeSlice(reflected.Type(), 0, 0))
-			}
-		case reflect.Struct:
-			// Initialize nil embedded pointers
-			for i := 0; i < reflected.NumField(); i++ {
-				f := reflected.Type().Field(i)
-				if f.Anonymous && reflected.Field(i).Kind() == reflect.Ptr && reflected.Field(i).IsNil() {
-					reflected.Field(i).Set(reflect.New(reflected.Field(i).Type().Elem()))
-				}
-			}
-
-			(value.(*lua.LTable)).ForEach(func(key, value lua.LValue) {
-				fieldName := key.String()
-
-				field := findField(reflected, fieldName)
-
-				if !field.IsValid() {
-					return
-				}
-
-				unmarshalWorker(value, field)
-			})
-		}
-	default:
-		switch reflected.Kind() {
-		case reflect.Interface:
-			// Decoding into nil interface? Switch to non-reflect code.
-			if reflected.NumMethod() == 0 {
-				result := valueInterface(value)
-				reflected.Set(reflect.ValueOf(result))
-			}
+		case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice:
+			reflected.SetZero()
+			return nil
 		default:
-			storeLiteral(reflected, value)
+			return fmt.Errorf("cannot unmarshal nil into %s", reflected.Type())
 		}
 	}
-	return nil
+	reflected = indirect(reflected)
+	if reflected.Kind() == reflect.Interface && reflected.NumMethod() == 0 {
+		result := valueInterface(value)
+		if result == nil {
+			return fmt.Errorf("cannot unmarshal %s into interface", value.Type())
+		}
+		reflected.Set(reflect.ValueOf(result))
+		return nil
+	}
+	table, ok := value.(*lua.LTable)
+	if !ok {
+		return storeLiteral(reflected, value)
+	}
+
+	var decodeErr error
+	switch reflected.Kind() {
+	case reflect.Map:
+		t := reflected.Type()
+		keyType := t.Key()
+		if reflected.IsNil() {
+			reflected.Set(reflect.MakeMap(t))
+		}
+		table.ForEach(func(key, value lua.LValue) {
+			if decodeErr != nil {
+				return
+			}
+			kv := reflect.New(keyType).Elem()
+			switch keyType.Kind() {
+			case reflect.String:
+				kv.SetString(key.String())
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				n, err := strconv.ParseInt(key.String(), 10, keyType.Bits())
+				if err != nil {
+					decodeErr = err
+					return
+				}
+				kv.SetInt(n)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				n, err := strconv.ParseUint(key.String(), 10, keyType.Bits())
+				if err != nil {
+					decodeErr = err
+					return
+				}
+				kv.SetUint(n)
+			default:
+				decodeErr = fmt.Errorf("unmarshal: unsupported map key type %s", keyType)
+				return
+			}
+			elem := reflect.New(t.Elem()).Elem()
+			if err := unmarshalWorker(value, elem); err != nil {
+				decodeErr = fmt.Errorf("[%s]: %w", key, err)
+				return
+			}
+			reflected.SetMapIndex(kv, elem)
+		})
+	case reflect.Slice:
+		length := table.Len()
+		reflected.Set(reflect.MakeSlice(reflected.Type(), length, length))
+		table.ForEach(func(key, value lua.LValue) {
+			if decodeErr != nil {
+				return
+			}
+			n, ok := key.(lua.LNumber)
+			if !ok || n < 1 || n > lua.LNumber(length) || n != lua.LNumber(int(n)) {
+				decodeErr = fmt.Errorf("unmarshal: expected array index, got %s", key)
+				return
+			}
+			if err := unmarshalWorker(value, reflected.Index(int(n)-1)); err != nil {
+				decodeErr = fmt.Errorf("[%d]: %w", int(n), err)
+			}
+		})
+		if decodeErr == nil {
+			for i := 1; i <= length; i++ {
+				if table.RawGetInt(i) == lua.LNil {
+					return fmt.Errorf("unmarshal: missing array item [%d]", i)
+				}
+			}
+		}
+	case reflect.Struct:
+		// Keep the flat protocol for embedded result and checksum structs.
+		for i := 0; i < reflected.NumField(); i++ {
+			f := reflected.Type().Field(i)
+			field := reflected.Field(i)
+			if f.Anonymous && field.CanSet() && field.Kind() == reflect.Ptr && field.IsNil() {
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+		}
+		table.ForEach(func(key, value lua.LValue) {
+			if decodeErr != nil {
+				return
+			}
+			field := findField(reflected, key.String())
+			if !field.IsValid() || !field.CanSet() {
+				return
+			}
+			if err := unmarshalWorker(value, field); err != nil {
+				decodeErr = fmt.Errorf("%s: %w", key, err)
+			}
+		})
+	default:
+		return fmt.Errorf("cannot unmarshal table into %s", reflected.Type())
+	}
+	return decodeErr
 }
 
 // findField finds a field in the struct, including embedded fields recursively
@@ -336,5 +340,5 @@ func Unmarshal(value lua.LValue, v any) error {
 		return errors.New("unmarshal: value must be a pointer")
 	}
 
-	return unmarshalWorker(value, reflected)
+	return unmarshalWorker(value, reflected.Elem())
 }

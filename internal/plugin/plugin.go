@@ -69,7 +69,7 @@ var (
 		"PreInstall":      {Name: "PreInstall", Required: true, Filename: "pre_install"},
 		"EnvKeys":         {Name: "EnvKeys", Required: true, Filename: "env_keys"},
 		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
-		"preUse":          {Name: "preUse", Required: false, Filename: "pre_use"},
+		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
 		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 	}
@@ -95,6 +95,7 @@ func CreatePlugin(tempInstallPath string, runtimeEnvCtx *env.RuntimeEnvContext) 
 		}
 
 		if err = luaPlugin.validate(); err != nil {
+			luaPlugin.Close()
 			return nil, err
 		}
 

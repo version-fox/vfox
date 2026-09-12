@@ -71,6 +71,7 @@ function sidebar(): DefaultTheme.Sidebar {
                     text: 'Authors',
                     items:[
                         {text: 'Create a Plugin', link: '/plugins/create/howto'},
+                        {text: 'Test and Debug', link: '/plugins/create/testing'},
                         {text: 'How to publish a plugin?', link: '/plugins/create/howto_registry'},
                         {text: 'Plugin Template', link: 'https://github.com/version-fox/vfox-plugin-template'},
                     ]
