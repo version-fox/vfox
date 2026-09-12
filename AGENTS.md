@@ -77,6 +77,7 @@ Keep imports acyclic. Shared utilities must not depend on SDK, plugin, environme
 ## SDK and plugin behavior
 
 - Installation calls `PreInstall`, prepares the main runtime and additions, then calls optional `PostInstall`. Preserve cleanup of partial directories created by a failed attempt. Uninstallation and its optional `PreUninstall` hook belong to SDK.
+- Installation keeps the final payload path stable for plugin-generated paths. `Install` uses a sibling `.installing` marker until `PostInstall` completes and a sibling `.lock` file for cross-process exclusion. Preserve interrupted-install retry and legacy marker-free payloads; do not unlink the lock file after releasing it.
 - Version resolution calls optional `PreUse` first. If no version is returned, use the existing exact-installed and prefix-matching logic. `IsNoResultProvided(err)` permits fallback; actual hook errors propagate. `UseWithConfig` checks that the resolved version is installed before applying scope state.
 - `Current` checks the highest-priority configured version. Activation/export uses the separate installed-version fallback in [tool_resolution.go](cmd/commands/tool_resolution.go); preserve the caller-specific behavior.
 - `EnvKeysForScope` passes scope link paths to the plugin and does not create links. Use the platform helpers in `env` to create/remove directory links for the main runtime and additions, preserving links that already point to the correct target.

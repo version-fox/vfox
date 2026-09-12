@@ -24,15 +24,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 
 	"github.com/pterm/pterm"
 	"github.com/schollz/progressbar/v3"
+
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/plugin"
@@ -150,7 +149,7 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 // Install installs a specific version of the SDK.
 // For main runtime, it will be installed to {InstallPath}/v-{main_version}/{main_name}-{main_version}
 // For additional runtimes, it will be installed to {InstallPath}/v-{main_version}/add-{addition_name}-{addition_version}
-func (b *impl) Install(version Version) error {
+func (b *impl) Install(version Version) (installErr error) {
 	label := b.Label(version)
 	logger.Debugf("Installing SDK: %s\n", label)
 
@@ -172,7 +171,7 @@ func (b *impl) Install(version Version) error {
 		logger.Debugf("PreInstall hook failed for %s: %v\n", label, err)
 		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
 	}
-	if installInfo == nil {
+	if installInfo == nil || installInfo.PreInstallPackageItem == nil {
 		return fmt.Errorf("no information about the current version")
 	}
 
@@ -184,33 +183,44 @@ func (b *impl) Install(version Version) error {
 	// for example, latest is resolved to a specific version number.
 	label = b.Label(sdkVersion)
 	logger.Debugf("Resolved version: %s\n", sdkVersion)
+	newDirPath := b.packagePath(sdkVersion)
+	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(sdkVersion)+".lock"))
+	if err != nil {
+		return fmt.Errorf("cannot install %s: %w", label, err)
+	}
+	defer func() {
+		if err := lock.Close(); err != nil {
+			installErr = errors.Join(installErr, fmt.Errorf("close installation lock: %w", err))
+		}
+	}()
+	// Recheck while holding the lock, before cleaning an interrupted attempt.
 	if b.CheckRuntimeExist(sdkVersion) {
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists after version resolution\n", label)
 		return nil
 	}
 	success := false
-	newDirPath := b.packagePath(sdkVersion)
 	logger.Debugf("Installing to path: %s\n", newDirPath)
-
-	sigs := make(chan os.Signal, 1)
-
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		_ = <-sigs
-		if !success {
-			_ = os.RemoveAll(newDirPath)
-		}
-		os.Exit(0)
-	}()
-
-	// Delete directory after failed installation
+	// Keep the marker outside the payload so failed cleanup cannot erase it
+	// before removing files still held open by a child process on Windows.
+	markerPath := b.installMarkerPath(sdkVersion)
+	if err := os.WriteFile(markerPath, nil, 0600); err != nil {
+		return fmt.Errorf("mark installation in progress: %w", err)
+	}
+	// Ordinary errors clean up immediately. Process termination leaves the
+	// marker behind and releases the OS lock; the next attempt can retry.
 	defer func() {
 		if !success {
-			_ = os.RemoveAll(newDirPath)
+			if err := os.RemoveAll(newDirPath); err != nil {
+				installErr = errors.Join(installErr, fmt.Errorf("clean incomplete installation: %w", err))
+			} else if err := os.Remove(markerPath); err != nil && !os.IsNotExist(err) {
+				installErr = errors.Join(installErr, fmt.Errorf("remove installation marker: %w", err))
+			}
 		}
 	}()
+	if err := os.RemoveAll(newDirPath); err != nil {
+		return fmt.Errorf("remove interrupted installation: %w", err)
+	}
 	installedPackage := make(map[string]*plugin.InstalledPackageItem)
 
 	path, err := b.preInstallSdk(mainSdk, filepath.Join(newDirPath, b.runtimePathDirName(true, mainSdk)))
@@ -249,6 +259,9 @@ func (b *impl) Install(version Version) error {
 		if err != nil {
 			return fmt.Errorf("plugin [PostInstall] method error: %w", err)
 		}
+	}
+	if err := os.Remove(markerPath); err != nil {
+		return fmt.Errorf("finish installation: %w", err)
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
@@ -689,7 +702,10 @@ func (b *impl) InstalledList() []Version {
 	}
 	for _, d := range dir {
 		if d.IsDir() && strings.HasPrefix(d.Name(), "v-") {
-			versions = append(versions, Version(strings.TrimPrefix(d.Name(), "v-")))
+			version := Version(strings.TrimPrefix(d.Name(), "v-"))
+			if b.CheckRuntimeExist(version) {
+				versions = append(versions, version)
+			}
 		}
 	}
 	sort.Slice(versions, func(i, j int) bool {
@@ -860,6 +876,9 @@ func (b *impl) createDirSymlinks(runtime *Runtime, targetDir string) error {
 }
 
 func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
+	if b.hasPendingInstall(version) {
+		return nil, ErrRuntimeNotFound
+	}
 	versionPath := b.packagePath(version)
 	items := make(map[string]*Runtime)
 	dir, err := os.ReadDir(versionPath)
@@ -899,11 +918,33 @@ func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
 		Additions:   additions,
 		PackagePath: versionPath,
 	}
+	if b.hasPendingInstall(version) {
+		return nil, ErrRuntimeNotFound
+	}
 	return p2, nil
 }
 
 func (b *impl) CheckRuntimeExist(version Version) bool {
-	return util.FileExists(b.packagePath(version))
+	if b.hasPendingInstall(version) {
+		return false
+	}
+	// Older installations have no marker. Keep those valid, but do not accept
+	// an empty version directory without the SDK's main payload directory.
+	name := b.Name
+	if b.plugin != nil {
+		name = b.plugin.Name
+	}
+	info, err := os.Stat(filepath.Join(b.packagePath(version), name+"-"+string(version)))
+	return err == nil && info.IsDir() && !b.hasPendingInstall(version)
+}
+
+func (b *impl) installMarkerPath(version Version) string {
+	return filepath.Join(b.InstallPath, ".v-"+string(version)+".installing")
+}
+
+func (b *impl) hasPendingInstall(version Version) bool {
+	_, err := os.Lstat(b.installMarkerPath(version))
+	return !os.IsNotExist(err)
 }
 
 func (b *impl) packagePath(version Version) string {
