@@ -12,14 +12,13 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        go-version: [ '1.21.x' ]
 
     steps:
       - uses: actions/checkout@v7
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Setup Go from go.mod
         uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
       - name: Install dependencies
         run: |
           go get .
