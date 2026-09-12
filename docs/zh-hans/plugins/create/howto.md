@@ -282,22 +282,14 @@ end
 
 ## 测试插件
 
-目前，`vfox` 插件测试方法很简单。您需要将插件放在 `${HOME}/.version-fox/plugin` 目录中，并使用不同的命令验证您的功能是否正常工作。
-您可以在插件中使用 `print`/`printTable` 函数来打印日志进行调试。
-
-- PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
-- PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`
-- PLUGIN:Available -> `vfox search <sdk-name>`
-- PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
-
-另外, 你可以通过添加 `--debug` 参数来查看更多的日志信息, 例如:
+直接对本地插件运行 Lua 断言，无需安装插件：
 
 ```shell
-vfox --debug install <sdk-name>@<version>
-vfox --debug use <sdk-name>@<version>
-
-...
+vfox plugin test .
+vfox plugin run . PreInstall --input '{"version":"latest"}' --json
 ```
+
+HTTP fixture、环境覆盖、hook 输入及 CI 边界请参阅[测试与调试插件](./testing.md)。真实安装测试应在一次性 CI runner 或 VM 中执行。
 
 ## 插件示例
 

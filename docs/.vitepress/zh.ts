@@ -79,6 +79,7 @@ function sidebar(): DefaultTheme.Sidebar {
                     text: '成为作者',
                     items:[
                         {text: '创建插件', link: '/zh-hans/plugins/create/howto'},
+                        {text: '测试与调试', link: '/zh-hans/plugins/create/testing'},
                         {text: '如何提交到索引仓库?', link: '/zh-hans/plugins/create/howto_registry'},
                         {text: '插件模板', link: 'https://github.com/version-fox/vfox-plugin-template'},
                     ]

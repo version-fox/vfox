@@ -17,6 +17,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -27,15 +28,41 @@ import (
 	"time"
 
 	"github.com/schollz/progressbar/v3"
+	lua "github.com/yuin/gopher-lua"
+
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
-	lua "github.com/yuin/gopher-lua"
 )
 
 type Module struct {
 	proxy          *config.Proxy
 	client         *http.Client
 	downloadClient *http.Client
+	output         io.Writer
+}
+
+// Options customize a single VM's HTTP module without replacing its Lua API.
+type Options struct {
+	// WrapTransport runs synchronously on the invoking Lua thread.
+	WrapTransport func(http.RoundTripper) http.RoundTripper
+	Output        io.Writer
+}
+
+type requestStateKey struct{}
+
+// RequestState identifies the invoking Lua thread for synchronous transports,
+// including requests made inside a coroutine.
+func RequestState(req *http.Request) *lua.LState {
+	state, _ := req.Context().Value(requestStateKey{}).(*lua.LState)
+	return state
+}
+
+func requestContext(L *lua.LState) context.Context {
+	ctx := L.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, requestStateKey{}, L)
 }
 
 // Get performs a http get request
@@ -63,7 +90,7 @@ func (m *Module) Get(L *lua.LState) int {
 		return 2
 	}
 
-	req, err := http.NewRequest("GET", urlStr.String(), nil)
+	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
@@ -117,7 +144,7 @@ func (m *Module) Head(L *lua.LState) int {
 		return 2
 	}
 
-	req, err := http.NewRequest("HEAD", urlStr.String(), nil)
+	req, err := http.NewRequestWithContext(requestContext(L), "HEAD", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
@@ -178,7 +205,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 		return 1
 	}
 
-	req, err := http.NewRequest("GET", urlStr.String(), nil)
+	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
 		return 1
@@ -216,12 +243,12 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 
 	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionSetWriter(m.output),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
 		progressbar.OptionFullWidth(),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Fprintf(os.Stderr, "\n")
+			fmt.Fprintln(m.output)
 		}),
 		progressbar.OptionSetDescription(desc),
 		progressbar.OptionSetTheme(progressbar.Theme{
@@ -259,12 +286,13 @@ func newModule(proxy *config.Proxy, settings *config.HTTP) *Module {
 		KeepAlive: 30 * time.Second,
 	}).DialContext
 	transport.ResponseHeaderTimeout = requestTimeout
-	if proxy.Enable {
+	if proxy != nil && proxy.Enable {
 		if uri, err := url.Parse(proxy.Url); err == nil {
 			transport.Proxy = http.ProxyURL(uri)
 		}
 	}
 	return &Module{
+		output: os.Stderr,
 		proxy:  proxy,
 		client: &http.Client{Transport: transport, Timeout: requestTimeout},
 		// Downloads need a larger total budget, while retaining the connection
@@ -273,9 +301,17 @@ func newModule(proxy *config.Proxy, settings *config.HTTP) *Module {
 	}
 }
 
-func createModule(proxy *config.Proxy, settings *config.HTTP) lua.LGFunction {
+func createModule(proxy *config.Proxy, settings *config.HTTP, options Options) lua.LGFunction {
 	return func(L *lua.LState) int {
 		m := newModule(proxy, settings)
+		if options.WrapTransport != nil {
+			transport := options.WrapTransport(m.client.Transport)
+			m.client.Transport = transport
+			m.downloadClient.Transport = transport
+		}
+		if options.Output != nil {
+			m.output = options.Output
+		}
 		t := L.NewTable()
 		L.SetFuncs(t, m.luaMap())
 		L.Push(t)
@@ -297,5 +333,9 @@ func (m *Module) ensureUserAgent(L *lua.LState, req *http.Request) {
 }
 
 func Preload(L *lua.LState, proxy *config.Proxy, settings *config.HTTP) {
-	L.PreloadModule("http", createModule(proxy, settings))
+	PreloadWithOptions(L, proxy, settings, Options{})
+}
+
+func PreloadWithOptions(L *lua.LState, proxy *config.Proxy, settings *config.HTTP, options Options) {
+	L.PreloadModule("http", createModule(proxy, settings, options))
 }

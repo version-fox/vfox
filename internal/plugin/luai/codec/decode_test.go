@@ -17,10 +17,50 @@
 package codec
 
 import (
+	"strings"
 	"testing"
 
 	lua "github.com/yuin/gopher-lua"
 )
+
+func TestUnmarshalRejectsNestedTypeErrors(t *testing.T) {
+	for _, source := range []string{
+		`return {items = {{enabled = "yes"}}}`,
+		`return {items = {{enabled = {}}}}`,
+		`return {items = "wrong"}`,
+		`return {items = {"wrong"}}`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			L := lua.NewState()
+			defer L.Close()
+			if err := L.DoString(source); err != nil {
+				t.Fatal(err)
+			}
+			var result struct {
+				Items []struct {
+					Enabled bool `json:"enabled"`
+				} `json:"items"`
+			}
+			err := Unmarshal(L.Get(-1), &result)
+			if err == nil || !strings.Contains(err.Error(), "items") {
+				t.Fatalf("error = %v, want field context", err)
+			}
+		})
+	}
+}
+
+func TestMarshalFlattensEmbeddedFields(t *testing.T) {
+	L := lua.NewState()
+	defer L.Close()
+	value, err := Marshal(L, OuterPtr{EmbeddedPtr: &EmbeddedPtr{D: "value", E: 42}, F: "outer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := value.(*lua.LTable)
+	if table.RawGetString("D") != lua.LString("value") || table.RawGetString("E") != lua.LNumber(42) {
+		t.Fatal("embedded fields must retain the flat hook protocol")
+	}
+}
 
 type Embedded struct {
 	A string

@@ -290,23 +290,14 @@ end
 
 ## Test Plugin
 
-Currently, VersionFox plugin testing is straightforward. You only need to place the plugin file in the
-`${HOME}/.version-fox/plugin` directory and verify that your features are working using different commands. You can use
-`print`/`printTable` statements in Lua scripts for printing log.
-
-- PLUGIN:PreInstall -> `vfox install <sdk-name>@<version>`
-- PLUGIN:PostInstall -> `vfox install <sdk-name>@<version>`
-- PLUGIN:Available -> `vfox search <sdk-name>`
-- PLUGIN:EnvKeys -> `vfox use <sdk-name>@<version>`
-
-In addition, you can use the `--debug` parameter to view more log information, for example:
+Run Lua assertions against your local plugin without installing it:
 
 ```shell
-vfox --debug install <sdk-name>@<version>
-vfox --debug use <sdk-name>@<version>
-
-...
+vfox plugin test .
+vfox plugin run . PreInstall --input '{"version":"latest"}' --json
 ```
+
+See [Test and debug a plugin](./testing.md) for HTTP fixtures, environment overrides, all hook inputs, and CI execution boundaries. Run real installations in disposable CI runners or VMs.
 
 ## Example
 

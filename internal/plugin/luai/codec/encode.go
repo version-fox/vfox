@@ -57,6 +57,12 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 			if err != nil {
 				return nil, err
 			}
+			if fieldType.Anonymous && fieldType.Tag.Get("json") == "" && field.Kind() == reflect.Struct {
+				sub.(*lua.LTable).ForEach(func(key, value lua.LValue) {
+					table.RawSet(key, value)
+				})
+				continue
+			}
 			if lf, ok := sub.(*lua.LFunction); ok {
 				state.SetField(table, tag, lf)
 			} else {
