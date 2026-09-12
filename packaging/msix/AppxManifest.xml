@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppxManifest template for the vfox MSIX package.
+
+  Tokens are substituted by msix/make-msix.ps1:
+    @@VERSION@@       four-part package version, e.g. 1.2.3.0
+    @@ARCHITECTURE@@  ProcessorArchitecture: x86 | x64 | arm64
+    @@PUBLISHER@@     must exactly match the subject of the signing certificate
+
+  The windows.appExecutionAlias extension registers `vfox.exe` under
+  %LOCALAPPDATA%\Microsoft\WindowsApps so the CLI is on PATH right after
+  installation without any manual environment changes. It follows the
+  uap5 form recommended by Microsoft's "Packaging a CLI executable as MSIX"
+  guide (the older uap3 form fails schema validation on recent Windows SDKs).
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap5 rescap">
+
+  <Identity
+      Name="VersionFox.vfox"
+      Publisher="@@PUBLISHER@@"
+      Version="@@VERSION@@"
+      ProcessorArchitecture="@@ARCHITECTURE@@" />
+
+  <Properties>
+    <DisplayName>vfox</DisplayName>
+    <PublisherDisplayName>VersionFox</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application
+        Id="vfox"
+        Executable="vfox.exe"
+        EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="vfox"
+          Description="A cross-platform SDK version manager with a simple cli."
+          BackgroundColor="transparent"
+          Square150x150Logo="assets\Square150x150Logo.png"
+          Square44x44Logo="assets\Square44x44Logo.png">
+        <uap:DefaultTile ShortName="vfox" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap5:Extension Category="windows.appExecutionAlias">
+          <uap5:AppExecutionAlias>
+            <uap5:ExecutionAlias Alias="vfox.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

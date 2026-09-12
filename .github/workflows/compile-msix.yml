@@ -1,0 +1,57 @@
+name: compile-msix
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+
+jobs:
+  compile-msix:
+    name: Build MSIX bundle and publish
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: packaging/msix
+    steps:
+      - name: Checkout version-fox
+        uses: actions/checkout@v7
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+      - name: Decode signing certificate
+        env:
+          MSIX_PFX_BASE64: ${{ secrets.MSIX_PFX_BASE64 }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrEmpty($env:MSIX_PFX_BASE64)) {
+            Write-Host "MSIX_PFX_BASE64 not configured; the bundle will be published unsigned."
+            exit 0
+          }
+          [IO.File]::WriteAllBytes((Join-Path (Get-Location) "signing.pfx"), [Convert]::FromBase64String($env:MSIX_PFX_BASE64))
+      # No inputs: make-msix.ps1 reads the version from internal/version.go
+      # and builds every architecture from source itself.
+      - name: Build MSIX bundle
+        env:
+          MSIX_SIGN_PFX_PASSWORD: ${{ secrets.MSIX_PFX_PASSWORD }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tagVersion = "${{ github.event.release.tag_name }}" -replace '^v', ''
+          $sourceVersion = (Select-String -Path "../../internal/version.go" -Pattern 'RuntimeVersion\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($tagVersion -ne $sourceVersion) {
+            throw "Version mismatch: release tag is '$tagVersion' but internal/version.go says '$sourceVersion'."
+          }
+          ./make-msix.ps1
+      - name: Upload MSIX Assets
+        uses: version-fox/vfox-release-assets@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_id: ${{ github.event.release.id }}
+          assets_path: packaging/msix/Output/*.msixbundle

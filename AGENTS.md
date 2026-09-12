@@ -132,3 +132,4 @@ java = { version = "21", vendor = "openjdk" }
 | Shell initialization and exports | [shell/](internal/shell/) |
 | vfox settings | [config/](internal/config/) |
 | Shared utilities | [shared/](internal/shared/) |
+| Windows MSIX packaging | [packaging/msix/](packaging/msix/) (`AppxManifest.xml`, `make-msix.ps1`, `gen-assets.ps1`; docs at [msix.md](docs/guides/msix.md); release via [compile-msix.yml](.github/workflows/compile-msix.yml), e2e via [e2e-msix-test.ps1](scripts/e2e-msix-test.ps1)) |
