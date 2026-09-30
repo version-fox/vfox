@@ -20,11 +20,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/version-fox/vfox/internal/shared/util"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -131,17 +129,12 @@ func configureDevelopmentOutput(L *lua.LState, output io.Writer, testing bool) {
 		}
 	} else {
 		osModule.RawSetString("execute", L.NewFunction(func(L *lua.LState) int {
-			program, args := "/bin/sh", []string{"-c", L.CheckString(1)}
-			if runtime.GOOS == "windows" {
-				root := os.Getenv("SystemRoot")
-				if root == "" {
-					root = `C:\Windows`
-				}
-				program, args = filepath.Join(root, "System32", "cmd.exe"), []string{"/c", L.CheckString(1)}
-			}
+			// util.ShellCommand uses PowerShell -EncodedCommand on Windows so
+			// paths with spaces, quotes, or backslashes survive the cmd-line
+			// layer. On Unix it falls back to /bin/sh -c.
+			command := util.ShellCommand(L.CheckString(1))
 			// As with normal Lua os.execute, arbitrary child processes are not
 			// covered by the Lua/HTTP deadline. Their output is diagnostic text.
-			command := exec.Command(program, args...)
 			command.Stdin, command.Stdout, command.Stderr = os.Stdin, output, output
 			if err := command.Run(); err != nil {
 				L.Push(lua.LNumber(1))

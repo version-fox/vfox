@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/util"
@@ -82,13 +83,17 @@ func (s *Shim) Generate() error {
 	}
 	targetPath := filepath.Join(s.OutputPath, filename)
 	ext := filepath.Ext(filename)
+	// PowerShell single-quoted strings only need escaping for embedded
+	// single quotes (double them). This handles paths with spaces,
+	// double quotes, and backslashes safely.
+	ps1Path := strings.ReplaceAll(s.BinaryPath, "'", "''")
 	if ext == ".cmd" {
 		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(cmdShimContent, s.BinaryPath)), stat.Mode()); err != nil {
 			return fmt.Errorf("failed to generate shim: %w", err)
 		}
 		return nil
 	} else if ext == ".ps1" {
-		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(ps1ShimContent, s.BinaryPath)), stat.Mode()); err != nil {
+		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(ps1ShimContent, ps1Path)), stat.Mode()); err != nil {
 			return fmt.Errorf("failed to generate shim: %w", err)
 		}
 		return nil
@@ -100,7 +105,8 @@ func (s *Shim) Generate() error {
 	shimName := filename[:len(filename)-len(ext)] + ".shim"
 	shimFile := filepath.Join(s.OutputPath, shimName)
 	logger.Debugf("Write shim file to %s", shimFile)
-	if err = os.WriteFile(shimFile, []byte(fmt.Sprintf(shimFileContent, s.BinaryPath)), stat.Mode()); err != nil {
+	shimPath := strings.ReplaceAll(s.BinaryPath, `"`, `\"`)
+	if err = os.WriteFile(shimFile, []byte(fmt.Sprintf(shimFileContent, shimPath)), stat.Mode()); err != nil {
 		return fmt.Errorf("failed to generate shim: %w", err)
 	}
 	return nil

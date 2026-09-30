@@ -50,6 +50,11 @@ func (vm *LuaVM) Prepare(options *module.PreloadOptions) error {
 		module.Preload(vm.Instance, options)
 	}
 
+	// On Windows, override os.execute and io.popen to use PowerShell
+	// -EncodedCommand so paths with spaces, quotes, or backslashes survive
+	// the cmd-line layer. See exec.go for details.
+	installWindowsExecOverrides(vm.Instance)
+
 	return nil
 }
 
