@@ -162,7 +162,7 @@ func MkSymlink(oldname, newname string) (err error) {
 	if IsWindows() {
 		script := fmt.Sprintf("New-Item -ItemType Junction -Path %s -Target %s -Force",
 			psSingleQuote(newname), psSingleQuote(oldname))
-		out, err := RunShellScript(script)
+		out, err := RunPowerShellScript(script)
 		if err != nil {
 			return fmt.Errorf("failed to create junction '%s' -> '%s': %w (%s)", newname, oldname, err, strings.TrimSpace(out))
 		}

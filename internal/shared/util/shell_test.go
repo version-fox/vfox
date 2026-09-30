@@ -116,54 +116,69 @@ func TestShellCommandUnix(t *testing.T) {
 	}
 }
 
-func TestShellCommandWindows(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("windows-only test")
+func TestWindowsCmdLine(t *testing.T) {
+	cases := []struct {
+		comSpec string
+		command string
+		want    string
+	}{
+		// The command text is appended verbatim so cmd builtins keep their
+		// cmd meaning (dir stays cmd's dir, not PowerShell's Get-ChildItem
+		// alias) and paths with spaces, quotes, or backslashes survive.
+		{`C:\Windows\System32\cmd.exe`, `dir /b /ad`, `C:\Windows\System32\cmd.exe /d /c dir /b /ad`},
+		{`C:\Windows\System32\cmd.exe`, `mklink /j "C:\a b" "C:\c d"`, `C:\Windows\System32\cmd.exe /d /c mklink /j "C:\a b" "C:\c d"`},
+		{`C:\Windows\System32\cmd.exe`, `"C:\Program Files\vfox\vfox.exe" --version`, `C:\Windows\System32\cmd.exe /d /c "C:\Program Files\vfox\vfox.exe" --version`},
+		{`C:\Windows\System32\cmd.exe`, `echo hello`, `C:\Windows\System32\cmd.exe /d /c echo hello`},
+		{`C:\Windows\System32\cmd.exe`, ``, `C:\Windows\System32\cmd.exe /d /c `},
+		// An interpreter path containing spaces is quoted.
+		{`C:\My Tools\cmd.exe`, `echo hello`, `"C:\My Tools\cmd.exe" /d /c echo hello`},
 	}
-	cmd := ShellCommand(`echo hello`)
-	if cmd.Path == "" && strings.ToLower(cmd.Args[0]) != "powershell.exe" && cmd.Args[0] != "powershell" {
-		t.Errorf("ShellCommand first arg = %q, want powershell", cmd.Args[0])
-	}
-	if len(cmd.Args) < 6 {
-		t.Fatalf("ShellCommand args = %v, want at least 6 (powershell -NoProfile -NoLogo -NonInteractive -EncodedCommand <base64>)", cmd.Args)
-	}
-	encIdx := -1
-	for i, a := range cmd.Args {
-		if a == "-EncodedCommand" {
-			encIdx = i
-			break
-		}
-	}
-	if encIdx == -1 {
-		t.Fatalf("ShellCommand args = %v, want -EncodedCommand flag", cmd.Args)
-	}
-	encoded := cmd.Args[encIdx+1]
-	for _, bad := range []string{" ", "\"", "\\", "'", "`"} {
-		if strings.Contains(encoded, bad) {
-			t.Errorf("encoded command contains %q: %q", bad, encoded)
+	for _, tc := range cases {
+		if got := windowsCmdLine(tc.comSpec, tc.command); got != tc.want {
+			t.Errorf("windowsCmdLine(%q, %q) = %q, want %q", tc.comSpec, tc.command, got, tc.want)
 		}
 	}
 }
 
-func TestShellCommandWindowsPathWithSpaces(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("windows-only test")
+// decodePowerShell decodes a PowerShell -EncodedCommand blob back to the
+// original script for assertions.
+func decodePowerShell(t *testing.T, encoded string) string {
+	t.Helper()
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("base64 decode failed: %v", err)
 	}
-	script := `& 'C:\Program Files\vfox\upgrade.bat'`
-	cmd := ShellCommand(script)
-	// The encoded argument must contain no spaces; this is what makes the
-	// command safe to pass through Go's exec.Command → CreateProcess chain.
-	encIdx := -1
-	for i, a := range cmd.Args {
-		if a == "-EncodedCommand" {
-			encIdx = i
-			break
-		}
+	if len(raw)%2 != 0 {
+		t.Fatalf("decoded length %d is not even (not UTF-16LE)", len(raw))
 	}
-	if encIdx == -1 {
-		t.Fatalf("no -EncodedCommand flag in args: %v", cmd.Args)
+	decoded := make([]uint16, len(raw)/2)
+	for i := range decoded {
+		decoded[i] = binary.LittleEndian.Uint16(raw[i*2:])
 	}
-	if strings.Contains(cmd.Args[encIdx+1], " ") {
-		t.Errorf("encoded command has spaces: %q", cmd.Args[encIdx+1])
+	return string(utf16.Decode(decoded))
+}
+
+func TestPowerShellCommandUnix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-only test")
+	}
+	// On Unix PowerShellCommand falls back to /bin/sh -c so callers stay
+	// testable; Windows-only call sites guard with IsWindows.
+	cmd := PowerShellCommand(`echo hello`)
+	if cmd.Path != "/bin/sh" {
+		t.Errorf("PowerShellCommand path = %q, want /bin/sh", cmd.Path)
+	}
+}
+
+func TestPowerShellArgsContainEncodedCommand(t *testing.T) {
+	args := powershellArgs(`echo hello`)
+	if len(args) != 5 {
+		t.Fatalf("powershellArgs = %v, want 5 args", args)
+	}
+	if args[3] != "-EncodedCommand" {
+		t.Errorf("powershellArgs[3] = %q, want -EncodedCommand", args[3])
+	}
+	if got := decodePowerShell(t, args[4]); got != "echo hello" {
+		t.Errorf("decoded powershellArgs = %q, want %q", got, "echo hello")
 	}
 }
