@@ -1,6 +1,6 @@
 # 配置
 
-`vfox` 允许你修改一些配置, 所有配置信息都存放在`$HOME/.version-fox/config.yaml`文件中。
+`vfox` 允许你修改一些配置, 所有配置信息都存放在`$HOME/.vfox/config.yaml`文件中。
 
 ::: tip 注意
 如果你是首次运行`vfox`, 则会自动创建一个空的 config.yaml 文件。
@@ -55,7 +55,7 @@ proxy:
 
 ## 存储路径
 
-`vfox`默认将 SDK 缓存文件存储在`$HOME/.version-fox/cache`目录下。
+`vfox`默认将 SDK 缓存文件存储在`$HOME/.vfox/cache`目录下。
 
 ::: danger !!!
 在配置之前， 请确保`vfox`有文件夹的写权限。⚠⚠⚠
@@ -110,7 +110,7 @@ cache:
 ```
 
 ::: tip 缓存文件路径
-`$HOME/.version-fox/plugins/<plugin-name>/available.cache`
+`$HOME/.vfox/plugin/<plugin-name>/.available.cache`
 :::
 
 ## Gitignore 设置 <Badge type="tip" text=">= 1.0.12" vertical="middle" />

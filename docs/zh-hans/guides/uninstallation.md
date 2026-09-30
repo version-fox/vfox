@@ -207,8 +207,12 @@ sudo rm /usr/local/bin/vfox
 ### 删除 vfox 数据目录
 
 ```shell
-rm -rf ~/.version-fox
+rm -rf ~/.vfox
 ```
+
+::: tip 提示
+vfox 1.0.0 之前使用的目录是 `~/.version-fox`。如果该目录仍然存在，vfox 会继续使用它，请一并删除。
+:::
 
 此目录包含：
 - 已安装的 SDK 版本

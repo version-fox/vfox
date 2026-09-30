@@ -207,8 +207,12 @@ This will permanently delete all SDK versions you installed through vfox!
 ### Remove vfox Data Directory
 
 ```shell
-rm -rf ~/.version-fox
+rm -rf ~/.vfox
 ```
+
+::: tip
+vfox versions before 1.0.0 used `~/.version-fox` instead. If that directory still exists, vfox keeps using it, so remove it as well.
+:::
 
 This directory contains:
 - Installed SDK versions
