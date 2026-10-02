@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -193,7 +192,7 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 		if err := os.WriteFile(batchFile, []byte(batchContent), 0666); err != nil {
 			return cli.Exit("Failed to clear: "+err.Error(), 1)
 		}
-		cmd := exec.Command("cmd.exe", "/C", batchFile)
+		cmd := util.PowerShellCommand(fmt.Sprintf("& '%s'", strings.ReplaceAll(batchFile, "'", "''")))
 		if err := cmd.Start(); err != nil {
 			return cli.Exit("Failed to launch shell: "+err.Error(), 1)
 		}

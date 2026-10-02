@@ -18,9 +18,9 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -147,16 +147,32 @@ func IsExecutable(src string) bool {
 	}
 }
 
-// MkSymlink Create a symbolic link
+// MkSymlink Create a symbolic link. On Windows this uses PowerShell's
+// New-Item -ItemType Junction, invoked via -EncodedCommand, so paths
+// containing spaces, quotes, or backslashes survive the cmd-line layer.
+// (The previous implementation shelled out to `cmd.exe /c mklink /j`,
+// which Go's exec.Command escapes in a way cmd.exe misinterprets.)
 func MkSymlink(oldname, newname string) (err error) {
-	if runtime.GOOS == "windows" {
-		// Create a symbolic link on Windows
-		// https://superuser.com/questions/1020821/how-can-i-create-a-symbolic-link-on-windows-10
-		if err = exec.Command("cmd", "/c", "mklink", "/j", newname, oldname).Run(); err == nil {
-			return nil
-		}
+	if !FileExists(oldname) {
+		return fmt.Errorf("source directory '%s' does not exist", oldname)
 	}
-	return os.Symlink(oldname, newname)
+	if FileExists(newname) {
+		return fmt.Errorf("destination '%s' already exists", newname)
+	}
+	if IsWindows() {
+		script := fmt.Sprintf("New-Item -ItemType Junction -Path %s -Target %s -Force",
+			psSingleQuote(newname), psSingleQuote(oldname))
+		out, err := RunPowerShellScript(script)
+		if err != nil {
+			return fmt.Errorf("failed to create junction '%s' -> '%s': %w (%s)", newname, oldname, err, strings.TrimSpace(out))
+		}
+		return nil
+	}
+	err = os.Symlink(oldname, newname)
+	if err != nil {
+		return fmt.Errorf("failed to create symlink: %w", err)
+	}
+	return nil
 }
 
 func isCrossDeviceRenameError(err error) bool {

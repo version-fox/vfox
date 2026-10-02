@@ -50,6 +50,12 @@ func (vm *LuaVM) Prepare(options *module.PreloadOptions) error {
 		module.Preload(vm.Instance, options)
 	}
 
+	// On Windows, override os.execute and io.popen to use util.ShellCommand,
+	// which invokes cmd.exe directly with a raw command line so cmd syntax
+	// is preserved while paths with spaces, quotes, or backslashes survive.
+	// See exec.go for details.
+	installWindowsExecOverrides(vm.Instance)
+
 	return nil
 }
 
