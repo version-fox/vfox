@@ -1,6 +1,6 @@
 # Configuration
 
-`vfox` allows you to change some configurations, all configuration is stored in the `$HOME/.version-fox/config.yaml`
+`vfox` allows you to change some configurations, all configuration is stored in the `$HOME/.vfox/config.yaml`
 file.
 
 ::: tip
@@ -58,7 +58,7 @@ proxy:
 
 ## Storage Settings
 
-By default, `vfox` stores SDK cache files in the `$HOME/.version-fox/cache` directory.
+By default, `vfox` stores SDK cache files in the `$HOME/.vfox/cache` directory.
 
 ::: danger !!!
 Before configuring, please make sure that `vfox` has write permission to the folder.⚠⚠⚠
@@ -113,7 +113,7 @@ cache:
 ```
 
 ::: tip Cache File Path
-`$HOME/.version-fox/plugins/<plugin-name>/available.cache`
+`$HOME/.vfox/plugin/<plugin-name>/.available.cache`
 :::
 
 ## Gitignore Settings <Badge type="tip" text=">= 1.0.12" vertical="middle" />
