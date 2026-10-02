@@ -131,6 +131,16 @@ winget uninstall vfox
 
 :::
 
+::: details MSIX 安装包
+
+```powershell
+Get-AppxPackage *vfox* | Remove-AppxPackage
+```
+
+也可以在 **设置** > **应用** > **已安装的应用** 中选择 **vfox** 并点击 **卸载**。卸载会同时移除 `vfox` 的应用执行别名。
+
+:::
+
 ::: details 手动安装
 
 1. 删除您解压 vfox 的目录

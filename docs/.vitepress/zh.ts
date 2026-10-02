@@ -102,6 +102,7 @@ function sidebar(): DefaultTheme.Sidebar {
         {
             text: '其他',
             items: [
+                {text: 'MSIX 安装包', link: '/zh-hans/guides/msix'},
             ]
         },
     ]
