@@ -10,6 +10,7 @@ on:
       - 'scripts/testdata/msix-runner/**'
       - 'cmd/commands/upgrade*'
       - '.github/workflows/e2e-tests.yml'
+      - '.github/workflows/compile-msix.yml'
   workflow_dispatch:
 
 jobs:
@@ -148,7 +149,7 @@ jobs:
           echo "All test artifacts have been uploaded."
 
       - name: Check test results
-        if: failure()
+        if: needs.test-windows.result != 'success' || needs.test-unix.result != 'success' || needs.test-msix-windows.result != 'success'
         run: |
           echo "Some tests failed. Please check the artifacts above."
           exit 1

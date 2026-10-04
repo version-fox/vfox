@@ -68,20 +68,51 @@ func normalUserToken(token windows.Token) (windows.Token, error) {
 	return restricted, nil
 }
 
+func verifyNormalUser(token windows.Token) error {
+	// SAFER can retain the original UAC elevation flag. Check effective
+	// group rights and integrity instead of relying on that historical flag.
+	groups, err := token.GetTokenGroups()
+	if err != nil {
+		return fmt.Errorf("read child token groups: %w", err)
+	}
+	for _, group := range groups.AllGroups() {
+		privileged := group.Sid.IsWellKnown(windows.WinBuiltinAdministratorsSid) ||
+			group.Sid.IsWellKnown(windows.WinBuiltinPowerUsersSid)
+		if privileged && group.Attributes&windows.SE_GROUP_ENABLED != 0 &&
+			group.Attributes&windows.SE_GROUP_USE_FOR_DENY_ONLY == 0 {
+			return errors.New("test child still has administrator or power-user rights")
+		}
+	}
+	var size uint32
+	err = windows.GetTokenInformation(token, windows.TokenIntegrityLevel, nil, 0, &size)
+	if !errors.Is(err, windows.ERROR_INSUFFICIENT_BUFFER) {
+		return fmt.Errorf("query child integrity buffer: %w", err)
+	}
+	buf := make([]byte, size)
+	if err := windows.GetTokenInformation(token, windows.TokenIntegrityLevel, &buf[0], size, &size); err != nil {
+		return fmt.Errorf("read child integrity: %w", err)
+	}
+	label := (*windows.Tokenmandatorylabel)(unsafe.Pointer(&buf[0]))
+	if !label.Label.Sid.IsWellKnown(windows.WinMediumLabelSid) {
+		return fmt.Errorf("expected medium integrity, got %s", label.Label.Sid)
+	}
+	return nil
+}
+
 func run() error {
 	if len(os.Args) < 2 {
 		return errors.New("usage: msix-runner <command> [arguments...]")
 	}
 	token := windows.GetCurrentProcessToken()
 	if os.Args[1] == "--child" {
-		if token.IsElevated() {
-			return errors.New("test child still has an elevated token")
+		if err := verifyNormalUser(token); err != nil {
+			return err
 		}
 		if len(os.Args) < 3 {
 			return errors.New("missing child command")
 		}
 		if os.Args[2] == "--check-token" {
-			fmt.Println("Non-elevated child token verified")
+			fmt.Println("Normal-user child verified: medium integrity, no administrator or power-user rights")
 			return nil
 		}
 		return runCommand(exec.Command(os.Args[2], os.Args[3:]...))
@@ -94,8 +125,8 @@ func run() error {
 			return err
 		}
 		defer linked.Close()
-		if linked.IsElevated() {
-			return errors.New("normal-user token is elevated")
+		if err := verifyNormalUser(linked); err != nil {
+			return err
 		}
 		child.SysProcAttr = &syscall.SysProcAttr{Token: syscall.Token(linked)}
 	}
