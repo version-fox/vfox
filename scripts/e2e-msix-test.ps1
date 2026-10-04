@@ -348,7 +348,10 @@ try {
             try {
                 # `list` initializes SdkManager/pathmeta (unlike --version/--help,
                 # which are handled at CLI routing), so ~/.vfox gets created.
-                $null = Invoke-PackagedVfox -Arguments @("list")
+                $output = & $runnerPath $aliasPath list 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 1 -or $output -notmatch "you don't have any sdk installed yet") {
+                    throw "Unexpected result for an empty SDK directory: $output"
+                }
                 if (Test-Path (Join-Path $probeHome ".vfox")) { "USER_DATA_OK" } else { "NO_USER_DATA" }
             }
             finally {
