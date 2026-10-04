@@ -29,7 +29,8 @@
     The publisher is fixed to "CN=VersionFox". Signing is optional and
     configured through the environment only:
       MSIX_SIGN_PFX_PATH (falls back to <script>/signing.pfx when present),
-      MSIX_SIGN_PFX_PASSWORD (falls back to MSIX_PFX_PASSWORD).
+      MSIX_SIGN_PFX_PASSWORD (falls back to MSIX_PFX_PASSWORD),
+      MSIX_TIMESTAMP_URL (defaults to http://timestamp.digicert.com).
 
 .EXAMPLE
     ./make-msix.ps1
@@ -221,7 +222,7 @@ foreach ($pkg in $packages) {
 }
 
 $bundlePath = Join-Path $OutputDir ("vfox_{0}_windows.msixbundle" -f $Version)
-& $makeAppx bundle /o /d $bundleStage /p $bundlePath | Out-Host
+& $makeAppx bundle /o /bv $msixVersion /d $bundleStage /p $bundlePath | Out-Host
 Assert-NativeSuccess -Step "MakeAppx bundle"
 Write-Host "Created bundle: $bundlePath"
 
@@ -230,7 +231,13 @@ if (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) {
         throw "A signing certificate was found but no password was provided. Set MSIX_SIGN_PFX_PASSWORD (or MSIX_PFX_PASSWORD)."
     }
     $signTool = Find-SdkTool -ToolName "signtool"
-    & $signTool sign /fd SHA256 /f $SignPfxPath /p $SignPfxPassword $bundlePath | Out-Host
+    $timestampUrl = $env:MSIX_TIMESTAMP_URL
+    if ([string]::IsNullOrWhiteSpace($timestampUrl)) {
+        $timestampUrl = "http://timestamp.digicert.com"
+    }
+    # A trusted timestamp keeps released bundles installable after the
+    # signing certificate expires. Treat timestamp failures as build failures.
+    & $signTool sign /fd SHA256 /tr $timestampUrl /td SHA256 /f $SignPfxPath /p $SignPfxPassword $bundlePath | Out-Host
     Assert-NativeSuccess -Step "SignTool sign"
     Write-Host "Signed bundle: $bundlePath"
 }

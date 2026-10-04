@@ -1,6 +1,17 @@
 name: vfox E2E Test
 
-on: [push]
+on:
+  push:
+  pull_request:
+    paths:
+      - 'packaging/msix/**'
+      - 'scripts/e2e-msix-test.ps1'
+      - 'scripts/testdata/msix-probe/**'
+      - 'scripts/testdata/msix-runner/**'
+      - 'cmd/commands/upgrade*'
+      - '.github/workflows/e2e-tests.yml'
+      - '.github/workflows/compile-msix.yml'
+  workflow_dispatch:
 
 jobs:
   test-windows:
@@ -50,13 +61,16 @@ jobs:
   test-msix-windows:
     name: Test MSIX packaging on Windows
     runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.24'
+          go-version-file: go.mod
       - name: Check Go installation
         run: go version
       # Build, pack, sign, install and verify the .msixbundle end-to-end
@@ -135,9 +149,7 @@ jobs:
           echo "All test artifacts have been uploaded."
 
       - name: Check test results
-        if: failure()
+        if: needs.test-windows.result != 'success' || needs.test-unix.result != 'success' || needs.test-msix-windows.result != 'success'
         run: |
           echo "Some tests failed. Please check the artifacts above."
           exit 1
-
-
