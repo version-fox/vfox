@@ -39,6 +39,7 @@ jobs:
       - name: Build MSIX bundle
         env:
           MSIX_SIGN_PFX_PASSWORD: ${{ secrets.MSIX_PFX_PASSWORD }}
+          MSIX_TIMESTAMP_URL: ${{ vars.MSIX_TIMESTAMP_URL }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"

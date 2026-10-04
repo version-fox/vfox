@@ -32,6 +32,7 @@ go test ./... -coverprofile=coverage.out -covermode=atomic
 ## E2E and release workflows
 
 - [scripts/e2e-test.sh](scripts/e2e-test.sh) and [scripts/e2e-test.ps1](scripts/e2e-test.ps1) install SDKs, change vfox state, and clean installation or user directories. Run them only in a disposable environment such as a CI runner or VM. Setting `VFOX_HOME` alone does not isolate the Unix script from the real user's vfox directory; Windows global use also writes user environment settings to the registry.
+- [scripts/e2e-msix-test.ps1](scripts/e2e-msix-test.ps1) also requires a disposable Windows runner or VM. It creates a temporary trusted certificate, installs and upgrades MSIX bundles, and verifies global SDK selections through the host registry. It restores the fixture's registry values and removes its packages and certificate on exit.
 - `./scripts/bump.sh <version>` changes the runtime version, stages it, commits, and creates a local tag. Use it for requested versioning work with the staging state reviewed; it does not push.
 - `goreleaser release` runs the release workflow, including a GitHub draft release and configured distribution updates. Use it for requested release work. See [.goreleaser.yaml](.goreleaser.yaml) and [.github/workflows/go-releaser.yml](.github/workflows/go-releaser.yml).
 

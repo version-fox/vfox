@@ -23,7 +23,7 @@ Windows refuses to install unsigned packages. Re-sign the bundle with your own c
 
 ### Signing an unsigned bundle
 
-The build cannot perform signing on behalf of users. At install time Windows verifies the signer against certificates trusted on the target machine, so a certificate generated during packaging is treated the same as no signature at all. In addition, MSIX requires an upgrade package to be signed with the same certificate as the installed one; per-build certificates would therefore break upgrades. Signing with a long-lived certificate of your own is a one-time operation: once the certificate is trusted, subsequent versions install without extra steps.
+Windows must trust the signing certificate on the target machine. Keep the package publisher unchanged across upgrades, and reuse a long-lived certificate to avoid importing a new certificate for each release. Trusting that certificate is a one-time operation; each unsigned bundle you download must still be signed before installation. Include a trusted timestamp so the signed bundle remains installable after the signing certificate expires.
 
 First create a self-signed code-signing certificate whose subject matches the package publisher (`CN=VersionFox`) and import it into the trusted store. Importing into `Cert:\LocalMachine\TrustedPeople` requires an elevated (administrator) PowerShell session:
 
@@ -39,7 +39,7 @@ Import-PfxCertificate -FilePath vfox.pfx -CertStoreLocation Cert:\LocalMachine\T
 Then sign the bundle and install it ([signtool](https://learn.microsoft.com/windows/win32/seccrypto/signtool) comes with the Windows SDK):
 
 ```powershell
-signtool sign /fd SHA256 /f vfox.pfx /p pick-a-password .\vfox_<version>_windows.msixbundle
+signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f vfox.pfx /p pick-a-password .\vfox_<version>_windows.msixbundle
 Add-AppxPackage -Path .\vfox_<version>_windows.msixbundle
 ```
 
@@ -55,8 +55,10 @@ Alternatively open **Settings** > **Apps** > **Installed apps**, select **vfox**
 
 Release bundles are built by the `compile-msix` workflow on every release. Signing is optional; two options:
 
-- **Self-signed certificate (no external account needed).** Generate one PFX and keep it stable across releases, then configure the repository secrets `MSIX_PFX_BASE64` (Base64-encoded certificate) and `MSIX_PFX_PASSWORD`; the subject must match the manifest publisher (`CN=VersionFox`). Releases are signed automatically from then on. Publish the public `.cer` file alongside the releases so users only need to import it once — because the signature stays identical across versions, upgrades are unaffected.
+- **Self-signed certificate (no external account needed).** Generate one PFX and keep it stable across releases, then configure the repository secrets `MSIX_PFX_BASE64` (Base64-encoded certificate) and `MSIX_PFX_PASSWORD`; the subject must match the manifest publisher (`CN=VersionFox`). Releases are signed automatically from then on. Publish the public `.cer` file alongside the releases so users only need to import it once. Keep the publisher identity stable when renewing the certificate, and distribute the new public certificate if it also needs to be trusted.
 - **Publicly trusted certificate.** Packages signed by a CA-issued code-signing certificate or through [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/overview) install without any user-side trust configuration. Obtaining one involves identity verification, and OV/EV certificates mandate hardware-protected private keys, which cannot be placed in CI secrets.
+
+Signed builds use an RFC 3161 timestamp from `http://timestamp.digicert.com`; set `MSIX_TIMESTAMP_URL` to use another timestamp service. The build fails if signing or timestamping fails. Both the architecture packages and the outer bundle use the source release version.
 
 All packaging files reside in the [`packaging/msix/`](https://github.com/version-fox/vfox/tree/main/packaging/msix) directory:
 
