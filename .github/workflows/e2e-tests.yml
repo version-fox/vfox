@@ -7,6 +7,7 @@ on:
       - 'packaging/msix/**'
       - 'scripts/e2e-msix-test.ps1'
       - 'scripts/testdata/msix-probe/**'
+      - 'scripts/testdata/msix-runner/**'
       - 'cmd/commands/upgrade*'
       - '.github/workflows/e2e-tests.yml'
   workflow_dispatch:
@@ -151,4 +152,3 @@ jobs:
         run: |
           echo "Some tests failed. Please check the artifacts above."
           exit 1
-

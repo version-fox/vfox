@@ -110,7 +110,7 @@ function Get-BundleVersion {
 function Invoke-PackagedVfox {
     param([string[]]$Arguments)
 
-    $output = & $aliasPath @Arguments 2>&1 | Out-String
+    $output = & $runnerPath $aliasPath @Arguments 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         throw "vfox $($Arguments -join ' ') exited with ${LASTEXITCODE}: $output"
     }
@@ -233,6 +233,19 @@ try {
     $upgradeBundlePath = Build-TestBundle -Version $UpgradeVersion
     $bundlePath = Build-TestBundle -Version $TestVersion
 
+    # Installation and certificate trust need elevation, but SDK commands
+    # must also work in an ordinary terminal. The helper verifies its child
+    # token before invoking the app execution alias.
+    $runnerPath = Join-Path $OutputDir "msix-runner.exe"
+    Push-Location $RepoRoot
+    try {
+        go build -o $runnerPath ./scripts/testdata/msix-runner
+        if ($LASTEXITCODE -ne 0) { throw "Could not build the non-elevated test runner" }
+    }
+    finally { Pop-Location }
+    & $runnerPath --check-token
+    if ($LASTEXITCODE -ne 0) { throw "Could not start a non-elevated test process" }
+
     # ------------------------------------------------------------------
     # Step 3: Trust certificate and install the bundle
     # ------------------------------------------------------------------
@@ -335,7 +348,7 @@ try {
             try {
                 # `list` initializes SdkManager/pathmeta (unlike --version/--help,
                 # which are handled at CLI routing), so ~/.vfox gets created.
-                $null = & $aliasPath list 2>&1
+                $null = Invoke-PackagedVfox -Arguments @("list")
                 if (Test-Path (Join-Path $probeHome ".vfox")) { "USER_DATA_OK" } else { "NO_USER_DATA" }
             }
             finally {
@@ -347,7 +360,7 @@ try {
 
     Run-Test "Packaged self-upgrade explains the installation method" `
         {
-            $output = & $aliasPath upgrade 2>&1 | Out-String
+            $output = & $runnerPath $aliasPath upgrade 2>&1 | Out-String
             if ($LASTEXITCODE -ne 1 -or $output -notmatch 'MSIX package.*cannot self-upgrade') {
                 throw "Unexpected upgrade result: $output"
             }
