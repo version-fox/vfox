@@ -20,6 +20,8 @@
 
 .DESCRIPTION
     Must run on Windows (Windows 10 1809+ / Windows Server 2025 or newer).
+    Use a disposable CI runner or VM: these tests install packages, trust a
+    test certificate and exercise real user environment registry writes.
     Builds vfox.exe for x86/x64/arm64, packs them into an .msixbundle via
     msix/make-msix.ps1, signs it with an ephemeral self-signed certificate,
     installs the bundle through the AppX deployment service, verifies the
@@ -43,6 +45,7 @@ $NC = "`e[0m"
 
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 $TestVersion = "9.9.9"
+$UpgradeVersion = "9.9.10"
 $PfxPassword = "vfox-e2e-password"
 $PublisherSubject = "CN=VersionFox"
 $PackageIdentityName = "VersionFox.vfox"
@@ -62,6 +65,81 @@ $versionFile = Join-Path $RepoRoot "internal/version.go"
 $originalVersionGo = $null
 $versionPatched = $false
 $msixOutDir = Join-Path $RepoRoot "packaging/msix/Output"
+$probeRoot = $null
+$registrySnapshot = @{}
+$savedEnvironment = @{}
+foreach ($name in @("USERPROFILE", "VFOX_HOME", "__VFOX_SHELL", "__VFOX_PID", "__VFOX_CURTMPPATH", "MSIX_SIGN_PFX_PATH", "MSIX_SIGN_PFX_PASSWORD")) {
+    $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+}
+
+function Build-TestBundle {
+    param([string]$Version)
+
+    $patched = $script:originalVersionGo -replace '\b(var|const)\s+RuntimeVersion\s*=\s*"[^"]*"', ('var RuntimeVersion = "{0}"' -f $Version)
+    Set-Content -Path $versionFile -Value $patched -Encoding UTF8 -NoNewline
+    $script:versionPatched = $true
+    $env:MSIX_SIGN_PFX_PATH = $pfxPath
+    $env:MSIX_SIGN_PFX_PASSWORD = $PfxPassword
+    & (Join-Path $RepoRoot "packaging/msix/make-msix.ps1") | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "make-msix.ps1 failed with exit code $LASTEXITCODE"
+    }
+    $bundle = Join-Path $msixOutDir ("vfox_{0}_windows.msixbundle" -f $Version)
+    if (-not (Test-Path $bundle)) { throw "Bundle not found: $bundle" }
+    Copy-Item -Path $bundle -Destination $packageDir
+    return $bundle
+}
+
+function Get-BundleVersion {
+    param([string]$Path)
+
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $entry = $zip.GetEntry("AppxMetadata/AppxBundleManifest.xml")
+        if ($null -eq $entry) { throw "Bundle manifest is missing" }
+        $reader = [System.IO.StreamReader]::new($entry.Open())
+        try {
+            [xml]$manifest = $reader.ReadToEnd()
+            return $manifest.Bundle.Identity.Version
+        }
+        finally { $reader.Dispose() }
+    }
+    finally { $zip.Dispose() }
+}
+
+function Invoke-PackagedVfox {
+    param([string[]]$Arguments)
+
+    $output = & $aliasPath @Arguments 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw "vfox $($Arguments -join ' ') exited with ${LASTEXITCODE}: $output"
+    }
+    return $output
+}
+
+function Assert-GlobalSdkState {
+    param([string]$Version)
+
+    # This PowerShell process is outside the package. Reading here catches
+    # writes that only succeeded inside the MSIX private registry hive.
+    $expectedPath = Join-Path $env:USERPROFILE ".vfox\sdks\msix-probe"
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment")
+    try {
+        if ($key.GetValue("VFOX_MSIX_E2E_HOME") -ne $expectedPath) {
+            throw "SDK home is not visible in the host registry"
+        }
+        if ($key.GetValue("VFOX_MSIX_E2E_VERSION") -ne $Version) {
+            throw "SDK version $Version is not visible in the host registry"
+        }
+        if (@($key.GetValue("Path") -split ';' | Where-Object { $_ -eq $expectedPath }).Count -ne 1) {
+            throw "Host PATH must contain the SDK link exactly once"
+        }
+    }
+    finally { $key.Dispose() }
+    if ((Get-Content -Raw (Join-Path $expectedPath "probe.txt")) -ne $Version) {
+        throw "SDK link does not expose version $Version to the host"
+    }
+}
 
 function Write-Banner {
     param([string]$Title, [ConsoleColor]$Color = [ConsoleColor]::White)
@@ -146,40 +224,14 @@ try {
     $packageDir = Join-Path $OutputDir "packages"
     New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
 
-    # Point the source tree at the throwaway test version so the bundle (and
-    # the binary inside it) reports 9.9.9 instead of the real release version.
-    # This also keeps the test isolated from any vfox already installed.
+    # Build the newer release first, then the older release. This catches
+    # bundle versions that follow build time instead of release ordering.
     $originalVersionGo = Get-Content -Raw -Path $versionFile
     if ($originalVersionGo -notmatch '\b(var|const)\s+RuntimeVersion\s*=') {
         throw "RuntimeVersion not found in $versionFile"
     }
-    $patchedVersionGo = $originalVersionGo -replace '\b(var|const)\s+RuntimeVersion\s*=\s*"[^"]*"', ('var RuntimeVersion = "{0}"' -f $TestVersion)
-    Set-Content -Path $versionFile -Value $patchedVersionGo -Encoding UTF8 -NoNewline
-    $versionPatched = $true
-    Write-Host "Patched $versionFile to test version $TestVersion"
-
-    # make-msix.ps1 takes no parameters: version comes from the patched source
-    # above, signing inputs come from the environment.
-    $env:MSIX_SIGN_PFX_PATH = $pfxPath
-    $env:MSIX_SIGN_PFX_PASSWORD = $PfxPassword
-    try {
-        & (Join-Path $RepoRoot "packaging/msix/make-msix.ps1")
-        if ($LASTEXITCODE -ne 0) {
-            throw "make-msix.ps1 failed with exit code $LASTEXITCODE"
-        }
-    }
-    finally {
-        Remove-Item Env:MSIX_SIGN_PFX_PATH -ErrorAction SilentlyContinue
-        Remove-Item Env:MSIX_SIGN_PFX_PASSWORD -ErrorAction SilentlyContinue
-    }
-
-    $bundlePath = Join-Path $msixOutDir ("vfox_{0}_windows.msixbundle" -f $TestVersion)
-    if (-not (Test-Path $bundlePath)) {
-        throw "Bundle not found: $bundlePath"
-    }
-    # Copy the bundle into the e2e output directory: $OutputDir is uploaded as
-    # a CI artifact, while packaging/msix/Output is a gitignored scratch dir.
-    Copy-Item -Path $bundlePath -Destination (Join-Path $packageDir (Split-Path $bundlePath -Leaf))
+    $upgradeBundlePath = Build-TestBundle -Version $UpgradeVersion
+    $bundlePath = Build-TestBundle -Version $TestVersion
 
     # ------------------------------------------------------------------
     # Step 3: Trust certificate and install the bundle
@@ -201,6 +253,29 @@ try {
     # Step 4: Assertions
     # ------------------------------------------------------------------
     $aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\vfox.exe"
+
+    Run-Test "Bundle identity uses the source release version" `
+        {
+            foreach ($entry in @(@{ Path = $bundlePath; Version = $TestVersion }, @{ Path = $upgradeBundlePath; Version = $UpgradeVersion })) {
+                $actual = Get-BundleVersion -Path $entry.Path
+                if ($actual -ne "$($entry.Version).0") {
+                    throw "Bundle version is $actual, expected $($entry.Version).0"
+                }
+            }
+            "BUNDLE_VERSION_OK"
+        } `
+        "BUNDLE_VERSION_OK"
+
+    Run-Test "Signed bundles carry a trusted timestamp" `
+        {
+            foreach ($path in @($bundlePath, $upgradeBundlePath)) {
+                $signature = Get-AuthenticodeSignature -FilePath $path
+                if ($signature.Status -ne "Valid") { throw "Invalid signature: $($signature.StatusMessage)" }
+                if ($null -eq $signature.TimeStamperCertificate) { throw "Signing timestamp is missing" }
+            }
+            "TIMESTAMP_OK"
+        } `
+        "TIMESTAMP_OK"
 
     Run-Test "Per-architecture packages were produced" `
         {
@@ -238,14 +313,14 @@ try {
 
     Run-Test "vfox runs through execution alias" `
         {
-            $versionOutput = & $aliasPath --version 2>&1 | Out-String
-            if ($versionOutput -match '\d+\.\d+\.\d+') { "CLI_OK: $($versionOutput.Trim())" } else { "BAD_OUTPUT: $versionOutput" }
+            $versionOutput = Invoke-PackagedVfox -Arguments @("--version")
+            if ($versionOutput -match "\b$([regex]::Escape($TestVersion))\b") { "CLI_OK: $($versionOutput.Trim())" } else { "BAD_OUTPUT: $versionOutput" }
         } `
         "CLI_OK"
 
     Run-Test "vfox --help through execution alias" `
         {
-            $helpOutput = & $aliasPath --help 2>&1 | Out-String
+            $helpOutput = Invoke-PackagedVfox -Arguments @("--help")
             if ($helpOutput -match 'Usage') { "HELP_OK" } else { "BAD_OUTPUT: $helpOutput" }
         } `
         "HELP_OK"
@@ -269,6 +344,95 @@ try {
             }
         } `
         "USER_DATA_OK"
+
+    Run-Test "Packaged self-upgrade explains the installation method" `
+        {
+            $output = & $aliasPath upgrade 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 1 -or $output -notmatch 'MSIX package.*cannot self-upgrade') {
+                throw "Unexpected upgrade result: $output"
+            }
+            "SELF_UPGRADE_BLOCKED"
+        } `
+        "SELF_UPGRADE_BLOCKED"
+
+    # Keep all SDK files in a fresh profile and preserve the registry values
+    # touched by the fixture. VFOX_HOME by itself does not isolate user state.
+    $probeRoot = Join-Path $tempRoot ("vfox-msix-sdk-" + [guid]::NewGuid().ToString("N"))
+    $env:USERPROFILE = Join-Path $probeRoot "user"
+    $env:VFOX_HOME = Join-Path $probeRoot "shared"
+    $env:__VFOX_SHELL = "pwsh"
+    $env:__VFOX_PID = "$PID"
+    Remove-Item Env:__VFOX_CURTMPPATH -ErrorAction SilentlyContinue
+    $pluginDir = Join-Path $env:VFOX_HOME "plugin\msix-probe"
+    New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
+    Copy-Item (Join-Path $PSScriptRoot "testdata\msix-probe\main.lua") $pluginDir
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+    try {
+        foreach ($name in @("Path", "VFOX_MSIX_E2E_HOME", "VFOX_MSIX_E2E_VERSION")) {
+            $exists = $key.GetValueNames() -contains $name
+            $registrySnapshot[$name] = @{
+                Exists = $exists
+                Value = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+                Kind = if ($exists) { $key.GetValueKind($name) } else { $null }
+            }
+        }
+    }
+    finally { $key.Dispose() }
+
+    Run-Test "Global SDK selection reaches the host registry and filesystem" `
+        {
+            $null = Invoke-PackagedVfox -Arguments @("install", "msix-probe@1.0.0")
+            $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@1.0.0")
+            Assert-GlobalSdkState -Version "1.0.0"
+            "GLOBAL_SDK_OK"
+        } `
+        "GLOBAL_SDK_OK"
+
+    Run-Test "Switching global SDK versions updates host state without duplicate PATH entries" `
+        {
+            $null = Invoke-PackagedVfox -Arguments @("install", "msix-probe@2.0.0")
+            $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@2.0.0")
+            Assert-GlobalSdkState -Version "2.0.0"
+            "GLOBAL_SWITCH_OK"
+        } `
+        "GLOBAL_SWITCH_OK"
+
+    Run-Test "An earlier-built newer release upgrades in place and preserves SDK state" `
+        {
+            $family = $InstalledPackage.PackageFamilyName
+            Add-AppxPackage -Path $upgradeBundlePath
+            $script:InstalledPackage = Get-AppxPackage -Name $PackageIdentityName
+            if ($InstalledPackage.Version -ne "$UpgradeVersion.0" -or $InstalledPackage.PackageFamilyName -ne $family) {
+                throw "Unexpected package identity after upgrade: $($InstalledPackage.PackageFullName)"
+            }
+            $output = Invoke-PackagedVfox -Arguments @("--version")
+            if ($output -notmatch "\b$([regex]::Escape($UpgradeVersion))\b") { throw "Old executable after upgrade: $output" }
+            Assert-GlobalSdkState -Version "2.0.0"
+            $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@1.0.0")
+            Assert-GlobalSdkState -Version "1.0.0"
+            "IN_PLACE_UPGRADE_OK"
+        } `
+        "IN_PLACE_UPGRADE_OK"
+
+    Run-Test "SDK uninstall removes its host environment entries" `
+        {
+            $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@1.0.0")
+            # Remove the inactive version first so the CLI cannot auto-switch
+            # to it when the active version is uninstalled.
+            $null = Invoke-PackagedVfox -Arguments @("uninstall", "msix-probe@2.0.0")
+            $null = Invoke-PackagedVfox -Arguments @("uninstall", "msix-probe@1.0.0")
+            $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment")
+            try {
+                if ($null -ne $key.GetValue("VFOX_MSIX_E2E_HOME") -or $null -ne $key.GetValue("VFOX_MSIX_E2E_VERSION")) {
+                    throw "SDK environment variables remain in the host registry"
+                }
+                $expectedPath = Join-Path $env:USERPROFILE ".vfox\sdks\msix-probe"
+                if (($key.GetValue("Path") -split ';') -contains $expectedPath) { throw "SDK path remains in the host registry" }
+            }
+            finally { $key.Dispose() }
+            "SDK_UNINSTALL_OK"
+        } `
+        "SDK_UNINSTALL_OK"
 
     # ------------------------------------------------------------------
     # Step 5: Uninstall
@@ -304,13 +468,27 @@ finally {
         Set-Content -Path $versionFile -Value $originalVersionGo -Encoding UTF8 -NoNewline
         Write-Host "Restored $versionFile" -ForegroundColor Yellow
     }
-    Remove-Item Env:MSIX_SIGN_PFX_PATH -ErrorAction SilentlyContinue
-    Remove-Item Env:MSIX_SIGN_PFX_PASSWORD -ErrorAction SilentlyContinue
+    if ($registrySnapshot.Count -gt 0) {
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+        try {
+            foreach ($name in $registrySnapshot.Keys) {
+                $entry = $registrySnapshot[$name]
+                if ($entry.Exists) { $key.SetValue($name, $entry.Value, $entry.Kind) }
+                else { $key.DeleteValue($name, $false) }
+            }
+        }
+        finally { $key.Dispose() }
+    }
+    foreach ($name in $savedEnvironment.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], "Process")
+    }
     # Remove the throwaway test artifacts from the packaging scratch dir
     # (the copies under $OutputDir are kept for the CI artifact upload).
     if ($null -ne $msixOutDir -and (Test-Path $msixOutDir)) {
-        Get-ChildItem -Path $msixOutDir -Filter ("vfox_{0}_windows*" -f $TestVersion) -ErrorAction SilentlyContinue |
-            Remove-Item -Force -ErrorAction SilentlyContinue
+        foreach ($version in @($TestVersion, $UpgradeVersion)) {
+            Get-ChildItem -Path $msixOutDir -Filter ("vfox_{0}_windows*" -f $version) -ErrorAction SilentlyContinue |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+        }
     }
 
     # Only remove the package installed by this run (exact identity), never
@@ -326,6 +504,9 @@ finally {
     }
     if ($null -ne $pfxPath -and (Test-Path $pfxPath)) {
         Remove-Item -Path $pfxPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $probeRoot -and (Test-Path $probeRoot)) {
+        Remove-Item -Path $probeRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
