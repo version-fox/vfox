@@ -215,3 +215,87 @@ func TestNushellActivateWithPidCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestNushellActivateDirect(t *testing.T) {
+	n := nushell{}
+
+	tests := []struct {
+		name           string
+		enablePidCheck bool
+		expectPidBlock bool
+	}{
+		{
+			name:           "Direct activate with PID check",
+			enablePidCheck: true,
+			expectPidBlock: true,
+		},
+		{
+			name:           "Direct activate without PID check",
+			enablePidCheck: false,
+			expectPidBlock: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script, err := n.Activate(ActivateConfig{
+				SelfPath:       "/usr/local/bin/vfox",
+				Args:           nil,
+				EnablePidCheck: tt.enablePidCheck,
+			})
+			if err != nil {
+				t.Fatalf("Activate() failed: %v", err)
+			}
+
+			if script == "" {
+				t.Fatal("Activate() returned empty script")
+			}
+
+			// Direct activation should return the script directly without sourcing
+			if strings.Contains(script, "source ($nu.default-config-dir") {
+				t.Error("Direct script should not contain source line")
+			}
+			if strings.Contains(script, "^'/usr/local/bin/vfox' activate nushell $nu.default-config-dir") {
+				t.Error("Direct script should not contain self-re-activate line")
+			}
+
+			// Verify template evaluation
+			if strings.Contains(script, "{{if .EnablePidCheck}}") || strings.Contains(script, "{{end}}") {
+				t.Error("Template conditional directives were not evaluated")
+			}
+			if strings.Contains(script, "{{.SelfPath}}") {
+				t.Error("Template variable '{{.SelfPath}}' was not evaluated")
+			}
+
+			// Verify self path and required nushell hooks
+			if !strings.Contains(script, "/usr/local/bin/vfox") {
+				t.Error("SelfPath missing from script")
+			}
+			if !strings.Contains(script, "export-env") {
+				t.Error("Missing export-env block")
+			}
+			if !strings.Contains(script, "def --env updateVfoxEnvironment") {
+				t.Error("Missing updateVfoxEnvironment function definition")
+			}
+			if !strings.Contains(script, "$env.config = ($env.config | upsert hooks.pre_prompt") {
+				t.Error("Missing hooks.pre_prompt configuration")
+			}
+			if !strings.Contains(script, "get -o hooks.pre_prompt") {
+				t.Error("Missing optional get flag for hooks.pre_prompt")
+			}
+			if !strings.Contains(script, "$env.__VFOX_SHELL = 'nushell'") {
+				t.Error("Missing __VFOX_SHELL declaration")
+			}
+
+			hasPidCheck := strings.Contains(script, "# Check if PID changed") &&
+				strings.Contains(script, "if ($nu.pid != $env.__VFOX_PID)")
+
+			if tt.expectPidBlock && !hasPidCheck {
+				t.Error("Expected PID check block to be present when EnablePidCheck is true")
+			}
+			if !tt.expectPidBlock && hasPidCheck {
+				t.Error("Expected PID check block to be absent when EnablePidCheck is false")
+			}
+		})
+	}
+}

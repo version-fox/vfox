@@ -123,3 +123,34 @@ func TestZshActivateReinitializesInheritedSession(t *testing.T) {
 		}
 	}
 }
+
+func TestNewShell(t *testing.T) {
+	tests := []struct {
+		name      string
+		shellName string
+		want      Shell
+	}{
+		{"bash", "bash", Bash},
+		{"BASH upper", "BASH", Bash},
+		{"zsh", "zsh", Zsh},
+		{"fish", "fish", Fish},
+		{"pwsh", "pwsh", Pwsh},
+		{"powershell", "powershell", Pwsh},
+		{"clink", "clink", Clink},
+		{"nu", "nu", Nushell},
+		{"NU upper", "NU", Nushell},
+		{"nushell", "nushell", Nushell},
+		{"NuShell mixed", "NuShell", Nushell},
+		{"unknown", "unknown", nil},
+		{"empty", "", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewShell(tt.shellName)
+			if got != tt.want {
+				t.Fatalf("NewShell(%q) = %v, want %v", tt.shellName, got, tt.want)
+			}
+		})
+	}
+}
