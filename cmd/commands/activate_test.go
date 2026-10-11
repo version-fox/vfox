@@ -65,3 +65,52 @@ func TestRenderActivateScriptPassesNushellConfigPath(t *testing.T) {
 		t.Fatalf("generated vfox.nu does not reference self path:\n%s", string(content))
 	}
 }
+
+func TestRenderActivateScriptPassesNuConfigPath(t *testing.T) {
+	configDir := t.TempDir()
+
+	got, err := renderActivateScript("nu", "/usr/bin/vfox", []string{configDir}, env.Vars{}, false)
+	if err != nil {
+		t.Fatalf("renderActivateScript() failed: %v", err)
+	}
+
+	if !strings.Contains(got, `source ($nu.default-config-dir | path join "vfox.nu")`) {
+		t.Fatalf("renderActivateScript() returned unexpected Nushell source script:\n%s", got)
+	}
+
+	vfoxNu := filepath.Join(configDir, "vfox.nu")
+	content, err := os.ReadFile(vfoxNu)
+	if err != nil {
+		t.Fatalf("expected generated %s: %v", vfoxNu, err)
+	}
+	if !strings.Contains(string(content), "^'/usr/bin/vfox' activate nushell $nu.default-config-dir") {
+		t.Fatalf("generated vfox.nu does not reference self path:\n%s", string(content))
+	}
+}
+
+func TestRenderActivateScriptNushellDirectOutput(t *testing.T) {
+	for _, shellName := range []string{"nu", "nushell"} {
+		t.Run(shellName, func(t *testing.T) {
+			got, err := renderActivateScript(shellName, "/usr/bin/vfox", nil, env.Vars{}, false)
+			if err != nil {
+				t.Fatalf("renderActivateScript(%q) failed: %v", shellName, err)
+			}
+
+			if strings.Contains(got, "source ($nu.default-config-dir") {
+				t.Fatalf("direct activation script should not contain source line:\n%s", got)
+			}
+			if !strings.Contains(got, "export-env") {
+				t.Fatalf("direct activation script missing export-env:\n%s", got)
+			}
+			if !strings.Contains(got, "def --env updateVfoxEnvironment") {
+				t.Fatalf("direct activation script missing updateVfoxEnvironment:\n%s", got)
+			}
+			if !strings.Contains(got, "/usr/bin/vfox") {
+				t.Fatalf("direct activation script missing self path:\n%s", got)
+			}
+			if !strings.Contains(got, "$env.__VFOX_SHELL = 'nushell'") {
+				t.Fatalf("direct activation script missing __VFOX_SHELL:\n%s", got)
+			}
+		})
+	}
+}
