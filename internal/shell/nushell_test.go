@@ -84,6 +84,14 @@ func TestExport(t *testing.T) {
 			},
 		},
 		{
+			"PathNil",
+			env.Vars{"PATH": nil},
+			nushellExportData{
+				EnvsToSet:   map[string]any{pathVarName: []any{}},
+				EnvsToUnset: make([]string, 0),
+			},
+		},
+		{
 			"PathAndOtherEnv",
 			env.Vars{
 				"PATH": newString("/path1" + sep + "/path2" + sep + "/path3"),
@@ -202,6 +210,14 @@ func TestNushellActivateWithPidCheck(t *testing.T) {
 				t.Error("Missing correct 'get -o hooks.pre_prompt'")
 			}
 
+			// Verify guarded environment variable handling
+			if !strings.Contains(contentStr, "if not ($envData.envsToSet | is-empty)") {
+				t.Error("Missing envsToSet emptiness check")
+			}
+			if !strings.Contains(contentStr, "if not ($envData.envsToUnset | is-empty)") {
+				t.Error("Missing envsToUnset emptiness check")
+			}
+
 			// Check for PID check block presence/absence
 			hasPidCheck := strings.Contains(contentStr, "# Check if PID changed") &&
 				strings.Contains(contentStr, "if ($nu.pid != $env.__VFOX_PID)")
@@ -286,6 +302,12 @@ func TestNushellActivateDirect(t *testing.T) {
 			if !strings.Contains(script, "$env.__VFOX_SHELL = 'nushell'") {
 				t.Error("Missing __VFOX_SHELL declaration")
 			}
+			if !strings.Contains(script, "if not ($envData.envsToSet | is-empty)") {
+				t.Error("Missing envsToSet emptiness check")
+			}
+			if !strings.Contains(script, "if not ($envData.envsToUnset | is-empty)") {
+				t.Error("Missing envsToUnset emptiness check")
+			}
 
 			hasPidCheck := strings.Contains(script, "# Check if PID changed") &&
 				strings.Contains(script, "if ($nu.pid != $env.__VFOX_PID)")
@@ -297,5 +319,70 @@ func TestNushellActivateDirect(t *testing.T) {
 				t.Error("Expected PID check block to be absent when EnablePidCheck is false")
 			}
 		})
+	}
+}
+
+func TestNushellActivateErrors(t *testing.T) {
+	n := nushell{}
+
+	t.Run("MkdirAll error", func(t *testing.T) {
+		tempDir := t.TempDir()
+		filePath := filepath.Join(tempDir, "regular_file")
+		if err := os.WriteFile(filePath, []byte("data"), 0644); err != nil {
+			t.Fatalf("Failed to create file: %v", err)
+		}
+		// Passing filePath/child causes os.MkdirAll to fail because filePath is a regular file
+		invalidDirPath := filepath.Join(filePath, "child")
+		_, err := n.Activate(ActivateConfig{
+			SelfPath: "/usr/bin/vfox",
+			Args:     []string{invalidDirPath},
+		})
+		if err == nil {
+			t.Fatal("Expected error from MkdirAll, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to create config directory") {
+			t.Errorf("Unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("WriteFile error", func(t *testing.T) {
+		tempDir := t.TempDir()
+		// Create a directory where the file would be written
+		dirInPlaceOfFile := filepath.Join(tempDir, "vfox.nu")
+		if err := os.Mkdir(dirInPlaceOfFile, 0755); err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+		_, err := n.Activate(ActivateConfig{
+			SelfPath: "/usr/bin/vfox",
+			Args:     []string{tempDir},
+		})
+		if err == nil {
+			t.Fatal("Expected error from WriteFile, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to write file") {
+			t.Errorf("Unexpected error message: %v", err)
+		}
+	})
+}
+
+func TestNushellActivateCreatesConfigDir(t *testing.T) {
+	n := nushell{}
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "nested", "config")
+
+	script, err := n.Activate(ActivateConfig{
+		SelfPath: "/usr/bin/vfox",
+		Args:     []string{configDir},
+	})
+	if err != nil {
+		t.Fatalf("Activate() failed: %v", err)
+	}
+	if script == "" {
+		t.Fatal("Activate() returned empty script")
+	}
+
+	targetPath := filepath.Join(configDir, "vfox.nu")
+	if _, err := os.Stat(targetPath); err != nil {
+		t.Fatalf("Expected %s to exist, stat failed: %v", targetPath, err)
 	}
 }
