@@ -136,7 +136,10 @@ end)
 local vfox_setenv = function(str)
     local key, val = str:match('^set "([^=]+)=(.*)"')
     if key and val then
-        return os.setenv(key, val ~= '' and val or nil)
+        local value = val ~= '' and val or nil
+        if os.getenv(key) ~= value then
+            return os.setenv(key, value)
+        end
     end
 end
 
