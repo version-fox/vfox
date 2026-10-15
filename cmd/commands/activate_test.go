@@ -1,11 +1,15 @@
 package commands
 
 import (
+	"bytes"
+	"context"
 	"os"
+	"strconv"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
 )
@@ -63,5 +67,59 @@ func TestRenderActivateScriptPassesNushellConfigPath(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "^'/usr/bin/vfox' activate nushell $nu.default-config-dir") {
 		t.Fatalf("generated vfox.nu does not reference self path:\n%s", string(content))
+	}
+}
+
+func TestActivateCmdIncludesShimDirs(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	t.Chdir(f.work)
+	// Pin the hook session to this process: activateCmd discards an
+	// inherited session (IsInheritedHookSession), which would replace the
+	// fixture session dir with a pid-based one when the outer shell
+	// itself runs under vfox.
+	t.Setenv(env.PidFlag, strconv.Itoa(os.Getppid()))
+	// Keep IDE-resolution mode off so the full hook script is rendered.
+	t.Setenv("VSCODE_RESOLVING_ENVIRONMENT", "")
+	t.Setenv("INTELLIJ_ENVIRONMENT_READER", "")
+	// activateCmd exports hook session vars; snapshot them to avoid leaking
+	// into other tests in this process.
+	snapshot := map[string]*string{}
+	for _, key := range []string{env.HookFlag, env.PidFlag, env.InitializedFlag, pathmeta.HookCurTmpPath} {
+		if v, ok := os.LookupEnv(key); ok {
+			v := v
+			snapshot[key] = &v
+		} else {
+			snapshot[key] = nil
+		}
+	}
+	t.Cleanup(func() {
+		for key, v := range snapshot {
+			if v == nil {
+				_ = os.Unsetenv(key)
+			} else {
+				_ = os.Setenv(key, *v)
+			}
+		}
+	})
+
+	oldWriter := Activate.Writer
+	var buf bytes.Buffer
+	Activate.Writer = &buf
+	defer func() { Activate.Writer = oldWriter }()
+
+	app := &cli.Command{Name: "vfox", Commands: []*cli.Command{Activate}}
+	if err := app.Run(context.Background(), []string{"vfox", "activate", "bash"}); err != nil {
+		t.Fatalf("activate failed: %v", err)
+	}
+	output := buf.String()
+	// Stable shim dirs must be exported on PATH ahead of version bins.
+	for _, shimDir := range []string{
+		filepath.Join(f.work, ".vfox", "shims"),
+		filepath.Join(filepath.Dir(f.state), "shims"),
+		filepath.Join(f.home, "shims"),
+	} {
+		if !strings.Contains(output, shimDir) {
+			t.Errorf("activate output missing shim dir %q:\n%s", shimDir, output)
+		}
 	}
 }

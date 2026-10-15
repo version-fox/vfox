@@ -149,18 +149,29 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	scopePriority := []env.UseScope{env.Project, env.Session, env.Global}
 	finalEnvs.MergeByScopePriority(envsByScope, scopePriority)
 
+	// 3b. Stable shim dirs stay on PATH across version switches so plugins can
+	// install Volta-style shims pinned to the install-time runtime.
+	// Order: user prefix > shims (Project, Session, Global) > version bins > clean.
+	shimEnvs := env.NewPaths(env.EmptyPaths)
+	for _, scope := range scopePriority {
+		if shimDir := runtimeEnvContext.GetShimDirPathByScope(scope); shimDir != "" {
+			shimEnvs.Add(shimDir)
+		}
+	}
+
 	// 3. Build final PATH with proper priority:
-	// User-injected paths (e.g., virtualenv) > Project > Session > Global > Cleaned System PATH
+	// User-injected paths (e.g., virtualenv) > Shims > Project > Session > Global > Cleaned System PATH
 	//
 	// SplitSystemPaths separates:
 	// - prefixPaths: paths appearing BEFORE first vfox path (user-injected, highest priority)
 	// - cleanSystemPaths: remaining non-vfox paths (lowest priority)
 	prefixPaths, cleanSystemPaths := runtimeEnvContext.SplitSystemPaths()
 
-	// Build final path order: prefix > vfox > clean system
+	// Build final path order: prefix > shims > vfox > clean system
 	// We need to prepend prefixPaths to maintain their highest priority
 	newPaths := env.NewPaths(env.EmptyPaths)
 	newPaths.Merge(prefixPaths)
+	newPaths.Merge(shimEnvs)
 	newPaths.Merge(finalEnvs.Paths)
 	newPaths.Merge(cleanSystemPaths)
 	finalEnvs.Paths = newPaths

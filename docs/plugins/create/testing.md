@@ -70,7 +70,7 @@ vfox plugin run . ParseLegacyFile --input '{"filename":".example-version","filep
 
 On shells with different JSON quoting rules, prefer `--input-file`. `--input` and `--input-file` are mutually exclusive; omitted input is `{}`.
 
-Hook names are case-sensitive: `Available`, `PreInstall`, `EnvKeys`, `PostInstall`, `PreUse`, `ParseLegacyFile`, `PreUninstall`. Supply the normal hook context, including paths and installed SDK information when needed. For `ParseLegacyFile`, supply an `installedVersions` array; the adapter provides the hook's `getInstalledVersions()` callback. No installation, scope switching or SDK lookup happens automatically. Invoking an unimplemented optional hook is an error.
+Hook names are case-sensitive: `Available`, `PreInstall`, `EnvKeys`, `PostInstall`, `PreUse`, `PostUse`, `ParseLegacyFile`, `PreUninstall`. Supply the normal hook context, including paths and installed SDK information when needed. For `ParseLegacyFile`, supply an `installedVersions` array; the adapter provides the hook's `getInstalledVersions()` callback. No installation, scope switching or SDK lookup happens automatically. Invoking an unimplemented optional hook is an error.
 
 `run` allows real HTTP and retains the real environment by default; `--offline` rejects HTTP. `--json` writes only the typed result to stdout. Void hooks and hooks that provide no result produce `null`. Unknown result fields are discarded by the normal codec. Lua prints, standard output writes, download progress and `os.execute` output go to stderr. Errors go to stderr and cause a nonzero exit. Without `--json`, the result is indented and prefixed with the hook name.
 

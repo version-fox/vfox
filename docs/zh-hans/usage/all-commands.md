@@ -12,6 +12,7 @@ vfox install <sdk-name>@<version> Install the specified version of SDK
 vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox unuse [--global --project --session] <sdk-name>   Unset the SDK version from the specified scope
+vfox reshim   刷新命令垫片，让新装的全局包可用
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command in vfox managed environment
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK

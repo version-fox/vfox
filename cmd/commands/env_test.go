@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -153,6 +154,13 @@ func (f *envCommandFixture) calls(t *testing.T) []string {
 func TestEnvPathStableAcrossRebuilds(t *testing.T) {
 	f := newEnvCommandFixture(t)
 	var paths []string
+	// Stable shim dirs stay on PATH across version switches, ahead of
+	// version bins (Project, Session, Global scope order).
+	paths = append(paths,
+		filepath.Join(f.work, ".vfox", "shims"),
+		filepath.Join(filepath.Dir(f.state), "shims"),
+		filepath.Join(f.home, "shims"),
+	)
 	for _, name := range f.names {
 		paths = append(paths, filepath.Join(f.home, "sdks", name, "bin"))
 	}
@@ -261,6 +269,48 @@ func TestEnvCacheWithoutShellIsInvalidated(t *testing.T) {
 	for _, log := range f.calls(t) {
 		if log != "called\ncalled\n" {
 			t.Fatalf("old cache did not recalculate hooks: %q", log)
+		}
+	}
+}
+
+func TestOutputJSONIncludesShimDirs(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	t.Chdir(f.work)
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	jsonErr := outputJSON()
+	_ = w.Close()
+	os.Stdout = old
+	if jsonErr != nil {
+		t.Fatalf("outputJSON failed: %v", jsonErr)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		Paths []string `json:"paths"`
+	}
+	if err := json.Unmarshal(out, &data); err != nil {
+		t.Fatalf("invalid JSON %q: %v", out, err)
+	}
+	// Stable shim dirs come first (Project, Session, Global scope order).
+	wantShims := []string{
+		filepath.Join(f.work, ".vfox", "shims"),
+		filepath.Join(filepath.Dir(f.state), "shims"),
+		filepath.Join(f.home, "shims"),
+	}
+	if len(data.Paths) < len(wantShims) {
+		t.Fatalf("paths = %q, want at least %q", data.Paths, wantShims)
+	}
+	for i, want := range wantShims {
+		if data.Paths[i] != want {
+			t.Errorf("paths[%d] = %q, want %q", i, data.Paths[i], want)
 		}
 	}
 }

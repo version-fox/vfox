@@ -108,6 +108,25 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 	return linkDir
 }
 
+// GetShimDirPathByScope returns the stable shim directory path for the given scope.
+// Unlike GetLinkDirPathByScope (version-specific symlinks that drop out of PATH
+// on `use`), shim dirs are version-independent and stay on PATH across switches,
+// so plugins can install Volta-style shims pinned to the install-time runtime.
+// vfox itself never interprets shim contents; plugins own shim creation via the
+// optional PostUse hook and `vfox reshim`.
+func (m *RuntimeEnvContext) GetShimDirPathByScope(scope UseScope) string {
+	switch scope {
+	case Global:
+		return m.PathMeta.Working.GlobalShimDir
+	case Project:
+		return m.PathMeta.Working.ProjectShimDir
+	case Session:
+		return m.PathMeta.Working.SessionShimDir
+	default:
+		return ""
+	}
+}
+
 // CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
 // This ensures the system PATH is clean before adding vfox paths back in priority order.
 func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {

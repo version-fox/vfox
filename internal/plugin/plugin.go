@@ -55,6 +55,7 @@ type (
 		PostInstall(ctx *PostInstallHookCtx) error
 		PreUninstall(ctx *PreUninstallHookCtx) error
 		PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error)
+		PostUse(ctx *PostUseHookCtx) error
 		ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error)
 		EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
 		HasFunction(name string) bool
@@ -70,6 +71,7 @@ var (
 		"EnvKeys":         {Name: "EnvKeys", Required: true, Filename: "env_keys"},
 		"PostInstall":     {Name: "PostInstall", Required: false, Filename: "post_install"},
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
+		"PostUse":         {Name: "PostUse", Required: false, Filename: "post_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
 		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 	}

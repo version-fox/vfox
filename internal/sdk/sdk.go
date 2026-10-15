@@ -67,6 +67,10 @@ type Sdk interface {
 	// EnvKeysForScope returns environment variables for a version in the given scope
 	// It creates symlinks if needed and returns env vars with paths pointing to symlinks
 	EnvKeysForScope(version Version, scope env.UseScope) (*env.Envs, error)
+	// TriggerPostUse invokes the plugin's optional PostUse hook for a version/scope.
+	// It runs automatically after `use`, and manually via `vfox reshim` so plugins
+	// can sync version-independent shims without vfox knowing language details.
+	TriggerPostUse(version Version, scope env.UseScope, previousVersion Version) error
 
 	Close()
 }
@@ -631,6 +635,12 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 
 	logger.Debugf("Load %v tool versions: %v\n", scope, vfoxToml.GetAllTools())
 
+	// Capture the previously selected version in this scope for PostUse.
+	var previousVersion Version
+	if oldVersion, ok := vfoxToml.GetToolVersion(b.Name); ok {
+		previousVersion = Version(oldVersion)
+	}
+
 	// On Windows global scope, remove old version's registry entries before adding new ones
 	if runtime.GOOS == "windows" && scope == env.Global {
 		if oldVersion, ok := vfoxToml.GetToolVersion(b.Name); ok && oldVersion != string(version) {
@@ -668,6 +678,14 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 	if err := b.createSymlinksForScope(runtimePackage, scope); err != nil {
 		logger.Debugf("Failed to create symlinks: %v\n", err)
 		return fmt.Errorf("failed to create symlinks, err:%w", err)
+	}
+
+	// Give plugins a generic post-switch chance to sync version-independent
+	// shims (e.g. Volta-style global-package shims pinned to the install-time
+	// runtime). Core never interprets shim contents.
+	if err := b.TriggerPostUse(version, scope, previousVersion); err != nil {
+		logger.Debugf("Failed to run PostUse hook: %v\n", err)
+		return err
 	}
 
 	// On Windows, always update registry for global scope so GUI apps can pick up the PATH
@@ -820,6 +838,44 @@ func (b *impl) EnvKeysForScope(version Version, scope env.UseScope) (*env.Envs, 
 	// 3. Return env keys with paths pointing to symlinks
 	symlinkPackage := runtimePackage.ReplacePath(linkDir)
 	return b.EnvKeys(symlinkPackage)
+}
+
+// TriggerPostUse invokes the plugin's optional PostUse hook for a version/scope.
+// Plugins without a PostUse function are skipped. The scope-specific stable shim
+// dir is created best-effort so plugins can write version-independent shims.
+func (b *impl) TriggerPostUse(version Version, scope env.UseScope, previousVersion Version) error {
+	if b.plugin == nil || !b.plugin.HasFunction("PostUse") {
+		return nil
+	}
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return err
+	}
+	main := convertRuntime2InstalledPackageItem(runtimePackage.Runtime)
+	sdkInfo := make(map[string]*plugin.InstalledPackageItem, len(runtimePackage.Additions)+1)
+	for _, addition := range runtimePackage.Additions {
+		sdkInfo[addition.Name] = convertRuntime2InstalledPackageItem(addition)
+	}
+	sdkInfo[main.Name] = main
+	shimDir := b.envContext.GetShimDirPathByScope(scope)
+	if shimDir != "" {
+		if err := os.MkdirAll(shimDir, pathmeta.ReadWriteAuth); err != nil {
+			logger.Debugf("Failed to create shim dir %s: %v", shimDir, err)
+		}
+	}
+	ctx := &plugin.PostUseHookCtx{
+		Cwd:             b.envContext.PathMeta.Working.Directory,
+		Scope:           scope.String(),
+		Version:         string(version),
+		PreviousVersion: string(previousVersion),
+		Main:            main,
+		SdkInfo:         sdkInfo,
+		ShimDir:         shimDir,
+	}
+	if err := b.plugin.PostUse(ctx); err != nil {
+		return fmt.Errorf("plugin [PostUse] error: %w", err)
+	}
+	return nil
 }
 
 // removeSymlinksForScope removes symlinks for the specified scope and version

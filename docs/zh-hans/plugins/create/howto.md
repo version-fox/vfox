@@ -43,6 +43,7 @@
 | [hooks/env_keys.lua](#envkeys)                  | ✅       | 配置环境变量                            |
 | [hooks/post_install.lua](#postinstall)          | ❌       | 执行额外的操作, 如编译源码等            |
 | [hooks/pre_use.lua](#preuse)                    | ❌       | 在切换版本之前, 提供修改版本的机会      |
+| [hooks/post_use.lua](#postuse)                  | ❌       | 在 `use`/`reshim` 之后同步版本无关垫片（通用，如 Volta 风格） |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌       | 自定义解析遗留文件                      |
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌       | 删除之前进行额外操作                    |
 
@@ -215,6 +216,36 @@ function PLUGIN:PreUse(ctx)
     return {
         version = sdkVersion,
     }
+end
+```
+
+### PostUse
+
+在 `vfox use` 更新完作用域链接之后调用，也可通过 `vfox reshim` 手动触发。
+这是实现 Volta 风格行为的通用扩展点（见
+[version-fox/vfox#725](https://github.com/version-fox/vfox/issues/725)）。
+
+`vfox` 会把各作用域稳定的垫片目录常驻在 `PATH` 上（`~/.vfox/shims`、
+`<project>/.vfox/shims`、`<session>/shims`），切换版本时不会掉出 `PATH`。
+`vfox` 本体不解读垫片内容：垫片具体执行什么由你的插件决定。例如 Node.js
+插件可以把全局包垫片钉选到安装时的运行时上，而 Python 插件可以钉选到自己的
+安装时解释器。文档里不要写包管理器专属逻辑，这些细节归各个语言插件所有。
+卸载版本时可以用 `PreUninstall` 清理指向该版本的垫片。
+
+```lua
+function PLUGIN:PostUse(ctx)
+    --- 当前正在使用的、已解析好的版本
+    local version = ctx.version
+    --- 同一作用域之前选择的版本（首次使用为空字符串）
+    local previousVersion = ctx.previousVersion
+    --- global/project/session 其中之一
+    local scope = ctx.scope
+    --- 该作用域稳定的垫片目录，常驻 PATH，在这里创建垫片
+    local shimDir = ctx.shimDir
+    --- 当前工作目录
+    local cwd = ctx.cwd
+    local main = ctx.main
+    local sdkInfo = ctx.sdkInfo
 end
 ```
 

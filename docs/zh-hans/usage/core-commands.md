@@ -131,6 +131,25 @@ vfox unuse [options] <sdk-name>
 使用 `unuse` 后，SDK 将不再在指定作用域中处于活动状态。如果 SDK 在其他作用域中配置，那些将根据 vfox 的作用域层次结构优先生效（Project > Session > Global）。
 :::
 
+## Reshim
+
+刷新命令垫片，让刚装好的全局包立刻可用。
+
+**用法**
+
+```shell
+vfox reshim
+```
+
+举个例子：你先 `vfox use nodejs@24`，然后 `npm install -g rimraf`，回到 shell
+发现 `rimraf` 找不到——这时跑一遍 `vfox reshim` 就行，不用重新 `use` 一次。
+
+背后的原因是这样：为了让你切换版本后全局命令还能用，`vfox` 会在 `PATH` 里
+长期保留几个固定的垫片目录，具体往里面放什么由各个插件决定（比如把全局包
+指向安装它时的那个版本）。但插件默认只在你 `vfox use` 切换版本时更新这些
+垫片，你在两次 `use` 之间装的东西，垫片里还没有。`reshim` 就是让所有插件把
+垫片重新同步一遍，它不改你的版本选择，随时跑都安全。
+
 ## Uninstall
 
 卸载指定版本的 SDK。

@@ -38,3 +38,11 @@ end
 function PLUGIN:EnvKeys(ctx)
     return { { key = "PATH", value = ctx.main.path .. "/bin" } }
 end
+
+--- Optional post-switch hook: sync version-independent shims into ctx.shimDir.
+--- Core keeps shim dirs on PATH across `use` switches; plugins own shim contents.
+function PLUGIN:PostUse(ctx)
+    assert(ctx.version ~= nil, "PostUse ctx.version missing")
+    assert(ctx.scope ~= nil, "PostUse ctx.scope missing")
+    assert(ctx.shimDir ~= nil and ctx.shimDir ~= "", "PostUse ctx.shimDir missing")
+end

@@ -107,6 +107,19 @@ func outputJSON() error {
 			}
 		}
 	}
+	// Stable shim dirs first: they stay on PATH across version switches.
+	shimDirs := []string{
+		manager.RuntimeEnvContext.GetShimDirPathByScope(env.Project),
+		manager.RuntimeEnvContext.GetShimDirPathByScope(env.Session),
+		manager.RuntimeEnvContext.GetShimDirPathByScope(env.Global),
+	}
+	nonEmptyShims := make([]string, 0, len(shimDirs))
+	for _, dir := range shimDirs {
+		if dir != "" {
+			nonEmptyShims = append(nonEmptyShims, dir)
+		}
+	}
+	data.Paths = append(nonEmptyShims, data.Paths...)
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -296,18 +309,30 @@ func envFlag(cmd *cli.Command) error {
 	scopePriority := []env.UseScope{env.Project, env.Session, env.Global}
 	finalEnvs.MergeByScopePriority(envsByScope, scopePriority)
 
+	// 7b. Stable shim dirs stay on PATH across version switches so plugins can
+	// install Volta-style shims pinned to the install-time runtime.
+	// Order: user prefix > shims (Project, Session, Global) > version bins > clean.
+	// vfox never interprets shim contents; see PostUse hook and `vfox reshim`.
+	shimEnvs := env.NewPaths(env.EmptyPaths)
+	for _, scope := range scopePriority {
+		if shimDir := runtimeEnvContext.GetShimDirPathByScope(scope); shimDir != "" {
+			shimEnvs.Add(shimDir)
+		}
+	}
+
 	// 8. Build final PATH with proper priority:
-	// User-injected paths (e.g., virtualenv) > Project > Session > Global > Cleaned System PATH
+	// User-injected paths (e.g., virtualenv) > Shims > Project > Session > Global > Cleaned System PATH
 	//
 	// SplitSystemPaths separates:
 	// - prefixPaths: paths appearing BEFORE first vfox path (user-injected, highest priority)
 	// - cleanSystemPaths: remaining non-vfox paths (lowest priority)
 	prefixPaths, cleanSystemPaths := runtimeEnvContext.SplitSystemPaths()
 
-	// Build final path order: prefix > vfox > clean system
+	// Build final path order: prefix > shims > vfox > clean system
 	// We need to prepend prefixPaths to maintain their highest priority
 	newPaths := env.NewPaths(env.EmptyPaths)
 	newPaths.Merge(prefixPaths)
+	newPaths.Merge(shimEnvs)
 	newPaths.Merge(finalEnvs.Paths)
 	newPaths.Merge(cleanSystemPaths)
 	finalEnvs.Paths = newPaths

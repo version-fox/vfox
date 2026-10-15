@@ -99,6 +99,7 @@ func newCmd() *cmd {
 		commands.Config,
 		commands.Exec,
 		commands.Cd,
+		commands.Reshim,
 	}
 	for _, command := range app.Commands {
 		command.ShellComplete = completeCommand

@@ -150,6 +150,23 @@ type PreUninstallHookCtx struct {
 	SdkInfo map[string]*InstalledPackageItem `json:"sdkInfo"`
 }
 
+// PostUseHookCtx is passed to the optional PostUse hook after `vfox use`
+// (and `vfox reshim`) has updated scope links. It gives plugins a generic,
+// language-agnostic chance to sync version-independent shims after a switch.
+// vfox itself never interprets shim contents; e.g. a Node.js plugin may pin
+// a global package shim to the install-time runtime, while a Python plugin may
+// pin to its own install-time interpreter.
+type PostUseHookCtx struct {
+	Cwd             string                           `json:"cwd"`
+	Scope           string                           `json:"scope"`
+	Version         string                           `json:"version"`
+	PreviousVersion string                           `json:"previousVersion"`
+	Main            *InstalledPackageItem            `json:"main"`
+	SdkInfo         map[string]*InstalledPackageItem `json:"sdkInfo"`
+	// ShimDir is the scope-specific stable shim dir, always on PATH.
+	ShimDir string `json:"shimDir"`
+}
+
 // RuntimeInfo represents the runtime information of the current exec environment.
 type RuntimeInfo struct {
 	OsType        string `json:"osType"`

@@ -1,0 +1,4 @@
+# Shell completion scripts are executed by POSIX shells and must keep
+# LF line endings even on Windows checkouts with core.autocrlf=true.
+# (CRLF here breaks TestBashZshCompletionShellFormat and real sourcing.)
+completions/* text eol=lf

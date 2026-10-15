@@ -130,6 +130,27 @@ vfox unuse [options] <sdk-name>
 After using `unuse`, the SDK will no longer be active in the specified scope. If the SDK is configured in other scopes, those will take precedence according to vfox's scope hierarchy (Project > Session > Global).
 :::
 
+## Reshim
+
+Refresh command shims so newly installed global packages become available.
+
+**Usage**
+
+```shell
+vfox reshim
+```
+
+Example: you run `vfox use nodejs@24`, then `npm install -g rimraf`, and back in
+the shell `rimraf` is not found — just run `vfox reshim` instead of using a
+version again.
+
+Why this step exists: so global commands survive version switches, `vfox` keeps a
+few fixed shim directories on `PATH`, and each plugin decides what goes in them
+(e.g. pointing a global package at the runtime it was installed with). But plugins
+only refresh these shims when you `vfox use` a version, so anything installed
+between two `use` calls is not there yet. `reshim` asks every plugin to sync its
+shims again. It never changes your selected versions, so it is safe to run anytime.
+
 ## Uninstall
 
 Uninstall the specified version of the SDK.

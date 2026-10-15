@@ -44,6 +44,7 @@ The full list of hooks callable from vfox.
 | [hooks/env_keys.lua](#envkeys)                  | ✅           | Configure environment variables                                                 |
 | [hooks/post_install.lua](#postinstall)          | ❌           | Execute additional operations after install, such as compiling source code, etc |
 | [hooks/pre_use.lua](#preuse)                    | ❌           | An opportunity to change the version before using it                            |
+| [hooks/post_use.lua](#postuse)                  | ❌           | Sync version-independent shims after `use`/`reshim` (generic, e.g. Volta-style) |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌           | Custom parser for legacy version files                                          |
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌           | Perform some operations before uninstalling targeted version                    |
 
@@ -223,6 +224,37 @@ function PLUGIN:PreUse(ctx)
     return {
         version = sdkVersion,
     }
+end
+```
+
+### PostUse
+
+Called after `vfox use` has updated scope links, and manually via `vfox reshim`.
+This is the generic extension point for Volta-style behavior (see
+[version-fox/vfox#725](https://github.com/version-fox/vfox/issues/725)).
+
+`vfox` keeps scope-specific stable shim dirs on `PATH` across version switches
+(`~/.vfox/shims`, `<project>/.vfox/shims`, `<session>/shims`). It never
+interprets shim contents: your plugin decides what a shim runs. For example, a
+Node.js plugin may pin a global-package shim to the install-time runtime, while
+a Python plugin may pin to its own install-time interpreter. Keep this hook free
+of package-manager specifics in shared docs; each plugin owns its language details.
+Use `PreUninstall` to drop shims that point at a version being uninstalled.
+
+```lua
+function PLUGIN:PostUse(ctx)
+    --- resolved version now in use
+    local version = ctx.version
+    --- previously selected version in this scope ("" on first use)
+    local previousVersion = ctx.previousVersion
+    --- one of global/project/session
+    local scope = ctx.scope
+    --- scope-specific stable shim dir, always on PATH; create shims here
+    local shimDir = ctx.shimDir
+    --- working directory
+    local cwd = ctx.cwd
+    local main = ctx.main
+    local sdkInfo = ctx.sdkInfo
 end
 ```
 

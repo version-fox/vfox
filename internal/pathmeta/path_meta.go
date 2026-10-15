@@ -43,10 +43,13 @@ type SharedPaths struct {
 }
 
 type WorkingPaths struct {
-	Directory     string // Current working directory
-	ProjectSdkDir string // .vfox/sdk (project-level)
-	SessionSdkDir string // Session temporary shim path
-	GlobalSdkDir  string // Global shim path in user home
+	Directory      string // Current working directory
+	ProjectSdkDir  string // .vfox/sdks (project-level)
+	SessionSdkDir  string // Session temporary shim path
+	GlobalSdkDir   string // Global shim path in user home
+	ProjectShimDir string // .vfox/shims (project-level stable shims, version-independent)
+	SessionShimDir string // Session stable shims, version-independent
+	GlobalShimDir  string // Global stable shims in user home, version-independent
 }
 
 type PathMeta struct {
@@ -66,6 +69,7 @@ const (
 	installedDirPrefix  = "cache"  // Shared installed directory
 	configFilePrefix    = "config.yaml"
 	symlinkSdkDirPrefix = "sdks"
+	shimDirPrefix       = "shims"
 
 	ReadWriteAuth = 0755 // can write and read
 )
@@ -118,6 +122,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 	if len(sharedRoot) == 0 {
 		sharedRoot = vfoxUserHome
 	}
+	sessionSdkDir := generateSessionShimPath(filepath.Join(vfoxUserHome, tmpDirPrefix), pid)
 	meta := &PathMeta{
 		User: UserPaths{
 			Home:   vfoxUserHome,
@@ -131,17 +136,26 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 			Config:   filepath.Join(sharedRoot, configFilePrefix),
 		},
 		Working: WorkingPaths{
-			Directory:     currentDir,
-			ProjectSdkDir: filepath.Join(currentDir, vfoxDirPrefix, symlinkSdkDirPrefix),
-			SessionSdkDir: generateSessionShimPath(filepath.Join(vfoxUserHome, tmpDirPrefix), pid),
-			GlobalSdkDir:  filepath.Join(vfoxUserHome, symlinkSdkDirPrefix),
+			Directory:      currentDir,
+			ProjectSdkDir:  filepath.Join(currentDir, vfoxDirPrefix, symlinkSdkDirPrefix),
+			SessionSdkDir:  sessionSdkDir,
+			GlobalSdkDir:   filepath.Join(vfoxUserHome, symlinkSdkDirPrefix),
+			ProjectShimDir: filepath.Join(currentDir, vfoxDirPrefix, shimDirPrefix),
+			// Session shims live under the session temp dir so they never mix with
+			// session configs (e.g. env-state.json) stored directly in SessionSdkDir.
+			SessionShimDir: filepath.Join(sessionSdkDir, shimDirPrefix),
+			GlobalShimDir:  filepath.Join(vfoxUserHome, shimDirPrefix),
 		},
 		Executable: getExecutablePath(),
 	}
 
 	// Initialize necessary directories
+	// Global shims stay on PATH across version switches, so ensure the dir exists
+	// eagerly. Project/session shim dirs are created lazily on PostUse/reshim
+	// to avoid creating .vfox directories in every visited project.
 	_ = os.MkdirAll(meta.User.Temp, ReadWriteAuth)
 	_ = os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth)
+	_ = os.MkdirAll(meta.Working.GlobalShimDir, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Installs, ReadWriteAuth)
 	_ = os.Mkdir(meta.Shared.Plugins, ReadWriteAuth)
 

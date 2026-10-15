@@ -136,6 +136,16 @@ func (l *LuaPlugin) PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error) {
 	return &hookResult, nil
 }
 
+func (l *LuaPlugin) PostUse(ctx *PostUseHookCtx) error {
+	L := l.vm.Instance
+	ctxTable, err := codec.Marshal(L, ctx)
+	if err != nil {
+		return err
+	}
+	_, err = l.CallFunction("PostUse", ctxTable)
+	return err
+}
+
 func (l *LuaPlugin) PreUninstall(ctx *PreUninstallHookCtx) error {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)
