@@ -23,8 +23,7 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
         file_available:write(current_timestamp .. '\n')
         local vfox_available = io.popen('vfox available')
         for line in vfox_available:lines() do
-            local trim = line:gsub('%c%[%d+m', '')
-            local name = trim:match("^%s*([%w%-]+)%s+[✓✗]")
+            local name = line:gsub('%c%[%d+m', ''):match('^  (%S+)%s+[✓✗]')
             if name then
                 table.insert(vfox_sdk_table, name)
                 file_available:write(name .. '\n')
@@ -38,7 +37,7 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
         local pre, ls = '', {}
         local vfox_ls = io.popen('vfox ls')
         for line in vfox_ls:lines() do
-            local txt = line:gsub('%c%[%d+m', ''):match('^%W*(%w.*)')
+            local txt = line:gsub('%c%[%d+m', ''):match('^[ ┬└│─├]*(%S.*)')
             if txt then
                 if txt:match('^%d') then
                     ls[pre] = true
@@ -73,7 +72,7 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
 
     local vfox_sdk = clink.argmatcher():nofiles():addarg(vfox_sdk_func):addflags('--help', '-h')
     local vfox_use = clink.argmatcher():nofiles():addarg(vfox_sdk_version_func):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--unlink', '--help', '-h')
-    local vfox_unuse = clink.argmatcher():nofiles():addarg(vfox_sdk_version_func):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--help', '-h')
+    local vfox_unuse = clink.argmatcher():nofiles():addarg(vfox_sdk_func):addflags('--global', '-g', '--session', '-s', '--project', '-p', '--help', '-h')
     local vfox_exec = clink.argmatcher():nofiles():addarg(vfox_sdk_version_func):addflags('--help', '-h')
     local vfox_help = clink.argmatcher():nofiles():addflags('--help', '-h')
     local vfox_shell = clink.argmatcher():nofiles():addarg('bash', 'zsh', 'pwsh', 'fish', 'clink', 'nushell'):addflags('--help', '-h')
