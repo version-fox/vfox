@@ -1,0 +1,31 @@
+# Repo-wide line-ending policy (see version-fox/vfox#727).
+#
+# Baseline: let git decide which files are text. Text is stored with LF in the
+# repository and follows the machine's core.autocrlf/core.eol on checkout;
+# binaries (shim.exe, test.zip, images) are detected and never converted.
+# Do not replace this with a blanket `* text` or `* text eol=lf`, which would
+# disable binary detection and corrupt those files.
+* text=auto
+
+# Everything below must be LF in every working tree, whatever core.autocrlf or
+# core.eol a machine uses. `eol=lf` overrides both on checkout.
+
+# Scripts that a shell executes or sources. A trailing CR breaks every command
+# ("$'\r': command not found") and the shebang line (the interpreter becomes
+# "pwsh\r"), and the completions are packaged as-is by goreleaser (archives,
+# brew, deb/rpm).
+*.sh text eol=lf
+*.ps1 text eol=lf
+completions/** text eol=lf
+
+# Go toolchain files. gofmt always emits LF and reports CRLF sources as
+# unformatted; the go command writes go.mod/go.sum with LF, and
+# `go mod tidy -diff` reports a CRLF go.sum.
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Checksum manifests read by `sha256sum -c`/`shasum -c`. Some verifiers keep the
+# CR as part of the file name and then cannot find "shim.exe".
+*.sha256 text eol=lf
+*.sha512 text eol=lf
