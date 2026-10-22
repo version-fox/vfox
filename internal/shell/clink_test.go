@@ -38,11 +38,13 @@ func TestClinkStartup(t *testing.T) {
 	rt.env[env.HookFlag] = "bash"
 	rt.env[env.PidFlag] = "1111"
 	rt.env[curTmpPathFlag] = `C:\Users\tester\.vfox\tmp\1111`
+	rt.env[env.OrigPathFlag] = `C:\parent\baseline`
 	rt.env["PATH"] = `C:\Windows`
-	nodePath, sessionDir := `C:\Users\tester\.vfox\tmp\4242\nodejs\bin;C:\Windows`, `C:\Users\tester\.vfox\tmp\4242`
+	nodePath, sessionDir, baseline := `C:\Users\tester\.vfox\tmp\4242\nodejs\bin;C:\Windows`, `C:\Users\tester\.vfox\tmp\4242`, `C:\Windows`
 	rt.outputs["vfox activate clink"] = activateOutput(t, env.Vars{
-		"PATH":         &nodePath,
-		curTmpPathFlag: &sessionDir,
+		"PATH":           &nodePath,
+		curTmpPathFlag:   &sessionDir,
+		env.OrigPathFlag: &baseline,
 	})
 
 	rt.load()
@@ -54,24 +56,29 @@ func TestClinkStartup(t *testing.T) {
 	}
 
 	// vfox activate reads the hook state from its environment, so it has to see
-	// one that belongs to this shell and no session directory of another.
+	// one that belongs to this shell, and neither the session directory nor the
+	// PATH baseline of another: it records a baseline when there is none. It
+	// cannot tell that they are inherited, because the PID is this shell's.
 	activate := rt.started[0].env
 	for name, want := range map[string]string{env.HookFlag: "clink", env.PidFlag: fmt.Sprint(clinkPid)} {
 		if activate[name] != want {
 			t.Errorf("%s = %q when vfox activate runs, want %q", name, activate[name], want)
 		}
 	}
-	if value, ok := activate[curTmpPathFlag]; ok {
-		t.Errorf("%s = %q when vfox activate runs, want it unset", curTmpPathFlag, value)
+	for _, name := range []string{curTmpPathFlag, env.OrigPathFlag} {
+		if value, ok := activate[name]; ok {
+			t.Errorf("%s = %q when vfox activate runs, want it unset", name, value)
+		}
 	}
 
 	// The variables it prints are applied. The line that runs the cleanup is not.
 	want := map[string]string{
-		"USERPROFILE":  clinkUserProfile,
-		env.HookFlag:   "clink",
-		env.PidFlag:    fmt.Sprint(clinkPid),
-		curTmpPathFlag: sessionDir,
-		"PATH":         nodePath,
+		"USERPROFILE":    clinkUserProfile,
+		env.HookFlag:     "clink",
+		env.PidFlag:      fmt.Sprint(clinkPid),
+		curTmpPathFlag:   sessionDir,
+		env.OrigPathFlag: baseline,
+		"PATH":           nodePath,
 	}
 	if !maps.Equal(rt.env, want) {
 		t.Errorf("environment = %v, want %v", rt.env, want)

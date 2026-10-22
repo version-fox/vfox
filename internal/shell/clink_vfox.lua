@@ -152,7 +152,9 @@ local vfox_filter = function() end
 local vfox_task = coroutine.create(function()
     os.setenv('__VFOX_SHELL', 'clink')
     os.setenv('__VFOX_PID', os.getpid())
+    -- vfox activate only drops the state of another shell when __VFOX_PID is not this shell's.
     os.setenv('__VFOX_CURTMPPATH', nil)
+    os.setenv('__VFOX_ORIG_PATH', nil)
     local vfox_activate = io.popen('vfox activate clink')
     for line in vfox_activate:lines() do
         vfox_setenv(line)
