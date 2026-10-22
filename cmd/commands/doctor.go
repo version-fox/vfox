@@ -56,7 +56,7 @@ func doctorCmd(ctx context.Context, cmd *cli.Command) error {
 	name, version := splitDoctorSpec(cmd.Args().First())
 	if name != "" && version != "" {
 		if source, err := manager.LookupSdk(name); err == nil {
-			version = manager.ResolveAlias(name, source, version)
+			version = manager.ResolveVersionName(name, source, version)
 		}
 	}
 
@@ -84,10 +84,11 @@ func doctorCmd(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// splitDoctorSpec reads [<sdk>[@<version>]].
+// splitDoctorSpec reads [<sdk>[@<version>]]. The version is returned as typed;
+// see Manager.ResolveVersionName for what happens to a leading 'v'.
 func splitDoctorSpec(spec string) (name string, version sdk.Version) {
 	name, v, _ := strings.Cut(spec, "@")
-	return strings.ToLower(name), sdk.Version(strings.TrimPrefix(v, "v"))
+	return strings.ToLower(name), sdk.Version(v)
 }
 
 func nonNil(findings []sdk.Finding) []sdk.Finding {

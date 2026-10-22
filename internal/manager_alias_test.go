@@ -299,3 +299,35 @@ func TestUnsetAliasThatTheLoadedConfigDoesNotKnow(t *testing.T) {
 		t.Errorf("user config aliases = %v, want none", got)
 	}
 }
+
+func TestResolveVersionName(t *testing.T) {
+	f, s := aliasFixture(t)
+	f.install(t, "alpha", "vendor") // what `vfox link alpha@vendor` leaves behind
+	f.RuntimeEnvContext.UserConfig = &config.Config{Aliases: map[string]map[string]string{
+		"alpha": {"v1": "2.0.0", "stable": "1.0.0", "4": "2.0.0", "v3": "1.0.0"},
+	}}
+	f.install(t, "alpha", "v3") // an installed version beats an alias of the same name
+
+	for _, tt := range []struct {
+		name  string
+		sdk   sdk.Sdk
+		typed sdk.Version
+		want  sdk.Version
+	}{
+		{"an alias that starts with a v is not the prefix 1", s, "v1", "2.0.0"},
+		{"an installed version that starts with a v", s, "vendor", "vendor"},
+		{"an installed version wins over an alias", s, "v3", "v3"},
+		{"the usual v", s, "v1.0.0", "1.0.0"},
+		{"no v", s, "1.0.0", "1.0.0"},
+		{"an alias", s, "stable", "1.0.0"},
+		{"the alias of the name without the v", s, "v4", "2.0.0"},
+		{"a v on something that is not installed", s, "v9.9.9", "9.9.9"},
+		{"nothing typed", s, "", ""},
+		{"an SDK that is not known still has aliases", nil, "v1", "2.0.0"},
+		{"an SDK that is not known", nil, "v9", "9"},
+	} {
+		if got := f.ResolveVersionName("alpha", tt.sdk, tt.typed); got != tt.want {
+			t.Errorf("%s: ResolveVersionName(%q) = %q, want %q", tt.name, tt.typed, got, tt.want)
+		}
+	}
+}

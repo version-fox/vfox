@@ -518,3 +518,73 @@ func TestLinkNeedsAnInstallationRoot(t *testing.T) {
 		t.Errorf("err = %v, want the reason why nothing could be linked", err)
 	}
 }
+
+func TestStripVersionPrefix(t *testing.T) {
+	s, p, external := newLinkTestSDK(t)
+	p.withCommand(t, "tool")
+	mustInstall(t, s, "1.2.3")
+	mustLink(t, s, "vendor", external)
+	mustLink(t, s, "v7", newExternalSDK(t, "tool"))
+
+	// Versions that cannot be used are still versions of that name: `doctor`
+	// and `uninstall` have to find them.
+	gone := newExternalSDK(t, "tool")
+	mustLink(t, s, "vanished", gone)
+	if err := os.RemoveAll(gone); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(s.installMarkerPath("vpending"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range []struct {
+		name        string
+		sdk         Sdk
+		typed, want Version
+	}{
+		{"the usual v", s, "v1.2.3", "1.2.3"},
+		{"no v", s, "1.2.3", "1.2.3"},
+		{"a v that belongs to a linked version", s, "vendor", "vendor"},
+		{"a linked version that is called like a prefixed one", s, "v7", "v7"},
+		{"its spelling without the v is not that version", s, "7", "7"},
+		{"a link whose target is gone", s, "vanished", "vanished"},
+		{"an interrupted installation", s, "vpending", "vpending"},
+		{"a v on something that is not installed", s, "v9.9.9", "9.9.9"},
+		{"only one v", s, "vv1", "v1"},
+		{"a lone v", s, "v", ""},
+		{"nothing typed", s, "", ""},
+		{"an SDK that is not known", nil, "vendor", "endor"},
+	} {
+		if got := StripVersionPrefix(tt.sdk, tt.typed); got != tt.want {
+			t.Errorf("%s: StripVersionPrefix(%q) = %q, want %q", tt.name, tt.typed, got, tt.want)
+		}
+	}
+}
+
+func TestHasVersion(t *testing.T) {
+	s, p, external := newLinkTestSDK(t)
+	p.withCommand(t, "tool")
+	mustInstall(t, s, "1.2.3")
+	mustLink(t, s, "sys", external)
+	if err := os.WriteFile(s.installMarkerPath("half"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(external); err != nil {
+		t.Fatal(err)
+	}
+
+	for version, want := range map[Version]bool{
+		"1.2.3": true,  // installed
+		"sys":   true,  // linked, and its target is gone: it can no longer be used, but it is there
+		"half":  true,  // an interrupted installation
+		"9.9.9": false, // nothing
+		"":      false,
+	} {
+		if got := s.HasVersion(version); got != want {
+			t.Errorf("HasVersion(%q) = %v, want %v", version, got, want)
+		}
+	}
+	if s.CheckRuntimeExist("sys") || s.CheckRuntimeExist("half") {
+		t.Error("CheckRuntimeExist must stay the stricter question")
+	}
+}

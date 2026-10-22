@@ -241,10 +241,12 @@ vfox use java@j17
 ```
 
 ::: tip 别名只留在你的机器上
-别名保存在你的 `config.yaml` 中，只在命令行输入时解析：`use`、`uninstall`、`info` 和 `exec`。`vfox use -p java@j17` 写进 `.vfox.toml` 的是真实版本，所以没有这个别名的同事也能正常使用这个文件。
+别名保存在你的 `config.yaml` 中，只在命令行输入时解析：`use`、`uninstall`、`info`、`exec` 和 `doctor`。`vfox use -p java@j17` 写进 `.vfox.toml` 的是真实版本，所以没有这个别名的同事也能正常使用这个文件。
 :::
 
 已安装的同名版本永远优先于别名，因此 `alias set` 会拒绝这样的名字。卸载一个版本时，指向它的别名会一并删除。
+
+你输入的版本号开头的 `v`（`v20.1.0` 即 `20.1.0`）只有在没有任何已安装版本、也没有任何别名叫这个名字时才会被去掉。所以别名和用 [`vfox link`](#link) 登记的版本都可以以 `v` 开头。
 
 ## Doctor
 

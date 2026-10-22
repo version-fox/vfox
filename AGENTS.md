@@ -75,7 +75,8 @@ Keep imports acyclic. Shared utilities must not depend on SDK, plugin, environme
 - Activation and environment output is evaluated by the shell; keep unrelated output out of generated shell code. Diagnostics belong to `use` and `doctor`, never to `activate` or `env`; `env` runs at every prompt, so it gets no new checks.
 - SDK argument parsing is command-specific. Check the relevant parser before changing version prefixes, `@latest`, or `exec` arguments and its `--` separator.
 - `link` registers an SDK that already exists (`<sdk>@<version> <path>`, or `--detect` through the plugin's `Detect` hook); the version name is used as written. `doctor` prints findings or `--json` and exits with status 1 only for error findings; `doctor --adopt` writes missing receipts. `alias` edits the user config. `install --reinstall` needs the exact installed version and refuses linked ones.
-- Aliases are resolved for command-line input only (`use`, `uninstall`, `info`, `exec`), through `Manager.ResolveAlias`: an installed version of the same name wins. Never resolve them in version files or in `env`/`activate`.
+- Aliases are resolved for command-line input only (`use`, `uninstall`, `info`, `exec`, `doctor`), through `Manager.ResolveAlias`: an installed version of the same name wins. Never resolve them in version files or in `env`/`activate`.
+- Commands that parse `<sdk>@<version>` (`use`, `exec`, `doctor`, `install`) keep the version as typed and let `Manager.ResolveVersionName` (`sdk.StripVersionPrefix` for `install`) decide about a leading `v`: a version or alias called as typed wins, and only otherwise is the `v` conventional (`v20.1.0`). Linked versions and aliases may start with `v`, so never trim it while parsing.
 
 ## SDK and plugin behavior
 

@@ -240,10 +240,12 @@ vfox use java@j17
 ```
 
 ::: tip Aliases stay on your machine
-Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info` and `exec`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
+Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info`, `exec` and `doctor`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
 :::
 
 A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. Uninstalling a version removes the aliases that name it.
+
+A leading `v` in a version you type (`v20.1.0` for `20.1.0`) is dropped only when no installed version and no alias is called what you typed. So an alias, like a [linked](#link) version, may start with a `v`.
 
 ## Doctor
 

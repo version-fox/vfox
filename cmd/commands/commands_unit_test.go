@@ -55,13 +55,34 @@ func TestSplitDoctorSpec(t *testing.T) {
 		{"nodejs", "nodejs", ""},
 		{"NodeJS", "nodejs", ""},
 		{"nodejs@24.21.0", "nodejs", "24.21.0"},
-		{"nodejs@v24.21.0", "nodejs", "24.21.0"}, // the spelling `vfox current` prints
+		{"nodejs@v24.21.0", "nodejs", "v24.21.0"}, // the spelling `vfox current` prints; whether the v goes is for ResolveVersionName
+		{"java@vendor", "java", "vendor"},
 		{"nodejs@", "nodejs", ""},
 	}
 	for _, tt := range tests {
 		name, version := splitDoctorSpec(tt.spec)
 		if name != tt.name || string(version) != tt.version {
 			t.Errorf("splitDoctorSpec(%q) = (%q, %q), want (%q, %q)", tt.spec, name, version, tt.name, tt.version)
+		}
+	}
+}
+
+// The commands that take <sdk>@<version> hand the version over as typed: a
+// leading "v" may belong to the name of a linked version or an alias.
+func TestSdkArgumentsKeepTheVersionAsTyped(t *testing.T) {
+	for _, tt := range []struct{ arg, name, version string }{
+		{"nodejs", "nodejs", ""},
+		{"nodejs@24.21.0", "nodejs", "24.21.0"},
+		{"nodejs@v24.21.0", "nodejs", "v24.21.0"},
+		{"java@vendor", "java", "vendor"},
+	} {
+		name, version := parseSdkArg(tt.arg)
+		if name != tt.name || string(version) != tt.version {
+			t.Errorf("parseSdkArg(%q) = (%q, %q), want (%q, %q)", tt.arg, name, version, tt.name, tt.version)
+		}
+		spec, err := parseExecSDKSpec(tt.arg)
+		if err != nil || spec.Name != tt.name || string(spec.Version) != tt.version {
+			t.Errorf("parseExecSDKSpec(%q) = (%+v, %v), want (%q, %q)", tt.arg, spec, err, tt.name, tt.version)
 		}
 	}
 }

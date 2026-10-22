@@ -60,6 +60,11 @@ type Sdk interface {
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
 	InstalledList() []Version
 
+	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
+	// installation, a link whose target is gone, an interrupted installation. CheckRuntimeExist is
+	// the stricter question, whether the version can be used.
+	HasVersion(version Version) bool
+
 	// Installation describes an installed version: who owns it and what vfox recorded about it.
 	Installation(version Version) (*Installation, error)
 	// Link registers an existing SDK directory as a version, without copying or downloading anything.
@@ -1016,6 +1021,18 @@ func (b *impl) CheckRuntimeExist(version Version) bool {
 	// os.Stat follows links, so a linked runtime counts while its target exists.
 	info, err := os.Stat(b.mainRuntimePath(version))
 	return err == nil && info.IsDir() && !b.hasPendingInstall(version)
+}
+
+func (b *impl) HasVersion(version Version) bool {
+	if version == "" {
+		return false
+	}
+	for _, path := range []string{b.packagePath(version), b.installMarkerPath(version)} {
+		if _, err := os.Lstat(path); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *impl) installMarkerPath(version Version) string {

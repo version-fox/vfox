@@ -89,14 +89,12 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
 			var name string
-			var version sdk.Version
+			var typedVersion sdk.Version
 			if argsLen == 2 {
 				name = strings.ToLower(argArr[0])
-				// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0")
-				version = sdk.Version(strings.TrimPrefix(argArr[1], "v"))
+				typedVersion = sdk.Version(argArr[1])
 			} else {
 				name = strings.ToLower(argArr[0])
-				version = ""
 			}
 
 			sdkSource, err := manager.LookupSdkWithInstall(name, yes)
@@ -106,6 +104,10 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 				continue
 			}
 			sdkMetadata := sdkSource.Metadata()
+
+			// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0"), unless a
+			// version is installed under that very name, as a linked one can be.
+			version := sdk.StripVersionPrefix(sdkSource, typedVersion)
 
 			// Handle @latest tag
 			if version == "latest" {

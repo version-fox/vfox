@@ -59,6 +59,23 @@ func (m *Manager) ResolveAlias(sdkName string, s sdk.Sdk, version sdk.Version) s
 	return version
 }
 
+// ResolveVersionName turns the version a user typed into the version to act on.
+// The name as typed comes first: an installed version of that name, or an alias
+// for one. Only when there is neither is a leading "v" read as the usual way to
+// spell a version (v20.1.0), and the name without it gets the same two checks.
+// What matches neither way is returned without the "v" and left to the caller,
+// which prefix-matches or reports that it is not installed.
+func (m *Manager) ResolveVersionName(sdkName string, s sdk.Sdk, typed sdk.Version) sdk.Version {
+	if resolved := m.ResolveAlias(sdkName, s, typed); resolved != typed {
+		return resolved
+	}
+	stripped := sdk.StripVersionPrefix(s, typed)
+	if stripped == typed {
+		return typed
+	}
+	return m.ResolveAlias(sdkName, s, stripped)
+}
+
 // SetAlias names an installed version. The alias is stored in the user config.
 func (m *Manager) SetAlias(sdkName, alias string, version sdk.Version) error {
 	sdkName = strings.ToLower(sdkName)

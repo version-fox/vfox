@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/pterm/pterm"
 
@@ -44,6 +45,19 @@ var versionNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+\-]*$`)
 // picks: it becomes a directory name and is typed in commands.
 func ValidVersionName(name string) bool {
 	return versionNamePattern.MatchString(name) && name != "latest"
+}
+
+// StripVersionPrefix returns the version a user means by what they typed after
+// "@". A leading "v" is the usual way to spell a version (v20.1.0 for 20.1.0),
+// but a name the user picked can start with one too, such as a linked version
+// called vendor. So a version that is on disk under the name as typed is left
+// alone, even when it is broken, and the "v" only goes when there is none.
+// s may be nil.
+func StripVersionPrefix(s Sdk, typed Version) Version {
+	if typed == "" || (s != nil && s.HasVersion(typed)) {
+		return typed
+	}
+	return Version(strings.TrimPrefix(string(typed), "v"))
 }
 
 // Link registers an existing SDK directory as a version. Nothing is downloaded
