@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
@@ -65,6 +66,10 @@ func (m *Manager) Diagnose(name string, version sdk.Version) ([]sdk.Finding, err
 			opts.NoPath = true
 		}
 		findings = append(findings, s.Diagnose(opts)...)
+
+		if version == "" {
+			findings = append(findings, m.aliasFindings(s)...)
+		}
 	}
 
 	sdk.ApplyIgnore(findings, m.ignores)
@@ -146,6 +151,33 @@ func (m *Manager) orphanedInstallFindings() []sdk.Finding {
 				break
 			}
 		}
+	}
+	return findings
+}
+
+// aliasFindings reports aliases that name a version which is no longer installed.
+func (m *Manager) aliasFindings(s sdk.Sdk) []sdk.Finding {
+	name := strings.ToLower(s.Metadata().Name)
+	aliases := m.AliasesFor(name)
+	names := make([]string, 0, len(aliases))
+	for alias := range aliases {
+		names = append(names, alias)
+	}
+	sort.Strings(names)
+	var findings []sdk.Finding
+	for _, alias := range names {
+		version := aliases[alias]
+		if s.CheckRuntimeExist(sdk.Version(version)) {
+			continue
+		}
+		findings = append(findings, sdk.Finding{
+			ID:       sdk.FindingAliasDangling,
+			Severity: sdk.SeverityWarn,
+			SDK:      name,
+			Version:  version,
+			Message:  fmt.Sprintf("The alias %s names %s@%s, which is not installed.", alias, name, version),
+			Fix:      []string{fmt.Sprintf("vfox alias unset %s %s", name, alias)},
+		})
 	}
 	return findings
 }

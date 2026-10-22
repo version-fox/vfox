@@ -68,6 +68,8 @@ type Sdk interface {
 	Adopt(version Version) (bool, error)
 	// Diagnose checks installed versions and reports what looks wrong.
 	Diagnose(opts DiagnoseOptions) []Finding
+	// Detect lists SDKs on this machine that the plugin knows how to find and vfox did not install.
+	Detect() ([]DetectedRuntime, error)
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
 	Metadata() *Metadata // Get the metadata of the SDK

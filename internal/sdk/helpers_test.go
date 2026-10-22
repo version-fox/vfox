@@ -39,6 +39,7 @@ type testPlugin struct {
 	preUninstall func(*plugin.PreUninstallHookCtx) error
 	envKeys      func(*plugin.EnvKeysHookCtx) ([]*plugin.EnvKeysHookResultItem, error)
 	fingerprint  func(*plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error)
+	detect       func(*plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error)
 
 	preInstallCalls  int
 	preUninstallCall int
@@ -52,6 +53,8 @@ func (p *testPlugin) HasFunction(name string) bool {
 		return p.preUninstall != nil
 	case "Fingerprint":
 		return p.fingerprint != nil
+	case "Detect":
+		return p.detect != nil
 	}
 	return false
 }
@@ -80,6 +83,10 @@ func (p *testPlugin) EnvKeys(ctx *plugin.EnvKeysHookCtx) ([]*plugin.EnvKeysHookR
 
 func (p *testPlugin) Fingerprint(ctx *plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error) {
 	return p.fingerprint(ctx)
+}
+
+func (p *testPlugin) Detect(ctx *plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error) {
+	return p.detect(ctx)
 }
 
 // withCommand makes PostInstall put a command into the installed SDK's bin

@@ -139,6 +139,9 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 		version = latestVersion
 	}
 
+	// A name the user gave to an installed version stands for that version.
+	version = manager.ResolveAlias(name, sdkSource, version)
+
 	// Try to resolve version first
 	resolvedVersion := manager.ResolveVersion(name, version)
 	if resolvedVersion != "" {

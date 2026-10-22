@@ -27,6 +27,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
@@ -148,4 +149,42 @@ func (b *impl) validateLinkTarget(version Version, target string) error {
 		return nil // nothing to check, or it checks out
 	}
 	return fmt.Errorf("%s does not look like a %s installation: none of the directories the plugin puts on PATH %v holds a command", target, b.sdkName(), dirs)
+}
+
+// DetectedRuntime is an SDK found on this machine that vfox did not install.
+type DetectedRuntime struct {
+	Version Version // the name to link it under
+	Path    string
+	Note    string
+}
+
+// ErrDetectNotSupported is returned by Detect for a plugin without a Detect hook.
+var ErrDetectNotSupported = errors.New("the plugin cannot detect SDKs installed elsewhere")
+
+// Detect asks the plugin for SDKs on this machine that could be linked.
+func (b *impl) Detect() ([]DetectedRuntime, error) {
+	if b.plugin == nil || !b.plugin.HasFunction("Detect") {
+		return nil, ErrDetectNotSupported
+	}
+	items, err := b.plugin.Detect(&plugin.DetectHookCtx{})
+	if b.plugin.IsNoResultProvided(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("plugin [Detect] method error: %w", err)
+	}
+	var found []DetectedRuntime
+	seen := make(map[string]struct{})
+	for _, item := range items {
+		if item == nil || item.Path == "" || !ValidVersionName(item.Version) {
+			logger.Debugf("Ignoring unusable detected SDK: %+v\n", item)
+			continue
+		}
+		if _, dup := seen[item.Version]; dup {
+			continue
+		}
+		seen[item.Version] = struct{}{}
+		found = append(found, DetectedRuntime{Version: Version(item.Version), Path: item.Path, Note: item.Note})
+	}
+	return found, nil
 }

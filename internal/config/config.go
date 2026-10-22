@@ -35,6 +35,10 @@ type Config struct {
 	Gitignore         *Gitignore         `yaml:"gitignore"`
 	Diagnostics       *Diagnostics       `yaml:"diagnostics"`
 	Path              *Path              `yaml:"path"`
+	// Aliases maps an SDK name to user-defined names for installed versions:
+	// aliases[sdk][alias] = version. They are resolved for command-line input
+	// only and are never written to version files.
+	Aliases map[string]map[string]string `yaml:"aliases"`
 }
 
 const filename = "config.yaml"
@@ -52,6 +56,31 @@ var (
 		Path:              EmptyPath,
 	}
 )
+
+// Clone returns a copy that can be modified without touching c or the shared
+// defaults (NewConfigWithPath may hand out DefaultConfig itself).
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return &Config{}
+	}
+	clone := *c
+	clone.Aliases = cloneAliases(c.Aliases)
+	return &clone
+}
+
+func cloneAliases(aliases map[string]map[string]string) map[string]map[string]string {
+	if aliases == nil {
+		return nil
+	}
+	clone := make(map[string]map[string]string, len(aliases))
+	for sdk, names := range aliases {
+		clone[sdk] = make(map[string]string, len(names))
+		for name, version := range names {
+			clone[sdk][name] = version
+		}
+	}
+	return clone
+}
 
 func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
@@ -160,6 +189,9 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 	// Merge Diagnostics and Path: user overrides shared
 	result.Diagnostics = mergeDiagnostics(sharedConfig.Diagnostics, userConfig.Diagnostics)
 	result.Path = mergePath(sharedConfig.Path, userConfig.Path)
+
+	// Merge Aliases: entries of both are kept, the user wins on a clash
+	result.Aliases = mergeAliases(sharedConfig.Aliases, userConfig.Aliases)
 
 	// Apply defaults to any remaining nil fields
 	return ensureDefaults(result)
@@ -301,6 +333,26 @@ func mergePath(shared, user *Path) *Path {
 		return shared
 	}
 	return EmptyPath
+}
+
+// mergeAliases keeps the aliases of both configs; the user wins on a clash.
+func mergeAliases(shared, user map[string]map[string]string) map[string]map[string]string {
+	if len(shared) == 0 && len(user) == 0 {
+		return nil
+	}
+	merged := cloneAliases(shared)
+	if merged == nil {
+		merged = make(map[string]map[string]string)
+	}
+	for sdk, names := range user {
+		if merged[sdk] == nil {
+			merged[sdk] = make(map[string]string, len(names))
+		}
+		for name, version := range names {
+			merged[sdk][name] = version
+		}
+	}
+	return merged
 }
 
 // Helper functions to check if config is empty

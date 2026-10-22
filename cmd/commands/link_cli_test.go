@@ -107,6 +107,7 @@ func TestLinkCommandRefusesWhatItCannotDo(t *testing.T) {
 		{"name that is a path", []string{"link", "alpha@../x", external}, "not a usable version name"},
 		{"missing directory", []string{"link", "alpha@sys", filepath.Join(external, "missing")}, "cannot link"},
 		{"not an SDK", []string{"link", "alpha@sys", notAnSDK}, "does not look like"},
+		{"detect without an SDK", []string{"link", "--detect"}, "usage: vfox link --detect"},
 		{"reinstall with --all", []string{"install", "--all", "--reinstall"}, "--reinstall cannot be combined with --all"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -143,6 +144,49 @@ func TestLinkCommandForce(t *testing.T) {
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
 	r = f.run(t, "link", "--force", "alpha@1.0.0", first).mustFail(t, "link over an installed version")
 	mustContain(t, "error", r.output(), "already installed")
+}
+
+func TestLinkDetect(t *testing.T) {
+	f := newCLIFixture(t, false)
+	found := f.external(t, "alphatool")
+	f.env["ALPHA_DETECT_DIR"] = found
+
+	t.Run("it asks first, and cannot in a script", func(t *testing.T) {
+		r := f.run(t, "link", "--detect", "alpha").mustFail(t, "link --detect without -y")
+		mustContain(t, "output", r.output(), "found-1", found, "from the test", "-y")
+		if exists(filepath.Join(f.shared, "cache", "alpha", "v-found-1")) {
+			t.Error("nothing may be linked without a yes")
+		}
+	})
+	t.Run("it links what the plugin found", func(t *testing.T) {
+		out := f.run(t, "link", "--detect", "-y", "alpha").mustSucceed(t, "link --detect -y").output()
+		mustContain(t, "output", out, "Linked", "alpha@found-1")
+		mustContain(t, "list", f.run(t, "list", "alpha").mustSucceed(t, "list").output(), "found-1 (linked → "+found+")")
+	})
+	t.Run("a second run finds nothing new", func(t *testing.T) {
+		out := f.run(t, "link", "--detect", "-y", "alpha").mustSucceed(t, "link --detect -y").output()
+		mustContain(t, "output", out, "Skipping found-1", "already installed", "No new alpha installations found.")
+	})
+	t.Run("the same directory is not linked under a second name", func(t *testing.T) {
+		f.installOnDisk(t, "alpha", "unrelated", "alphatool") // does not matter, just a second version
+		out := f.run(t, "link", "--detect", "-y", "alpha").mustSucceed(t, "link --detect -y").output()
+		mustContain(t, "output", out, "No new alpha installations found.")
+	})
+	t.Run("a plugin that cannot detect says so", func(t *testing.T) {
+		r := f.run(t, "link", "--detect", "-y", "plain").mustFail(t, "link --detect on a plugin without the hook")
+		mustContain(t, "output", r.output(), "cannot detect")
+	})
+	t.Run("what cannot be linked is reported", func(t *testing.T) {
+		f2 := newCLIFixture(t, false)
+		f2.env["ALPHA_DETECT_DIR"] = f2.external(t) // not an SDK
+		r := f2.run(t, "link", "--detect", "-y", "alpha").mustFail(t, "link --detect of a directory that is not an SDK")
+		mustContain(t, "output", r.output(), "Could not link alpha@found-1", "does not look like")
+	})
+	t.Run("a plugin that finds nothing", func(t *testing.T) {
+		f3 := newCLIFixture(t, false)
+		out := f3.run(t, "link", "--detect", "-y", "alpha").mustSucceed(t, "link --detect with nothing to find").output()
+		mustContain(t, "output", out, "No new alpha installations found.")
+	})
 }
 
 func TestLinkedVersionCanBeSelected(t *testing.T) {

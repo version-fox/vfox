@@ -165,6 +165,16 @@ type FingerprintHookResult struct {
 	Facts map[string]string `json:"facts"`
 }
 
+// DetectHookCtx is the context of the optional Detect hook.
+type DetectHookCtx struct{}
+
+// DetectHookResultItem is an SDK found on this machine that vfox did not install.
+type DetectHookResultItem struct {
+	Version string `json:"version"` // name to link the SDK under
+	Path    string `json:"path"`    // SDK root directory
+	Note    string `json:"note"`    // optional, additional note
+}
+
 // ShadowHint is a plugin-declared explanation for a command of the SDK being
 // shadowed by an executable somewhere else in PATH. Match is a case-insensitive
 // substring of the shadowing executable's path.

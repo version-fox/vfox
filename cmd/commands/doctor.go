@@ -54,6 +54,11 @@ func doctorCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	name, version := splitDoctorSpec(cmd.Args().First())
+	if name != "" && version != "" {
+		if source, err := manager.LookupSdk(name); err == nil {
+			version = manager.ResolveAlias(name, source, version)
+		}
+	}
 
 	if cmd.Bool("adopt") {
 		return doctorAdopt(cmd, manager, name, version)

@@ -201,6 +201,27 @@ func (l *LuaPlugin) Fingerprint(ctx *FingerprintHookCtx) (*FingerprintHookResult
 	return &hookResult, nil
 }
 
+func (l *LuaPlugin) Detect(ctx *DetectHookCtx) ([]*DetectHookResultItem, error) {
+	L := l.vm.Instance
+	ctxTable, err := codec.Marshal(L, ctx)
+	if err != nil {
+		return nil, err
+	}
+	table, err := l.CallFunction("Detect", ctxTable)
+	if err != nil {
+		return nil, err
+	}
+	if table == nil || table.Type() == lua.LTNil {
+		return nil, ErrNoResultProvide
+	}
+	var hookResult []*DetectHookResultItem
+	err = codec.Unmarshal(table, &hookResult)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
+	}
+	return hookResult, nil
+}
+
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (lua.LValue, error) {
 	if !l.development {
 		logger.Debugf("CallFunction: %s\n", funcName)

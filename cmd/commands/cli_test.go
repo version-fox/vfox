@@ -65,7 +65,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Config, Doctor, Env, Info, Install, Link, List, Uninstall, Use,
+	Activate, Alias, Config, Doctor, Env, Info, Install, Link, List, Uninstall, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -90,13 +90,19 @@ func cloneCommands(commands ...*cli.Command) []*cli.Command {
 	return clones
 }
 
-// alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH and
-// fingerprints an installation by the contents of its VERSION file.
+// alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH, finds
+// "installations" in the directory ALPHA_DETECT_DIR, and fingerprints an
+// installation by the contents of its VERSION file.
 const alphaPlugin = `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 PLUGIN.shadowHints = {{match="pnpm", message="pnpm put its own alphatool first.", url="https://example.com/pnpm"}}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
 function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
 function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+function PLUGIN:Detect(ctx)
+  local dir = os.getenv("ALPHA_DETECT_DIR")
+  if dir == nil then return nil end
+  return {{version="found-1", path=dir, note="from the test"}}
+end
 function PLUGIN:Fingerprint(ctx)
   local f = io.open(ctx.path .. "/VERSION", "r")
   if f == nil then return nil end

@@ -394,6 +394,53 @@ func TestALinkInsideAnInstalledVersionIsNotALinkedVersion(t *testing.T) {
 	}
 }
 
+func TestDetect(t *testing.T) {
+	t.Run("plugin without the hook", func(t *testing.T) {
+		s := newTestSDK(t, &testPlugin{})
+		if _, err := s.Detect(); !errors.Is(err, ErrDetectNotSupported) {
+			t.Errorf("err = %v, want ErrDetectNotSupported", err)
+		}
+	})
+	t.Run("nothing found", func(t *testing.T) {
+		s := newTestSDK(t, &testPlugin{detect: func(*plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error) {
+			return nil, plugin.ErrNoResultProvide
+		}})
+		found, err := s.Detect()
+		if err != nil || len(found) != 0 {
+			t.Errorf("found = %v, err = %v", found, err)
+		}
+	})
+	t.Run("unusable entries are dropped", func(t *testing.T) {
+		s := newTestSDK(t, &testPlugin{detect: func(*plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error) {
+			return []*plugin.DetectHookResultItem{
+				{Version: "21.0.3-tem", Path: "/jdk/21", Note: "found"},
+				{Version: "17", Path: ""},           // no path
+				{Version: "latest", Path: "/jdk"},   // not a usable name
+				{Version: "a/b", Path: "/jdk"},      // not a usable name
+				{Version: "21.0.3-tem", Path: "/x"}, // name already taken by an earlier entry
+				nil,
+				{Version: "11", Path: "/jdk/11"},
+			}, nil
+		}})
+		found, err := s.Detect()
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []DetectedRuntime{{Version: "21.0.3-tem", Path: "/jdk/21", Note: "found"}, {Version: "11", Path: "/jdk/11"}}
+		if len(found) != len(want) || found[0] != want[0] || found[1] != want[1] {
+			t.Errorf("found = %+v, want %+v", found, want)
+		}
+	})
+	t.Run("hook error", func(t *testing.T) {
+		s := newTestSDK(t, &testPlugin{detect: func(*plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error) {
+			return nil, errors.New("boom")
+		}})
+		if _, err := s.Detect(); err == nil || !strings.Contains(err.Error(), "boom") {
+			t.Errorf("err = %v", err)
+		}
+	})
+}
+
 func TestAdoptWritesAReceiptForALegacyInstallation(t *testing.T) {
 	p := &testPlugin{fingerprint: func(*plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error) {
 		return &plugin.FingerprintHookResult{Facts: map[string]string{"head": "abc"}}, nil

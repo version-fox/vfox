@@ -64,6 +64,7 @@ const (
 	FindingInstallInterrupted = "sdk.install-interrupted"
 	FindingPluginMissing      = "sdk.plugin-missing"
 	FindingPluginIncompatible = "plugin.incompatible"
+	FindingAliasDangling      = "alias.dangling"
 )
 
 // Finding is one thing a check found.

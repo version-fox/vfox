@@ -19,6 +19,7 @@ package commands
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -71,16 +72,77 @@ func TestFormatVersionLabel(t *testing.T) {
 		version sdk.Version
 		origin  sdk.Origin
 		target  string
+		aliases []string
 		want    string
 	}{
-		{"installed", "17.0.9", sdk.OriginInstalled, "", "17.0.9"},
-		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", "17-sys (linked → /usr/lib/jvm/x)"},
-		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", "17-sys (linked)"},
+		{"installed", "17.0.9", sdk.OriginInstalled, "", nil, "17.0.9"},
+		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", nil, "17-sys (linked → /usr/lib/jvm/x)"},
+		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", nil, "17-sys (linked)"},
+		{"aliased", "17.0.9", sdk.OriginInstalled, "", []string{"j17", "lts"}, "17.0.9 [alias: j17, lts]"},
+		{"both", "17-sys", sdk.OriginLinked, "/jdk", []string{"sys"}, "17-sys (linked → /jdk) [alias: sys]"},
 	}
 	for _, tt := range tests {
-		if got := formatVersionLabel(tt.version, tt.origin, tt.target); got != tt.want {
+		if got := formatVersionLabel(tt.version, tt.origin, tt.target, tt.aliases); got != tt.want {
 			t.Errorf("%s: label = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestAliasesByVersion(t *testing.T) {
+	got := aliasesByVersion(map[string]string{"z": "1", "a": "1", "m": "2"})
+	want := map[string][]string{"1": {"a", "z"}, "2": {"m"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("aliasesByVersion = %v, want %v", got, want)
+	}
+	if got := aliasesByVersion(nil); len(got) != 0 {
+		t.Errorf("no aliases: %v", got)
+	}
+}
+
+// fakeSdk is the part of sdk.Sdk that detectCandidates looks at.
+type fakeSdk struct {
+	sdk.Sdk
+	installed map[sdk.Version]string // version -> link target ("" when installed by vfox)
+}
+
+func (f fakeSdk) CheckRuntimeExist(v sdk.Version) bool { _, ok := f.installed[v]; return ok }
+
+func (f fakeSdk) InstalledList() []sdk.Version {
+	var versions []sdk.Version
+	for v := range f.installed {
+		versions = append(versions, v)
+	}
+	return versions
+}
+
+func (f fakeSdk) Installation(v sdk.Version) (*sdk.Installation, error) {
+	target, ok := f.installed[v]
+	if !ok {
+		return nil, sdk.ErrRuntimeNotFound
+	}
+	return &sdk.Installation{Target: target}, nil
+}
+
+func TestDetectCandidates(t *testing.T) {
+	s := fakeSdk{installed: map[sdk.Version]string{
+		"17":     "",                        // installed by vfox
+		"21-tem": "/usr/lib/jvm/temurin-21", // linked
+	}}
+	found := []sdk.DetectedRuntime{
+		{Version: "17", Path: "/usr/lib/jvm/java-17"},            // name taken
+		{Version: "21-other", Path: "/usr/lib/jvm/temurin-21/"},  // directory already linked (trailing slash)
+		{Version: "11", Path: "/usr/lib/jvm/java-11", Note: "n"}, // new
+		{Version: "8", Path: "/usr/lib/jvm/java-8"},              // new
+	}
+	candidates, skipped := detectCandidates(s, found)
+
+	if want := []sdk.DetectedRuntime{found[2], found[3]}; !reflect.DeepEqual(candidates, want) {
+		t.Errorf("candidates = %+v, want %+v", candidates, want)
+	}
+	if len(skipped) != 2 ||
+		!strings.Contains(skipped[0], "17: a version of that name is already installed") ||
+		!strings.Contains(skipped[1], "21-other: /usr/lib/jvm/temurin-21/ is already linked as 21-tem") {
+		t.Errorf("skipped = %q", skipped)
 	}
 }
 
