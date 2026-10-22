@@ -18,8 +18,8 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -41,7 +41,46 @@ var Info = &cli.Command{
 			Aliases: []string{"f"},
 			Usage:   "Format the output using the given Go template",
 		},
+		&cli.BoolFlag{
+			Name:  "json",
+			Usage: "Output as JSON",
+		},
 	},
+}
+
+const notFound = "notfound"
+
+// versionData is what a --format template for <sdk>@<version> can use.
+type versionData struct {
+	Name    string
+	Version string
+	// Path is the directory that holds the version: the parent of Home. It is
+	// kept as it always was so scripts that use it keep working.
+	Path string
+	// Home is the main runtime directory, the one to point JAVA_HOME and the
+	// like at.
+	Home string
+}
+
+type runtimeJSON struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Path    string `json:"path"`
+}
+
+type versionJSON struct {
+	Name        string        `json:"name"`
+	Version     string        `json:"version"`
+	Installed   bool          `json:"installed"`
+	Home        string        `json:"home,omitempty"`
+	PackagePath string        `json:"packagePath,omitempty"`
+	Additions   []runtimeJSON `json:"additions,omitempty"`
+	Env         *envJSON      `json:"env,omitempty"`
+}
+
+type envJSON struct {
+	Paths     []string          `json:"paths"`
+	Variables map[string]string `json:"variables"`
 }
 
 func infoCmd(ctx context.Context, cmd *cli.Command) error {
@@ -54,6 +93,9 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 	if args == "" {
 		return cli.Exit("invalid arguments", 1)
 	}
+	if cmd.IsSet("json") && cmd.IsSet("format") {
+		return cli.Exit("use either --format or --json", 1)
+	}
 
 	// Check if the argument is in the format <sdk>@<version>
 	if strings.Contains(args, "@") {
@@ -64,50 +106,7 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 
 			// Check for empty SDK name or version
 			if name != "" && string(version) != "" {
-				sdkSource, err := manager.LookupSdk(name)
-				if err != nil {
-					if cmd.IsSet("format") {
-						// For template output, we still need to output something
-						data := struct {
-							Name    string
-							Version string
-							Path    string
-						}{
-							Name:    name,
-							Version: string(version),
-							Path:    "notfound",
-						}
-						return executeTemplate(cmd, data)
-					}
-					fmt.Println("notfound")
-					return nil
-				}
-				path := ""
-				runtimePackage, err := sdkSource.GetRuntimePackage(version)
-				if err == nil {
-					// TODO check
-					path = filepath.Join(runtimePackage.PackagePath)
-				} else {
-					path = "notfound"
-				}
-
-				// Check if format flag is set
-				formatValue := cmd.String("format")
-				if formatValue != "" {
-					data := struct {
-						Name    string
-						Version string
-						Path    string
-					}{
-						Name:    name,
-						Version: string(version),
-						Path:    path,
-					}
-					return executeTemplate(cmd, data)
-				}
-
-				fmt.Println(path)
-				return nil
+				return infoVersion(cmd, manager, name, version)
 			}
 		}
 	}
@@ -136,6 +135,21 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 		return executeTemplate(cmd, data)
 	}
+	if cmd.IsSet("json") {
+		return writeJSON(cmd, struct {
+			Name        string `json:"name"`
+			Version     string `json:"version"`
+			Homepage    string `json:"homepage"`
+			InstallPath string `json:"installPath"`
+			Description string `json:"description"`
+		}{
+			Name:        source.PluginMetadata.Name,
+			Version:     source.PluginMetadata.Version,
+			Homepage:    source.PluginMetadata.Homepage,
+			InstallPath: source.SdkInstalledPath,
+			Description: source.PluginMetadata.Description,
+		})
+	}
 
 	pterm.Println("Plugin Info:")
 	pterm.Println("Name    ", "->", pterm.LightBlue(source.PluginMetadata.Name))
@@ -145,6 +159,68 @@ func infoCmd(ctx context.Context, cmd *cli.Command) error {
 	pterm.Println(pterm.LightBlue(source.PluginMetadata.Description))
 	source.PluginMetadata.ShowNotes()
 	return nil
+}
+
+// infoVersion shows where an installed version lives and what it is.
+func infoVersion(cmd *cli.Command, manager *internal.Manager, name string, version sdk.Version) error {
+	sdkSource, err := manager.LookupSdk(name)
+	if err != nil {
+		if cmd.IsSet("json") {
+			return writeJSON(cmd, versionJSON{Name: name, Version: string(version)})
+		}
+		if cmd.IsSet("format") {
+			// For template output, we still need to output something
+			return executeTemplate(cmd, versionData{
+				Name: name, Version: string(version), Path: notFound, Home: notFound,
+			})
+		}
+		fmt.Println(notFound)
+		return nil
+	}
+	runtimePackage, err := sdkSource.GetRuntimePackage(version)
+
+	if cmd.IsSet("json") {
+		return writeJSON(cmd, describeVersion(sdkSource, name, version, runtimePackage, err))
+	}
+
+	data := versionData{Name: name, Version: string(version), Path: notFound, Home: notFound}
+	if err == nil {
+		data.Path = runtimePackage.PackagePath
+		data.Home = runtimePackage.Runtime.Path
+	}
+	if cmd.IsSet("format") {
+		return executeTemplate(cmd, data)
+	}
+	fmt.Println(data.Path)
+	return nil
+}
+
+func describeVersion(s sdk.Sdk, name string, version sdk.Version, pkg *sdk.RuntimePackage, err error) versionJSON {
+	out := versionJSON{Name: name, Version: string(version)}
+	if err != nil {
+		return out
+	}
+	out.Installed = true
+	out.Home = pkg.Runtime.Path
+	out.PackagePath = pkg.PackagePath
+	for _, addition := range pkg.Additions {
+		out.Additions = append(out.Additions, runtimeJSON{Name: addition.Name, Version: string(addition.Version), Path: addition.Path})
+	}
+	if envs, envErr := s.EnvKeys(pkg); envErr == nil {
+		out.Env = &envJSON{Paths: envs.Paths.Slice(), Variables: map[string]string{}}
+		for key, value := range envs.Variables {
+			if value != nil {
+				out.Env.Variables[key] = *value
+			}
+		}
+	}
+	return out
+}
+
+func writeJSON(cmd *cli.Command, v any) error {
+	encoder := json.NewEncoder(cmd.Writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(v)
 }
 
 func executeTemplate(cmd *cli.Command, data interface{}) error {

@@ -886,7 +886,9 @@ func (b *impl) GetRuntimePackage(version Version) (*RuntimePackage, error) {
 		return nil, err
 	}
 	for _, d := range dir {
-		if d.IsDir() {
+		// DirEntry.IsDir() is false for a symlink or junction, which is how a
+		// linked runtime is stored, so ask the file system about the target.
+		if fi, err := os.Stat(filepath.Join(versionPath, d.Name())); err == nil && fi.IsDir() {
 			if strings.HasSuffix(d.Name(), string(version)) {
 				name := strings.TrimSuffix(d.Name(), "-"+string(version))
 				if name == "" {
