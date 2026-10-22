@@ -71,6 +71,7 @@ func newManagerFixture(t *testing.T) *managerFixture {
 	// Whatever shell the tests run in must not leak into the checks. An
 	// activated shell is the default, unless a test says otherwise.
 	t.Setenv(env.HookFlag, "bash")
+	t.Setenv(env.OrigPathFlag, "")
 	t.Setenv("VIRTUAL_ENV", "")
 	t.Setenv("CONDA_PREFIX", "")
 	return &managerFixture{Manager: m, meta: meta}

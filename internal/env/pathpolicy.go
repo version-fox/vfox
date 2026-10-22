@@ -21,31 +21,87 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 // ShadowSource says why a PATH entry sits in front of vfox's directories.
 type ShadowSource string
 
 const (
-	// ShadowSourceUnknown: nothing is known about where the entry comes from.
+	// ShadowSourceUnknown: no baseline was recorded, so inherited and added
+	// entries cannot be told apart.
 	ShadowSourceUnknown ShadowSource = "unknown"
 	// ShadowSourceActivatedEnv: the directory of an active virtualenv or conda
 	// environment. It is meant to win.
 	ShadowSourceActivatedEnv ShadowSource = "activated-env"
+	// ShadowSourcePreserved: listed in `path.preserve`.
+	ShadowSourcePreserved ShadowSource = "preserved"
+	// ShadowSourceInherited: already in PATH when vfox was activated, such as
+	// the directories macOS path_helper or the Windows machine PATH put first.
+	ShadowSourceInherited ShadowSource = "inherited"
+	// ShadowSourceAdded: added to PATH after vfox was activated, such as the
+	// $PNPM_HOME that `pnpm setup` prepends at the end of a shell rc file.
+	ShadowSourceAdded ShadowSource = "added-after-activation"
 )
 
-// pathPolicy classifies the PATH entries in front of vfox's first directory.
+// pathPolicy decides which PATH entries in front of vfox's first directory
+// stay in front of it.
 type pathPolicy struct {
+	mode string
+	// orig is the PATH recorded at activation. nil means none was recorded.
+	orig map[string]struct{}
 	// activated holds the directories of an active virtualenv/conda environment.
 	activated map[string]struct{}
+	// preserved holds the directories listed in `path.preserve`.
+	preserved map[string]struct{}
 }
 
 func (m *RuntimeEnvContext) pathPolicy() pathPolicy {
-	p := pathPolicy{activated: make(map[string]struct{})}
+	p := pathPolicy{
+		mode:      config.PathModeLegacy,
+		orig:      parseOrigPath(os.Getenv(OrigPathFlag)),
+		activated: make(map[string]struct{}),
+		preserved: make(map[string]struct{}),
+	}
+	if m != nil && m.UserConfig != nil && m.UserConfig.Path != nil {
+		p.mode = m.UserConfig.Path.EffectiveMode()
+		for _, dir := range m.UserConfig.Path.Preserve {
+			if dir = expandPreservedDir(dir); dir != "" {
+				p.preserved[normalizePathEntry(dir)] = struct{}{}
+			}
+		}
+	}
 	for _, dir := range activatedEnvDirs() {
 		p.activated[normalizePathEntry(dir)] = struct{}{}
 	}
 	return p
+}
+
+// keepInFront reports whether an entry that sits before vfox's first directory
+// stays in front of the vfox directories.
+func (p pathPolicy) keepInFront(entry string) bool {
+	n := normalizePathEntry(entry)
+	if _, ok := p.activated[n]; ok {
+		return true
+	}
+	if _, ok := p.preserved[n]; ok {
+		return true
+	}
+	switch p.mode {
+	case config.PathModeAggressive:
+		return false
+	case config.PathModeBaseline:
+		if p.orig == nil {
+			return true // no baseline recorded: behave like legacy
+		}
+		_, inherited := p.orig[n]
+		return !inherited
+	default:
+		return true
+	}
 }
 
 // sourceOf explains why the directory is in front of vfox's directories.
@@ -54,7 +110,111 @@ func (p pathPolicy) sourceOf(dir string) ShadowSource {
 	if _, ok := p.activated[n]; ok {
 		return ShadowSourceActivatedEnv
 	}
-	return ShadowSourceUnknown
+	if _, ok := p.preserved[n]; ok {
+		return ShadowSourcePreserved
+	}
+	if p.orig == nil {
+		return ShadowSourceUnknown
+	}
+	if _, ok := p.orig[n]; ok {
+		return ShadowSourceInherited
+	}
+	return ShadowSourceAdded
+}
+
+// splitSystemPaths splits pathEnv around vfox's own directories. The entries
+// in front of the first vfox directory are divided by the policy: those it
+// keeps in front go to prefix, the others join clean, ahead of the entries
+// that were behind vfox already, so their relative order is preserved.
+func splitSystemPaths(pathEnv string, p pathPolicy) (prefix *Paths, clean *Paths) {
+	systemPaths := strings.Split(pathEnv, string(os.PathListSeparator))
+
+	prefix = NewPaths(EmptyPaths)
+	clean = NewPaths(EmptyPaths)
+
+	// First pass: check if there are any vfox paths
+	hasVfoxPath := false
+	for _, path := range systemPaths {
+		if path == "" {
+			continue
+		}
+		if pathmeta.IsVfoxRelatedPath(filepath.Clean(path)) {
+			hasVfoxPath = true
+			break
+		}
+	}
+
+	// If no vfox paths, all paths are clean system paths (no user-injected paths to preserve)
+	if !hasVfoxPath {
+		for _, path := range systemPaths {
+			if path == "" {
+				continue
+			}
+			clean.Add(path)
+		}
+		return prefix, clean
+	}
+
+	// Second pass: split by first vfox path
+	foundVfoxPath := false
+	for _, path := range systemPaths {
+		if path == "" {
+			continue
+		}
+		cleanPath := filepath.Clean(path)
+
+		if pathmeta.IsVfoxRelatedPath(cleanPath) {
+			logger.Debugf("Removing vfox path from system PATH: %s", path)
+			foundVfoxPath = true
+			continue
+		}
+
+		switch {
+		case foundVfoxPath:
+			// Path appears after first vfox path - normal system path
+			clean.Add(path)
+		case p.keepInFront(path):
+			// Path appears before first vfox path and is meant to win (e.g., virtualenv)
+			prefix.Add(path)
+		default:
+			logger.Debugf("Moving %s behind the vfox paths (%s mode)", path, p.mode)
+			clean.Add(path)
+		}
+	}
+
+	return prefix, clean
+}
+
+// BaselinePath returns the PATH to record as the activation baseline: the
+// current PATH without vfox's own directories, in order.
+func (m *RuntimeEnvContext) BaselinePath() *Paths {
+	baseline := NewPaths(EmptyPaths)
+	for _, path := range strings.Split(os.Getenv("PATH"), string(os.PathListSeparator)) {
+		if path == "" || pathmeta.IsVfoxRelatedPath(filepath.Clean(path)) {
+			continue
+		}
+		baseline.Add(path)
+	}
+	return baseline
+}
+
+// parseOrigPath reads the value of OrigPathFlag. nil means no baseline.
+func parseOrigPath(value string) map[string]struct{} {
+	if value == "" {
+		return nil
+	}
+	sep := string(os.PathListSeparator)
+	// Git Bash and MSYS2 export a list of POSIX-style paths separated by ':'.
+	if runtime.GOOS == "windows" && !strings.Contains(value, ";") && strings.HasPrefix(value, "/") {
+		sep = ":"
+	}
+	entries := make(map[string]struct{})
+	for _, entry := range strings.Split(value, sep) {
+		if entry = normalizePathEntry(entry); entry != "" {
+			entries[entry] = struct{}{}
+		}
+	}
+	return entries
 }
 
 // normalizePathEntry makes two spellings of the same directory compare equal.
@@ -99,4 +259,16 @@ func activatedEnvDirs() []string {
 		)
 	}
 	return dirs
+}
+
+// expandPreservedDir expands environment variables and a leading ~ in a
+// `path.preserve` entry.
+func expandPreservedDir(dir string) string {
+	dir = strings.TrimSpace(os.ExpandEnv(dir))
+	if dir == "~" || strings.HasPrefix(dir, "~/") || strings.HasPrefix(dir, `~\`) {
+		if home, err := os.UserHomeDir(); err == nil {
+			dir = filepath.Join(home, dir[1:])
+		}
+	}
+	return dir
 }

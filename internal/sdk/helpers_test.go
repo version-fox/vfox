@@ -113,6 +113,7 @@ func newTestSDK(t *testing.T, p *testPlugin) *impl {
 		}
 	}
 	// Whatever shell the tests run in must not leak into the PATH checks.
+	t.Setenv(env.OrigPathFlag, "")
 	t.Setenv("VIRTUAL_ENV", "")
 	t.Setenv("CONDA_PREFIX", "")
 	return &impl{

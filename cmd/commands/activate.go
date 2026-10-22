@@ -50,6 +50,8 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	if env.IsInheritedHookSession() {
 		_ = os.Unsetenv(pathmeta.HookCurTmpPath)
+		// The baseline belongs to the shell that recorded it, not to its children.
+		_ = os.Unsetenv(env.OrigPathFlag)
 	}
 	manager, err := internal.NewSdkManager()
 	if err != nil {
@@ -58,6 +60,16 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	runtimeEnvContext := manager.RuntimeEnvContext
+
+	// Remember the PATH this shell had before vfox touched it, once per shell
+	// session. Later runs use it to tell what the environment brought along
+	// from what was added after activation. It is recorded before PATH is
+	// split below, so that split can already use it.
+	var baseline *env.Paths
+	if os.Getenv(env.OrigPathFlag) == "" {
+		baseline = runtimeEnvContext.BaselinePath()
+		_ = os.Setenv(env.OrigPathFlag, strings.Join(baseline.Slice(), string(os.PathListSeparator)))
+	}
 
 	// 1. Load Project and Global configs with scope information
 	chain, err := runtimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Project)
@@ -181,6 +193,13 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	pathStr := finalEnvs.Paths.String()
 	exportEnvs["PATH"] = &pathStr
 
+	// Export the baseline in the format the shell uses for PATH (Git Bash
+	// wants POSIX-style paths), now that the shell is known.
+	if baseline != nil {
+		origStr := baseline.String()
+		exportEnvs[env.OrigPathFlag] = &origStr
+	}
+
 	// Export __VFOX_CURTMFPATH so that vfox env can use the same session directory
 	// This ensures state cache works across multiple vfox env calls in the same session
 	curTmpPath := runtimeEnvContext.PathMeta.Working.SessionSdkDir
@@ -209,7 +228,7 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly := make(env.Vars, len(exportEnvs))
 		for k, v := range exportEnvs {
 			switch k {
-			case env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath:
+			case env.PidFlag, env.HookFlag, env.InitializedFlag, env.OrigPathFlag, pathmeta.HookCurTmpPath:
 				continue
 			default:
 				exportOnly[k] = v
@@ -228,6 +247,9 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly[env.HookFlag] = nil
 		exportOnly[env.PidFlag] = nil
 		exportOnly[env.InitializedFlag] = nil
+		// A baseline leaking into the integrated terminals would make them
+		// reuse a stale PATH instead of recording their own.
+		exportOnly[env.OrigPathFlag] = nil
 		exportOnly[pathmeta.HookCurTmpPath] = nil
 		return s.Export(exportOnly), nil
 	}

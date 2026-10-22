@@ -229,7 +229,8 @@ func TestUseSaysWhenACommandIsShadowed(t *testing.T) {
 		"Now using", "alpha@1.0.0",
 		"`alphatool` runs "+filepath.Join(f.shadowDir, "alphatool")+" instead of alpha@1.0.0",
 		"comes before vfox in PATH",
-		"pnpm put its own alphatool first. See https://example.com/pnpm")
+		"pnpm put its own alphatool first. See https://example.com/pnpm",
+		"path.mode aggressive")
 	// The same diagnosis is available on demand, with the same words.
 	doctor := f.run(t, "doctor", "alpha").mustSucceed(t, "doctor alpha").stdout
 	mustContain(t, "doctor", doctor, "warn   path.shadowed  alpha@1.0.0", "pnpm put its own alphatool first.")
@@ -272,4 +273,19 @@ func TestUseStaysQuietAboutAnActiveVirtualenv(t *testing.T) {
 	mustNotContain(t, "use", out, "comes before vfox")
 	// It is still on record for whoever asks.
 	mustContain(t, "doctor", f.run(t, "doctor", "alpha").mustSucceed(t, "doctor").stdout, "info   path.shadowed")
+}
+
+func TestUseUnderTheBaselineMode(t *testing.T) {
+	// A directory that was in PATH when vfox was activated, and a mode that puts
+	// such directories behind vfox's: nothing shadows vfox any more.
+	f := newShadowFixture(t, "system-path-helper")
+	f.writeUserConfig(t, "path:\n  mode: baseline\n")
+	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.shadowDir, f.system}, ":")
+	out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
+	mustNotContain(t, "use", out, "comes before vfox")
+
+	// The default mode keeps it in front, and now says where it came from.
+	f.writeUserConfig(t, "")
+	out = f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
+	mustContain(t, "use", out, "comes before vfox", "already in PATH when vfox was activated", "path.mode baseline")
 }

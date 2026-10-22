@@ -288,7 +288,7 @@ func (b *impl) shadowFindings(version Version, dirs []string) []Finding {
 		source := group[0].Source
 
 		severity := SeverityWarn
-		if source == env.ShadowSourceActivatedEnv {
+		if source == env.ShadowSourceActivatedEnv || source == env.ShadowSourcePreserved {
 			severity = SeverityInfo // kept in front on purpose
 		}
 		var message string
@@ -307,6 +307,7 @@ func (b *impl) shadowFindings(version Version, dirs []string) []Finding {
 			"source":    string(source),
 		}
 		f.Hints = append(f.Hints, b.shadowHints(group[0].Winner)...)
+		f.Hints = append(f.Hints, shadowSourceHint(source)...)
 		findings = append(findings, f)
 	}
 	return findings
@@ -332,4 +333,17 @@ func (b *impl) shadowHints(winner string) []string {
 		}
 	}
 	return hints
+}
+
+func shadowSourceHint(source env.ShadowSource) []string {
+	switch source {
+	case env.ShadowSourceInherited:
+		return []string{"That directory was already in PATH when vfox was activated. `vfox config path.mode baseline` puts such directories behind vfox's."}
+	case env.ShadowSourceAdded:
+		return []string{"That directory was added to PATH after `vfox activate` ran. Activate vfox after the line that adds it in your shell's startup file, or run `vfox config path.mode aggressive`."}
+	case env.ShadowSourceUnknown:
+		return []string{"vfox did not record the PATH it found when it was activated. Open a new shell, or run `vfox config path.mode aggressive`."}
+	default:
+		return nil
+	}
 }

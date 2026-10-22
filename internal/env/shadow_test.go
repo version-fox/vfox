@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/config"
 )
 
 func TestFindShadows(t *testing.T) {
@@ -44,12 +46,13 @@ func TestFindShadows(t *testing.T) {
 	writeCommand(t, system, "npm")
 	venvNpx := writeCommand(t, venv, "npx")
 
-	policy := pathPolicy{activated: map[string]struct{}{normalizePathEntry(venv): {}}}
+	orig := []string{system}
+	policy := policyFor(config.PathModeLegacy, orig, []string{venv}, nil)
 
 	got := findShadows(provided, []string{venv, pnpm, system}, policy)
 	want := []Shadow{
-		{Name: "node", Winner: pnpmNode, Dir: pnpm, Source: ShadowSourceUnknown},
-		{Name: "npm", Winner: filepath.Join(system, "npm"), Dir: system, Source: ShadowSourceUnknown},
+		{Name: "node", Winner: pnpmNode, Dir: pnpm, Source: ShadowSourceAdded},
+		{Name: "npm", Winner: filepath.Join(system, "npm"), Dir: system, Source: ShadowSourceInherited},
 		{Name: "npx", Winner: venvNpx, Dir: venv, Source: ShadowSourceActivatedEnv},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -61,9 +64,61 @@ func TestFindShadows(t *testing.T) {
 		}
 	}
 
+	// Without a recorded baseline the source of a plain directory is unknown.
+	unknown := findShadows(provided, []string{pnpm}, policyFor(config.PathModeLegacy, nil, nil, nil))
+	if len(unknown) != 1 || unknown[0].Source != ShadowSourceUnknown {
+		t.Errorf("unknown = %+v", unknown)
+	}
+	// A directory listed in path.preserve is on purpose.
+	preserved := findShadows(provided, []string{pnpm}, policyFor(config.PathModeLegacy, nil, nil, []string{pnpm}))
+	if len(preserved) != 1 || preserved[0].Source != ShadowSourcePreserved {
+		t.Errorf("preserved = %+v", preserved)
+	}
 	// Nothing to shadow, or nothing in front.
 	if findShadows(nil, []string{pnpm}, policy) != nil || findShadows(provided, nil, policy) != nil {
 		t.Error("no commands or no directories in front mean no shadows")
+	}
+}
+
+// FindShadows looks at the PATH `vfox env` is going to export: what stays in
+// front of vfox's directories.
+func TestFindShadowsFollowsTheExportedOrder(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses POSIX paths")
+	}
+	root := t.TempDir()
+	sdkBin := filepath.Join(root, ".vfox", "sdks", "node", "bin")
+	system := filepath.Join(root, "system", "bin")
+	pnpm := filepath.Join(root, "pnpm", "bin")
+	writeCommand(t, sdkBin, "node")
+	writeCommand(t, system, "node")
+	writeCommand(t, pnpm, "node")
+	provided := ListExecutables([]string{sdkBin})
+
+	t.Setenv("PATH", joinPath(pnpm, system, sdkBin))
+	t.Setenv(OrigPathFlag, system)
+	t.Setenv("VIRTUAL_ENV", "")
+	t.Setenv("CONDA_PREFIX", "")
+
+	legacy := pathContext(config.PathModeLegacy).FindShadows(provided)
+	if len(legacy) != 1 || legacy[0].Dir != pnpm || legacy[0].Source != ShadowSourceAdded {
+		t.Errorf("legacy: %+v, want node shadowed by pnpm's directory", legacy)
+	}
+
+	// In baseline mode the inherited directory no longer sits in front, and the
+	// one pnpm added still does; either way the winner is the first of them.
+	baseline := pathContext(config.PathModeBaseline).FindShadows(provided)
+	if len(baseline) != 1 || baseline[0].Dir != pnpm {
+		t.Errorf("baseline: %+v", baseline)
+	}
+
+	// Once the only thing in front is inherited, baseline mode has nothing left to report.
+	t.Setenv("PATH", joinPath(system, sdkBin))
+	if got := pathContext(config.PathModeBaseline).FindShadows(provided); got != nil {
+		t.Errorf("baseline with only inherited directories in front: %+v", got)
+	}
+	if got := pathContext(config.PathModeLegacy).FindShadows(provided); len(got) != 1 || got[0].Source != ShadowSourceInherited {
+		t.Errorf("legacy with only inherited directories in front: %+v", got)
 	}
 }
 

@@ -23,12 +23,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
-	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 // RuntimeEnvContext represents the runtime environment context.
@@ -115,63 +112,23 @@ func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
 	return cleanPaths
 }
 
+// PathMode returns the effective `path.mode` setting.
+func (m *RuntimeEnvContext) PathMode() string {
+	if m == nil || m.UserConfig == nil {
+		return config.PathModeLegacy
+	}
+	return m.UserConfig.Path.EffectiveMode()
+}
+
 // SplitSystemPaths splits the current PATH into two parts:
-// 1. prefixPaths: paths that appear BEFORE the first vfox-managed path (user-injected, highest priority)
+// 1. prefixPaths: paths that appear BEFORE the first vfox-managed path and stay in front of it
 // 2. cleanPaths: remaining non-vfox paths (lower priority than vfox)
 //
 // This preserves the priority of paths like Python virtual environments that users activate
-// after vfox has set up the environment.
+// after vfox has set up the environment. Which of the entries in front of vfox's directories
+// count as such is decided by the `path.mode` setting: "legacy" (the default) keeps all of
+// them, "baseline" keeps only those added after `vfox activate` ran, and "aggressive" keeps
+// only active virtualenv/conda directories and `path.preserve`.
 func (m *RuntimeEnvContext) SplitSystemPaths() (prefixPaths *Paths, cleanPaths *Paths) {
-	systemPaths := strings.Split(os.Getenv("PATH"), string(os.PathListSeparator))
-
-	prefixPaths = NewPaths(EmptyPaths)
-	cleanPaths = NewPaths(EmptyPaths)
-
-	// First pass: check if there are any vfox paths
-	hasVfoxPath := false
-	for _, path := range systemPaths {
-		if path == "" {
-			continue
-		}
-		if pathmeta.IsVfoxRelatedPath(filepath.Clean(path)) {
-			hasVfoxPath = true
-			break
-		}
-	}
-
-	// If no vfox paths, all paths are clean system paths (no user-injected paths to preserve)
-	if !hasVfoxPath {
-		for _, path := range systemPaths {
-			if path == "" {
-				continue
-			}
-			cleanPaths.Add(path)
-		}
-		return prefixPaths, cleanPaths
-	}
-
-	// Second pass: split by first vfox path
-	foundVfoxPath := false
-	for _, path := range systemPaths {
-		if path == "" {
-			continue
-		}
-		cleanPath := filepath.Clean(path)
-
-		if pathmeta.IsVfoxRelatedPath(cleanPath) {
-			logger.Debugf("Removing vfox path from system PATH: %s", path)
-			foundVfoxPath = true
-			continue
-		}
-
-		if !foundVfoxPath {
-			// Path appears before first vfox path - it's user-injected (e.g., virtualenv)
-			prefixPaths.Add(path)
-		} else {
-			// Path appears after first vfox path - normal system path
-			cleanPaths.Add(path)
-		}
-	}
-
-	return prefixPaths, cleanPaths
+	return splitSystemPaths(os.Getenv("PATH"), m.pathPolicy())
 }

@@ -34,6 +34,7 @@ type Config struct {
 	Cache             *Cache             `yaml:"cache"`
 	Gitignore         *Gitignore         `yaml:"gitignore"`
 	Diagnostics       *Diagnostics       `yaml:"diagnostics"`
+	Path              *Path              `yaml:"path"`
 }
 
 const filename = "config.yaml"
@@ -48,6 +49,7 @@ var (
 		Cache:             EmptyCache,
 		Gitignore:         EmptyGitignore,
 		Diagnostics:       EmptyDiagnostics,
+		Path:              EmptyPath,
 	}
 )
 
@@ -95,6 +97,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Diagnostics == nil {
 		config.Diagnostics = EmptyDiagnostics
+	}
+	if config.Path == nil {
+		config.Path = EmptyPath
 	}
 	return config, nil
 
@@ -152,8 +157,9 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 	// Merge Gitignore: user overrides shared
 	result.Gitignore = mergeGitignore(sharedConfig.Gitignore, userConfig.Gitignore)
 
-	// Merge Diagnostics: user overrides shared
+	// Merge Diagnostics and Path: user overrides shared
 	result.Diagnostics = mergeDiagnostics(sharedConfig.Diagnostics, userConfig.Diagnostics)
+	result.Path = mergePath(sharedConfig.Path, userConfig.Path)
 
 	// Apply defaults to any remaining nil fields
 	return ensureDefaults(result)
@@ -187,6 +193,9 @@ func ensureDefaults(c *Config) *Config {
 	}
 	if c.Diagnostics == nil {
 		c.Diagnostics = EmptyDiagnostics
+	}
+	if c.Path == nil {
+		c.Path = EmptyPath
 	}
 	return c
 }
@@ -281,6 +290,17 @@ func mergeDiagnostics(shared, user *Diagnostics) *Diagnostics {
 		return shared
 	}
 	return EmptyDiagnostics
+}
+
+// mergePath merges PATH ordering configs, with the same rules as mergeDiagnostics.
+func mergePath(shared, user *Path) *Path {
+	if user != nil && user != EmptyPath {
+		return user
+	}
+	if shared != nil {
+		return shared
+	}
+	return EmptyPath
 }
 
 // Helper functions to check if config is empty

@@ -26,6 +26,10 @@ const (
 	HookFlag        = "__VFOX_SHELL"
 	PidFlag         = "__VFOX_PID"
 	InitializedFlag = "__VFOX_INITIALIZED"
+	// OrigPathFlag holds the PATH `vfox activate` found in this shell, without
+	// vfox's own directories. Entries in front of vfox's directories that are
+	// not in it were added after activation.
+	OrigPathFlag = "__VFOX_ORIG_PATH"
 )
 
 func IsHookEnv() bool {

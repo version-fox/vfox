@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/version-fox/vfox/internal/config"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/plugin"
 )
 
@@ -215,7 +216,7 @@ func TestDiagnoseShadowedCommand(t *testing.T) {
 	if shadowed.Detail["directory"] != f.shadow || shadowed.Detail["commands"] != "tool" || shadowed.Detail["source"] != "unknown" {
 		t.Errorf("detail = %v", shadowed.Detail)
 	}
-	if len(shadowed.Hints) != 0 {
+	if len(shadowed.Hints) != 1 || !strings.Contains(shadowed.Hints[0], "path.mode aggressive") {
 		t.Errorf("hints = %v", shadowed.Hints)
 	}
 
@@ -226,8 +227,30 @@ func TestDiagnoseShadowedCommand(t *testing.T) {
 		}
 		t.Cleanup(func() { s.plugin.Metadata.ShadowHints = nil })
 		hints := findingByID(s.Diagnose(DiagnoseOptions{Version: "1.0.0", Fast: true}), FindingPathShadowed).Hints
-		if len(hints) != 1 || hints[0] != "pnpm installed its own tool. See https://example.com/pnpm.md" {
+		if len(hints) != 2 || hints[0] != "pnpm installed its own tool. See https://example.com/pnpm.md" {
 			t.Errorf("hints = %q", hints)
+		}
+	})
+
+	t.Run("knowing the baseline says where the directory came from", func(t *testing.T) {
+		t.Setenv(env.OrigPathFlag, f.shadow)
+		got := findingByID(s.Diagnose(DiagnoseOptions{Version: "1.0.0", Fast: true}), FindingPathShadowed)
+		if got == nil || got.Detail["source"] != "inherited" || !strings.Contains(got.Hints[0], "path.mode baseline") {
+			t.Errorf("finding = %+v", got)
+		}
+		t.Setenv(env.OrigPathFlag, f.system)
+		got = findingByID(s.Diagnose(DiagnoseOptions{Version: "1.0.0", Fast: true}), FindingPathShadowed)
+		if got == nil || got.Detail["source"] != "added-after-activation" || !strings.Contains(got.Hints[0], "vfox activate") {
+			t.Errorf("finding = %+v", got)
+		}
+	})
+
+	t.Run("baseline mode has already moved an inherited directory behind vfox", func(t *testing.T) {
+		t.Setenv(env.OrigPathFlag, f.shadow)
+		s.envContext.UserConfig = &config.Config{Path: &config.Path{Mode: config.PathModeBaseline}}
+		t.Cleanup(func() { s.envContext.UserConfig = &config.Config{} })
+		if findings := s.Diagnose(DiagnoseOptions{Version: "1.0.0", Fast: true}); len(findings) != 0 {
+			t.Errorf("findings = %+v, want none: nothing shadows vfox any more", findings)
 		}
 	})
 
