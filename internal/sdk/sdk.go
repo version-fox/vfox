@@ -58,6 +58,11 @@ type Sdk interface {
 	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
 	InstalledList() []Version
+
+	// Installation describes an installed version: who owns it and what vfox recorded about it.
+	Installation(version Version) (*Installation, error)
+	// Link registers an existing SDK directory as a version, without copying or downloading anything.
+	Link(version Version, target string, opts LinkOptions) error
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
 	Metadata() *Metadata // Get the metadata of the SDK
@@ -260,6 +265,9 @@ func (b *impl) Install(version Version) (installErr error) {
 			return fmt.Errorf("plugin [PostInstall] method error: %w", err)
 		}
 	}
+	// The receipt goes in before the marker comes off, so a finished
+	// installation always has one.
+	b.recordInstall(version, sdkVersion, installInfo, newDirPath)
 	if err := os.Remove(markerPath); err != nil {
 		return fmt.Errorf("finish installation: %w", err)
 	}
@@ -278,6 +286,21 @@ func (b *impl) Install(version Version) (installErr error) {
 	}
 
 	return nil
+}
+
+// recordInstall leaves the receipt of a finished installation in its version
+// directory. A receipt only informs later checks, so failing to write one is
+// logged and never fails the installation.
+func (b *impl) recordInstall(requested, version Version, info *plugin.PreInstallHookResult, packagePath string) {
+	receipt := b.newReceipt(version, OriginInstalled)
+	receipt.Requested = string(requested)
+	receipt.Sources = append(receipt.Sources, receiptSource(info.PreInstallPackageItem))
+	for _, addition := range info.Addition {
+		receipt.Sources = append(receipt.Sources, receiptSource(addition))
+	}
+	if err := writeReceipt(packagePath, receipt); err != nil {
+		logger.Debugf("Failed to write the receipt of %s: %v\n", b.Label(version), err)
+	}
 }
 
 func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath string) error {
@@ -377,19 +400,28 @@ func (b *impl) Uninstall(version Version) (err error) {
 	label := b.Label(version)
 	logger.Debugf("Uninstalling SDK: %s\n", label)
 
-	if !b.CheckRuntimeExist(version) {
+	installed := b.CheckRuntimeExist(version)
+	// A link whose target has gone away no longer counts as installed, but it
+	// is still there to be removed.
+	if !installed && !b.brokenLink(version) {
 		logger.Debugf("SDK %s not installed\n", label)
 		return fmt.Errorf("%s is not installed", pterm.Red(label))
 	}
 	path := b.packagePath(version)
 	logger.Debugf("Uninstalling from path: %s\n", path)
 
-	sdkPackage, err := b.GetRuntimePackage(version)
-	if err != nil {
-		logger.Debugf("Failed to get runtime package for %s: %v\n", label, err)
-		return
+	linkedTo, linked := b.linkedTarget(version)
+	var sdkPackage *RuntimePackage
+	if installed {
+		sdkPackage, err = b.GetRuntimePackage(version)
+		if err != nil {
+			logger.Debugf("Failed to get runtime package for %s: %v\n", label, err)
+			return
+		}
 	}
-	if b.plugin.HasFunction("PreUninstall") {
+	// vfox does not own the files of a linked version, so the plugin has
+	// nothing of its own to clean up in them.
+	if installed && !linked && b.plugin.HasFunction("PreUninstall") {
 		logger.Debugf("Calling PreUninstall hook for %s\n", label)
 		// Give the plugin a chance before actually uninstalling targeted version.
 		main := convertRuntime2InstalledPackageItem(sdkPackage.Runtime)
@@ -417,6 +449,15 @@ func (b *impl) Uninstall(version Version) (err error) {
 		}
 	}
 
+	if linked {
+		logger.Debugf("Removing link: %s\n", path)
+		if err = b.removeLink(version); err != nil {
+			logger.Debugf("Failed to remove link: %v\n", err)
+			return
+		}
+		pterm.Printf("Unlinked %s successfully! %s was left untouched.\n", label, linkedTo)
+		return
+	}
 	logger.Debugf("Removing directory: %s\n", path)
 	err = os.RemoveAll(path)
 	if err != nil {
@@ -932,11 +973,8 @@ func (b *impl) CheckRuntimeExist(version Version) bool {
 	}
 	// Older installations have no marker. Keep those valid, but do not accept
 	// an empty version directory without the SDK's main payload directory.
-	name := b.Name
-	if b.plugin != nil {
-		name = b.plugin.Name
-	}
-	info, err := os.Stat(filepath.Join(b.packagePath(version), name+"-"+string(version)))
+	// os.Stat follows links, so a linked runtime counts while its target exists.
+	info, err := os.Stat(b.mainRuntimePath(version))
 	return err == nil && info.IsDir() && !b.hasPendingInstall(version)
 }
 

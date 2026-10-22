@@ -174,6 +174,13 @@ func mustInstall(t *testing.T, s *impl, version Version) {
 	}
 }
 
+func mustLink(t *testing.T, s *impl, version Version, target string) {
+	t.Helper()
+	if err := s.Link(version, target, LinkOptions{}); err != nil {
+		t.Fatalf("Link(%s): %v", version, err)
+	}
+}
+
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil

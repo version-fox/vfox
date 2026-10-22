@@ -24,6 +24,7 @@ import (
 	"github.com/pterm/pterm/putils"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var List = &cli.Command{
@@ -55,7 +56,7 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 			name := s.Metadata().Name
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
 			for _, version := range s.InstalledList() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: string(version)})
+				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: versionLabel(s, version)})
 			}
 		}
 		// Generate tree from LeveledList.
@@ -75,11 +76,34 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("no available version")
 	}
 	for _, version := range list {
+		label := versionLabel(source, version)
 		if version == curVersion {
-			pterm.Println("->", fmt.Sprintf("%s", version), pterm.LightGreen("<— current"))
+			pterm.Println("->", label, pterm.LightGreen("<— current"))
 		} else {
-			pterm.Println("->", fmt.Sprintf("%s", version))
+			pterm.Println("->", label)
 		}
 	}
 	return nil
+}
+
+// versionLabel is how `vfox list` shows a version: its name and, if it is a
+// link, where it is linked to.
+func versionLabel(s sdk.Sdk, version sdk.Version) string {
+	origin, target := sdk.OriginInstalled, ""
+	if installation, err := s.Installation(version); err == nil {
+		origin, target = installation.Origin, installation.Target
+	}
+	return formatVersionLabel(version, origin, target)
+}
+
+func formatVersionLabel(version sdk.Version, origin sdk.Origin, target string) string {
+	label := string(version)
+	if origin == sdk.OriginLinked {
+		label += " (linked"
+		if target != "" {
+			label += " → " + target
+		}
+		label += ")"
+	}
+	return label
 }

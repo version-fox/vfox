@@ -60,6 +60,11 @@ type versionData struct {
 	// Home is the main runtime directory, the one to point JAVA_HOME and the
 	// like at.
 	Home string
+	// Origin is "installed" for versions vfox installed and "linked" for SDKs
+	// that live elsewhere and were registered with `vfox link`.
+	Origin string
+	// Target is where a linked version points to.
+	Target string
 }
 
 type runtimeJSON struct {
@@ -72,10 +77,13 @@ type versionJSON struct {
 	Name        string        `json:"name"`
 	Version     string        `json:"version"`
 	Installed   bool          `json:"installed"`
+	Origin      string        `json:"origin,omitempty"`
+	Target      string        `json:"target,omitempty"`
 	Home        string        `json:"home,omitempty"`
 	PackagePath string        `json:"packagePath,omitempty"`
 	Additions   []runtimeJSON `json:"additions,omitempty"`
 	Env         *envJSON      `json:"env,omitempty"`
+	Receipt     *sdk.Receipt  `json:"receipt,omitempty"`
 }
 
 type envJSON struct {
@@ -177,16 +185,18 @@ func infoVersion(cmd *cli.Command, manager *internal.Manager, name string, versi
 		fmt.Println(notFound)
 		return nil
 	}
-	runtimePackage, err := sdkSource.GetRuntimePackage(version)
+	installation, err := sdkSource.Installation(version)
 
 	if cmd.IsSet("json") {
-		return writeJSON(cmd, describeVersion(sdkSource, name, version, runtimePackage, err))
+		return writeJSON(cmd, describeVersion(sdkSource, name, version, installation, err))
 	}
 
 	data := versionData{Name: name, Version: string(version), Path: notFound, Home: notFound}
 	if err == nil {
-		data.Path = runtimePackage.PackagePath
-		data.Home = runtimePackage.Runtime.Path
+		data.Path = installation.PackagePath
+		data.Home = installation.Runtime.Path
+		data.Origin = string(installation.Origin)
+		data.Target = installation.Target
 	}
 	if cmd.IsSet("format") {
 		return executeTemplate(cmd, data)
@@ -195,18 +205,21 @@ func infoVersion(cmd *cli.Command, manager *internal.Manager, name string, versi
 	return nil
 }
 
-func describeVersion(s sdk.Sdk, name string, version sdk.Version, pkg *sdk.RuntimePackage, err error) versionJSON {
+func describeVersion(s sdk.Sdk, name string, version sdk.Version, installation *sdk.Installation, err error) versionJSON {
 	out := versionJSON{Name: name, Version: string(version)}
 	if err != nil {
 		return out
 	}
 	out.Installed = true
-	out.Home = pkg.Runtime.Path
-	out.PackagePath = pkg.PackagePath
-	for _, addition := range pkg.Additions {
+	out.Origin = string(installation.Origin)
+	out.Target = installation.Target
+	out.Home = installation.Runtime.Path
+	out.PackagePath = installation.PackagePath
+	out.Receipt = installation.Receipt
+	for _, addition := range installation.Additions {
 		out.Additions = append(out.Additions, runtimeJSON{Name: addition.Name, Version: string(addition.Version), Path: addition.Path})
 	}
-	if envs, envErr := s.EnvKeys(pkg); envErr == nil {
+	if envs, envErr := s.EnvKeys(installation.RuntimePackage); envErr == nil {
 		out.Env = &envJSON{Paths: envs.Paths.Slice(), Variables: map[string]string{}}
 		for key, value := range envs.Variables {
 			if value != nil {
