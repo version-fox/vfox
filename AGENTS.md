@@ -66,6 +66,7 @@ Keep imports acyclic. Shared utilities must not depend on SDK, plugin, environme
 - Return errors from library code; do not introduce `log.Fatal` there. Preserve error chains with `fmt.Errorf("context: %w", err)`.
 - Handle errors or explain intentional best-effort behavior, such as optional clipboard operations or cleanup.
 - Keep `unsafe` limited to necessary platform API interop, such as Windows elevation and environment-change broadcasts.
+- Line endings are set by [.gitattributes](.gitattributes): `* text=auto` keeps committed text as LF and lets `core.autocrlf` choose each machine's checkout style, while shell and PowerShell scripts, `completions/**`, Go toolchain files, and checksum manifests are pinned to `eol=lf`. Pin any new file that a shell or tool parses byte-for-byte, and keep `text=auto` (never a blanket `* text`) so binaries stay untouched. After changing the rules, verify with `git add --renormalize .` (no staged content diff) and fresh clones with `core.autocrlf=true` and `false`.
 
 ## CLI behavior
 
