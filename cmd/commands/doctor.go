@@ -37,6 +37,10 @@ var Doctor = &cli.Command{
 			Name:  "json",
 			Usage: "Output the findings as JSON",
 		},
+		&cli.BoolFlag{
+			Name:  "adopt",
+			Usage: "Record the current state of versions installed before receipts existed, as the state to compare against later",
+		},
 	},
 	Action:   doctorCmd,
 	Category: CategorySDK,
@@ -50,6 +54,10 @@ func doctorCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	name, version := splitDoctorSpec(cmd.Args().First())
+
+	if cmd.Bool("adopt") {
+		return doctorAdopt(cmd, manager, name, version)
+	}
 
 	findings, err := manager.Diagnose(name, version)
 	if err != nil {
@@ -161,4 +169,47 @@ func plural(n int, noun string) string {
 		return fmt.Sprintf("1 %s", noun)
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// doctorAdopt writes receipts for the versions that have none.
+func doctorAdopt(cmd *cli.Command, manager *internal.Manager, name string, version sdk.Version) error {
+	var sdks []sdk.Sdk
+	if name != "" {
+		source, err := manager.LookupSdk(name)
+		if err != nil {
+			return fmt.Errorf("%s not supported, error: %w", name, err)
+		}
+		sdks = append(sdks, source)
+	} else {
+		all, err := manager.LoadAllSdk()
+		if err != nil {
+			return err
+		}
+		sdks = all
+	}
+
+	written, failed := 0, 0
+	for _, source := range sdks {
+		versions := source.InstalledList()
+		if version != "" {
+			versions = []sdk.Version{version}
+		}
+		for _, v := range versions {
+			label := fmt.Sprintf("%s@%s", strings.ToLower(source.Metadata().Name), v)
+			adopted, err := source.Adopt(v)
+			switch {
+			case err != nil:
+				failed++
+				fmt.Fprintf(cmd.ErrWriter, "Could not adopt %s: %v\n", label, err)
+			case adopted:
+				written++
+				fmt.Fprintf(cmd.Writer, "Adopted %s\n", label)
+			}
+		}
+	}
+	fmt.Fprintf(cmd.Writer, "%s written.\n", plural(written, "receipt"))
+	if failed > 0 {
+		return cli.Exit("", 1)
+	}
+	return nil
 }

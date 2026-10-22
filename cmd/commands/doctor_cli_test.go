@@ -108,6 +108,52 @@ func TestDoctorReportsABrokenLink(t *testing.T) {
 	f.run(t, "doctor").mustSucceed(t, "doctor after the fix")
 }
 
+func TestDoctorAdoptsOldInstallationsAndNoticesWhenTheyChange(t *testing.T) {
+	f := newCLIFixture(t, false)
+	main := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+	must(t, os.WriteFile(filepath.Join(main, "VERSION"), []byte("1.0.0"), 0644))
+
+	// Installed before vfox kept receipts: nothing to compare against.
+	r := f.run(t, "doctor").mustSucceed(t, "doctor")
+	mustContain(t, "doctor", r.stdout, "Found 0 errors, 0 warnings and 1 notice.", "info   sdk.no-receipt  alpha@1.0.0", "fix: vfox doctor --adopt alpha@1.0.0")
+
+	out := f.run(t, "doctor", "--adopt").mustSucceed(t, "doctor --adopt").output()
+	mustContain(t, "adopt", out, "Adopted alpha@1.0.0", "1 receipt written.")
+	mustContain(t, "doctor", f.run(t, "doctor").mustSucceed(t, "doctor").output(), "No problems found.")
+	mustContain(t, "second adopt", f.run(t, "doctor", "--adopt").mustSucceed(t, "doctor --adopt").output(), "0 receipts written.")
+	mustNotContain(t, "second adopt", f.run(t, "doctor", "--adopt").output(), "Adopted")
+
+	// The SDK modifies itself.
+	must(t, os.WriteFile(filepath.Join(main, "VERSION"), []byte("1.0.1"), 0644))
+	r = f.run(t, "doctor").mustSucceed(t, "a warning does not fail doctor")
+	mustContain(t, "doctor", r.stdout,
+		"Found 0 errors, 1 warning and 0 notices.",
+		"warn   sdk.drift  alpha@1.0.0",
+		"has changed since vfox installed it",
+		"fix: vfox install --reinstall alpha@1.0.0")
+	report := parseDoctor(t, f.run(t, "doctor", "--json", "alpha").mustSucceed(t, "doctor --json"))
+	if severity, ok := report.find("sdk.drift"); !ok || severity != "warn" || !report.OK {
+		t.Errorf("report = %+v", report)
+	}
+}
+
+func TestDoctorAdoptNarrowsToTheArgument(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+	f.installOnDisk(t, "alpha", "2.0.0", "alphatool")
+	f.installOnDisk(t, "plain", "1.0.0", "plaintool")
+
+	out := f.run(t, "doctor", "--adopt", "alpha@2.0.0").mustSucceed(t, "doctor --adopt alpha@2.0.0").output()
+	mustContain(t, "adopt", out, "Adopted alpha@2.0.0", "1 receipt written.")
+	mustNotContain(t, "adopt", out, "alpha@1.0.0", "plain@1.0.0")
+
+	out = f.run(t, "doctor", "--adopt", "alpha").mustSucceed(t, "doctor --adopt alpha").output()
+	mustContain(t, "adopt", out, "Adopted alpha@1.0.0", "1 receipt written.")
+
+	f.run(t, "doctor", "--adopt", "alpha@9.9.9").mustFail(t, "adopting a version that is not installed")
+	mustContain(t, "adopt", f.run(t, "doctor", "--adopt", "nosuch").mustFail(t, "adopting for an SDK without a plugin").output(), "not supported")
+}
+
 func TestDoctorReportsInstalledVersionsWithoutPlugin(t *testing.T) {
 	f := newCLIFixture(t, false)
 	must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "orphan", "v-1.0.0", "orphan-1.0.0"), 0755))
@@ -139,6 +185,20 @@ func TestDoctorHonorsTheIgnoreList(t *testing.T) {
 	report := parseDoctor(t, f.run(t, "doctor", "--json").mustSucceed(t, "doctor --json"))
 	if len(report.Findings) != 1 || !report.Findings[0].Ignored || !report.OK {
 		t.Errorf("report = %+v, want the one finding kept and marked", report)
+	}
+}
+
+func TestDoctorHonorsTheIgnoreListForNotices(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool") // no receipt: an info finding
+	f.writeUserConfig(t, "diagnostics:\n  ignore:\n    - sdk.no-receipt:alpha\n")
+
+	out := f.run(t, "doctor").mustSucceed(t, "doctor").stdout
+	mustContain(t, "doctor", out, "No problems found.", "1 finding ignored by diagnostics.ignore.", "(ignored)")
+
+	report := parseDoctor(t, f.run(t, "doctor", "--json").mustSucceed(t, "doctor --json"))
+	if len(report.Findings) != 1 || !report.Findings[0].Ignored {
+		t.Errorf("findings = %+v, want the one finding kept and marked", report.Findings)
 	}
 }
 

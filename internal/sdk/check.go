@@ -129,9 +129,16 @@ func (b *impl) diagnoseVersion(version Version, opts DiagnoseOptions) []Finding 
 	}
 
 	var findings []Finding
+	if !opts.Fast && inst.Receipt == nil {
+		f := b.newFinding(version, FindingNoReceipt, SeverityInfo,
+			label+" was installed before vfox kept receipts, so changes made to it cannot be detected.")
+		f.Fix = []string{"vfox doctor --adopt " + label}
+		findings = append(findings, f)
+	}
 
 	payload, dirs := b.payloadFindings(version, inst)
 	findings = append(findings, payload...)
+	findings = append(findings, b.driftFindings(version, inst, opts)...)
 	if !opts.NoPath && (opts.PathFor == "" || opts.PathFor == version) && len(dirs) > 0 {
 		findings = append(findings, b.shadowFindings(version, dirs)...)
 	}
@@ -166,8 +173,88 @@ func (b *impl) payloadFindings(version Version, inst *Installation) ([]Finding, 
 	f.Detail = map[string]string{"directories": strings.Join(dirs, ", ")}
 	if inst.Origin == OriginLinked {
 		f.Hints = []string{"Check that the linked directory is a complete installation: " + inst.Target}
+	} else {
+		f.Fix = []string{"vfox install --reinstall " + label}
 	}
 	return []Finding{f}, nil
+}
+
+// factDiff is one fact that is no longer what vfox recorded.
+type factDiff struct {
+	Key, Was, Now string
+	Missing       bool // the plugin no longer reports it
+}
+
+func compareFacts(recorded, current map[string]string) []factDiff {
+	var diffs []factDiff
+	for key, was := range recorded {
+		now, ok := current[key]
+		if !ok {
+			diffs = append(diffs, factDiff{Key: key, Was: was, Missing: true})
+		} else if now != was {
+			diffs = append(diffs, factDiff{Key: key, Was: was, Now: now})
+		}
+	}
+	sort.Slice(diffs, func(i, j int) bool { return diffs[i].Key < diffs[j].Key })
+	return diffs
+}
+
+func shortFact(value string) string {
+	const max = 12
+	if len(value) > max {
+		return value[:max] + "…"
+	}
+	return value
+}
+
+// driftFindings compares the facts recorded at installation with the ones the
+// plugin reports now.
+func (b *impl) driftFindings(version Version, inst *Installation, opts DiagnoseOptions) []Finding {
+	if inst.Receipt == nil || len(inst.Receipt.Facts) == 0 || b.plugin == nil || !b.plugin.HasFunction("Fingerprint") {
+		return nil
+	}
+	label := b.Label(version)
+	current, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Runtime.Path)
+	if err != nil {
+		if opts.Fast {
+			return nil
+		}
+		return []Finding{b.newFinding(version, FindingFingerprintFailed, SeverityWarn,
+			fmt.Sprintf("%s could not be compared with what vfox recorded: %v.", label, err))}
+	}
+	diffs := compareFacts(inst.Receipt.Facts, current)
+	if len(diffs) == 0 {
+		return nil
+	}
+
+	parts := make([]string, 0, len(diffs))
+	detail := make(map[string]string, len(diffs))
+	for _, diff := range diffs {
+		now := shortFact(diff.Now)
+		if diff.Missing {
+			now = "unreadable"
+		}
+		parts = append(parts, fmt.Sprintf("%s: %s -> %s", diff.Key, shortFact(diff.Was), now))
+		detail[diff.Key] = diff.Was + " -> " + diff.Now
+	}
+	summary := strings.Join(parts, "; ")
+
+	if inst.Origin == OriginLinked {
+		f := b.newFinding(version, FindingDrift, SeverityInfo,
+			fmt.Sprintf("%s has changed since it was linked (%s).", label, summary))
+		f.Detail = detail
+		f.Hints = []string{"vfox does not own a linked SDK; this is the owner's change."}
+		return []Finding{f}
+	}
+	f := b.newFinding(version, FindingDrift, SeverityWarn,
+		fmt.Sprintf("%s has changed since vfox installed it (%s).", label, summary))
+	f.Detail = detail
+	f.Hints = []string{
+		"Something modified the SDK in place, for example a self-update command. vfox manages versions by directory and does not track that.",
+		"To move to a newer version, install it with vfox instead: vfox install " + strings.ToLower(b.Name) + "@<new-version>",
+	}
+	f.Fix = []string{"vfox install --reinstall " + label}
+	return []Finding{f}
 }
 
 // shadowFindings reports the commands of the version that an executable in

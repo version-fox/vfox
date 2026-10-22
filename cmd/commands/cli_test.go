@@ -90,12 +90,20 @@ func cloneCommands(commands ...*cli.Command) []*cli.Command {
 	return clones
 }
 
-// alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH.
+// alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH and
+// fingerprints an installation by the contents of its VERSION file.
 const alphaPlugin = `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 PLUGIN.shadowHints = {{match="pnpm", message="pnpm put its own alphatool first.", url="https://example.com/pnpm"}}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
 function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
 function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+function PLUGIN:Fingerprint(ctx)
+  local f = io.open(ctx.path .. "/VERSION", "r")
+  if f == nil then return nil end
+  local content = f:read("*a")
+  f:close()
+  return {facts={version=content}}
+end
 `
 
 // plainPlugin has no optional hooks at all.

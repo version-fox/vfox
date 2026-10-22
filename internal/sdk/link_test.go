@@ -394,6 +394,51 @@ func TestALinkInsideAnInstalledVersionIsNotALinkedVersion(t *testing.T) {
 	}
 }
 
+func TestAdoptWritesAReceiptForALegacyInstallation(t *testing.T) {
+	p := &testPlugin{fingerprint: func(*plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error) {
+		return &plugin.FingerprintHookResult{Facts: map[string]string{"head": "abc"}}, nil
+	}}
+	s := newTestSDK(t, p)
+	// An installation from before receipts: just the payload directory.
+	writeTestCommand(t, filepath.Join(s.mainRuntimePath("1.0.0"), "bin"), "tool")
+
+	inst, err := s.Installation("1.0.0")
+	if err != nil || inst.Receipt != nil {
+		t.Fatalf("setup: %+v, %v", inst, err)
+	}
+	adopted, err := s.Adopt("1.0.0")
+	if err != nil || !adopted {
+		t.Fatalf("Adopt = (%v, %v)", adopted, err)
+	}
+	inst, _ = s.Installation("1.0.0")
+	if inst.Receipt == nil || inst.Receipt.Origin != OriginInstalled || inst.Receipt.Facts["head"] != "abc" {
+		t.Errorf("receipt = %+v", inst.Receipt)
+	}
+	if adopted, err := s.Adopt("1.0.0"); err != nil || adopted {
+		t.Errorf("a second Adopt = (%v, %v), want (false, nil): a receipt is never overwritten", adopted, err)
+	}
+	if _, err := s.Adopt("9.9.9"); err == nil {
+		t.Error("adopting a version that is not installed must fail")
+	}
+}
+
+func TestAdoptKeepsALinkedVersionLinked(t *testing.T) {
+	s, _, external := newLinkTestSDK(t)
+	if err := os.MkdirAll(s.packagePath("hand"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.CreateDirSymlink(external, s.mainRuntimePath("hand")); err != nil {
+		t.Fatal(err)
+	}
+	if adopted, err := s.Adopt("hand"); err != nil || !adopted {
+		t.Fatalf("Adopt = (%v, %v)", adopted, err)
+	}
+	inst, _ := s.Installation("hand")
+	if inst.Receipt.Origin != OriginLinked || inst.Receipt.Target == "" {
+		t.Errorf("receipt = %+v", inst.Receipt)
+	}
+}
+
 func TestLinkRefusesAVersionThatIsBeingInstalled(t *testing.T) {
 	s, _, external := newLinkTestSDK(t)
 	if err := os.MkdirAll(s.InstallPath, 0755); err != nil {

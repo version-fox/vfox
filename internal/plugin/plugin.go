@@ -60,6 +60,7 @@ type (
 		PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error)
 		ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error)
 		EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
+		Fingerprint(ctx *FingerprintHookCtx) (*FingerprintHookResult, error)
 		HasFunction(name string) bool
 		Close()
 	}
@@ -75,6 +76,7 @@ var (
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
 		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
+		"Fingerprint":     {Name: "Fingerprint", Required: false, Filename: "fingerprint"},
 	}
 )
 

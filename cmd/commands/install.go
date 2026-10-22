@@ -47,6 +47,10 @@ var Install = &cli.Command{
 			Aliases: []string{"y"},
 			Usage:   "Quick installation, skip interactive prompts",
 		},
+		&cli.BoolFlag{
+			Name:  "reinstall",
+			Usage: "Replace an installed version with a fresh copy, for example after the SDK modified itself in place",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -54,8 +58,12 @@ var Install = &cli.Command{
 
 func installCmd(ctx context.Context, cmd *cli.Command) error {
 	yes := cmd.Bool("yes")
+	reinstall := cmd.Bool("reinstall")
 
 	if cmd.Bool("all") {
+		if reinstall {
+			return cli.Exit("--reinstall cannot be combined with --all", 1)
+		}
 		return installAll(yes)
 	}
 
@@ -131,7 +139,11 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				if err = sdkSource.Install(resolvedVersion); err != nil {
+				install := sdkSource.Install
+				if reinstall {
+					install = sdkSource.Reinstall
+				}
+				if err = install(resolvedVersion); err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}

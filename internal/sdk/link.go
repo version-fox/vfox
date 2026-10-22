@@ -114,6 +114,13 @@ func (b *impl) Link(version Version, target string, opts LinkOptions) (linkErr e
 	receipt := b.newReceipt(version, OriginLinked)
 	receipt.Requested = string(version)
 	receipt.Target = abs
+	if pkg, err := b.GetRuntimePackage(version); err == nil {
+		facts, err := b.fingerprint(version, sdkInfoOf(pkg), pkg.Runtime.Path)
+		if err != nil {
+			logger.Debugf("No facts recorded for %s: %v\n", label, err)
+		}
+		receipt.Facts = facts
+	}
 	if err := writeReceipt(packagePath, receipt); err != nil {
 		// Without a receipt the link still counts as linked: it is a link.
 		logger.Debugf("Failed to write the receipt of %s: %v\n", label, err)

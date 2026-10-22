@@ -177,6 +177,30 @@ func (l *LuaPlugin) ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFi
 	return &hookResult, nil
 }
 
+func (l *LuaPlugin) Fingerprint(ctx *FingerprintHookCtx) (*FingerprintHookResult, error) {
+	L := l.vm.Instance
+	ctxTable, err := codec.Marshal(L, ctx)
+	if err != nil {
+		return nil, err
+	}
+	table, err := l.CallFunction("Fingerprint", ctxTable)
+	if err != nil {
+		return nil, err
+	}
+	if table == nil || table.Type() == lua.LTNil {
+		return nil, ErrNoResultProvide
+	}
+	hookResult := FingerprintHookResult{}
+	err = codec.Unmarshal(table, &hookResult)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
+	}
+	if len(hookResult.Facts) == 0 {
+		return nil, ErrNoResultProvide
+	}
+	return &hookResult, nil
+}
+
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (lua.LValue, error) {
 	if !l.development {
 		logger.Debugf("CallFunction: %s\n", funcName)

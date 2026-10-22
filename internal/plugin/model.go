@@ -150,6 +150,21 @@ type PreUninstallHookCtx struct {
 	SdkInfo map[string]*InstalledPackageItem `json:"sdkInfo"`
 }
 
+// FingerprintHookCtx is the context of the optional Fingerprint hook.
+type FingerprintHookCtx struct {
+	Path    string                           `json:"path"` // main runtime directory
+	Version string                           `json:"version"`
+	SdkInfo map[string]*InstalledPackageItem `json:"sdkInfo"`
+}
+
+// FingerprintHookResult carries the facts that identify an installation, such
+// as the commit an SDK checkout is at. vfox records them when the SDK is
+// installed and compares them again later to notice an SDK that was modified
+// in place.
+type FingerprintHookResult struct {
+	Facts map[string]string `json:"facts"`
+}
+
 // ShadowHint is a plugin-declared explanation for a command of the SDK being
 // shadowed by an executable somewhere else in PATH. Match is a case-insensitive
 // substring of the shadowing executable's path.

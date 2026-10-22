@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
@@ -161,4 +162,55 @@ func (b *impl) newReceipt(version Version, origin Origin) *Receipt {
 		receipt.Plugin = ReceiptPlugin{Name: b.plugin.Name, Version: b.plugin.Version}
 	}
 	return receipt
+}
+
+// fingerprint asks the plugin for the facts that identify an installation. A
+// plugin without the hook, or one with nothing to say, yields no facts and no error.
+func (b *impl) fingerprint(version Version, sdkInfo map[string]*plugin.InstalledPackageItem, mainPath string) (map[string]string, error) {
+	if b.plugin == nil || !b.plugin.HasFunction("Fingerprint") {
+		return nil, nil
+	}
+	result, err := b.plugin.Fingerprint(&plugin.FingerprintHookCtx{
+		Path:    mainPath,
+		Version: string(version),
+		SdkInfo: sdkInfo,
+	})
+	if b.plugin.IsNoResultProvided(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("plugin [Fingerprint] method error: %w", err)
+	}
+	return result.Facts, nil
+}
+
+func sdkInfoOf(pkg *RuntimePackage) map[string]*plugin.InstalledPackageItem {
+	info := map[string]*plugin.InstalledPackageItem{pkg.Runtime.Name: convertRuntime2InstalledPackageItem(pkg.Runtime)}
+	for _, addition := range pkg.Additions {
+		info[addition.Name] = convertRuntime2InstalledPackageItem(addition)
+	}
+	return info
+}
+
+// Adopt writes a receipt for a version that has none, taking its current state
+// as the baseline. It reports whether it wrote one.
+func (b *impl) Adopt(version Version) (bool, error) {
+	inst, err := b.Installation(version)
+	if err != nil {
+		return false, err
+	}
+	if inst.Receipt != nil {
+		return false, nil
+	}
+	receipt := b.newReceipt(version, inst.Origin)
+	receipt.Target = inst.Target
+	facts, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Runtime.Path)
+	if err != nil {
+		logger.Debugf("No facts recorded for %s: %v\n", b.Label(version), err)
+	}
+	receipt.Facts = facts
+	if err := writeReceipt(inst.PackagePath, receipt); err != nil {
+		return false, fmt.Errorf("write receipt: %w", err)
+	}
+	return true, nil
 }

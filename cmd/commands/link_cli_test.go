@@ -107,6 +107,7 @@ func TestLinkCommandRefusesWhatItCannotDo(t *testing.T) {
 		{"name that is a path", []string{"link", "alpha@../x", external}, "not a usable version name"},
 		{"missing directory", []string{"link", "alpha@sys", filepath.Join(external, "missing")}, "cannot link"},
 		{"not an SDK", []string{"link", "alpha@sys", notAnSDK}, "does not look like"},
+		{"reinstall with --all", []string{"install", "--all", "--reinstall"}, "--reinstall cannot be combined with --all"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := f.run(t, tc.args...).mustFail(t, strings.Join(tc.args, " "))

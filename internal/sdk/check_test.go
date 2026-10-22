@@ -77,7 +77,7 @@ func TestDiagnoseEmptyPayload(t *testing.T) {
 		t.Setenv("PATH", t.TempDir())
 		mustInstall(t, s, "1.0.0")
 		f := findingByID(s.Diagnose(DiagnoseOptions{Version: "1.0.0"}), FindingPayloadEmpty)
-		if f == nil || f.Severity != SeverityError {
+		if f == nil || f.Severity != SeverityError || !reflect.DeepEqual(f.Fix, []string{"vfox install --reinstall test-sdk@1.0.0"}) {
 			t.Errorf("finding = %+v", f)
 		}
 	})
