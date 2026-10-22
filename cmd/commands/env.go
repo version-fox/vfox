@@ -144,22 +144,12 @@ func envFlag(cmd *cli.Command) error {
 
 	runtimeEnvContext := manager.RuntimeEnvContext
 
-	// 1. Load configs from all scopes with priority: Global < Session < Project
-	chain, err := runtimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
+	// 1. Load configs from all scopes with priority: Global < Session < Project,
+	// and the legacy version files of the project
+	chain, err := loadToolChain(manager, env.Global, env.Session, env.Project)
 	if err != nil {
 		return err
 	}
-
-	projectToml, _ := chain.GetTomlByScope(env.Project)
-	// Give a chance to legacy file to set tool versions if not already set in vfox.toml
-	// This allows backward compatibility with older projects using legacy files
-	// New projects should use vfox.toml directly
-	_ = manager.ParseLegacyFile(runtimeEnvContext.CurrentWorkingDir, func(sdkname, version string) {
-		// Set only if not already set in vfox.toml
-		if _, ok := projectToml.GetToolVersion(sdkname); !ok {
-			projectToml.SetTool(sdkname, version)
-		}
-	})
 
 	// 2. Collect config file paths for change detection
 	// Only include paths that actually exist to avoid false positives

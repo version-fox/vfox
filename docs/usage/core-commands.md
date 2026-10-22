@@ -278,6 +278,8 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | `plugin.incompatible`     | warn    | The plugin needs a newer `vfox`                                                                                          |
 | `alias.dangling`          | warn    | An alias names a version that is not installed                                                                           |
 
+`path.shadowed` is checked for the version your shell uses, which is the one `vfox env` puts on `PATH`: the first installed version among those your project, session and global settings ask for. Name a version, as in `vfox doctor java@17`, to check that one instead.
+
 The exit status is `1` when an error was found.
 
 After `vfox use`, `vfox` runs the fast checks for the version it just selected by itself and prints the warnings. See [Diagnostics Settings](../guides/configuration.md#diagnostics-settings) to switch that off or to silence single findings.

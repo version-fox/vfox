@@ -279,6 +279,8 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | `plugin.incompatible`     | warn  | 插件需要更新版本的 `vfox`                                                                                         |
 | `alias.dangling`          | warn  | 别名指向一个没有安装的版本                                                                                        |
 
+`path.shadowed` 检查的是你的 shell 正在使用的版本，也就是 `vfox env` 放进 `PATH` 的那个：项目、会话和全局设置所要求的版本里，第一个已安装的。指定版本（例如 `vfox doctor java@17`）则改为检查那个版本。
+
 发现错误时退出码为 `1`。
 
 执行 `vfox use` 之后，`vfox` 会自动对刚选中的版本运行快速检查并打印警告。如何关闭它，或只静音个别结果，见 [诊断设置](../guides/configuration.md#诊断设置)。

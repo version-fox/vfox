@@ -64,7 +64,7 @@ func doctorCmd(ctx context.Context, cmd *cli.Command) error {
 		return doctorAdopt(cmd, manager, name, version)
 	}
 
-	findings, err := manager.Diagnose(name, version)
+	findings, err := manager.Diagnose(name, version, versionInEffect(manager))
 	if err != nil {
 		return err
 	}

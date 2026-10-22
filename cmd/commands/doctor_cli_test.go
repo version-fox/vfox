@@ -236,6 +236,63 @@ func TestUseSaysWhenACommandIsShadowed(t *testing.T) {
 	mustContain(t, "doctor", doctor, "warn   path.shadowed  alpha@1.0.0", "pnpm put its own alphatool first.")
 }
 
+// `vfox env` falls back to an installed version when the one a closer scope asks
+// for is not installed. `doctor` has to look at the PATH of the version the shell
+// really uses, and not skip the check because no configured version is installed.
+func TestDoctorChecksTheVersionEnvFallsBackTo(t *testing.T) {
+	f := newShadowFixture(t, "pnpm") // alpha@1.0.0 is installed; a pnpm directory comes before vfox's in PATH
+	vfoxBin := filepath.Join(f.userHome, "sdks", "alpha", "bin")
+	global := filepath.Join(f.userHome, ".vfox.toml")
+	project := filepath.Join(f.work, ".vfox.toml")
+	must(t, os.WriteFile(global, []byte("[tools]\nalpha = \"1.0.0\"\n"), 0644))
+	must(t, os.WriteFile(project, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644)) // not installed
+
+	// What the shell uses is the global version.
+	mustContain(t, "env", f.run(t, "env", "-s", "bash").mustSucceed(t, "env").stdout, vfoxBin)
+
+	out := f.run(t, "doctor", "alpha").mustSucceed(t, "doctor alpha").stdout
+	mustContain(t, "doctor alpha", out, "warn   path.shadowed  alpha@1.0.0", "pnpm put its own alphatool first.")
+	mustContain(t, "doctor", f.run(t, "doctor").mustSucceed(t, "doctor").stdout, "path.shadowed  alpha@1.0.0")
+
+	// With nothing installed to fall back to, no version is in use and none can be shadowed.
+	must(t, os.Remove(global))
+	mustNotContain(t, "doctor alpha", f.run(t, "doctor", "alpha").mustSucceed(t, "doctor alpha").stdout, "path.shadowed")
+}
+
+// legacyPlugin reads .legacy-version, the way plugins for .nvmrc and the like do.
+const legacyPlugin = `PLUGIN = {name="legacy", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0", legacyFilenames={".legacy-version"}}
+function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+function PLUGIN:ParseLegacyFile(ctx)
+  local f = io.open(ctx.filepath, "r")
+  local content = f:read("*a")
+  f:close()
+  local version = content:gsub("%s+", "")
+  return {version=version}
+end
+`
+
+// A version that only a legacy version file asks for is in use as well.
+func TestDoctorFollowsALegacyVersionFileLikeEnv(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "legacy", legacyPlugin)
+	must(t, os.WriteFile(filepath.Join(f.userHome, ".legacy_filenames"), []byte("legacy true\n"), 0644))
+	f.installOnDisk(t, "legacy", "1.0.0", "legacytool")
+	must(t, os.WriteFile(filepath.Join(f.work, ".legacy-version"), []byte("1.0.0\n"), 0644))
+	shadowDir := filepath.Join(f.root, "pnpm", "bin")
+	must(t, os.MkdirAll(shadowDir, 0755))
+	must(t, os.WriteFile(filepath.Join(shadowDir, "legacytool"), []byte("#!/bin/sh\n"), 0755))
+	f.env["PATH"] = strings.Join([]string{shadowDir, filepath.Join(f.userHome, "sdks", "legacy", "bin"), f.system}, ":")
+
+	out := f.run(t, "doctor", "legacy").mustSucceed(t, "doctor legacy").stdout
+	mustContain(t, "doctor legacy", out, "warn   path.shadowed  legacy@1.0.0")
+
+	// Switched off, the file is not read by env either, so nothing is in use.
+	f.writeUserConfig(t, "legacyVersionFile:\n  enable: false\n")
+	mustNotContain(t, "doctor legacy", f.run(t, "doctor", "legacy").mustSucceed(t, "doctor legacy").stdout, "path.shadowed")
+}
+
 func TestUseStaysQuietWhenNothingIsShadowed(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")

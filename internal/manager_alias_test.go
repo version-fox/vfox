@@ -268,14 +268,14 @@ func TestAliasFindings(t *testing.T) {
 	}
 
 	// `doctor` for the whole SDK reports them; for one version they are not about it.
-	all, err := f.Diagnose("alpha", "")
+	all, err := f.Diagnose("alpha", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if findFinding(all, sdk.FindingAliasDangling, "alpha") == nil {
 		t.Errorf("Diagnose lacks the dangling aliases: %+v", all)
 	}
-	one, err := f.Diagnose("alpha", "1.0.0")
+	one, err := f.Diagnose("alpha", "1.0.0", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

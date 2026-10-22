@@ -29,10 +29,17 @@ import (
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
+// VersionInEffect says which version of an SDK the shell uses, or "" when it
+// uses none.
+type VersionInEffect func(s sdk.Sdk) sdk.Version
+
 // Diagnose runs the checks of `vfox doctor`. name and version narrow them down
-// to one SDK, or to one version of it; both empty checks everything. It only
-// reads, so it is safe to run at any time.
-func (m *Manager) Diagnose(name string, version sdk.Version) ([]sdk.Finding, error) {
+// to one SDK, or to one version of it; both empty checks everything. The PATH
+// is only looked at for the version in effect, which inEffect names; without it
+// that is the version Sdk.Current reports, which does not know about the
+// fallback to an installed version that `vfox env` makes. It only reads, so it
+// is safe to run at any time.
+func (m *Manager) Diagnose(name string, version sdk.Version, inEffect VersionInEffect) ([]sdk.Finding, error) {
 	var findings []sdk.Finding
 	findings = append(findings, m.activationFindings()...)
 
@@ -60,7 +67,7 @@ func (m *Manager) Diagnose(name string, version sdk.Version) ([]sdk.Finding, err
 		// Only the version in effect can be shadowed in a way that matters.
 		if version != "" {
 			opts.PathFor = version
-		} else if current := s.Current(); current != "" {
+		} else if current := versionInUse(s, inEffect); current != "" {
 			opts.PathFor = current
 		} else {
 			opts.NoPath = true
@@ -75,6 +82,13 @@ func (m *Manager) Diagnose(name string, version sdk.Version) ([]sdk.Finding, err
 	sdk.ApplyIgnore(findings, m.ignores)
 	sdk.SortFindings(findings)
 	return findings, nil
+}
+
+func versionInUse(s sdk.Sdk, inEffect VersionInEffect) sdk.Version {
+	if inEffect != nil {
+		return inEffect(s)
+	}
+	return s.Current()
 }
 
 func (m *Manager) ignores(id, sdkName, version string) bool {

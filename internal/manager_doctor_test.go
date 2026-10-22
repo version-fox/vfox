@@ -140,7 +140,7 @@ func TestDiagnoseWholeHome(t *testing.T) {
 	f.writePlugin(t, "future", "99.0.0")
 	t.Setenv(env.HookFlag, "") // this shell was not activated
 
-	findings, err := f.Diagnose("", "")
+	findings, err := f.Diagnose("", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestDiagnoseOneSDK(t *testing.T) {
 	}
 	t.Setenv(env.HookFlag, "")
 
-	findings, err := f.Diagnose("alpha", "")
+	findings, err := f.Diagnose("alpha", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestDiagnoseOneSDK(t *testing.T) {
 		t.Error("the scan for orphaned installations belongs to the check of the whole home")
 	}
 
-	if _, err := f.Diagnose("nosuch", ""); err == nil || !strings.Contains(err.Error(), "not supported") {
+	if _, err := f.Diagnose("nosuch", "", nil); err == nil || !strings.Contains(err.Error(), "not supported") {
 		t.Errorf("err = %v, want it to say that the SDK is not supported", err)
 	}
 }
@@ -208,8 +208,8 @@ func TestDiagnoseLooksAtThePATHOfTheVersionInEffect(t *testing.T) {
 	}
 	t.Setenv("PATH", strings.Join([]string{shadow, filepath.Join(f.meta.Working.GlobalSdkDir, "alpha", "bin"), t.TempDir()}, string(os.PathListSeparator)))
 
-	shadowedVersions := func(version sdk.Version) []string {
-		findings, err := f.Diagnose("alpha", version)
+	shadowedVersions := func(version sdk.Version, inEffect VersionInEffect) []string {
+		findings, err := f.Diagnose("alpha", version, inEffect)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,17 +222,30 @@ func TestDiagnoseLooksAtThePATHOfTheVersionInEffect(t *testing.T) {
 		return versions
 	}
 
-	if got := shadowedVersions(""); len(got) != 0 {
+	if got := shadowedVersions("", nil); len(got) != 0 {
 		t.Errorf("no version is in effect, so there is no PATH to look at: %v", got)
 	}
 	if err := os.WriteFile(filepath.Join(f.meta.Working.Directory, ".vfox.toml"), []byte("[tools]\nalpha = \"1.0.0\"\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if got := shadowedVersions(""); len(got) != 1 || got[0] != "1.0.0" {
+	if got := shadowedVersions("", nil); len(got) != 1 || got[0] != "1.0.0" {
 		t.Errorf("shadowed = %v, want only the version that is in effect", got)
 	}
-	if got := shadowedVersions("2.0.0"); len(got) != 1 || got[0] != "2.0.0" {
+	if got := shadowedVersions("2.0.0", nil); len(got) != 1 || got[0] != "2.0.0" {
 		t.Errorf("shadowed = %v, want the version that was asked for", got)
+	}
+
+	// The caller can say better than Sdk.Current which version the shell uses,
+	// for instance when a version that is not installed is asked for first.
+	versionIs := func(version sdk.Version) VersionInEffect { return func(sdk.Sdk) sdk.Version { return version } }
+	if got := shadowedVersions("", versionIs("2.0.0")); len(got) != 1 || got[0] != "2.0.0" {
+		t.Errorf("shadowed = %v, want the version the caller names", got)
+	}
+	if got := shadowedVersions("", versionIs("")); len(got) != 0 {
+		t.Errorf("shadowed = %v, want no PATH check when the caller names no version", got)
+	}
+	if got := shadowedVersions("1.0.0", versionIs("2.0.0")); len(got) != 1 || got[0] != "1.0.0" {
+		t.Errorf("shadowed = %v, want the version that was asked for to win", got)
 	}
 }
 
@@ -242,7 +255,7 @@ func TestDiagnoseMarksWhatTheUserIgnores(t *testing.T) {
 	t.Setenv(env.HookFlag, "")
 	f.RuntimeEnvContext.UserConfig = &config.Config{Diagnostics: &config.Diagnostics{OnUse: true, Ignore: []string{sdk.FindingPathNotActivated}}}
 
-	findings, err := f.Diagnose("", "")
+	findings, err := f.Diagnose("", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
