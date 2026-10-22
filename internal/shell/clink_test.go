@@ -418,6 +418,9 @@ func TestClinkRepeatedArguments(t *testing.T) {
 		{"vfox add nodejs ", []string{"java", "golang", "python", "dotnet-core", "my-plugin"}},
 		{"vfox add nodejs java ", []string{"golang", "python", "dotnet-core", "my-plugin"}},
 		{"vfox add nodejs g", []string{"golang"}},
+		// A hyphen in the name of a plugin is just a character.
+		{"vfox add dotnet-core ", []string{"nodejs", "java", "golang", "python", "my-plugin"}},
+		{"vfox add dotnet-core my-plugin ", []string{"nodejs", "java", "golang", "python"}},
 		// The others take one.
 		{"vfox unuse nodejs ", nil},
 		{"vfox info nodejs ", nil},
@@ -427,6 +430,39 @@ func TestClinkRepeatedArguments(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.line, func(t *testing.T) {
 			assertMatches(t, loadedClink(t).complete(tt.line), tt.want)
+		})
+	}
+}
+
+// The names of the plugins are matched as text, not as Lua patterns, to leave
+// out the ones that are already on the line. In a pattern a hyphen is a
+// quantifier and a dot is a wildcard, so a plugin like gcc-arm-none-eabi was
+// offered again after it had been entered.
+func TestClinkAddMatchesPluginNamesLiterally(t *testing.T) {
+	var available strings.Builder
+	available.WriteString("AVAILABLE PLUGINS\n\n")
+	for _, name := range []string{"gcc-arm-none-eabi", "a.b", "axb", "nodejs"} {
+		fmt.Fprintf(&available, "  %-19s ✓  https://github.com/version-fox/vfox-%s\n", name, name)
+	}
+	available.WriteString("\n  Use 'vfox add <plugin>' to install\n")
+
+	tests := []struct {
+		line string
+		want []string
+	}{
+		{"vfox add ", []string{"gcc-arm-none-eabi", "a.b", "axb", "nodejs"}},
+		{"vfox add gcc-arm-none-eabi ", []string{"a.b", "axb", "nodejs"}},
+		// The pattern a.b matches axb as well.
+		{"vfox add axb ", []string{"gcc-arm-none-eabi", "a.b", "nodejs"}},
+		{"vfox add a.b ", []string{"gcc-arm-none-eabi", "axb", "nodejs"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			rt := newClinkRuntime(t)
+			rt.outputs["vfox available"] = available.String()
+			rt.load()
+
+			assertMatches(t, rt.complete(tt.line), tt.want)
 		})
 	}
 }

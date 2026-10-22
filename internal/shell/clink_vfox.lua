@@ -88,7 +88,8 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
             function(word, word_index, line_state)
                 local res, line = {}, line_state:getline()
                 for _, v in ipairs(vfox_sdk_table) do
-                    if not line:find(v) then
+                    -- Plain text: a name like gcc-arm-none-eabi is not a pattern.
+                    if not line:find(v, 1, true) then
                         table.insert(res, v)
                     end
                 end
