@@ -28,7 +28,9 @@ const (
 	InitializedFlag = "__VFOX_INITIALIZED"
 	// OrigPathFlag holds the PATH `vfox activate` found in this shell, without
 	// vfox's own directories. Entries in front of vfox's directories that are
-	// not in it were added after activation.
+	// not in it were added after activation. Nushell, which cannot evaluate the
+	// output of `vfox activate`, sets it from the generated vfox.nu instead, with
+	// vfox's directories left in: they are skipped when it is compared.
 	OrigPathFlag = "__VFOX_ORIG_PATH"
 )
 
