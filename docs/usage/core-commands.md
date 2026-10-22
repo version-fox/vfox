@@ -278,7 +278,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | `plugin.incompatible`     | warn    | The plugin needs a newer `vfox`                                                                                          |
 | `alias.dangling`          | warn    | An alias names a version that is not installed                                                                           |
 
-`path.shadowed` is checked for the version your shell uses, which is the one `vfox env` puts on `PATH`: the first installed version among those your project, session and global settings ask for. Name a version, as in `vfox doctor java@17`, to check that one instead.
+`path.shadowed` is checked for the version your shell uses, which is the one `vfox env` puts on `PATH`: the first installed version among those your project, session and global settings ask for. Name a version, as in `vfox doctor java@17`, to check that one instead. A command that is the very file the SDK provides, such as a symlink to a [linked](#link) installation, is not a shadow.
 
 The exit status is `1` when an error was found.
 

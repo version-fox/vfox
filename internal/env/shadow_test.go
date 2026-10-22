@@ -80,6 +80,71 @@ func TestFindShadows(t *testing.T) {
 	}
 }
 
+// A command in front of vfox's directories that is the very file the SDK
+// provides runs the SDK's own executable, so it shadows nothing. It is what
+// linking a system or Homebrew installation next to a symlink of its own
+// looks like.
+func TestFindShadowsIgnoresTheSDKsOwnExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses symbolic links")
+	}
+	root := t.TempDir()
+	sdkBin := filepath.Join(root, "sdk", "bin")
+	own := writeCommand(t, sdkBin, "tool")
+	provided := ListExecutables([]string{sdkBin})
+	policy := policyFor(config.PathModeLegacy, nil, nil, nil)
+
+	symlink := filepath.Join(root, "symlink", "bin")
+	hardlink := filepath.Join(root, "hardlink", "bin")
+	other := filepath.Join(root, "other", "bin")
+	for _, dir := range []string{symlink, hardlink} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(own, filepath.Join(symlink, "tool")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(own, filepath.Join(hardlink, "tool")); err != nil {
+		t.Fatal(err)
+	}
+	otherTool := writeCommand(t, other, "tool")
+
+	for name, dirs := range map[string][]string{
+		"a symbolic link to it": {symlink},
+		"a hard link to it":     {hardlink},
+		// The first match in PATH order is the one that runs, and it is the SDK's own.
+		"a different file only behind it": {symlink, other},
+	} {
+		if got := findShadows(provided, dirs, policy); got != nil {
+			t.Errorf("%s: shadows = %+v, want none", name, got)
+		}
+	}
+
+	got := findShadows(provided, []string{other, symlink}, policy)
+	if want := []Shadow{{Name: "tool", Winner: otherTool, Dir: other, Source: ShadowSourceUnknown}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("a different file in front of it: shadows = %+v, want %+v", got, want)
+	}
+
+	// The SDK reached through a link of its own, as vfox's directories are.
+	linkedBin := filepath.Join(root, "vfox", "sdks", "tool", "bin")
+	if err := os.MkdirAll(filepath.Dir(linkedBin), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sdkBin, linkedBin); err != nil {
+		t.Fatal(err)
+	}
+	if got := findShadows(ListExecutables([]string{linkedBin}), []string{symlink}, policy); got != nil {
+		t.Errorf("through a linked directory: shadows = %+v, want none", got)
+	}
+
+	// An executable that is gone can only be told apart by its name.
+	gone := []Executable{{Name: "tool", Path: filepath.Join(root, "gone", "tool")}}
+	if got := findShadows(gone, []string{symlink}, policy); len(got) != 1 {
+		t.Errorf("an SDK file that cannot be read: shadows = %+v, want the command reported", got)
+	}
+}
+
 // FindShadows looks at the PATH `vfox env` is going to export: what stays in
 // front of vfox's directories.
 func TestFindShadowsFollowsTheExportedOrder(t *testing.T) {

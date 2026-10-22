@@ -36,7 +36,8 @@ type Shadow struct {
 // FindShadows reports which of the provided commands are shadowed by an
 // executable in the directories that stay in front of vfox's own. It evaluates
 // the order `vfox env` is going to export, so it can run before the shell has
-// picked the new version up.
+// picked the new version up. An executable that is the very file the SDK
+// provides, such as a link to it, shadows nothing.
 func (m *RuntimeEnvContext) FindShadows(provided []Executable) []Shadow {
 	prefix, _ := m.SplitSystemPaths()
 	return findShadows(provided, prefix.Slice(), m.pathPolicy())
@@ -46,9 +47,9 @@ func findShadows(provided []Executable, prefixDirs []string, policy pathPolicy) 
 	if len(provided) == 0 || len(prefixDirs) == 0 {
 		return nil
 	}
-	wanted := make(map[string]string, len(provided)) // lookup key -> command name
+	wanted := make(map[string]Executable, len(provided)) // lookup key -> the SDK's command
 	for _, exe := range provided {
-		wanted[lookupKey(exe.Name)] = exe.Name
+		wanted[lookupKey(exe.Name)] = exe
 	}
 	exts := pathExts()
 	var shadows []Shadow
@@ -61,7 +62,7 @@ func findShadows(provided []Executable, prefixDirs []string, policy pathPolicy) 
 			// The directory in front may be a whole system bin directory, with
 			// thousands of files: look at the name before asking the file system
 			// anything, and only stat what could be one of the commands.
-			name, ok := wanted[lookupKey(candidateName(entry.Name(), exts))]
+			exe, ok := wanted[lookupKey(candidateName(entry.Name(), exts))]
 			if !ok {
 				continue
 			}
@@ -73,12 +74,23 @@ func findShadows(provided []Executable, prefixDirs []string, policy pathPolicy) 
 			if _, isCommand := commandName(entry.Name(), info, exts); !isCommand {
 				continue
 			}
-			delete(wanted, lookupKey(name)) // the first directory in PATH order wins
-			shadows = append(shadows, Shadow{Name: name, Winner: path, Dir: dir, Source: policy.sourceOf(dir)})
+			delete(wanted, lookupKey(exe.Name)) // the first directory in PATH order wins, whatever it is
+			if sameFile(info, exe.Path) {
+				continue // it runs the SDK's own executable
+			}
+			shadows = append(shadows, Shadow{Name: exe.Name, Winner: path, Dir: dir, Source: policy.sourceOf(dir)})
 		}
 	}
 	sort.Slice(shadows, func(i, j int) bool { return shadows[i].Name < shadows[j].Name })
 	return shadows
+}
+
+// sameFile reports whether the file at path, which info describes, is the file
+// at want once links are followed: a symlink or hard link to an SDK's command
+// runs that command. A want that cannot be read is not the same file.
+func sameFile(info os.FileInfo, want string) bool {
+	wantInfo, err := os.Stat(want)
+	return err == nil && os.SameFile(info, wantInfo)
 }
 
 // candidateName is the command a file name could stand for, before the file

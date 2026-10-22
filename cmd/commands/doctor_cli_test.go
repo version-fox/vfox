@@ -293,6 +293,31 @@ func TestDoctorFollowsALegacyVersionFileLikeEnv(t *testing.T) {
 	mustNotContain(t, "doctor legacy", f.run(t, "doctor", "legacy").mustSucceed(t, "doctor legacy").stdout, "path.shadowed")
 }
 
+// Linking a system or Homebrew installation is the usual way to meet this: a
+// directory in front of vfox's holds a link to the very command the SDK provides.
+func TestDoctorDoesNotCallALinkToTheSDKsOwnCommandAShadow(t *testing.T) {
+	f := newCLIFixture(t, false)
+	external := f.external(t, "alphatool")
+	f.run(t, "link", "alpha@sys", external).mustSucceed(t, "link")
+	front := filepath.Join(f.root, "homebrew", "bin")
+	must(t, os.MkdirAll(front, 0755))
+	command := filepath.Join(front, "alphatool")
+	must(t, os.Symlink(filepath.Join(external, "bin", "alphatool"), command))
+	f.env["PATH"] = strings.Join([]string{front, filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system}, ":")
+
+	out := f.run(t, "use", "-g", "alpha@sys").mustSucceed(t, "use").output()
+	mustContain(t, "use", out, "Now using", "alpha@sys")
+	mustNotContain(t, "use", out, "comes before vfox")
+	mustContain(t, "doctor", f.run(t, "doctor", "alpha").mustSucceed(t, "doctor").stdout, "No problems found.")
+
+	// Another file of that name in the same place is a shadow.
+	must(t, os.Remove(command))
+	must(t, os.WriteFile(command, []byte("#!/bin/sh\n"), 0755))
+	out = f.run(t, "use", "-g", "alpha@sys").mustSucceed(t, "use").output()
+	mustContain(t, "use", out, "`alphatool` runs "+command+" instead of alpha@sys")
+	mustContain(t, "doctor", f.run(t, "doctor", "alpha").mustSucceed(t, "doctor").stdout, "warn   path.shadowed  alpha@sys")
+}
+
 func TestUseStaysQuietWhenNothingIsShadowed(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")

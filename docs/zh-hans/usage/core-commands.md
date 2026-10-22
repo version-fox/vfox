@@ -279,7 +279,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | `plugin.incompatible`     | warn  | 插件需要更新版本的 `vfox`                                                                                         |
 | `alias.dangling`          | warn  | 别名指向一个没有安装的版本                                                                                        |
 
-`path.shadowed` 检查的是你的 shell 正在使用的版本，也就是 `vfox env` 放进 `PATH` 的那个：项目、会话和全局设置所要求的版本里，第一个已安装的。指定版本（例如 `vfox doctor java@17`）则改为检查那个版本。
+`path.shadowed` 检查的是你的 shell 正在使用的版本，也就是 `vfox env` 放进 `PATH` 的那个：项目、会话和全局设置所要求的版本里，第一个已安装的。指定版本（例如 `vfox doctor java@17`）则改为检查那个版本。如果那个命令其实就是 SDK 自己提供的同一个文件（例如指向 [`vfox link`](#link) 登记的安装的符号链接），就不算遮蔽。
 
 发现错误时退出码为 `1`。
 
