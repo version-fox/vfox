@@ -196,7 +196,9 @@ you open a new terminal.
 ## Aliases
 
 Names you give to installed versions with [`vfox alias`](../usage/core-commands.md#alias) are stored in the same file.
-They are resolved for what you type on the command line only, never in `.vfox.toml`.
+They are resolved for what you type on the command line only, never in `.vfox.toml`. `vfox alias` changes the
+`aliases` key and nothing else: the rest of your file stays as it is, so a section it does not set keeps following the
+shared configuration.
 
 ```yaml
 aliases:

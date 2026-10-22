@@ -142,28 +142,18 @@ func (m *Manager) RemoveAliasesFor(sdkName string, version sdk.Version) ([]strin
 
 // updateAliases applies change to the aliases in the user's config file and
 // then to the ones this process has loaded. The file is written only when
-// change succeeds, and only the user config is touched: values that come from
-// the shared config stay out of it.
+// change succeeds, and only its aliases are touched: values that come from the
+// shared config stay out of it, and so does every default, which would turn a
+// section the user never set into one the user declared.
 func (m *Manager) updateAliases(change func(aliases map[string]map[string]string) error) error {
-	meta := m.RuntimeEnvContext.PathMeta
-	userConfig, err := config.NewConfigWithPath(meta.User.Config)
+	file, err := config.LoadAliasFile(m.RuntimeEnvContext.PathMeta.User.Config)
 	if err != nil {
 		return fmt.Errorf("load user config: %w", err)
 	}
-	// NewConfigWithPath may hand out the shared defaults themselves.
-	userConfig = userConfig.Clone()
-	if userConfig.Aliases == nil {
-		userConfig.Aliases = make(map[string]map[string]string)
-	}
-	if err := change(userConfig.Aliases); err != nil {
+	if err := change(file.Aliases); err != nil {
 		return err
 	}
-	for sdkName, names := range userConfig.Aliases {
-		if len(names) == 0 {
-			delete(userConfig.Aliases, sdkName)
-		}
-	}
-	if err := userConfig.SaveConfig(meta.User.Home); err != nil {
+	if err := file.Save(); err != nil {
 		return fmt.Errorf("save user config: %w", err)
 	}
 

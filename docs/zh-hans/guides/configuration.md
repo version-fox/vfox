@@ -178,7 +178,7 @@ vfox config path.mode baseline
 
 ## 别名
 
-用 [`vfox alias`](../usage/core-commands.md#alias) 给已安装版本起的名字也保存在同一个文件里。它们只在命令行输入时解析，不会出现在 `.vfox.toml` 中。
+用 [`vfox alias`](../usage/core-commands.md#alias) 给已安装版本起的名字也保存在同一个文件里。它们只在命令行输入时解析，不会出现在 `.vfox.toml` 中。`vfox alias` 只修改 `aliases` 这一项，文件的其余部分保持原样，所以你没有设置的配置段会继续沿用共享配置。
 
 ```yaml
 aliases:

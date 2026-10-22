@@ -197,3 +197,35 @@ func TestExecResolvesAliases(t *testing.T) {
 		}
 	}
 }
+
+// Changing an alias changes the aliases and nothing else: a section the user's
+// file does not declare keeps following the shared config, so the settings an
+// administrator put there must still apply afterwards.
+func TestAliasChangesLeaveTheRestOfTheUserConfigAlone(t *testing.T) {
+	f := newCLIFixture(t, true)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+	must(t, os.WriteFile(filepath.Join(f.shared, "config.yaml"), []byte("path:\n  mode: baseline\ndiagnostics:\n  onUse: false\n"), 0644))
+	f.writeUserConfig(t, "aliases: {}\n")
+
+	f.run(t, "alias", "set", "alpha", "stable", "1.0.0").mustSucceed(t, "alias set")
+	f.run(t, "alias", "set", "alpha", "other", "1.0.0").mustSucceed(t, "alias set")
+	f.run(t, "alias", "unset", "alpha", "other").mustSucceed(t, "alias unset")
+
+	user := readFile(t, filepath.Join(f.userHome, "config.yaml"))
+	mustContain(t, "user config", user, "stable: 1.0.0")
+	mustNotContain(t, "user config", user, "path:", "diagnostics:", "plugin:", "proxy:", "storage:", "registry:", "cache:", "gitignore:", "other")
+
+	// The next process, which loads both files.
+	settings := f.manager(t).RuntimeEnvContext.UserConfig
+	if mode := settings.Path.EffectiveMode(); mode != "baseline" {
+		t.Errorf("path.mode = %q after an alias change, want the shared baseline", mode)
+	}
+	if settings.Diagnostics.OnUse {
+		t.Error("diagnostics.onUse was switched back on by an alias change")
+	}
+
+	// Taking the aliases of an uninstalled version along does not copy anything either.
+	f.run(t, "uninstall", "alpha@stable").mustSucceed(t, "uninstall")
+	user = readFile(t, filepath.Join(f.userHome, "config.yaml"))
+	mustNotContain(t, "user config", user, "path:", "diagnostics:", "stable")
+}

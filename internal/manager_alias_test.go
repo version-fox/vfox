@@ -331,3 +331,39 @@ func TestResolveVersionName(t *testing.T) {
 		}
 	}
 }
+
+// Only the aliases are written. What the user's file does not declare stays out
+// of it, so that it keeps following the shared config.
+func TestAliasChangesWriteOnlyTheAliases(t *testing.T) {
+	f, _ := aliasFixture(t)
+	if err := os.WriteFile(f.meta.User.Config, []byte("# mine\ncache:\n    availableHookDuration: 1h\naliases: {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []func() error{
+		func() error { return f.SetAlias("alpha", "stable", "1.0.0") },
+		func() error { return f.SetAlias("alpha", "lts", "2.0.0") },
+		func() error { return f.UnsetAlias("alpha", "lts") },
+		func() error { _, err := f.RemoveAliasesFor("alpha", "1.0.0"); return err },
+	}
+	for i, step := range steps {
+		if err := step(); err != nil {
+			t.Fatalf("step %d: %v", i, err)
+		}
+		content, err := os.ReadFile(f.meta.User.Config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		saved := string(content)
+		for _, want := range []string{"# mine", "cache:", "availableHookDuration: 1h"} {
+			if !strings.Contains(saved, want) {
+				t.Errorf("step %d lost %q:\n%s", i, want, saved)
+			}
+		}
+		for _, unwanted := range []string{"path:", "diagnostics:", "proxy:", "plugin:", "storage:", "registry:", "gitignore:", "legacyVersionFile:"} {
+			if strings.Contains(saved, unwanted) {
+				t.Errorf("step %d declared %q in the user's file:\n%s", i, unwanted, saved)
+			}
+		}
+	}
+}
