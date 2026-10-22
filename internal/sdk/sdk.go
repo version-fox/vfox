@@ -63,6 +63,8 @@ type Sdk interface {
 	Installation(version Version) (*Installation, error)
 	// Link registers an existing SDK directory as a version, without copying or downloading anything.
 	Link(version Version, target string, opts LinkOptions) error
+	// Diagnose checks installed versions and reports what looks wrong.
+	Diagnose(opts DiagnoseOptions) []Finding
 	ParseLegacyFile(path string) (Version, error) // Parse legacy version file to get the runtime version
 	Current() Version
 	Metadata() *Metadata // Get the metadata of the SDK
@@ -723,6 +725,10 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	logger.Debugf("Successfully using SDK: %s\n", b.Label(version))
+
+	// Say so when the shell is not going to run what was just selected. This
+	// comes before the hand-off to a new shell below, which blocks.
+	b.reportFindings(version, hookEnv)
 
 	// In non-hook environment, spawn a new shell so the user can use the new version immediately
 	if !hookEnv {

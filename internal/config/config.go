@@ -33,6 +33,7 @@ type Config struct {
 	LegacyVersionFile *LegacyVersionFile `yaml:"legacyVersionFile"`
 	Cache             *Cache             `yaml:"cache"`
 	Gitignore         *Gitignore         `yaml:"gitignore"`
+	Diagnostics       *Diagnostics       `yaml:"diagnostics"`
 }
 
 const filename = "config.yaml"
@@ -46,6 +47,7 @@ var (
 		LegacyVersionFile: EmptyLegacyVersionFile,
 		Cache:             EmptyCache,
 		Gitignore:         EmptyGitignore,
+		Diagnostics:       EmptyDiagnostics,
 	}
 )
 
@@ -90,6 +92,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Gitignore == nil {
 		config.Gitignore = EmptyGitignore
+	}
+	if config.Diagnostics == nil {
+		config.Diagnostics = EmptyDiagnostics
 	}
 	return config, nil
 
@@ -147,6 +152,9 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 	// Merge Gitignore: user overrides shared
 	result.Gitignore = mergeGitignore(sharedConfig.Gitignore, userConfig.Gitignore)
 
+	// Merge Diagnostics: user overrides shared
+	result.Diagnostics = mergeDiagnostics(sharedConfig.Diagnostics, userConfig.Diagnostics)
+
 	// Apply defaults to any remaining nil fields
 	return ensureDefaults(result)
 }
@@ -176,6 +184,9 @@ func ensureDefaults(c *Config) *Config {
 	}
 	if c.Gitignore == nil {
 		c.Gitignore = EmptyGitignore
+	}
+	if c.Diagnostics == nil {
+		c.Diagnostics = EmptyDiagnostics
 	}
 	return c
 }
@@ -257,6 +268,19 @@ func mergeGitignore(shared, user *Gitignore) *Gitignore {
 		return shared
 	}
 	return EmptyGitignore
+}
+
+// mergeDiagnostics merges diagnostics configs. A section the user's file
+// declares replaces the shared one; NewConfigWithPath hands out EmptyDiagnostics
+// itself for a file without the section, so pointer identity tells them apart.
+func mergeDiagnostics(shared, user *Diagnostics) *Diagnostics {
+	if user != nil && user != EmptyDiagnostics {
+		return user
+	}
+	if shared != nil {
+		return shared
+	}
+	return EmptyDiagnostics
 }
 
 // Helper functions to check if config is empty

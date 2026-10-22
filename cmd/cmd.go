@@ -88,6 +88,7 @@ func newCmd() *cmd {
 		commands.List,
 		commands.Uninstall,
 		commands.Link,
+		commands.Doctor,
 		commands.Available,
 		commands.Search,
 		commands.Update,

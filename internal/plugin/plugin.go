@@ -46,6 +46,9 @@ type (
 		MinRuntimeVersion string   `json:"minRuntimeVersion"`
 		Notes             []string `json:"notes"`
 		LegacyFilenames   []string `json:"legacyFilenames"`
+		// ShadowHints explain, per shadowing executable, how to get the SDK's
+		// commands back in front of PATH. Optional.
+		ShadowHints []ShadowHint `json:"shadowHints"`
 	}
 
 	// Plugin is the interface that all plugins must implement.

@@ -69,6 +69,11 @@ func TestLinkCommandEndToEnd(t *testing.T) {
 		mustContain(t, "install", out, "alpha@sys is already installed")
 	})
 
+	t.Run("a healthy link is no problem", func(t *testing.T) {
+		out := f.run(t, "doctor").mustSucceed(t, "doctor").output()
+		mustContain(t, "doctor", out, "No problems found.")
+	})
+
 	t.Run("uninstalling removes the link and nothing else", func(t *testing.T) {
 		out := f.run(t, "uninstall", "alpha@sys").mustSucceed(t, "uninstall").output()
 		mustContain(t, "uninstall", out, "Unlinked", "alpha@sys", "left untouched")

@@ -150,6 +150,15 @@ type PreUninstallHookCtx struct {
 	SdkInfo map[string]*InstalledPackageItem `json:"sdkInfo"`
 }
 
+// ShadowHint is a plugin-declared explanation for a command of the SDK being
+// shadowed by an executable somewhere else in PATH. Match is a case-insensitive
+// substring of the shadowing executable's path.
+type ShadowHint struct {
+	Match   string `json:"match"`
+	Message string `json:"message"`
+	URL     string `json:"url"`
+}
+
 // RuntimeInfo represents the runtime information of the current exec environment.
 type RuntimeInfo struct {
 	OsType        string `json:"osType"`

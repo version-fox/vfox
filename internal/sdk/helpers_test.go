@@ -185,3 +185,20 @@ func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
 }
+
+func findingIDs(findings []Finding) []string {
+	ids := make([]string, 0, len(findings))
+	for _, f := range findings {
+		ids = append(ids, f.ID)
+	}
+	return ids
+}
+
+func findingByID(findings []Finding, id string) *Finding {
+	for i := range findings {
+		if findings[i].ID == id {
+			return &findings[i]
+		}
+	}
+	return nil
+}

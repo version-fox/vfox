@@ -65,7 +65,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Env, Info, Install, Link, List, Uninstall, Use,
+	Activate, Doctor, Env, Info, Install, Link, List, Uninstall, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -92,6 +92,7 @@ func cloneCommands(commands ...*cli.Command) []*cli.Command {
 
 // alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH.
 const alphaPlugin = `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+PLUGIN.shadowHints = {{match="pnpm", message="pnpm put its own alphatool first.", url="https://example.com/pnpm"}}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
 function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
 function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
