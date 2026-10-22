@@ -52,21 +52,7 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		if len(allSdk) == 0 {
 			return fmt.Errorf("you don't have any sdk installed yet")
 		}
-		tree := pterm.LeveledList{}
-
-		for _, s := range allSdk {
-			name := s.Metadata().Name
-			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
-			aliases := aliasesByVersion(manager.AliasesFor(name))
-			for _, version := range s.InstalledList() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: versionLabel(s, version, aliases)})
-			}
-		}
-		// Generate tree from LeveledList.
-		root := putils.TreeFromLeveledList(tree)
-		root.Text = "All installed sdk versions"
-		// Render TreePrinter
-		_ = pterm.DefaultTree.WithRoot(root).Render()
+		printInstalledSdks(allSdk, manager.AliasesFor)
 		return nil
 	}
 	source, err := manager.LookupSdk(sdkName)
@@ -125,4 +111,26 @@ func formatVersionLabel(version sdk.Version, origin sdk.Origin, target string, a
 		label += " [alias: " + strings.Join(aliases, ", ") + "]"
 	}
 	return label
+}
+
+// printInstalledSdks prints a tree of the SDKs with their installed versions.
+// The Clink completion script, internal/shell/clink_vfox.lua, reads the SDK
+// names and the versions from the lines of the tree; clink_format_test.go locks
+// the layout. aliasesFor returns the aliases of an SDK as alias -> version.
+func printInstalledSdks(allSdk []sdk.Sdk, aliasesFor func(sdkName string) map[string]string) {
+	tree := pterm.LeveledList{}
+
+	for _, s := range allSdk {
+		name := s.Metadata().Name
+		tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
+		aliases := aliasesByVersion(aliasesFor(name))
+		for _, version := range s.InstalledList() {
+			tree = append(tree, pterm.LeveledListItem{Level: 1, Text: versionLabel(s, version, aliases)})
+		}
+	}
+	// Generate tree from LeveledList.
+	root := putils.TreeFromLeveledList(tree)
+	root.Text = "All installed sdk versions"
+	// Render TreePrinter
+	_ = pterm.DefaultTree.WithRoot(root).Render()
 }

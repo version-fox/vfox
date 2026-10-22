@@ -10,7 +10,8 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
     local file_available = io.open(file_name, 'r')
     if file_available then
         local file_timestamp = tonumber(file_available:read('*l'))
-        if current_timestamp - file_timestamp <= 24 * 60 * 60 then
+        -- A file without a timestamp is unusable, e.g. never completely written: list the plugins again.
+        if file_timestamp and current_timestamp - file_timestamp <= 24 * 60 * 60 then
             for line in file_available:lines() do
                 table.insert(vfox_sdk_table, line)
             end
@@ -37,14 +38,18 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
         local pre, ls = '', {}
         local vfox_ls = io.popen('vfox ls')
         for line in vfox_ls:lines() do
-            local txt = line:gsub('%c%[%d+m', ''):match('^[ ┬└│─├]*(%S.*)')
+            line = line:gsub('%c%[%d+m', '')
+            local txt = line:match('^[ ┬└│─├]*(%S.*)')
             if txt then
-                if txt:match('^%d') then
-                    ls[pre] = true
-                    table.insert(ls, pre .. '@' .. txt)
-                elseif not txt:find(' ', 1, true) then
+                if line:find('^├') or line:find('^└') then
+                    -- The first level of the tree is the SDKs.
                     pre = txt
                     ls[pre] = false
+                elseif line:find('^│') or line:find('^ ') then
+                    -- The second level is their versions, which can have any name. The name
+                    -- can be followed by "(linked → path)" and "[alias: ...]".
+                    ls[pre] = true
+                    table.insert(ls, pre .. '@' .. txt:match('^(%S+)'))
                 end
             end
         end
@@ -88,7 +93,8 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
             function(word, word_index, line_state)
                 local res, line = {}, line_state:getline()
                 for _, v in ipairs(vfox_sdk_table) do
-                    if not line:find(v) then
+                    -- Plain text: a name like gcc-arm-none-eabi is not a pattern.
+                    if not line:find(v, 1, true) then
                         table.insert(res, v)
                     end
                 end
@@ -146,7 +152,9 @@ local vfox_filter = function() end
 local vfox_task = coroutine.create(function()
     os.setenv('__VFOX_SHELL', 'clink')
     os.setenv('__VFOX_PID', os.getpid())
+    -- vfox activate only drops the state of another shell when __VFOX_PID is not this shell's.
     os.setenv('__VFOX_CURTMPPATH', nil)
+    os.setenv('__VFOX_ORIG_PATH', nil)
     local vfox_activate = io.popen('vfox activate clink')
     for line in vfox_activate:lines() do
         vfox_setenv(line)
