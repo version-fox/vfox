@@ -55,22 +55,28 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 
 	name := strings.ToLower(argArr[0])
 	version := sdk.Version(argArr[1])
-	resolvedVersion := manager.ResolveVersion(name, version)
 
 	source, err := manager.LookupSdk(name)
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
+	resolvedVersion := manager.ResolveAlias(name, source, manager.ResolveVersion(name, version))
 	cv := source.Current()
 	if err = source.Uninstall(resolvedVersion); err != nil {
 		return err
+	}
+	// An alias must not outlive the version it names.
+	if removed, err := manager.RemoveAliasesFor(name, resolvedVersion); err != nil {
+		pterm.Printf("%s\n", pterm.LightYellow(fmt.Sprintf("Could not update the aliases of %s@%s: %v", name, resolvedVersion, err)))
+	} else if len(removed) > 0 {
+		pterm.Printf("Removed the alias(es) %s of %s@%s.\n", strings.Join(removed, ", "), name, resolvedVersion)
 	}
 	remainVersion := source.InstalledList()
 	if len(remainVersion) == 0 {
 		_ = os.RemoveAll(source.Metadata().SdkInstalledPath)
 		return nil
 	}
-	if cv == version {
+	if cv == resolvedVersion {
 		pterm.Println("Auto switch to the other version.")
 		firstVersion := remainVersion[0]
 		return source.Use(firstVersion, env.Global)

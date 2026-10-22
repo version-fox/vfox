@@ -66,7 +66,10 @@ vfox info [options] <plugin-name>
 
 - `-f, --format`: 使用给定的 Go 模板格式化输出。可用字段：
   - 插件信息：`Name`、`Version`、`Homepage`、`InstallPath`、`Description`
-  - 版本信息：`Name`、`Version`、`Path`
+  - 版本信息：`Name`、`Version`、`Path`、`Home`、`Origin`、`Target`
+- `--json`: 以 JSON 输出。对某个版本，还会包含插件设置的环境变量和 `vfox` 保存的回执。
+
+对某个版本而言，`Home` 是 SDK 的主运行时目录，也就是应该让 `JAVA_HOME` 之类指向的目录；`Path` 是包含它的那一层（版本目录），保持原有含义不变。`Origin` 是 `installed` 或 `linked`（见 [`vfox link`](./core-commands.md#link)），`Target` 是链接版本所指向的目录。
 
 **例子**
 
@@ -85,6 +88,12 @@ vfox info nodejs@20.0.0
 vfox info --format "{{.Homepage}}" nodejs
 vfox info --format "{{.InstallPath}}" nodejs
 vfox info --format "{{.Path}}" nodejs@20.0.0
+vfox info --format "{{.Home}}" nodejs@20.0.0
+```
+
+**机器可读的输出**
+```shell
+vfox info --json java@17.0.9
 ```
 
 ## Remove

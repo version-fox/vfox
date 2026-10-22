@@ -61,6 +61,37 @@ func TestCompletionScriptsUseCurrentCliFlag(t *testing.T) {
 	}
 }
 
+// TestCompletionScriptsUseLFLineEndings guards the completions/** rule in
+// .gitattributes. A CR breaks every POSIX shell ("$'\r': command not found") and
+// the scripts are packaged as-is, yet Windows checkouts get CRLF through
+// core.autocrlf and the native Bash/Zsh tests below are skipped there.
+func TestCompletionScriptsUseLFLineEndings(t *testing.T) {
+	t.Parallel()
+
+	scriptPaths, err := filepath.Glob(filepath.Join("..", "completions", "*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scriptPaths) == 0 {
+		t.Fatal("no completion scripts found")
+	}
+
+	for _, scriptPath := range scriptPaths {
+		t.Run(filepath.Base(scriptPath), func(t *testing.T) {
+			t.Parallel()
+
+			content, err := os.ReadFile(scriptPath)
+			if err != nil {
+				t.Fatalf("read completion script %q: %v", scriptPath, err)
+			}
+			if bytes.Contains(content, []byte("\r")) {
+				t.Fatalf("completion script %q contains carriage returns; completions/ must be checked out with LF line endings "+
+					"(see .gitattributes; to refresh a stale checkout, delete the files in completions/ and run git checkout -- completions)", scriptPath)
+			}
+		})
+	}
+}
+
 func TestGenerateShellCompletionFlagProducesSuggestions(t *testing.T) {
 	t.Parallel()
 

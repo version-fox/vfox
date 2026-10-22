@@ -19,11 +19,14 @@ package commands
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var List = &cli.Command{
@@ -49,20 +52,7 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		if len(allSdk) == 0 {
 			return fmt.Errorf("you don't have any sdk installed yet")
 		}
-		tree := pterm.LeveledList{}
-
-		for _, s := range allSdk {
-			name := s.Metadata().Name
-			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
-			for _, version := range s.InstalledList() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: string(version)})
-			}
-		}
-		// Generate tree from LeveledList.
-		root := putils.TreeFromLeveledList(tree)
-		root.Text = "All installed sdk versions"
-		// Render TreePrinter
-		_ = pterm.DefaultTree.WithRoot(root).Render()
+		printInstalledSdks(allSdk, manager.AliasesFor)
 		return nil
 	}
 	source, err := manager.LookupSdk(sdkName)
@@ -74,12 +64,73 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 	if len(list) == 0 {
 		return fmt.Errorf("no available version")
 	}
+	aliases := aliasesByVersion(manager.AliasesFor(sdkName))
 	for _, version := range list {
+		label := versionLabel(source, version, aliases)
 		if version == curVersion {
-			pterm.Println("->", fmt.Sprintf("%s", version), pterm.LightGreen("<— current"))
+			pterm.Println("->", label, pterm.LightGreen("<— current"))
 		} else {
-			pterm.Println("->", fmt.Sprintf("%s", version))
+			pterm.Println("->", label)
 		}
 	}
 	return nil
+}
+
+// aliasesByVersion turns alias -> version into version -> sorted aliases.
+func aliasesByVersion(aliases map[string]string) map[string][]string {
+	byVersion := make(map[string][]string)
+	for alias, version := range aliases {
+		byVersion[version] = append(byVersion[version], alias)
+	}
+	for _, names := range byVersion {
+		sort.Strings(names)
+	}
+	return byVersion
+}
+
+// versionLabel is how `vfox list` shows a version: its name, where it is linked
+// to if it is a link, and the aliases it has.
+func versionLabel(s sdk.Sdk, version sdk.Version, aliases map[string][]string) string {
+	origin, target := sdk.OriginInstalled, ""
+	if installation, err := s.Installation(version); err == nil {
+		origin, target = installation.Origin, installation.Target
+	}
+	return formatVersionLabel(version, origin, target, aliases[string(version)])
+}
+
+func formatVersionLabel(version sdk.Version, origin sdk.Origin, target string, aliases []string) string {
+	label := string(version)
+	if origin == sdk.OriginLinked {
+		label += " (linked"
+		if target != "" {
+			label += " → " + target
+		}
+		label += ")"
+	}
+	if len(aliases) > 0 {
+		label += " [alias: " + strings.Join(aliases, ", ") + "]"
+	}
+	return label
+}
+
+// printInstalledSdks prints a tree of the SDKs with their installed versions.
+// The Clink completion script, internal/shell/clink_vfox.lua, reads the SDK
+// names and the versions from the lines of the tree; clink_format_test.go locks
+// the layout. aliasesFor returns the aliases of an SDK as alias -> version.
+func printInstalledSdks(allSdk []sdk.Sdk, aliasesFor func(sdkName string) map[string]string) {
+	tree := pterm.LeveledList{}
+
+	for _, s := range allSdk {
+		name := s.Metadata().Name
+		tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
+		aliases := aliasesByVersion(aliasesFor(name))
+		for _, version := range s.InstalledList() {
+			tree = append(tree, pterm.LeveledListItem{Level: 1, Text: versionLabel(s, version, aliases)})
+		}
+	}
+	// Generate tree from LeveledList.
+	root := putils.TreeFromLeveledList(tree)
+	root.Text = "All installed sdk versions"
+	// Render TreePrinter
+	_ = pterm.DefaultTree.WithRoot(root).Render()
 }

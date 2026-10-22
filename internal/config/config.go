@@ -33,6 +33,12 @@ type Config struct {
 	LegacyVersionFile *LegacyVersionFile `yaml:"legacyVersionFile"`
 	Cache             *Cache             `yaml:"cache"`
 	Gitignore         *Gitignore         `yaml:"gitignore"`
+	Diagnostics       *Diagnostics       `yaml:"diagnostics"`
+	Path              *Path              `yaml:"path"`
+	// Aliases maps an SDK name to user-defined names for installed versions:
+	// aliases[sdk][alias] = version. They are resolved for command-line input
+	// only and are never written to version files.
+	Aliases map[string]map[string]string `yaml:"aliases"`
 }
 
 const filename = "config.yaml"
@@ -46,12 +52,63 @@ var (
 		LegacyVersionFile: EmptyLegacyVersionFile,
 		Cache:             EmptyCache,
 		Gitignore:         EmptyGitignore,
+		Diagnostics:       EmptyDiagnostics,
+		Path:              EmptyPath,
 	}
 )
 
+// Clone returns a copy that can be modified without touching c or the shared
+// defaults (NewConfigWithPath may hand out DefaultConfig itself).
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return &Config{}
+	}
+	clone := *c
+	clone.Aliases = cloneAliases(c.Aliases)
+	return &clone
+}
+
+func cloneAliases(aliases map[string]map[string]string) map[string]map[string]string {
+	if aliases == nil {
+		return nil
+	}
+	clone := make(map[string]map[string]string, len(aliases))
+	for sdk, names := range aliases {
+		clone[sdk] = make(map[string]string, len(names))
+		for name, version := range names {
+			clone[sdk][name] = version
+		}
+	}
+	return clone
+}
+
+// setOnDemand lists the sections a config file only holds once somebody set
+// them. A section the user's file declares replaces the shared one, so a file
+// that vfox creates must not declare these with their defaults: the first run
+// would otherwise pin them for good and a shared VFOX_HOME could no longer
+// decide them. A new section of this kind belongs in this list.
+var setOnDemand = map[string]bool{"diagnostics": true, "path": true, "aliases": true}
+
+// newFileContent is what a config file vfox creates holds: the defaults of every
+// section but the ones in setOnDemand.
+func newFileContent() ([]byte, error) {
+	var doc yaml.Node
+	if err := doc.Encode(DefaultConfig); err != nil {
+		return nil, err
+	}
+	var kept []*yaml.Node
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if !setOnDemand[doc.Content[i].Value] {
+			kept = append(kept, doc.Content[i], doc.Content[i+1])
+		}
+	}
+	doc.Content = kept
+	return yaml.Marshal(&doc)
+}
+
 func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
-		content, err := yaml.Marshal(DefaultConfig)
+		content, err := newFileContent()
 		if err == nil {
 			_ = os.WriteFile(p, content, 0666)
 			return DefaultConfig, nil
@@ -90,6 +147,12 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Gitignore == nil {
 		config.Gitignore = EmptyGitignore
+	}
+	if config.Diagnostics == nil {
+		config.Diagnostics = EmptyDiagnostics
+	}
+	if config.Path == nil {
+		config.Path = EmptyPath
 	}
 	return config, nil
 
@@ -147,6 +210,13 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 	// Merge Gitignore: user overrides shared
 	result.Gitignore = mergeGitignore(sharedConfig.Gitignore, userConfig.Gitignore)
 
+	// Merge Diagnostics and Path: user overrides shared
+	result.Diagnostics = mergeDiagnostics(sharedConfig.Diagnostics, userConfig.Diagnostics)
+	result.Path = mergePath(sharedConfig.Path, userConfig.Path)
+
+	// Merge Aliases: entries of both are kept, the user wins on a clash
+	result.Aliases = mergeAliases(sharedConfig.Aliases, userConfig.Aliases)
+
 	// Apply defaults to any remaining nil fields
 	return ensureDefaults(result)
 }
@@ -176,6 +246,12 @@ func ensureDefaults(c *Config) *Config {
 	}
 	if c.Gitignore == nil {
 		c.Gitignore = EmptyGitignore
+	}
+	if c.Diagnostics == nil {
+		c.Diagnostics = EmptyDiagnostics
+	}
+	if c.Path == nil {
+		c.Path = EmptyPath
 	}
 	return c
 }
@@ -257,6 +333,50 @@ func mergeGitignore(shared, user *Gitignore) *Gitignore {
 		return shared
 	}
 	return EmptyGitignore
+}
+
+// mergeDiagnostics merges diagnostics configs. A section the user's file
+// declares replaces the shared one; NewConfigWithPath hands out EmptyDiagnostics
+// itself for a file without the section, so pointer identity tells them apart.
+func mergeDiagnostics(shared, user *Diagnostics) *Diagnostics {
+	if user != nil && user != EmptyDiagnostics {
+		return user
+	}
+	if shared != nil {
+		return shared
+	}
+	return EmptyDiagnostics
+}
+
+// mergePath merges PATH ordering configs, with the same rules as mergeDiagnostics.
+func mergePath(shared, user *Path) *Path {
+	if user != nil && user != EmptyPath {
+		return user
+	}
+	if shared != nil {
+		return shared
+	}
+	return EmptyPath
+}
+
+// mergeAliases keeps the aliases of both configs; the user wins on a clash.
+func mergeAliases(shared, user map[string]map[string]string) map[string]map[string]string {
+	if len(shared) == 0 && len(user) == 0 {
+		return nil
+	}
+	merged := cloneAliases(shared)
+	if merged == nil {
+		merged = make(map[string]map[string]string)
+	}
+	for sdk, names := range user {
+		if merged[sdk] == nil {
+			merged[sdk] = make(map[string]string, len(names))
+		}
+		for name, version := range names {
+			merged[sdk][name] = version
+		}
+	}
+	return merged
 }
 
 // Helper functions to check if config is empty

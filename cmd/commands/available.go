@@ -44,7 +44,15 @@ func availableCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	printAvailable(available)
+	return nil
+}
 
+// printAvailable prints one plugin per line, in a fixed layout: two spaces, the
+// name padded to a common width, a mark telling whether the plugin is official,
+// and the homepage. The Clink completion script, internal/shell/clink_vfox.lua,
+// reads the plugin names from these lines; clink_format_test.go locks the layout.
+func printAvailable(available internal.RegistryIndex) {
 	pterm.Println(pterm.Bold.Sprint("AVAILABLE PLUGINS"))
 	pterm.Println()
 
@@ -70,6 +78,4 @@ func availableCmd(ctx context.Context, cmd *cli.Command) error {
 
 	pterm.Println()
 	pterm.Printf("  %s\n", pterm.FgGray.Sprint("Use 'vfox add <plugin>' to install"))
-	return nil
-
 }

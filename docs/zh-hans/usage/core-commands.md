@@ -54,6 +54,7 @@ vfox i <sdk-name>@<version>
 
 - `-a, --all`: 安装 .vfox.toml 中记录的所有 SDK 版本
 - `-y, --yes`: 直接安装，跳过确认提示
+- `--reinstall`: 用全新的副本替换已安装的版本，例如 SDK 在原地改动过自己之后（见 [Doctor](#doctor)）。版本号需与已安装的完全一致。通过 [`vfox link`](#link) 登记的版本不能重装。
 
 ::: tip 自动安装
 你可以一次性安装多个 SDK，通过空格分隔。
@@ -146,6 +147,10 @@ vfox un <sdk-name>@<version>
 
 `version`: 具体版本号
 
+::: tip 通过 link 登记的版本
+卸载用 [`vfox link`](#link) 登记的版本，只会删除链接，它指向的 SDK 不会被动。
+:::
+
 ## List
 
 查看当前已安装的所有 SDK 版本。
@@ -159,6 +164,126 @@ vfox ls[<sdk-name>]
 ```
 
 `sdk-name`: SDK 名称， 不传展示所有。
+
+用 [`vfox link`](#link) 登记的版本会标注 `(linked → <路径>)`，有 [别名](#alias) 的版本会显示别名：
+
+```shell
+$ vfox list java
+-> 17-system (linked → /usr/lib/jvm/java-17-openjdk-amd64)
+-> 17.0.9-tem [alias: j17] <— current
+```
+
+## Link
+
+把本机上已经存在的 SDK 当作 `vfox` 的一个版本来用，比如系统包管理器装的 JDK、IDE 下载的 JDK，或者 CI runner 工具缓存里自带的 JDK。
+
+不会下载，也不会复制。`vfox` 只保存一个指向该目录的链接，SDK 仍然留在原处、仍然归它原来的主人所有：`vfox uninstall` 只会删除链接。
+
+**用法**
+
+```shell
+vfox link [options] <sdk-name>@<version> <path>
+
+vfox ln <sdk-name>@<version> <path>
+
+vfox link --detect [-y] <sdk-name>
+```
+
+`sdk-name`: SDK 名称。需要已经添加了它的插件。
+
+`version`: 给这个 SDK 起的名字，原样使用，例如 `17.0.9`、`17-system`、`brew`。可以使用字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`。
+
+`path`: SDK 所在的目录，即包含 `bin` 的那一层。
+
+**选项**
+
+- `-f, --force`: 把已经链接的版本指向另一个目录。`vfox` 自己安装的版本不会被替换。
+- `--detect`: 让插件在本机上查找 SDK，并把找到的链接进来。插件需要实现 [`Detect`](../plugins/create/howto.md#detect) hook。
+- `-y, --yes`: 配合 `--detect` 使用，不再询问，直接链接找到的全部。
+
+**示例**
+
+```shell
+vfox link java@17-system /usr/lib/jvm/java-17-openjdk-amd64
+vfox use java@17-system
+
+# 已经链接的版本不会再下载
+vfox install java@17-system
+
+# 它在哪里？
+vfox info --format "{{.Home}}" java@17-system
+
+# 只删除链接，不删除 JDK
+vfox uninstall java@17-system
+```
+
+::: tip 插件有发言权
+`vfox link` 会让插件判断这个目录像不像它的 SDK：插件放进 `PATH` 的目录必须存在且里面有命令。否则会拒绝链接并说明原因。
+:::
+
+## Alias
+
+给已安装的版本起一个自己的短名字。
+
+**用法**
+
+```shell
+vfox alias set <sdk-name> <alias> <version>
+vfox alias list [<sdk-name>]
+vfox alias unset <sdk-name> <alias>
+```
+
+**示例**
+
+```shell
+vfox alias set java j17 17.0.9-tem
+vfox use java@j17
+```
+
+::: tip 别名只留在你的机器上
+别名保存在你的 `config.yaml` 中，只在命令行输入时解析：`use`、`uninstall`、`info`、`exec` 和 `doctor`。`vfox use -p java@j17` 写进 `.vfox.toml` 的是真实版本，所以没有这个别名的同事也能正常使用这个文件。
+:::
+
+已安装的同名版本永远优先于别名，因此 `alias set` 会拒绝这样的名字。卸载一个版本时，指向它的别名会一并删除。
+
+你输入的版本号开头的 `v`（`v20.1.0` 即 `20.1.0`）只有在没有任何已安装版本、也没有任何别名叫这个名字时才会被去掉。所以别名和用 [`vfox link`](#link) 登记的版本都可以以 `v` 开头。
+
+## Doctor
+
+检查 `vfox` 和已安装的 SDK 有没有问题。
+
+**用法**
+
+```shell
+vfox doctor [options] [<sdk-name>[@<version>]]
+```
+
+**选项**
+
+- `--json`: 以 JSON 输出检查结果。
+- `--adopt`: 为 `vfox` 开始保存回执之前安装的版本补写回执，以它们当前的状态作为之后比较的基准。
+
+`vfox` 会在每个它安装或链接的版本目录里写一个很小的回执（`.vfox-receipt.json`），记录这个版本从哪里来；如果插件实现了 [`Fingerprint`](../plugins/create/howto.md#fingerprint)，还会记录能标识这个版本的事实。
+
+| 检查项                    | 级别  | 含义                                                                                                              |
+| :------------------------ | :---- | :---------------------------------------------------------------------------------------------------------------- |
+| `path.shadowed`           | warn  | SDK 的某个命令没有被运行，因为 `PATH` 中更靠前的位置有同名的可执行文件（pnpm 装的 `node`、系统 JDK……）                |
+| `path.not-activated`      | error | 当前 shell 没有设置 `vfox activate`                                                                               |
+| `sdk.drift`               | warn  | SDK 在安装之后被就地改动过（例如 `flutter upgrade`）。处理：`vfox install --reinstall <sdk>@<version>`               |
+| `sdk.link-dangling`       | error | 链接版本指向的目录不见了                                                                                          |
+| `sdk.payload-empty`       | error | 插件放进 `PATH` 的目录不存在，或里面没有命令                                                                      |
+| `sdk.envkeys-failed`      | error | 插件说不出该往环境里放什么                                                                                        |
+| `sdk.install-interrupted` | warn  | 有一次安装被中断了                                                                                                |
+| `sdk.no-receipt`          | info  | 安装于回执出现之前，无法发现它被改动过（`vfox doctor --adopt`）                                                   |
+| `sdk.plugin-missing`      | warn  | 有已安装的版本，但没有添加对应的插件                                                                              |
+| `plugin.incompatible`     | warn  | 插件需要更新版本的 `vfox`                                                                                         |
+| `alias.dangling`          | warn  | 别名指向一个没有安装的版本                                                                                        |
+
+`path.shadowed` 检查的是你的 shell 正在使用的版本，也就是 `vfox env` 放进 `PATH` 的那个：项目、会话和全局设置所要求的版本里，第一个已安装的。指定版本（例如 `vfox doctor java@17`）则改为检查那个版本。如果那个命令其实就是 SDK 自己提供的同一个文件（例如指向 [`vfox link`](#link) 登记的安装的符号链接），就不算遮蔽。
+
+发现错误时退出码为 `1`。
+
+执行 `vfox use` 之后，`vfox` 会自动对刚选中的版本运行快速检查并打印警告。如何关闭它，或只静音个别结果，见 [诊断设置](../guides/configuration.md#诊断设置)。
 
 ## Current
 

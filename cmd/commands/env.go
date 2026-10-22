@@ -144,22 +144,12 @@ func envFlag(cmd *cli.Command) error {
 
 	runtimeEnvContext := manager.RuntimeEnvContext
 
-	// 1. Load configs from all scopes with priority: Global < Session < Project
-	chain, err := runtimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
+	// 1. Load configs from all scopes with priority: Global < Session < Project,
+	// and the legacy version files of the project
+	chain, err := loadToolChain(manager, env.Global, env.Session, env.Project)
 	if err != nil {
 		return err
 	}
-
-	projectToml, _ := chain.GetTomlByScope(env.Project)
-	// Give a chance to legacy file to set tool versions if not already set in vfox.toml
-	// This allows backward compatibility with older projects using legacy files
-	// New projects should use vfox.toml directly
-	_ = manager.ParseLegacyFile(runtimeEnvContext.CurrentWorkingDir, func(sdkname, version string) {
-		// Set only if not already set in vfox.toml
-		if _, ok := projectToml.GetToolVersion(sdkname); !ok {
-			projectToml.SetTool(sdkname, version)
-		}
-	})
 
 	// 2. Collect config file paths for change detection
 	// Only include paths that actually exist to avoid false positives
@@ -186,6 +176,12 @@ func envFlag(cmd *cli.Command) error {
 	if err != nil {
 		logger.Debugf("Failed to check config changes, will recalculate: %v\n", err)
 		changed = true // Assume changed on error
+	}
+	// Output rendered under another PATH ordering policy is stale. `path.mode`
+	// and `path.preserve` are in config.yaml, which configPaths does not track.
+	pathPolicy := runtimeEnvContext.PathPolicyKey()
+	if state.PathPolicyChanged(pathPolicy) {
+		changed = true
 	}
 
 	logger.Debugf("Config changed: %v, configPaths: %+v\n", changed, configPaths)
@@ -329,6 +325,7 @@ func envFlag(cmd *cli.Command) error {
 	exportStr := s.Export(exportEnvs)
 
 	// 10. Update state with new output
+	state.SetPathPolicy(pathPolicy)
 	if err := state.Update(configPaths, exportStr, shellName); err != nil {
 		logger.Debugf("Failed to update state: %v", err)
 	}

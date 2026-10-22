@@ -50,6 +50,8 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	if env.IsInheritedHookSession() {
 		_ = os.Unsetenv(pathmeta.HookCurTmpPath)
+		// The baseline belongs to the shell that recorded it, not to its children.
+		_ = os.Unsetenv(env.OrigPathFlag)
 	}
 	manager, err := internal.NewSdkManager()
 	if err != nil {
@@ -59,22 +61,22 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 
 	runtimeEnvContext := manager.RuntimeEnvContext
 
-	// 1. Load Project and Global configs with scope information
-	chain, err := runtimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Project)
+	// Remember the PATH this shell had before vfox touched it, once per shell
+	// session. Later runs use it to tell what the environment brought along
+	// from what was added after activation. It is recorded before PATH is
+	// split below, so that split can already use it.
+	var baseline *env.Paths
+	if os.Getenv(env.OrigPathFlag) == "" {
+		baseline = runtimeEnvContext.BaselinePath()
+		_ = os.Setenv(env.OrigPathFlag, strings.Join(baseline.Slice(), string(os.PathListSeparator)))
+	}
+
+	// 1. Load Project and Global configs with scope information, and the legacy
+	// version files of the project
+	chain, err := loadToolChain(manager, env.Global, env.Project)
 	if err != nil {
 		return err
 	}
-
-	projectToml, _ := chain.GetTomlByScope(env.Project)
-	// Give a chance to legacy file to set tool versions if not already set in vfox.toml
-	// This allows backward compatibility with older projects using legacy files
-	// New projects should use vfox.toml directly
-	_ = manager.ParseLegacyFile(runtimeEnvContext.CurrentWorkingDir, func(sdkname, version string) {
-		// Set only if not already set in vfox.toml
-		if _, ok := projectToml.GetToolVersion(sdkname); !ok {
-			projectToml.SetTool(sdkname, version)
-		}
-	})
 
 	// 2. Process each SDK: check if link is needed, create symlinks if necessary
 	// Collect envs by scope to ensure proper PATH priority: Project > Session > Global > System
@@ -181,6 +183,13 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	pathStr := finalEnvs.Paths.String()
 	exportEnvs["PATH"] = &pathStr
 
+	// Export the baseline in the format the shell uses for PATH (Git Bash
+	// wants POSIX-style paths), now that the shell is known.
+	if baseline != nil {
+		origStr := baseline.String()
+		exportEnvs[env.OrigPathFlag] = &origStr
+	}
+
 	// Export __VFOX_CURTMFPATH so that vfox env can use the same session directory
 	// This ensures state cache works across multiple vfox env calls in the same session
 	curTmpPath := runtimeEnvContext.PathMeta.Working.SessionSdkDir
@@ -209,7 +218,7 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly := make(env.Vars, len(exportEnvs))
 		for k, v := range exportEnvs {
 			switch k {
-			case env.PidFlag, env.HookFlag, env.InitializedFlag, pathmeta.HookCurTmpPath:
+			case env.PidFlag, env.HookFlag, env.InitializedFlag, env.OrigPathFlag, pathmeta.HookCurTmpPath:
 				continue
 			default:
 				exportOnly[k] = v
@@ -228,6 +237,9 @@ func renderActivateScript(name, selfPath string, args []string, exportEnvs env.V
 		exportOnly[env.HookFlag] = nil
 		exportOnly[env.PidFlag] = nil
 		exportOnly[env.InitializedFlag] = nil
+		// A baseline leaking into the integrated terminals would make them
+		// reuse a stale PATH instead of recording their own.
+		exportOnly[env.OrigPathFlag] = nil
 		exportOnly[pathmeta.HookCurTmpPath] = nil
 		return s.Export(exportOnly), nil
 	}
