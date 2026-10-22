@@ -1,0 +1,10 @@
+AVAILABLE PLUGINS
+
+  nodejs        ✓  https://github.com/version-fox/vfox-nodejs
+  java          ✓  https://github.com/version-fox/vfox-java
+  golang        ✓  https://github.com/version-fox/vfox-golang
+  python        ✓  https://github.com/version-fox/vfox-python
+  dotnet-core   ✓  https://github.com/version-fox/vfox-dotnet
+  my-plugin     ✗  https://example.com/vfox-my-plugin
+
+  Use 'vfox add <plugin>' to install
