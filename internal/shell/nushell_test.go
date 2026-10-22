@@ -215,3 +215,45 @@ func TestNushellActivateWithPidCheck(t *testing.T) {
 		})
 	}
 }
+
+// Nushell cannot evaluate what `vfox activate` prints: it is only a `source`
+// line, and the exports in it never reach the session. So vfox.nu has to record
+// the PATH baseline itself, and before the first `vfox env`, which compares the
+// PATH it finds with it.
+func TestNushellActivateRecordsTheBaseline(t *testing.T) {
+	configPath := t.TempDir()
+	if _, err := (nushell{}).Activate(ActivateConfig{SelfPath: "/usr/bin/vfox", Args: []string{configPath}}); err != nil {
+		t.Fatalf("Activate() failed: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(configPath, "vfox.nu"))
+	if err != nil {
+		t.Fatalf("Failed to read vfox.nu: %v", err)
+	}
+	script := string(content)
+
+	if strings.Contains(script, "{{") {
+		t.Errorf("a template directive was not evaluated:\n%s", script)
+	}
+
+	assignment := "$env." + env.OrigPathFlag + " = "
+	start := strings.Index(script, assignment)
+	if start < 0 {
+		t.Fatalf("vfox.nu does not set %s:\n%s", env.OrigPathFlag, script)
+	}
+	line, _, _ := strings.Cut(script[start:], "\n")
+	line = strings.TrimRight(line, "\r")
+
+	// It records the PATH of the session, the way the platform spells the variable, as one string.
+	if want := "($env." + env.PathVarName + " | str join '" + string(os.PathListSeparator) + "')"; !strings.HasSuffix(line, want) {
+		t.Errorf("the baseline is set by %q, want it to end with %q", line, want)
+	}
+
+	// The initial update, the last use of the function, calls `vfox env`.
+	if initial := strings.LastIndex(script, "updateVfoxEnvironment"); start > initial {
+		t.Errorf("the baseline is set after the first `vfox env` call:\n%s", script)
+	}
+	// And it is set inside export-env, which is what changes the session.
+	if exportEnv := strings.Index(script, "export-env {"); exportEnv < 0 || start < exportEnv {
+		t.Errorf("the baseline is set outside export-env, which would not reach the session:\n%s", script)
+	}
+}

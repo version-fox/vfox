@@ -45,6 +45,8 @@
 | [hooks/pre_use.lua](#preuse)                    | ❌       | 在切换版本之前, 提供修改版本的机会      |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌       | 自定义解析遗留文件                      |
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌       | 删除之前进行额外操作                    |
+| [hooks/fingerprint.lua](#fingerprint)           | ❌       | 报告能标识一次安装的事实，让对它的改动能被发现 |
+| [hooks/detect.lua](#detect)                     | ❌       | 查找本机上 `vfox` 没有安装的 SDK，供 `vfox link --detect` 使用 |
 
 ## 必须实现的钩子函数
 
@@ -279,6 +281,84 @@ function PLUGIN:PreUninstall(ctx)
     local name = sdkInfo.name
 end
 ```
+
+### Fingerprint
+
+有些 SDK 在安装之后会自己改动自己：`flutter upgrade` 会把它的 git 检出移到另一个提交，`npm install -g npm` 会替换 npm。`vfox` 按目录管理版本，光靠自己没办法发现 `flutter@3.47.4` 已经不再是 3.47.4。
+
+这个钩子返回能标识一次安装的事实。`vfox` 会在安装完成之后（以及 `vfox link` 之后）调用它，把结果保存在该版本的回执里。之后 `vfox use` 和 `vfox doctor` 会再次调用它，事实不一致时给出警告，所有插件的提示内容和处理办法（`vfox install --reinstall`）都是一样的。
+
+只返回能标识 SDK 本身的内容。用户本来就该做的改动，比如全局包，不能算在里面。没有什么可检查的时候返回 `nil`。
+
+::: warning 注意
+每次 `vfox use` 都会运行这个钩子。它只能读取，不能访问网络，而且必须很快（远低于 50 毫秒）。读几个文件是正确的做法，启动进程则不是。
+:::
+
+**位置**: `hooks/fingerprint.lua`
+
+```lua
+function PLUGIN:Fingerprint(ctx)
+    --- 主运行时目录
+    local path = ctx.path
+    local version = ctx.version
+    --- 其他 SDK 信息，与 PostInstall 中相同
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+
+    --- 一个扁平的事实表，值按文本比较。
+    return {
+        facts = {
+            head = read_git_head(path),
+        },
+    }
+end
+```
+
+::: tip 链接的 SDK
+用 `vfox link` 登记的 SDK 同样会记录事实，但它们发生变化时只提示一下：那个 SDK 不归 `vfox` 所有。
+:::
+
+### Detect
+
+这个钩子用来找出本机上已经存在、但不是 `vfox` 安装的 SDK，例如系统包管理器、IDE 或 CI runner 装的 JDK。`vfox link --detect <sdk>` 会调用它，并把返回的内容链接进来。
+
+返回 SDK 的目录（也就是 `EnvKeys` 里 `ctx.path` 期望的那个目录）和链接时使用的名字。名字会原样使用，所以请取用户会输入的名字，比如 `21.0.3-tem`。它可以包含字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`。已经链接或已经安装的条目，`vfox` 会自动跳过。
+
+**位置**: `hooks/detect.lua`
+
+```lua
+function PLUGIN:Detect(ctx)
+    local found = {}
+    for _, home in ipairs(candidate_homes()) do
+        local release = read_release_file(home)
+        if release then
+            table.insert(found, {
+                version = release.version .. "-" .. release.vendor,
+                path = home,
+                note = "found in " .. home, -- 可选
+            })
+        end
+    end
+    return found
+end
+```
+
+### shadowHints
+
+这是元数据，不是钩子。`vfox use` 之后，如果 SDK 的某个命令没有被运行，因为 `PATH` 里更靠前的位置还有别的可执行文件，`vfox` 会告诉用户。插件了解常见的“罪魁祸首”，所以可以说明该怎么处理。每一项匹配遮蔽它的可执行文件路径的一部分（不区分大小写），并附上一段说明，还可以附一个链接。
+
+**位置**: `metadata.lua`
+
+```lua
+PLUGIN.shadowHints = {
+    {
+        match = "pnpm",
+        message = "pnpm installed its own node. Run `pnpm remove -g node`.",
+        url = "https://github.com/version-fox/vfox-nodejs/blob/main/docs/pnpm.md",
+    },
+}
+```
+
+检测“被遮蔽”本身由 `vfox` 对所有插件统一完成，不需要再在 `PreUse` 里扫描 `PATH`。
 
 ## 测试插件
 

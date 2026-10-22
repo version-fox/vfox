@@ -10,6 +10,9 @@ vfox info <sdk-name>[@<version>] [options]  Show plugin info or SDK path with op
 vfox search <sdk-name>          Search available versions of a SDK
 vfox install <sdk-name>@<version> Install the specified version of SDK
 vfox uninstall <sdk-name>@<version> Uninstall the specified version of SDK
+vfox link <sdk-name>@<version> <path>  Use an SDK that is already on this machine as a version (vfox link --detect <sdk-name> lets the plugin find them)
+vfox alias set|list|unset           Give installed versions short names of your own
+vfox doctor [<sdk-name>[@<version>]] Check vfox and the installed SDKs for problems
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox unuse [--global --project --session] <sdk-name>   Unset the version of SDK from specified scope
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command in vfox managed environment

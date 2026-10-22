@@ -47,6 +47,10 @@ var Install = &cli.Command{
 			Aliases: []string{"y"},
 			Usage:   "Quick installation, skip interactive prompts",
 		},
+		&cli.BoolFlag{
+			Name:  "reinstall",
+			Usage: "Replace an installed version with a fresh copy, for example after the SDK modified itself in place",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -54,8 +58,12 @@ var Install = &cli.Command{
 
 func installCmd(ctx context.Context, cmd *cli.Command) error {
 	yes := cmd.Bool("yes")
+	reinstall := cmd.Bool("reinstall")
 
 	if cmd.Bool("all") {
+		if reinstall {
+			return cli.Exit("--reinstall cannot be combined with --all", 1)
+		}
 		return installAll(yes)
 	}
 
@@ -81,14 +89,12 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			errorStore.AddAndShow(sdkArg, fmt.Errorf("your input is invalid: %s", sdkArg))
 		} else {
 			var name string
-			var version sdk.Version
+			var typedVersion sdk.Version
 			if argsLen == 2 {
 				name = strings.ToLower(argArr[0])
-				// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0")
-				version = sdk.Version(strings.TrimPrefix(argArr[1], "v"))
+				typedVersion = sdk.Version(argArr[1])
 			} else {
 				name = strings.ToLower(argArr[0])
-				version = ""
 			}
 
 			sdkSource, err := manager.LookupSdkWithInstall(name, yes)
@@ -98,6 +104,10 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 				continue
 			}
 			sdkMetadata := sdkSource.Metadata()
+
+			// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0"), unless a
+			// version is installed under that very name, as a linked one can be.
+			version := sdk.StripVersionPrefix(sdkSource, typedVersion)
 
 			// Handle @latest tag
 			if version == "latest" {
@@ -131,7 +141,11 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				if err = sdkSource.Install(resolvedVersion); err != nil {
+				install := sdkSource.Install
+				if reinstall {
+					install = sdkSource.Reinstall
+				}
+				if err = install(resolvedVersion); err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}

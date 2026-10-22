@@ -53,6 +53,11 @@ export-env {
   $env.__VFOX_SHELL = 'nushell'
   $env.__VFOX_PID = $nu.pid
 
+  # Remember the PATH this session starts with, before vfox changes it. "vfox env" compares the PATH it finds later
+  # with it, to tell what was already there from what was added since (see "path.mode"). The output of "vfox activate"
+  # never reaches a Nushell session, so unlike in the other shells this script has to record it.
+  $env.__VFOX_ORIG_PATH = ($env.{{.PathVarName}} | str join '{{.PathSeparator}}')
+
   # Have vfox clean up old temp files.
   ^'{{.SelfPath}}' env --cleanup | ignore
 
@@ -81,9 +86,13 @@ func (n nushell) Activate(config ActivateConfig) (string, error) {
 	templateData := struct {
 		SelfPath       string
 		EnablePidCheck bool
+		PathVarName    string
+		PathSeparator  string
 	}{
 		SelfPath:       config.SelfPath,
 		EnablePidCheck: config.EnablePidCheck,
+		PathVarName:    env.PathVarName,
+		PathSeparator:  string(os.PathListSeparator),
 	}
 
 	if err := tmpl.Execute(&buf, templateData); err != nil {

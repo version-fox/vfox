@@ -299,6 +299,10 @@ func invokeDevelopmentHook(p Plugin, name string, decode func(any) error) (any, 
 		return callDevelopmentHook(decode, func(ctx *PostInstallHookCtx) (any, error) { return nil, p.PostInstall(ctx) })
 	case "PreUninstall":
 		return callDevelopmentHook(decode, func(ctx *PreUninstallHookCtx) (any, error) { return nil, p.PreUninstall(ctx) })
+	case "Fingerprint":
+		return callDevelopmentHook(decode, p.Fingerprint)
+	case "Detect":
+		return callDevelopmentHook(decode, p.Detect)
 	case "ParseLegacyFile":
 		return callDevelopmentHook(decode, func(ctx *developmentLegacyContext) (*ParseLegacyFileResult, error) {
 			return p.ParseLegacyFile(&ParseLegacyFileHookCtx{

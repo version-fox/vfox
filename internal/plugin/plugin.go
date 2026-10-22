@@ -46,6 +46,9 @@ type (
 		MinRuntimeVersion string   `json:"minRuntimeVersion"`
 		Notes             []string `json:"notes"`
 		LegacyFilenames   []string `json:"legacyFilenames"`
+		// ShadowHints explain, per shadowing executable, how to get the SDK's
+		// commands back in front of PATH. Optional.
+		ShadowHints []ShadowHint `json:"shadowHints"`
 	}
 
 	// Plugin is the interface that all plugins must implement.
@@ -57,6 +60,8 @@ type (
 		PreUse(ctx *PreUseHookCtx) (*PreUseHookResult, error)
 		ParseLegacyFile(ctx *ParseLegacyFileHookCtx) (*ParseLegacyFileResult, error)
 		EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
+		Fingerprint(ctx *FingerprintHookCtx) (*FingerprintHookResult, error)
+		Detect(ctx *DetectHookCtx) ([]*DetectHookResultItem, error)
 		HasFunction(name string) bool
 		Close()
 	}
@@ -72,6 +77,8 @@ var (
 		"PreUse":          {Name: "PreUse", Required: false, Filename: "pre_use"},
 		"ParseLegacyFile": {Name: "ParseLegacyFile", Required: false, Filename: "parse_legacy_file"},
 		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
+		"Fingerprint":     {Name: "Fingerprint", Required: false, Filename: "fingerprint"},
+		"Detect":          {Name: "Detect", Required: false, Filename: "detect"},
 	}
 )
 

@@ -19,11 +19,14 @@ package commands
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/sdk"
 )
 
 var List = &cli.Command{
@@ -54,8 +57,9 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 		for _, s := range allSdk {
 			name := s.Metadata().Name
 			tree = append(tree, pterm.LeveledListItem{Level: 0, Text: name})
+			aliases := aliasesByVersion(manager.AliasesFor(name))
 			for _, version := range s.InstalledList() {
-				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: string(version)})
+				tree = append(tree, pterm.LeveledListItem{Level: 1, Text: versionLabel(s, version, aliases)})
 			}
 		}
 		// Generate tree from LeveledList.
@@ -74,12 +78,51 @@ func listCmd(ctx context.Context, cmd *cli.Command) error {
 	if len(list) == 0 {
 		return fmt.Errorf("no available version")
 	}
+	aliases := aliasesByVersion(manager.AliasesFor(sdkName))
 	for _, version := range list {
+		label := versionLabel(source, version, aliases)
 		if version == curVersion {
-			pterm.Println("->", fmt.Sprintf("%s", version), pterm.LightGreen("<— current"))
+			pterm.Println("->", label, pterm.LightGreen("<— current"))
 		} else {
-			pterm.Println("->", fmt.Sprintf("%s", version))
+			pterm.Println("->", label)
 		}
 	}
 	return nil
+}
+
+// aliasesByVersion turns alias -> version into version -> sorted aliases.
+func aliasesByVersion(aliases map[string]string) map[string][]string {
+	byVersion := make(map[string][]string)
+	for alias, version := range aliases {
+		byVersion[version] = append(byVersion[version], alias)
+	}
+	for _, names := range byVersion {
+		sort.Strings(names)
+	}
+	return byVersion
+}
+
+// versionLabel is how `vfox list` shows a version: its name, where it is linked
+// to if it is a link, and the aliases it has.
+func versionLabel(s sdk.Sdk, version sdk.Version, aliases map[string][]string) string {
+	origin, target := sdk.OriginInstalled, ""
+	if installation, err := s.Installation(version); err == nil {
+		origin, target = installation.Origin, installation.Target
+	}
+	return formatVersionLabel(version, origin, target, aliases[string(version)])
+}
+
+func formatVersionLabel(version sdk.Version, origin sdk.Origin, target string, aliases []string) string {
+	label := string(version)
+	if origin == sdk.OriginLinked {
+		label += " (linked"
+		if target != "" {
+			label += " → " + target
+		}
+		label += ")"
+	}
+	if len(aliases) > 0 {
+		label += " [alias: " + strings.Join(aliases, ", ") + "]"
+	}
+	return label
 }

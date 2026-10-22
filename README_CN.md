@@ -55,6 +55,12 @@ if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force
 vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
+再执行一次下面的命令，让你用 `vfox` 选择的版本不会被系统排在 `PATH` 更前面的同名程序挡住（未来的版本会把 `baseline` 设为默认值）：
+
+```bash
+vfox config path.mode baseline
+```
+
 > 请记住重启你的 Shell 以应用更改。
 
 Fish 补全支持命令和选项。Homebrew、DEB 和 RPM 软件包会自动安装补全脚本。

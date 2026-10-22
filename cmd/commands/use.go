@@ -99,13 +99,14 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 	return sdkSource.UseWithConfig(resolvedVersion, scope, unlink)
 }
 
-// parseSdkArg parses the SDK argument in format "name@version"
+// parseSdkArg parses the SDK argument in format "name@version". The version is
+// returned as typed: whether a leading 'v' is part of it (a linked version or an
+// alias can be called vendor) is for Manager.ResolveVersionName to say.
 func parseSdkArg(sdkArg string) (name string, version sdk.Version) {
 	parts := strings.Split(sdkArg, "@")
 	name = parts[0]
 	if len(parts) > 1 {
-		// Remove 'v' prefix if present (e.g., "v20.0.0" -> "20.0.0")
-		version = sdk.Version(strings.TrimPrefix(parts[1], "v"))
+		version = sdk.Version(parts[1])
 	}
 	return
 }
@@ -124,6 +125,10 @@ func determineScopeFromFlags(cmd *cli.Command) env.UseScope {
 
 // resolveVersion resolves the version, with interactive selection if needed
 func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Version, name string) (sdk.Version, error) {
+	// A name the user gave to an installed version stands for that version. A
+	// leading 'v' (v20.0.0 for 20.0.0) only goes when nothing has the name as typed.
+	version = manager.ResolveVersionName(name, sdkSource, version)
+
 	// Handle @latest tag
 	if version == "latest" {
 		availableVersions, err := sdkSource.Available([]string{})

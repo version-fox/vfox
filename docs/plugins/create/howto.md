@@ -46,6 +46,8 @@ The full list of hooks callable from vfox.
 | [hooks/pre_use.lua](#preuse)                    | ❌           | An opportunity to change the version before using it                            |
 | [hooks/parse_legacy_file.lua](#parselegacyfile) | ❌           | Custom parser for legacy version files                                          |
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌           | Perform some operations before uninstalling targeted version                    |
+| [hooks/fingerprint.lua](#fingerprint)           | ❌           | Report the facts that identify an installation, so changes made to it show up   |
+| [hooks/detect.lua](#detect)                     | ❌           | Find SDKs on this machine that `vfox` did not install, for `vfox link --detect` |
 
 ## Required hook functions
 
@@ -287,6 +289,96 @@ function PLUGIN:PreUninstall(ctx)
     local name = sdkInfo.name
 end
 ```
+
+### Fingerprint
+
+Some SDKs change themselves after they are installed: `flutter upgrade` moves its git checkout to another commit,
+`npm install -g npm` replaces npm. `vfox` manages versions by directory, so by itself it cannot tell that
+`flutter@3.47.4` is no longer 3.47.4.
+
+This hook returns the facts that identify an installation. `vfox` calls it right after an installation (and after
+`vfox link`) and keeps the result in the version's receipt. `vfox use` and `vfox doctor` call it again and warn when the
+facts are no longer the same, with the same message and the same way out (`vfox install --reinstall`) for every plugin.
+
+Return only what identifies the SDK itself. Changes the user is meant to make, such as global packages, must not be part of it.
+Return `nil` when there is nothing to check.
+
+::: warning
+The hook runs on every `vfox use`. It must only read, must not use the network, and must be fast (well under 50 ms).
+Reading a few files is the way to go; starting processes is not.
+:::
+
+**Location**: `hooks/fingerprint.lua`
+
+```lua
+function PLUGIN:Fingerprint(ctx)
+    --- main runtime directory
+    local path = ctx.path
+    local version = ctx.version
+    --- other SDK information, same as in PostInstall
+    local sdkInfo = ctx.sdkInfo['sdk-name']
+
+    --- A flat table of facts. Values are compared as text.
+    return {
+        facts = {
+            head = read_git_head(path),
+        },
+    }
+end
+```
+
+::: tip Linked SDKs
+Facts are also recorded for an SDK registered with `vfox link`, but a change in them is only a notice there:
+`vfox` does not own that SDK.
+:::
+
+### Detect
+
+This hook finds SDKs that are already on the machine and that `vfox` did not install, such as the JDKs of the system
+package manager, of an IDE or of a CI runner. `vfox link --detect <sdk>` calls it and links what it returns.
+
+Return the SDK directory (the one `EnvKeys` expects as `ctx.path`) and the name to link it under. The name is used as
+written, so make it something a user would type, like `21.0.3-tem`. It may contain letters, digits, `.`, `_`, `+` and
+`-`, and must not be `latest`. Entries that are already linked or installed are skipped by `vfox`.
+
+**Location**: `hooks/detect.lua`
+
+```lua
+function PLUGIN:Detect(ctx)
+    local found = {}
+    for _, home in ipairs(candidate_homes()) do
+        local release = read_release_file(home)
+        if release then
+            table.insert(found, {
+                version = release.version .. "-" .. release.vendor,
+                path = home,
+                note = "found in " .. home, -- optional
+            })
+        end
+    end
+    return found
+end
+```
+
+### shadowHints
+
+This is metadata, not a hook. After `vfox use`, `vfox` tells the user when a command of the SDK is not the one that runs
+because another executable sits earlier in `PATH`. A plugin knows the usual culprits, so it can say what to do about them.
+Each entry matches part of the path of the shadowing executable (case-insensitive) and adds a message and, optionally, a link.
+
+**Location**: `metadata.lua`
+
+```lua
+PLUGIN.shadowHints = {
+    {
+        match = "pnpm",
+        message = "pnpm installed its own node. Run `pnpm remove -g node`.",
+        url = "https://github.com/version-fox/vfox-nodejs/blob/main/docs/pnpm.md",
+    },
+}
+```
+
+Detecting the shadowing itself is done by `vfox` for every plugin; there is no need to scan `PATH` in `PreUse`.
 
 ## Test Plugin
 

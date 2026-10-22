@@ -111,7 +111,8 @@ func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 		return execSDKSpec{}, fmt.Errorf("invalid SDK spec %q", arg)
 	}
 	if len(parts) == 2 {
-		spec.Version = sdk.Version(strings.TrimPrefix(parts[1], "v"))
+		// As typed: see Manager.ResolveVersionName for what happens to a leading 'v'.
+		spec.Version = sdk.Version(parts[1])
 	}
 	return spec, nil
 }
@@ -185,7 +186,8 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 
 func resolveExecSDKVersion(manager *internal.Manager, sdkSpec execSDKSpec) (sdk.Version, error) {
 	if sdkSpec.Version != "" {
-		return sdkSpec.Version, nil
+		source, _ := manager.LookupSdk(sdkSpec.Name)
+		return manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version), nil
 	}
 
 	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
