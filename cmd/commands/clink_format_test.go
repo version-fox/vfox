@@ -72,19 +72,45 @@ func TestInstalledSdksOutputMatchesClinkFixture(t *testing.T) {
 	checkClinkFixture(t, "vfox ls", "vfox_ls.txt", out)
 }
 
+// A version can be a link to an SDK that vfox did not install, under any name,
+// and can have aliases: the tree adds both to the name of the version.
+func TestInstalledSdksWithLinksAndAliasesOutputMatchesClinkFixture(t *testing.T) {
+	aliases := map[string]map[string]string{
+		"java":   {"sys": "17-sys"},
+		"nodejs": {"lts": "21.5.1", "current-lts": "21.5.1"},
+	}
+	out := printed(func() {
+		printInstalledSdks([]sdk.Sdk{
+			installedSdk{
+				name:     "java",
+				versions: []sdk.Version{"21.0.1+12", "17-sys", "system"},
+				linked:   map[sdk.Version]string{"17-sys": "/usr/lib/jvm/x", "system": "/usr/lib/jvm/default"},
+			},
+			installedSdk{name: "nodejs", versions: []sdk.Version{"21.5.1", "20.10.0"}},
+			installedSdk{name: "golang", versions: []sdk.Version{"v1.22.0"}},
+		}, func(name string) map[string]string { return aliases[name] })
+	})
+
+	checkClinkFixture(t, "vfox ls", "vfox_ls_linked.txt", out)
+}
+
 // installedSdk is an installed SDK as the tree of vfox ls shows it. Printing the
 // tree uses nothing else of an SDK.
 type installedSdk struct {
 	sdk.Sdk
 	name     string
 	versions []sdk.Version
+	linked   map[sdk.Version]string // the versions that are links, and where they point to
 }
 
 func (s installedSdk) Metadata() *sdk.Metadata { return &sdk.Metadata{Name: s.name} }
 
 func (s installedSdk) InstalledList() []sdk.Version { return s.versions }
 
-func (s installedSdk) Installation(sdk.Version) (*sdk.Installation, error) {
+func (s installedSdk) Installation(version sdk.Version) (*sdk.Installation, error) {
+	if target, ok := s.linked[version]; ok {
+		return &sdk.Installation{Origin: sdk.OriginLinked, Target: target}, nil
+	}
 	return &sdk.Installation{Origin: sdk.OriginInstalled}, nil
 }
 

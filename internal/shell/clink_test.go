@@ -287,6 +287,15 @@ func TestClinkAvailableOutput(t *testing.T) {
 
 func TestClinkInstalledOutput(t *testing.T) {
 	plain := readClinkFixture(t, "vfox_ls.txt")
+	// Versions that are links to an SDK vfox did not install, and versions with
+	// aliases, are followed by what the tree adds to their name. A version can
+	// have any name, like system or v1.22.0.
+	linked := readClinkFixture(t, "vfox_ls_linked.txt")
+	linkedSdks := []string{"golang", "java", "nodejs"}
+	linkedVersions := []string{
+		"golang@v1.22.0", "java@21.0.1+12", "java@17-sys", "java@system", "nodejs@21.5.1", "nodejs@20.10.0",
+	}
+	linkedUsable := append(slices.Clone(linkedSdks), linkedVersions...)
 	// The fixture has to exercise what the script copes with: every glyph of the
 	// tree, and escape sequences once colored.
 	for _, glyph := range []string{"├", "─", "┬", "│", "└"} {
@@ -307,6 +316,8 @@ func TestClinkInstalledOutput(t *testing.T) {
 	}{
 		{name: "plain", output: plain, sdks: clinkSdks, versions: clinkSdkVersions, usable: clinkUsable},
 		{name: "colored", output: colorTree(plain), sdks: clinkSdks, versions: clinkSdkVersions, usable: clinkUsable},
+		{name: "links and aliases", output: linked, sdks: linkedSdks, versions: linkedVersions, usable: linkedUsable},
+		{name: "links and aliases, colored", output: colorTree(linked), sdks: linkedSdks, versions: linkedVersions, usable: linkedUsable},
 		{name: "nothing installed", output: "you don't have any sdk installed yet\n"},
 		{name: "no output", output: ""},
 	}

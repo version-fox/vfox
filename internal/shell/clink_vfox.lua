@@ -38,14 +38,18 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
         local pre, ls = '', {}
         local vfox_ls = io.popen('vfox ls')
         for line in vfox_ls:lines() do
-            local txt = line:gsub('%c%[%d+m', ''):match('^[ ┬└│─├]*(%S.*)')
+            line = line:gsub('%c%[%d+m', '')
+            local txt = line:match('^[ ┬└│─├]*(%S.*)')
             if txt then
-                if txt:match('^%d') then
-                    ls[pre] = true
-                    table.insert(ls, pre .. '@' .. txt)
-                elseif not txt:find(' ', 1, true) then
+                if line:find('^├') or line:find('^└') then
+                    -- The first level of the tree is the SDKs.
                     pre = txt
                     ls[pre] = false
+                elseif line:find('^│') or line:find('^ ') then
+                    -- The second level is their versions, which can have any name. The name
+                    -- can be followed by "(linked → path)" and "[alias: ...]".
+                    ls[pre] = true
+                    table.insert(ls, pre .. '@' .. txt:match('^(%S+)'))
                 end
             end
         end

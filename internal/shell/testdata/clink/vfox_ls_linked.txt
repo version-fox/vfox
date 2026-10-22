@@ -1,0 +1,11 @@
+All installed sdk versions
+├─┬java
+│ ├──21.0.1+12
+│ ├──17-sys (linked → /usr/lib/jvm/x) [alias: sys]
+│ └──system (linked → /usr/lib/jvm/default)
+├─┬nodejs
+│ ├──21.5.1 [alias: current-lts, lts]
+│ └──20.10.0
+└─┬golang
+  └──v1.22.0
+
