@@ -26,6 +26,35 @@ vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 
 Use `vfox use` when you want to persist version selection for Global, Project, or Session scope. Use `vfox exec` when you want a command to run immediately with the correct SDK environment.
 
+## `vfox use` says it switched, but `node` / `java` / … is still the old one
+
+Something in front of `vfox` in `PATH` provides a command of the same name, so the shell never gets to `vfox`'s. After
+`vfox use`, `vfox` says which executable that is. `vfox doctor <sdk>` shows the same in detail.
+
+The usual causes are a `node` installed by `pnpm runtime set node -g` (it lands in `$PNPM_HOME/bin`), a system JDK or
+a Homebrew `node` that the OS puts before `vfox`'s directories, and a startup file that adds a directory to `PATH` after
+`eval "$(vfox activate bash)"`. Remove the competing copy, move the `vfox activate` line below the line that adds the
+directory, or let `vfox` put its directories first with `vfox config path.mode baseline` (`aggressive` also covers
+directories added after `vfox activate`): see [PATH Order Settings](./configuration.md#path-order-settings).
+
+## How do I use a JDK (or any SDK) that is already installed on my machine?
+
+Link it. Nothing is downloaded or copied, and removing the version from `vfox` later leaves the SDK alone:
+
+```shell
+vfox link java@17-system /usr/lib/jvm/java-17-openjdk-amd64
+vfox use java@17-system
+```
+
+On a CI runner, `vfox link --detect java -y` links the JDKs the plugin can find. See [`vfox link`](../usage/core-commands.md#link).
+
+## An SDK changed after `vfox` installed it (`flutter upgrade`, …)
+
+`vfox` manages versions by directory, so it cannot stop an SDK from updating itself in place. It notices, though:
+`vfox use` and `vfox doctor` warn when the plugin reports that an installed version is no longer what was installed.
+Put it back with `vfox install --reinstall <sdk>@<version>`, and move to a newer version by installing that version
+with `vfox` instead.
+
 ## Why can't I select when use `use` and `search` commands in GitBash?
 
 Related ISSUE: [Unable to select in GitBash](https://github.com/version-fox/vfox/issues/98)

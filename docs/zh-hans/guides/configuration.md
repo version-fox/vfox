@@ -130,6 +130,63 @@ gitignore:
 vfox config gitignore.enable false
 ```
 
+## 诊断设置
+
+执行 `vfox use` 之后，`vfox` 会检查刚选中的版本，并把值得注意的情况打印出来，例如你拿到的 `node` 并不是刚选中的那个，因为 `PATH` 里更靠前的位置还有另一个 `node`。这些就是 [`vfox doctor`](../usage/core-commands.md#doctor) 的快速检查，它们不会让 `vfox use` 失败。
+
+```yaml
+diagnostics:
+  onUse: true # 设置为 false 可关闭 `vfox use` 之后的自动检查
+  ignore: # 静音某些结果：<finding-id>[:<sdk>[@<version>]]
+    - "sdk.drift:flutter@3.47.0"
+    - "path.shadowed:nodejs"
+```
+
+通过命令关闭检查：
+
+```shell
+vfox config diagnostics.onUse false
+```
+
+## PATH 顺序设置
+
+`vfox` 会把自己的目录放到 `PATH` 的最前面，但会保留在它之前就已经排在前面的内容，所以你在 `vfox` 之后才激活的 Python 虚拟环境仍然优先。不过排在 `vfox` 前面的并不都是虚拟环境：macOS 的 `path_helper` 会把系统目录挪到登录 shell 的最前面；Windows 的系统 `PATH` 排在 `vfox use -g` 写入的用户 `PATH` 之前；`pnpm setup` 会往 shell 启动文件末尾追加一行，把 `$PNPM_HOME` 放到最前面。有了这些在前面，不管 `vfox use` 怎么说，`node` 或 `java` 依然是系统（或 pnpm）的那一个。出现这种情况时 `vfox doctor` 会告诉你。
+
+```yaml
+path:
+  mode: legacy # legacy | baseline | aggressive
+  preserve: [] # 始终排在 vfox 目录之前的目录，例如 ["~/.cargo/bin"]
+```
+
+- `legacy`（目前的默认值）：第一个 `vfox` 目录之前的所有内容都继续排在它前面。
+- `baseline`（推荐）：只有在 `vfox activate` 运行**之后**才加入 `PATH` 的内容继续排在前面。`vfox` 激活时 `PATH` 里已经有的内容（比如上面说的系统目录）会排到 `vfox` 目录之后。`vfox activate` 会把当时的 `PATH` 记录在 `__VFOX_ORIG_PATH` 中。如果你依赖某个目录排在 `vfox` 之前，可以把它列入 `preserve`。
+- `aggressive`：只有处于激活状态的虚拟环境 / conda 环境的目录，以及 `preserve` 中的目录继续排在前面。
+
+处于激活状态的虚拟环境或 conda 环境的目录（`VIRTUAL_ENV`、`CONDA_PREFIX`）始终排在前面。
+
+```shell
+vfox config path.mode baseline
+```
+
+::: warning ⚠️ 默认值将会改变
+未来的版本会把 `path.mode` 的默认值从 `legacy` 改为 `baseline`，这样上面说的系统目录不用任何设置就不再压过 `vfox`。[快速入门](./quick-start.md#_2-挂载vfox到你的shell)已经要求新安装的用户设置它。想在改动之后继续保持现在的行为，请显式设置：`vfox config path.mode legacy`。
+:::
+
+::: tip
+修改设置后，shell 在下一次提示符出现时生效。`baseline` 还需要 `vfox activate` 在该 shell 启动时记录下来的 `PATH`；在升级 `vfox` 之前启动的 shell 里没有这份记录，会按 `legacy` 处理，重新打开终端即可。
+:::
+
+## 别名
+
+用 [`vfox alias`](../usage/core-commands.md#alias) 给已安装版本起的名字也保存在同一个文件里。它们只在命令行输入时解析，不会出现在 `.vfox.toml` 中。
+
+```yaml
+aliases:
+  java:
+    j17: 17.0.9-tem
+    j21: 21.0.1-graal
+```
+
 ## Config 命令 
 
 设置，查看配置
@@ -142,6 +199,7 @@ vfox config [<key>] [<value>]
 vfox config proxy.enable true
 vfox config proxy.url http://localhost:7890
 vfox config storage.sdkPath /tmp
+vfox config path.mode baseline
 ```
 
 `key`：配置项，以`.`分割。

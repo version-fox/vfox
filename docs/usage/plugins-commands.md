@@ -70,7 +70,10 @@ vfox info [options] <plugin-name>
 
 - `-f, --format`: Format the output using the given Go template. Available fields:
   - For plugin info: `Name`, `Version`, `Homepage`, `InstallPath`, `Description`
-  - For version info: `Name`, `Version`, `Path`
+  - For version info: `Name`, `Version`, `Path`, `Home`, `Origin`, `Target`
+- `--json`: Output as JSON. For a version it adds the environment the plugin sets up and the receipt `vfox` keeps.
+
+For a version, `Home` is the main runtime directory of the SDK, the one to point `JAVA_HOME` and the like at. `Path` is the directory that holds it (the version directory) and is kept as it always was. `Origin` is `installed` or `linked` (see [`vfox link`](./core-commands.md#link)), and `Target` is the directory a linked version points to.
 
 **Examples**
 
@@ -89,6 +92,12 @@ vfox info nodejs@20.0.0
 vfox info --format "{{.Homepage}}" nodejs
 vfox info --format "{{.InstallPath}}" nodejs
 vfox info --format "{{.Path}}" nodejs@20.0.0
+vfox info --format "{{.Home}}" nodejs@20.0.0
+```
+
+**Machine-readable output**
+```shell
+vfox info --json java@17.0.9
 ```
 
 ## Remove

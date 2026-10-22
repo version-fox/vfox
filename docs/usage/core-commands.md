@@ -52,6 +52,7 @@ vfox i <sdk-name>@<version>
 
 - `-a, --all`: Install all SDK versions recorded in .vfox.toml
 - `-y, --yes`: Quick installation, skip interactive prompts​
+- `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled.
 
 ::: tip
 You can install multiple SDKs at the same time by separating them with space.
@@ -145,6 +146,10 @@ vfox un <sdk-name>@<version>
 
 `version`: The specific version number
 
+::: tip Linked versions
+Uninstalling a version registered with [`vfox link`](#link) removes the link only. The SDK it points to is left untouched.
+:::
+
 ## List
 
 View all installed sdks.
@@ -158,6 +163,122 @@ vfox ls [<sdk-name>]
 ```
 
 `sdk-name`: SDK name, if not passed, display all.
+
+Versions registered with [`vfox link`](#link) are marked `(linked → <path>)`, and versions that have an [alias](#alias) show it:
+
+```shell
+$ vfox list java
+-> 17-system (linked → /usr/lib/jvm/java-17-openjdk-amd64)
+-> 17.0.9-tem [alias: j17] <— current
+```
+
+## Link
+
+Use an SDK that is already on your machine as a version of `vfox`. That can be a JDK from your system package manager, one an IDE downloaded, or one a CI runner ships in its tool cache.
+
+Nothing is downloaded or copied. `vfox` keeps a link to the directory, and the SDK stays where it is and stays its owner's: `vfox uninstall` removes the link only.
+
+**Usage**
+
+```shell
+vfox link [options] <sdk-name>@<version> <path>
+
+vfox ln <sdk-name>@<version> <path>
+
+vfox link --detect [-y] <sdk-name>
+```
+
+`sdk-name`: SDK name. Its plugin must be added already.
+
+`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed.
+
+`path`: The directory of the SDK, the one that holds `bin`.
+
+**Options**
+
+- `-f, --force`: Point an already linked version to a different directory. A version that `vfox` installed itself is never replaced.
+- `--detect`: Ask the plugin to look for SDKs on this machine and link what it finds. The plugin must implement the [`Detect`](../plugins/create/howto.md#detect) hook.
+- `-y, --yes`: With `--detect`, link everything that was found without asking.
+
+**Examples**
+
+```shell
+vfox link java@17-system /usr/lib/jvm/java-17-openjdk-amd64
+vfox use java@17-system
+
+# Nothing is downloaded for a version that is linked
+vfox install java@17-system
+
+# Where is it?
+vfox info --format "{{.Home}}" java@17-system
+
+# Removes the link, not the JDK
+vfox uninstall java@17-system
+```
+
+::: tip The plugin has a say
+`vfox link` asks the plugin whether the directory looks like one of its SDKs: the directories the plugin puts on `PATH` must exist and hold commands. Otherwise the link is refused and says why.
+:::
+
+## Alias
+
+Give an installed version a short name of your own.
+
+**Usage**
+
+```shell
+vfox alias set <sdk-name> <alias> <version>
+vfox alias list [<sdk-name>]
+vfox alias unset <sdk-name> <alias>
+```
+
+**Examples**
+
+```shell
+vfox alias set java j17 17.0.9-tem
+vfox use java@j17
+```
+
+::: tip Aliases stay on your machine
+Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info` and `exec`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
+:::
+
+A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. Uninstalling a version removes the aliases that name it.
+
+## Doctor
+
+Check `vfox` and the installed SDKs for problems.
+
+**Usage**
+
+```shell
+vfox doctor [options] [<sdk-name>[@<version>]]
+```
+
+**Options**
+
+- `--json`: Output the findings as JSON.
+- `--adopt`: Write a receipt for versions installed before `vfox` kept them, taking their current state as the one to compare against later.
+
+`vfox` writes a small receipt (`.vfox-receipt.json`) into the directory of every version it installs or links. It records where the version came from and, if the plugin implements [`Fingerprint`](../plugins/create/howto.md#fingerprint), the facts that identify it.
+
+| Finding                   | Level   | Meaning                                                                                                                  |
+| :------------------------ | :------ | :----------------------------------------------------------------------------------------------------------------------- |
+| `path.shadowed`           | warn    | A command of the SDK is not the one that runs, because another executable sits earlier in `PATH` (a pnpm-installed `node`, a system JDK …) |
+| `path.not-activated`      | error   | `vfox activate` is not set up in this shell                                                                              |
+| `sdk.drift`               | warn    | The SDK was modified in place since it was installed (for example `flutter upgrade`). Fix: `vfox install --reinstall <sdk>@<version>` |
+| `sdk.link-dangling`       | error   | The directory a linked version points to is gone                                                                         |
+| `sdk.payload-empty`       | error   | The directories the plugin puts on `PATH` do not exist or hold no command                                                |
+| `sdk.envkeys-failed`      | error   | The plugin could not say what to put in the environment                                                                  |
+| `sdk.install-interrupted` | warn    | An installation was interrupted                                                                                          |
+| `sdk.no-receipt`          | info    | Installed before receipts existed, so changes to it cannot be detected (`vfox doctor --adopt`)                            |
+| `sdk.plugin-missing`      | warn    | Versions are installed but the plugin is not added                                                                       |
+| `plugin.incompatible`     | warn    | The plugin needs a newer `vfox`                                                                                          |
+| `alias.dangling`          | warn    | An alias names a version that is not installed                                                                           |
+
+The exit status is `1` when an error was found.
+
+After `vfox use`, `vfox` runs the fast checks for the version it just selected by itself and prints the warnings. See [Diagnostics Settings](../guides/configuration.md#diagnostics-settings) to switch that off or to silence single findings.
 
 ## Current
 
