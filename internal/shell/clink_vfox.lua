@@ -10,7 +10,8 @@ clink.argmatcher('vfox'):nofiles():setdelayinit(function(vfox)
     local file_available = io.open(file_name, 'r')
     if file_available then
         local file_timestamp = tonumber(file_available:read('*l'))
-        if current_timestamp - file_timestamp <= 24 * 60 * 60 then
+        -- A file without a timestamp is unusable, e.g. never completely written: list the plugins again.
+        if file_timestamp and current_timestamp - file_timestamp <= 24 * 60 * 60 then
             for line in file_available:lines() do
                 table.insert(vfox_sdk_table, line)
             end

@@ -169,19 +169,20 @@ func TestClinkPromptEnvironmentLines(t *testing.T) {
 }
 
 func TestClinkAvailableCache(t *testing.T) {
-	// cache is the file as written age seconds ago: a timestamp, then one plugin per line.
-	cache := func(age int64, names ...string) string {
+	// written is the cache file as it was written age seconds ago: a timestamp,
+	// then one plugin per line.
+	written := func(age int64, names ...string) string {
 		content := fmt.Sprintf("%d\n", clinkNow-age)
 		for _, name := range names {
 			content += name + "\n"
 		}
 		return content
 	}
-	fetched := cache(0, clinkPlugins...) // what is written after running vfox available
+	fetched := written(0, clinkPlugins...) // what is written after running vfox available
 
 	tests := []struct {
 		name      string
-		cache     string // the file before the first completion; empty means there is none
+		cache     *string // the file before the first completion; nil means there is none
 		wantFetch bool
 		wantAdd   []string // the plugins `vfox add` offers
 		wantCache string   // the file afterwards
@@ -189,26 +190,43 @@ func TestClinkAvailableCache(t *testing.T) {
 		{name: "no cache", wantFetch: true, wantAdd: clinkPlugins, wantCache: fetched},
 		{
 			name:      "recent cache",
-			cache:     cache(60*60, "alpha", "beta"),
+			cache:     newString(written(60*60, "alpha", "beta")),
 			wantAdd:   []string{"alpha", "beta"},
-			wantCache: cache(60*60, "alpha", "beta"),
+			wantCache: written(60*60, "alpha", "beta"),
 		},
 		{
 			name:      "cache that is a day old",
-			cache:     cache(secondsPerDay, "alpha", "beta"),
+			cache:     newString(written(secondsPerDay, "alpha", "beta")),
 			wantAdd:   []string{"alpha", "beta"},
-			wantCache: cache(secondsPerDay, "alpha", "beta"),
+			wantCache: written(secondsPerDay, "alpha", "beta"),
 		},
 		{
 			name:      "expired cache",
-			cache:     cache(secondsPerDay+1, "alpha", "beta"),
+			cache:     newString(written(secondsPerDay+1, "alpha", "beta")),
 			wantFetch: true,
 			wantAdd:   clinkPlugins,
 			wantCache: fetched,
 		},
 		{
 			name:      "cache without plugins",
-			cache:     cache(60 * 60),
+			cache:     newString(written(60 * 60)),
+			wantFetch: true,
+			wantAdd:   clinkPlugins,
+			wantCache: fetched,
+		},
+		// A file without a timestamp, like the empty one left when the shell is
+		// closed while vfox available is running, is not a reason to fail: it is
+		// replaced.
+		{
+			name:      "empty cache file",
+			cache:     newString(""),
+			wantFetch: true,
+			wantAdd:   clinkPlugins,
+			wantCache: fetched,
+		},
+		{
+			name:      "cache without a timestamp",
+			cache:     newString("alpha\nbeta\n"),
 			wantFetch: true,
 			wantAdd:   clinkPlugins,
 			wantCache: fetched,
@@ -217,8 +235,8 @@ func TestClinkAvailableCache(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rt := newClinkRuntime(t)
-			if tt.cache != "" {
-				rt.files[clinkAvailableCache] = tt.cache
+			if tt.cache != nil {
+				rt.files[clinkAvailableCache] = *tt.cache
 			}
 			rt.load()
 			if rt.ran("vfox available") {
