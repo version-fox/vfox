@@ -82,9 +82,33 @@ func cloneAliases(aliases map[string]map[string]string) map[string]map[string]st
 	return clone
 }
 
+// setOnDemand lists the sections a config file only holds once somebody set
+// them. A section the user's file declares replaces the shared one, so a file
+// that vfox creates must not declare these with their defaults: the first run
+// would otherwise pin them for good and a shared VFOX_HOME could no longer
+// decide them. A new section of this kind belongs in this list.
+var setOnDemand = map[string]bool{"diagnostics": true, "path": true, "aliases": true}
+
+// newFileContent is what a config file vfox creates holds: the defaults of every
+// section but the ones in setOnDemand.
+func newFileContent() ([]byte, error) {
+	var doc yaml.Node
+	if err := doc.Encode(DefaultConfig); err != nil {
+		return nil, err
+	}
+	var kept []*yaml.Node
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if !setOnDemand[doc.Content[i].Value] {
+			kept = append(kept, doc.Content[i], doc.Content[i+1])
+		}
+	}
+	doc.Content = kept
+	return yaml.Marshal(&doc)
+}
+
 func NewConfigWithPath(p string) (*Config, error) {
 	if !util.FileExists(p) {
-		content, err := yaml.Marshal(DefaultConfig)
+		content, err := newFileContent()
 		if err == nil {
 			_ = os.WriteFile(p, content, 0666)
 			return DefaultConfig, nil
