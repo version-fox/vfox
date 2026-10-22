@@ -187,9 +187,10 @@ func envFlag(cmd *cli.Command) error {
 		logger.Debugf("Failed to check config changes, will recalculate: %v\n", err)
 		changed = true // Assume changed on error
 	}
-	// Output rendered under another `path.mode` is stale.
-	pathMode := runtimeEnvContext.PathMode()
-	if state.PathModeChanged(pathMode) {
+	// Output rendered under another PATH ordering policy is stale. `path.mode`
+	// and `path.preserve` are in config.yaml, which configPaths does not track.
+	pathPolicy := runtimeEnvContext.PathPolicyKey()
+	if state.PathPolicyChanged(pathPolicy) {
 		changed = true
 	}
 
@@ -334,7 +335,7 @@ func envFlag(cmd *cli.Command) error {
 	exportStr := s.Export(exportEnvs)
 
 	// 10. Update state with new output
-	state.SetPathMode(pathMode)
+	state.SetPathPolicy(pathPolicy)
 	if err := state.Update(configPaths, exportStr, shellName); err != nil {
 		logger.Debugf("Failed to update state: %v", err)
 	}

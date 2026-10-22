@@ -106,6 +106,52 @@ func TestEnvPathModeDecidesWhatStaysInFront(t *testing.T) {
 	}
 }
 
+// `path.preserve` is read from config.yaml, which the cache does not watch by
+// modification time, and the mode can stay the same while the directories to
+// preserve change. The next prompt must still follow the setting.
+func TestEnvFollowsPathPreserveAtTheNextPrompt(t *testing.T) {
+	f := newPathFixture(t)
+	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
+	inFront := []string{f.inherited, f.vfoxBin, f.system}
+	behind := []string{f.vfoxBin, f.inherited, f.system}
+	check := func(what string, want []string) {
+		t.Helper()
+		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+		if strings.Join(got, ":") != strings.Join(want, ":") {
+			t.Errorf("%s: PATH = %v, want %v (a cached answer was served?)", what, got, want)
+		}
+	}
+
+	f.writeUserConfig(t, fmt.Sprintf("path:\n  mode: baseline\n  preserve:\n    - %s\n", f.inherited))
+	check("a preserved directory stays in front", inFront)
+	check("and again, from the cache", inFront)
+
+	f.writeUserConfig(t, "path:\n  mode: baseline\n")
+	check("the directory is no longer preserved", behind)
+
+	f.writeUserConfig(t, fmt.Sprintf("path:\n  mode: baseline\n  preserve:\n    - %s\n", f.inherited))
+	check("the directory is preserved again", inFront)
+}
+
+// What `path.preserve` expands to depends on the environment, which can change
+// without the PATH changing.
+func TestEnvFollowsAnEnvironmentVariableOfPathPreserve(t *testing.T) {
+	f := newPathFixture(t)
+	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
+	f.writeUserConfig(t, "path:\n  mode: baseline\n  preserve:\n    - $PNPM_HOME\n")
+
+	f.env["PNPM_HOME"] = f.inherited
+	got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+	if got[0] != f.inherited {
+		t.Fatalf("PNPM_HOME is preserved, so it stays in front: PATH = %v", got)
+	}
+	delete(f.env, "PNPM_HOME")
+	got = pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+	if got[0] != f.vfoxBin {
+		t.Errorf("PNPM_HOME is gone, so nothing is preserved: PATH = %v, want vfox first (a cached answer was served?)", got)
+	}
+}
+
 func TestEnvKeepsWhatWasAddedAfterActivation(t *testing.T) {
 	f := newPathFixture(t)
 	pnpm := filepath.Join(f.root, "pnpm", "bin")

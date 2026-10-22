@@ -17,9 +17,11 @@
 package env
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
@@ -78,6 +80,24 @@ func (m *RuntimeEnvContext) pathPolicy() pathPolicy {
 		p.activated[normalizePathEntry(dir)] = struct{}{}
 	}
 	return p
+}
+
+// key identifies the decisions the policy takes apart from the PATH itself and
+// the baseline, which stay the same within a shell session: the mode, the
+// directories `path.preserve` expands to now (an environment variable it names
+// can change without the PATH changing) and those of an active virtualenv or
+// conda environment. Output rendered under another key is stale.
+func (p pathPolicy) key() string {
+	return fmt.Sprintf("%s preserve=%q activated=%q", p.mode, sortedEntries(p.preserved), sortedEntries(p.activated))
+}
+
+func sortedEntries(set map[string]struct{}) []string {
+	entries := make([]string, 0, len(set))
+	for entry := range set {
+		entries = append(entries, entry)
+	}
+	sort.Strings(entries)
+	return entries
 }
 
 // keepInFront reports whether an entry that sits before vfox's first directory

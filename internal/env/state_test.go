@@ -342,31 +342,31 @@ func TestConfigState_HasChanged_PathChanged(t *testing.T) {
 	}
 }
 
-// Output rendered under one PATH ordering mode must not be served under another.
-func TestConfigState_PathModeChanged(t *testing.T) {
+// Output rendered under one PATH ordering policy must not be served under another.
+func TestConfigState_PathPolicyChanged(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	state := NewConfigState(stateFile)
 
-	if !state.PathModeChanged("legacy") {
-		t.Fatal("a state that never recorded a mode must count as changed")
+	if !state.PathPolicyChanged("legacy") {
+		t.Fatal("a state that never recorded a policy must count as changed")
 	}
-	state.SetPathMode("legacy")
+	state.SetPathPolicy("legacy")
 	if err := state.Update(map[UseScope]string{}, "export PATH=/test", "bash"); err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
-	if state.PathModeChanged("legacy") {
-		t.Error("the recorded mode must not count as changed")
+	if state.PathPolicyChanged("legacy") {
+		t.Error("the recorded policy must not count as changed")
 	}
-	if !state.PathModeChanged("baseline") {
-		t.Error("another mode must count as changed")
+	if !state.PathPolicyChanged("baseline") {
+		t.Error("another policy must count as changed")
 	}
 
-	// The mode survives a round trip through the state file, as a new prompt would see it.
+	// The policy survives a round trip through the state file, as a new prompt would see it.
 	reloaded := NewConfigState(stateFile)
 	if err := reloaded.Load(); err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
-	if reloaded.PathModeChanged("legacy") || !reloaded.PathModeChanged("aggressive") {
-		t.Errorf("reloaded mode = %q", reloaded.CachedPathMode)
+	if reloaded.PathPolicyChanged("legacy") || !reloaded.PathPolicyChanged("aggressive") {
+		t.Errorf("reloaded policy = %q", reloaded.CachedPathPolicy)
 	}
 }

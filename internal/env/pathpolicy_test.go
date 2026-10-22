@@ -194,17 +194,82 @@ func TestSplitSystemPathsReadsTheEnvironment(t *testing.T) {
 	}
 }
 
-func TestPathModeAndExpansion(t *testing.T) {
-	if got := (*RuntimeEnvContext)(nil).PathMode(); got != config.PathModeLegacy {
-		t.Errorf("nil context: %q", got)
+// The key tells when cached output no longer follows the settings.
+func TestPathPolicyKey(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses POSIX paths")
 	}
-	if got := (&RuntimeEnvContext{}).PathMode(); got != config.PathModeLegacy {
-		t.Errorf("no config: %q", got)
-	}
-	if got := pathContext("Baseline").PathMode(); got != config.PathModeBaseline {
-		t.Errorf("baseline: %q", got)
+	t.Setenv("VIRTUAL_ENV", "")
+	t.Setenv("CONDA_PREFIX", "")
+	t.Setenv("PNPM_HOME", "")
+
+	base := pathContext("baseline", "/opt/a", "/opt/b").PathPolicyKey()
+	for name, ctx := range map[string]*RuntimeEnvContext{
+		"the same settings":        pathContext("baseline", "/opt/a", "/opt/b"),
+		"another order":            pathContext("baseline", "/opt/b", "/opt/a"),
+		"another spelling":         pathContext("Baseline", "/opt/a/", "/opt/./b"),
+		"the same twice":           pathContext("baseline", "/opt/a", "/opt/b", "/opt/a"),
+		"an empty entry on top":    pathContext("baseline", "", "/opt/a", "/opt/b"),
+		"an unset variable on top": pathContext("baseline", "$PNPM_HOME", "/opt/a", "/opt/b"),
+	} {
+		if got := ctx.PathPolicyKey(); got != base {
+			t.Errorf("%s: key = %q, want %q", name, got, base)
+		}
 	}
 
+	for name, ctx := range map[string]*RuntimeEnvContext{
+		"another mode":      pathContext("aggressive", "/opt/a", "/opt/b"),
+		"a directory fewer": pathContext("baseline", "/opt/a"),
+		"a directory more":  pathContext("baseline", "/opt/a", "/opt/b", "/opt/c"),
+		"another directory": pathContext("baseline", "/opt/a", "/opt/c"),
+		"nothing preserved": pathContext("baseline"),
+	} {
+		if got := ctx.PathPolicyKey(); got == base {
+			t.Errorf("%s: key = %q, want it to differ from %q", name, got, base)
+		}
+	}
+
+	t.Run("an environment variable of path.preserve", func(t *testing.T) {
+		ctx := pathContext("baseline", "$PNPM_HOME")
+		unset := ctx.PathPolicyKey()
+		t.Setenv("PNPM_HOME", "/data/pnpm")
+		set := ctx.PathPolicyKey()
+		t.Setenv("PNPM_HOME", "/data/other")
+		other := ctx.PathPolicyKey()
+		if unset == set || set == other || unset == other {
+			t.Errorf("keys = %q, %q, %q, want three different ones", unset, set, other)
+		}
+	})
+
+	t.Run("an active virtualenv or conda environment", func(t *testing.T) {
+		ctx := pathContext("baseline")
+		without := ctx.PathPolicyKey()
+		t.Setenv("VIRTUAL_ENV", "/home/me/venv")
+		venv := ctx.PathPolicyKey()
+		t.Setenv("CONDA_PREFIX", "/home/me/conda")
+		both := ctx.PathPolicyKey()
+		if without == venv || venv == both {
+			t.Errorf("keys = %q, %q, %q, want three different ones", without, venv, both)
+		}
+	})
+
+	t.Run("no settings", func(t *testing.T) {
+		want := pathContext(config.PathModeLegacy).PathPolicyKey()
+		for name, ctx := range map[string]*RuntimeEnvContext{
+			"a nil context": nil,
+			"no config":     {},
+			"no path":       {UserConfig: &config.Config{}},
+			"empty mode":    pathContext(""),
+			"unknown mode":  pathContext("whatever"),
+		} {
+			if got := ctx.PathPolicyKey(); got != want {
+				t.Errorf("%s: key = %q, want the legacy default %q", name, got, want)
+			}
+		}
+	})
+}
+
+func TestPathExpansion(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		return
 	}

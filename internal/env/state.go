@@ -43,9 +43,11 @@ type ConfigState struct {
 	// Cached PATH value (to detect user-made PATH changes)
 	CachedPath string `json:"cached_path,omitempty"`
 
-	// PATH ordering mode the cached output was rendered with. Changing the
-	// setting must not keep serving output rendered under the old one.
-	CachedPathMode string `json:"cached_path_mode,omitempty"`
+	// PATH ordering policy (see RuntimeEnvContext.PathPolicyKey) the cached
+	// output was rendered with. Changing `path.mode` or `path.preserve` must not
+	// keep serving output rendered under the old one: config.yaml is not among
+	// the files whose modification time is tracked.
+	CachedPathPolicy string `json:"cached_path_policy,omitempty"`
 
 	// Target shell used to render CachedOutput. Empty for legacy cache files.
 	CachedShell string `json:"cached_shell,omitempty"`
@@ -161,20 +163,20 @@ func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) 
 	return false, nil
 }
 
-// PathModeChanged reports whether the cached output was rendered under a
-// different PATH ordering mode than mode.
-func (s *ConfigState) PathModeChanged(mode string) bool {
+// PathPolicyChanged reports whether the cached output was rendered under a
+// different PATH ordering policy than policy.
+func (s *ConfigState) PathPolicyChanged(policy string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.CachedPathMode != mode
+	return s.CachedPathPolicy != policy
 }
 
-// SetPathMode records the PATH ordering mode of the output about to be stored
-// by Update.
-func (s *ConfigState) SetPathMode(mode string) {
+// SetPathPolicy records the PATH ordering policy of the output about to be
+// stored by Update.
+func (s *ConfigState) SetPathPolicy(policy string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.CachedPathMode = mode
+	s.CachedPathPolicy = policy
 }
 
 // Update updates the state with new config mtimes, current PATH, and cached output

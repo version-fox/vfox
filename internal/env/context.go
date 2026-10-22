@@ -112,12 +112,12 @@ func (m *RuntimeEnvContext) CleanSystemPaths() *Paths {
 	return cleanPaths
 }
 
-// PathMode returns the effective `path.mode` setting.
-func (m *RuntimeEnvContext) PathMode() string {
-	if m == nil || m.UserConfig == nil {
-		return config.PathModeLegacy
-	}
-	return m.UserConfig.Path.EffectiveMode()
+// PathPolicyKey identifies the PATH ordering policy in effect: the `path.mode`
+// setting, the directories `path.preserve` expands to and those of an active
+// virtualenv or conda environment. Output cached under another key is stale
+// even when the PATH and the version files are as they were.
+func (m *RuntimeEnvContext) PathPolicyKey() string {
+	return m.pathPolicy().key()
 }
 
 // SplitSystemPaths splits the current PATH into two parts:
