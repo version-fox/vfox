@@ -119,12 +119,8 @@ func NewConfigWithPath(p string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	config := &Config{}
-	err = yaml.Unmarshal(content, config)
+	config, err := decodeConfig(content)
 	if err != nil {
-		return nil, err
-	}
-	if err := config.Plugin.HTTP.Validate(); err != nil {
 		return nil, err
 	}
 	if config.Plugin.HTTP == nil {
@@ -158,11 +154,28 @@ func NewConfigWithPath(p string) (*Config, error) {
 
 }
 
+// decodeConfig reads what a config file holds and checks it, leaving the
+// sections the file does not declare nil. File uses it to refuse a change that
+// would leave a file vfox cannot load.
+func decodeConfig(content []byte) (*Config, error) {
+	config := &Config{}
+	if err := yaml.Unmarshal(content, config); err != nil {
+		return nil, err
+	}
+	if err := config.Plugin.HTTP.Validate(); err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
 func NewConfig(path string) (*Config, error) {
 	p := filepath.Join(path, filename)
 	return NewConfigWithPath(p)
 }
 
+// SaveConfig writes every section of c to the config file in path. It is not how
+// vfox changes the user's file: that would declare the defaults and the shared
+// values as if the user had chosen them. Use File for that.
 func (c *Config) SaveConfig(path string) error {
 	if err := c.Plugin.HTTP.Validate(); err != nil {
 		return err

@@ -203,10 +203,10 @@ func (r cliResult) output() string { return r.stdout + r.stderr }
 
 // inProcess lists the commands that run inside the test process, which is where
 // the coverage report can see them. The others set variables for a shell
-// (activate, env), change defaults that every command shares (config) or may
-// hand over to a shell (use), so each run of them gets a process of its own.
+// (activate, env) or may hand over to a shell (use), so each run of them gets a
+// process of its own.
 var inProcess = map[string]bool{
-	"alias": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
+	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
 }
 
 // run executes `vfox <args>` inside the fixture: in this process for the
