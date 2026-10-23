@@ -36,6 +36,10 @@ const (
 	// PathModeAggressive keeps only active virtualenv/conda directories and the
 	// directories listed in Preserve in front of the vfox directories.
 	PathModeAggressive = "aggressive"
+
+	// DefaultPathMode applies when the mode is not configured, or is not one
+	// of the modes above.
+	DefaultPathMode = PathModeBaseline
 )
 
 // Path configures the order of PATH entries around vfox's own directories.
@@ -47,7 +51,7 @@ type Path struct {
 }
 
 var EmptyPath = &Path{
-	Mode: PathModeLegacy,
+	Mode: DefaultPathMode,
 }
 
 // UnmarshalYAML keeps the default mode when the file only sets "preserve".
@@ -61,16 +65,17 @@ func (p *Path) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// EffectiveMode returns the configured mode, falling back to PathModeLegacy
-// for an empty or unknown value.
+// EffectiveMode returns the configured mode, falling back to DefaultPathMode
+// for an empty or unknown value: a typo behaves as if the setting were absent,
+// instead of failing a command that runs at every prompt.
 func (p *Path) EffectiveMode() string {
 	if p == nil {
-		return PathModeLegacy
+		return DefaultPathMode
 	}
 	switch mode := strings.ToLower(strings.TrimSpace(p.Mode)); mode {
-	case PathModeBaseline, PathModeAggressive:
+	case PathModeLegacy, PathModeBaseline, PathModeAggressive:
 		return mode
 	default:
-		return PathModeLegacy
+		return DefaultPathMode
 	}
 }

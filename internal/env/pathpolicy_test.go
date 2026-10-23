@@ -187,10 +187,29 @@ func TestSplitSystemPathsReadsTheEnvironment(t *testing.T) {
 		t.Errorf("clean = %v, want %v", got, want)
 	}
 
-	// The same PATH under the default settings is what vfox always did.
-	prefix, _ = (&RuntimeEnvContext{UserConfig: &config.Config{}}).SplitSystemPaths()
-	if got := len(prefix.Slice()); got != 4 {
-		t.Errorf("legacy prefix = %v, want all four entries", prefix.Slice())
+	// Nothing configured means the baseline mode too: the inherited directory goes
+	// behind vfox's, and cargo stays in front because it was added after activation
+	// (it does not need to be listed in `path.preserve`).
+	for name, ctx := range map[string]*RuntimeEnvContext{
+		"no config": {},
+		"no path":   {UserConfig: &config.Config{}},
+	} {
+		prefix, clean = ctx.SplitSystemPaths()
+		if got, want := prefix.Slice(), []string{added, filepath.Join(venv, "bin"), cargo}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: prefix = %v, want %v", name, got, want)
+		}
+		if got, want := clean.Slice(), []string{inherited, "/usr/bin"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: clean = %v, want %v", name, got, want)
+		}
+	}
+
+	// What vfox 1.0.x did, which now has to be asked for.
+	prefix, clean = pathContext(config.PathModeLegacy).SplitSystemPaths()
+	if got, want := prefix.Slice(), []string{inherited, added, filepath.Join(venv, "bin"), cargo}; !reflect.DeepEqual(got, want) {
+		t.Errorf("legacy: prefix = %v, want all four entries %v", got, want)
+	}
+	if got, want := clean.Slice(), []string{"/usr/bin"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("legacy: clean = %v, want %v", got, want)
 	}
 }
 
@@ -254,7 +273,7 @@ func TestPathPolicyKey(t *testing.T) {
 	})
 
 	t.Run("no settings", func(t *testing.T) {
-		want := pathContext(config.PathModeLegacy).PathPolicyKey()
+		want := pathContext(config.PathModeBaseline).PathPolicyKey()
 		for name, ctx := range map[string]*RuntimeEnvContext{
 			"a nil context": nil,
 			"no config":     {},
@@ -263,8 +282,11 @@ func TestPathPolicyKey(t *testing.T) {
 			"unknown mode":  pathContext("whatever"),
 		} {
 			if got := ctx.PathPolicyKey(); got != want {
-				t.Errorf("%s: key = %q, want the legacy default %q", name, got, want)
+				t.Errorf("%s: key = %q, want the baseline default %q", name, got, want)
 			}
+		}
+		if legacy := pathContext(config.PathModeLegacy).PathPolicyKey(); legacy == want {
+			t.Errorf("legacy: key = %q, want it to differ from the default's, or cached output outlives `vfox config path.mode legacy`", legacy)
 		}
 	})
 }
