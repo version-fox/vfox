@@ -63,7 +63,7 @@ type pathPolicy struct {
 
 func (m *RuntimeEnvContext) pathPolicy() pathPolicy {
 	p := pathPolicy{
-		mode:      config.PathModeLegacy,
+		mode:      config.DefaultPathMode,
 		orig:      parseOrigPath(os.Getenv(OrigPathFlag)),
 		activated: make(map[string]struct{}),
 		preserved: make(map[string]struct{}),

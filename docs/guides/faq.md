@@ -31,11 +31,16 @@ Use `vfox use` when you want to persist version selection for Global, Project, o
 Something in front of `vfox` in `PATH` provides a command of the same name, so the shell never gets to `vfox`'s. After
 `vfox use`, `vfox` says which executable that is. `vfox doctor <sdk>` shows the same in detail.
 
-The usual causes are a `node` installed by `pnpm runtime set node -g` (it lands in `$PNPM_HOME/bin`), a system JDK or
-a Homebrew `node` that the OS puts before `vfox`'s directories, and a startup file that adds a directory to `PATH` after
-`eval "$(vfox activate bash)"`. Remove the competing copy, move the `vfox activate` line below the line that adds the
-directory, or let `vfox` put its directories first with `vfox config path.mode baseline` (`aggressive` also covers
-directories added after `vfox activate`): see [PATH Order Settings](./configuration.md#path-order-settings).
+The usual causes are a `node` installed by `pnpm runtime set node -g` (it lands in `$PNPM_HOME/bin`) and a startup file
+that adds a directory to `PATH` after `eval "$(vfox activate bash)"`: `vfox` puts its directories before what was in
+`PATH` when it was activated, but what is added afterwards stays in front of them. Remove the competing copy, move the
+`vfox activate` line below the line that adds the directory, or run `vfox config path.mode aggressive`, which puts
+`vfox`'s directories before those as well.
+
+A system JDK or a Homebrew `node` that the OS puts before `vfox`'s directories does not win by default. If `vfox doctor`
+still reports one, the shell was started before `vfox` was upgraded (open a new terminal), `path.mode` is `legacy`
+(`vfox config path.mode baseline` restores the default), or the directory is listed in `path.preserve`. See
+[PATH Order Settings](./configuration.md#path-order-settings).
 
 ## How do I use a JDK (or any SDK) that is already installed on my machine?
 

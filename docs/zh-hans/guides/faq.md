@@ -31,7 +31,9 @@ vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 
 `vfox` 之前的 `PATH` 里有同名的命令，shell 根本走不到 `vfox` 提供的那个。`vfox use` 之后，`vfox` 会告诉你那个可执行文件是哪个；`vfox doctor <sdk>` 会给出同样的详细信息。
 
-常见原因：`pnpm runtime set node -g` 装的 `node`（放在 `$PNPM_HOME/bin`）；系统自带的 JDK，或操作系统排到 `vfox` 目录之前的 Homebrew `node`；以及在 `eval "$(vfox activate bash)"` 之后又往 `PATH` 加目录的启动文件。删掉冲突的那一份，把 `vfox activate` 那一行挪到添加目录的那一行之后，或者执行 `vfox config path.mode baseline` 让 `vfox` 把自己的目录放在最前面（`aggressive` 还会处理 `vfox activate` 之后才加入的目录）：见 [PATH 顺序设置](./configuration.md#path-顺序设置)。
+常见原因：`pnpm runtime set node -g` 装的 `node`（放在 `$PNPM_HOME/bin`），以及在 `eval "$(vfox activate bash)"` 之后又往 `PATH` 加目录的启动文件：`vfox` 会把自己的目录放到激活时 `PATH` 里原有内容之前，但激活**之后**才加入的目录仍排在它前面。删掉冲突的那一份，把 `vfox activate` 那一行挪到添加目录的那一行之后，或者执行 `vfox config path.mode aggressive`，让 `vfox` 的目录也排到这些目录之前。
+
+系统自带的 JDK，或操作系统排到 `vfox` 目录之前的 Homebrew `node`，默认不会再压过 `vfox`。如果 `vfox doctor` 仍然报告这类目录，可能是 shell 在升级 `vfox` 之前就已启动（重新打开终端）、`path.mode` 被设成了 `legacy`（执行 `vfox config path.mode baseline` 恢复默认值），或者该目录列在 `path.preserve` 里。详见 [PATH 顺序设置](./configuration.md#path-顺序设置)。
 
 ## 怎样使用本机上已经装好的 JDK（或其他 SDK）？
 

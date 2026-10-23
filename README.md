@@ -60,13 +60,6 @@ echo 'Invoke-Expression "$(vfox activate pwsh)"' >> $PROFILE
 vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 ```
 
-Also run this once, so that the versions you select with `vfox` are not hidden by programs that the system puts earlier
-in `PATH` (`baseline` is going to become the default in a future release):
-
-```bash
-vfox config path.mode baseline
-```
-
 > Remember to restart your shell to apply the changes.
 
 Fish completion suggests commands and options. Homebrew, DEB, and RPM packages

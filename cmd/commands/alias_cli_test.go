@@ -204,7 +204,8 @@ func TestExecResolvesAliases(t *testing.T) {
 func TestAliasChangesLeaveTheRestOfTheUserConfigAlone(t *testing.T) {
 	f := newCLIFixture(t, true)
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
-	must(t, os.WriteFile(filepath.Join(f.shared, "config.yaml"), []byte("path:\n  mode: baseline\ndiagnostics:\n  onUse: false\n"), 0644))
+	// Settings that differ from the defaults, so that losing them shows.
+	must(t, os.WriteFile(filepath.Join(f.shared, "config.yaml"), []byte("path:\n  mode: legacy\ndiagnostics:\n  onUse: false\n"), 0644))
 	f.writeUserConfig(t, "aliases: {}\n")
 
 	f.run(t, "alias", "set", "alpha", "stable", "1.0.0").mustSucceed(t, "alias set")
@@ -217,8 +218,8 @@ func TestAliasChangesLeaveTheRestOfTheUserConfigAlone(t *testing.T) {
 
 	// The next process, which loads both files.
 	settings := f.manager(t).RuntimeEnvContext.UserConfig
-	if mode := settings.Path.EffectiveMode(); mode != "baseline" {
-		t.Errorf("path.mode = %q after an alias change, want the shared baseline", mode)
+	if mode := settings.Path.EffectiveMode(); mode != "legacy" {
+		t.Errorf("path.mode = %q after an alias change, want the shared legacy", mode)
 	}
 	if settings.Diagnostics.OnUse {
 		t.Error("diagnostics.onUse was switched back on by an alias change")

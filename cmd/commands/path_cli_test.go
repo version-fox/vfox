@@ -84,26 +84,33 @@ func indexOf(entries []string, want string) int {
 func TestEnvPathModeDecidesWhatStaysInFront(t *testing.T) {
 	f := newPathFixture(t)
 	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
-
-	// vfox 1.0.x: everything in front of vfox's directory stays there.
-	legacy := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{f.inherited, f.vfoxBin, f.system}; strings.Join(legacy, ":") != strings.Join(want, ":") {
-		t.Errorf("legacy PATH = %v, want %v", legacy, want)
+	legacyOrder := []string{f.inherited, f.vfoxBin, f.system} // vfox 1.0.x: everything in front of vfox's directory stays there
+	baselineOrder := []string{f.vfoxBin, f.inherited, f.system}
+	check := func(what string, want []string) {
+		t.Helper()
+		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+		if strings.Join(got, ":") != strings.Join(want, ":") {
+			t.Errorf("%s: PATH = %v, want %v (a cached answer was served?)", what, got, want)
+		}
 	}
+
+	// Nothing configured: what the shell brought goes behind vfox's directory.
+	check("the default", baselineOrder)
 
 	// Changing the setting must show at the next prompt, not when the PATH
 	// happens to change: the output of the previous prompt is cached.
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
+	check("legacy", legacyOrder)
+
 	f.writeUserConfig(t, "path:\n  mode: baseline\n")
-	baseline := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{f.vfoxBin, f.inherited, f.system}; strings.Join(baseline, ":") != strings.Join(want, ":") {
-		t.Errorf("baseline PATH = %v, want %v (a cached legacy answer was served?)", baseline, want)
-	}
+	check("baseline", baselineOrder)
 
 	f.writeUserConfig(t, "path:\n  mode: legacy\n")
-	back := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if strings.Join(back, ":") != strings.Join(legacy, ":") {
-		t.Errorf("PATH after switching back = %v, want %v", back, legacy)
-	}
+	check("legacy again", legacyOrder)
+
+	// Dropping the setting brings the default back.
+	f.writeUserConfig(t, "")
+	check("the default again", baselineOrder)
 }
 
 // `path.preserve` is read from config.yaml, which the cache does not watch by
@@ -195,12 +202,16 @@ func TestEnvAggressiveModeAndPreserve(t *testing.T) {
 
 func TestEnvWithoutABaselineBehavesLikeLegacyInEveryMode(t *testing.T) {
 	f := newPathFixture(t)
-	// An old activation script never recorded one.
-	for _, mode := range []string{"baseline"} {
-		f.writeUserConfig(t, "path:\n  mode: "+mode+"\n")
+	// An old activation script never recorded one, and neither did a shell that
+	// was started before vfox was upgraded: the default must not reorder its PATH.
+	for _, tt := range []struct{ name, config string }{
+		{"the default", ""},
+		{"baseline", "path:\n  mode: baseline\n"},
+	} {
+		f.writeUserConfig(t, tt.config)
 		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
 		if got[0] != f.inherited {
-			t.Errorf("%s without a baseline: PATH = %v, want legacy order", mode, got)
+			t.Errorf("%s without a baseline: PATH = %v, want legacy order", tt.name, got)
 		}
 	}
 }
@@ -247,14 +258,22 @@ func TestActivateAppliesThePathMode(t *testing.T) {
 	f := newPathFixture(t)
 	delete(f.env, "__VFOX_SHELL")
 
+	for _, tt := range []struct{ name, config string }{
+		{"the default", ""},
+		{"baseline", "path:\n  mode: baseline\n"},
+	} {
+		f.writeUserConfig(t, tt.config)
+		got := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
+		if got[0] != f.vfoxBin || indexOf(got, f.inherited) < 1 {
+			t.Errorf("%s: PATH = %v, want vfox's directory first and the inherited one behind it", tt.name, got)
+		}
+	}
+
+	// What vfox 1.0.x did has to be asked for.
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
 	legacy := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
 	if legacy[0] != f.inherited {
 		t.Errorf("legacy: PATH = %v, want the inherited directory first as before", legacy)
-	}
-	f.writeUserConfig(t, "path:\n  mode: baseline\n")
-	baseline := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
-	if baseline[0] != f.vfoxBin || indexOf(baseline, f.inherited) < 1 {
-		t.Errorf("baseline: PATH = %v, want vfox's directory first and the inherited one behind it", baseline)
 	}
 }
 
@@ -272,23 +291,24 @@ func TestConfigCommandHandlesTheNewSettings(t *testing.T) {
 	f := newCLIFixture(t, false)
 	userConfig := filepath.Join(f.userHome, "config.yaml")
 
-	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "legacy" {
+	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "baseline" {
 		t.Errorf("default path.mode = %q", out)
 	}
 	if out := f.run(t, "config", "diagnostics.onUse").mustSucceed(t, "config diagnostics.onUse").stdout; strings.TrimSpace(out) != "true" {
 		t.Errorf("default diagnostics.onUse = %q", out)
 	}
 
-	f.run(t, "config", "path.mode", "baseline").mustSucceed(t, "config path.mode baseline")
+	// The documentation tells people to run this to keep the behavior of vfox 1.0.x.
+	f.run(t, "config", "path.mode", "legacy").mustSucceed(t, "config path.mode legacy")
 	f.run(t, "config", "diagnostics.onUse", "false").mustSucceed(t, "config diagnostics.onUse false")
 	saved := readFile(t, userConfig)
-	mustContain(t, "config.yaml", saved, "mode: baseline", "onUse: false")
+	mustContain(t, "config.yaml", saved, "mode: legacy", "onUse: false")
 
-	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "baseline" {
+	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "legacy" {
 		t.Errorf("path.mode = %q after setting it", out)
 	}
 	list := f.run(t, "config", "--list").mustSucceed(t, "config --list").stdout
-	mustContain(t, "config --list", list, "path.mode = baseline", "diagnostics.onUse = false", "path.preserve = []", "diagnostics.ignore = []")
+	mustContain(t, "config --list", list, "path.mode = legacy", "diagnostics.onUse = false", "path.preserve = []", "diagnostics.ignore = []")
 
 	// What was set is what the other commands see.
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
@@ -300,6 +320,6 @@ func TestConfigCommandHandlesTheNewSettings(t *testing.T) {
 	f.run(t, "config", "--unset", "diagnostics.onUse").mustSucceed(t, "config --unset diagnostics.onUse")
 	f.run(t, "config", "--unset", "path.mode").mustSucceed(t, "config --unset path.mode")
 	list = f.run(t, "config", "--list").mustSucceed(t, "config --list").stdout
-	mustContain(t, "config --list after unset", list, "path.mode = legacy", "diagnostics.onUse = true")
+	mustContain(t, "config --list after unset", list, "path.mode = baseline", "diagnostics.onUse = true")
 	mustContain(t, "use with the default settings", f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output(), "comes before vfox")
 }
