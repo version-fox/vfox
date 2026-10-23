@@ -225,7 +225,21 @@ vfox config path.mode baseline
 `key`: Configuration item, separated by `. `.
 `value`: If not passed, look at the value of the configuration item.
 
+`vfox config <key> <value>` changes your own `config.yaml`, and in it only the key you name: the other keys and the
+comments of the file stay as they are, and a section you have not set is not added to it, so it keeps following the
+defaults and the shared configuration. Lists and tables (`path.preserve`, `diagnostics.ignore`, `aliases`) cannot be set
+this way: edit the file, or use [`vfox alias`](../usage/core-commands.md#alias) for aliases.
+
 **Options**
 
 - `-l, --list`: list all config.
-- `-un, --unset`: remove a config.
+- `-un, --unset`: remove a config. The key is taken out of your `config.yaml`, and so is a section that this leaves
+  empty. A whole section can be removed too (`vfox config --unset path`). A key that the file does not have is not an
+  error.
+
+::: tip Shared configuration
+Your `config.yaml` is the only file `vfox config` changes. A `path` or `diagnostics` section that your file declares
+replaces the section of the [shared configuration](./multi-user-sharing.md) as a whole: after
+`vfox config path.mode baseline`, the `path.preserve` of the shared configuration no longer applies to you.
+`vfox config --unset path` removes the section from your file, and the shared one applies again.
+:::

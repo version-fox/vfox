@@ -205,7 +205,13 @@ vfox config path.mode baseline
 `key`：配置项，以`.`分割。
 `value`：不传为查看配置项的值。
 
+`vfox config <key> <value>` 只修改你自己的 `config.yaml`，并且只改你指定的那一项：文件里的其他配置项和注释保持原样，你没有设置过的配置段也不会被写进去，所以它们会继续沿用默认值和共享配置。列表和表（`path.preserve`、`diagnostics.ignore`、`aliases`）不能用这种方式设置：请直接编辑文件，别名请使用 [`vfox alias`](../usage/core-commands.md#alias)。
+
 **选项**
 
 - `-l, --list`：列出所有配置。
-- `-un, --unset`：删除一个配置。
+- `-un, --unset`：删除一个配置。这一项会从你的 `config.yaml` 中移除；如果它是所在配置段的最后一项，这个配置段也会一起移除。也可以整段移除（`vfox config --unset path`）。文件里本来就没有的配置项不会报错。
+
+::: tip 共享配置
+`vfox config` 只会修改你自己的 `config.yaml`。你的文件只要声明了 `path` 或 `diagnostics` 配置段，它就会整段替换[共享配置](./multi-user-sharing.md)里的同名配置段：执行 `vfox config path.mode baseline` 之后，共享配置里的 `path.preserve` 对你不再生效。`vfox config --unset path` 会把这个配置段从你的文件里移除，共享配置的配置段就重新生效。
+:::

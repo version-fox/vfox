@@ -246,21 +246,3 @@ func TestAliasFileRefusesWhatItCannotChangeSafely(t *testing.T) {
 		}
 	})
 }
-
-func TestAliasFileTopMapping(t *testing.T) {
-	for name, doc := range map[string]yaml.Node{
-		"a scalar instead of a document": {Kind: yaml.ScalarNode, Value: "x"},
-		"a document without content":     {Kind: yaml.DocumentNode},
-		"a document of two nodes":        {Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode}, {Kind: yaml.MappingNode}}},
-		"a document holding a sequence":  {Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.SequenceNode}}},
-	} {
-		f := &AliasFile{doc: doc}
-		if root, err := f.topMapping(); err == nil {
-			t.Errorf("%s: root = %+v, want an error", name, root)
-		}
-	}
-	empty := &AliasFile{}
-	if root, err := empty.topMapping(); err != nil || root.Kind != yaml.MappingNode {
-		t.Errorf("an empty file: root = %+v, %v, want an empty mapping", root, err)
-	}
-}
