@@ -51,6 +51,11 @@ var Install = &cli.Command{
 			Name:  "reinstall",
 			Usage: "Replace an installed version with a fresh copy, for example after the SDK modified itself in place",
 		},
+		&cli.BoolFlag{
+			Name:    "use",
+			Aliases: []string{"u"},
+			Usage:   "Use the installed version in the current shell session",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -59,10 +64,14 @@ var Install = &cli.Command{
 func installCmd(ctx context.Context, cmd *cli.Command) error {
 	yes := cmd.Bool("yes")
 	reinstall := cmd.Bool("reinstall")
+	useAfterInstall := cmd.Bool("use")
 
 	if cmd.Bool("all") {
 		if reinstall {
 			return cli.Exit("--reinstall cannot be combined with --all", 1)
+		}
+		if useAfterInstall {
+			return cli.Exit("--use cannot be combined with --all", 1)
 		}
 		return installAll(yes)
 	}
@@ -79,6 +88,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	errorStore := util.NewErrorStore()
+	switchFailed := false
 
 	for i := 0; i < args.Len(); i++ {
 		sdkArg := args.Get(i)
@@ -149,19 +159,45 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					errorStore.AddAndShow(name, err)
 					continue
 				}
+				if useAfterInstall {
+					label := installedVersion(sdkSource, resolvedVersion)
+					if err = sdkSource.UseWithConfig(label, env.Session, false); err != nil {
+						switchFailed = true
+						errorStore.AddAndShow(name, fmt.Errorf("installed, but switching failed: %w", err))
+						continue
+					}
+				}
 			}
 		}
 	}
 
 	notes := errorStore.GetNotesSet()
 
-	if notes.Len() == 1 {
+	if notes.Len() == 1 && switchFailed {
+		return fmt.Errorf("failed to switch %s", notes.Slice()[0])
+	} else if notes.Len() == 1 {
 		return fmt.Errorf("failed to install %s", notes.Slice()[0])
 	} else if notes.Len() > 1 {
 		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(notes.Slice(), ", "))
 	}
 
 	return nil
+}
+
+// installedVersion returns what is on disk for a version that was just asked for.
+// A plugin's PreInstall hook may install something else (`lts` becomes `22.1.0`), and its
+// receipt is the only record of which version that request ended up as.
+func installedVersion(sdkSource sdk.Sdk, requested sdk.Version) sdk.Version {
+	for _, installed := range sdkSource.InstalledList() {
+		installation, err := sdkSource.Installation(installed)
+		if err != nil || installation.Receipt == nil {
+			continue
+		}
+		if sdk.Version(installation.Receipt.Requested) == requested {
+			return installed
+		}
+	}
+	return requested
 }
 
 func installAll(autoConfirm bool) error {
