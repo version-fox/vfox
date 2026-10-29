@@ -126,8 +126,8 @@ func (m *RuntimeEnvContext) PathPolicyKey() string {
 //
 // This preserves the priority of paths like Python virtual environments that users activate
 // after vfox has set up the environment. Which of the entries in front of vfox's directories
-// count as such is decided by the `path.mode` setting: "legacy" (the default) keeps all of
-// them, "baseline" keeps only those added after `vfox activate` ran, and "aggressive" keeps
+// count as such is decided by the `path.mode` setting: "baseline" (the default) keeps only
+// those added after `vfox activate` ran, "legacy" keeps all of them, and "aggressive" keeps
 // only active virtualenv/conda directories and `path.preserve`.
 func (m *RuntimeEnvContext) SplitSystemPaths() (prefixPaths *Paths, cleanPaths *Paths) {
 	return splitSystemPaths(os.Getenv("PATH"), m.pathPolicy())
