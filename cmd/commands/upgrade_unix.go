@@ -18,6 +18,32 @@
 
 package commands
 
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/urfave/cli/v3"
+)
+
+// RequestPermission checks that the directory holding the vfox binary is writable.
+// The upgrade stages the download there and renames the new binary over the old one,
+// so it needs write access to the directory, not just to the binary.
 func RequestPermission() error {
-	return nil
+	exePath, err := os.Executable()
+	if err != nil {
+		return cli.Exit("Failed to get executable path: "+err.Error(), 1)
+	}
+	return checkUpgradeDirWritable(filepath.Dir(exePath), exePath)
+}
+
+// checkUpgradeDirWritable creates and removes a file in dir, which also catches
+// read-only mounts and ACLs that the directory's mode bits would not show.
+func checkUpgradeDirWritable(dir, exePath string) error {
+	probe, err := os.CreateTemp(dir, ".vfox_upgrade_check_*")
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("Cannot upgrade vfox: %s is not writable (%v).\nRe-run the upgrade with write access to it, for example: sudo %s upgrade", dir, err, exePath), 1)
+	}
+	probe.Close()
+	return os.Remove(probe.Name())
 }
