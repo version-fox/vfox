@@ -19,7 +19,9 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -42,7 +44,17 @@ func RequestPermission() error {
 func checkUpgradeDirWritable(dir, exePath string) error {
 	probe, err := os.CreateTemp(dir, ".vfox_upgrade_check_*")
 	if err != nil {
-		return cli.Exit(fmt.Sprintf("Cannot upgrade vfox: %s is not writable (%v).\nRe-run the upgrade with write access to it, for example: sudo %s upgrade", dir, err, exePath), 1)
+		reason := err
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			reason = pathErr.Err
+		}
+		msg := fmt.Sprintf("Cannot upgrade vfox: %s is not writable (%v).", dir, reason)
+		// sudo only helps with permissions, not with a read-only filesystem
+		if errors.Is(err, fs.ErrPermission) {
+			msg += fmt.Sprintf("\nRe-run the upgrade with write access to it, for example: sudo %s upgrade", exePath)
+		}
+		return cli.Exit(msg, 1)
 	}
 	probe.Close()
 	return os.Remove(probe.Name())

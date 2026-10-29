@@ -317,7 +317,7 @@ vfox cd [options] [<sdk-name>]
 
 升级 `vfox` 到最新版本。
 
-升级会直接替换 `vfox` 可执行文件，因此需要对其所在目录有写权限。如果 `vfox` 安装在 `/usr/local/bin` 等系统目录，请使用 `sudo` 运行，例如 `sudo /usr/local/bin/vfox upgrade`。
+在 Linux 和 macOS 上，升级会直接替换 `vfox` 可执行文件，因此需要对其所在目录有写权限。如果 `vfox` 安装在 `/usr/local/bin` 等系统目录，请使用 `sudo` 运行，例如 `sudo /usr/local/bin/vfox upgrade`。
 
 **用法**
 

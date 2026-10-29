@@ -315,7 +315,7 @@ vfox cd [options] [<sdk-name>]
 
 Upgrade `vfox` to the latest version.
 
-The upgrade replaces the `vfox` binary in place, so it needs write access to the directory that holds it. If `vfox` is installed in a system directory such as `/usr/local/bin`, run it with `sudo`, for example `sudo /usr/local/bin/vfox upgrade`.
+On Linux and macOS, the upgrade replaces the `vfox` binary in place, so it needs write access to the directory that holds it. If `vfox` is installed in a system directory such as `/usr/local/bin`, run it with `sudo`, for example `sudo /usr/local/bin/vfox upgrade`.
 
 **Usage**
 

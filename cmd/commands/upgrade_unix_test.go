@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestCheckUpgradeDirWritable(t *testing.T) {
@@ -59,6 +61,61 @@ func TestCheckUpgradeDirWritable(t *testing.T) {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("expected the error to contain %q, got %q", want, err.Error())
 			}
+		}
+	})
+
+	// install.sh moves the binary into /usr/local/bin with sudo, and it stays
+	// owned by the user who unpacked it. The binary is writable, the directory
+	// is not, so a check on the binary would pass here.
+	t.Run("writable binary in a read-only directory", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root can write to a read-only directory")
+		}
+		dir := t.TempDir()
+		exePath := filepath.Join(dir, "vfox")
+		if err := os.WriteFile(exePath, []byte("vfox"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dir, 0555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(dir, 0755) })
+
+		f, err := os.OpenFile(exePath, os.O_WRONLY, 0)
+		if err != nil {
+			t.Fatalf("the binary itself should be writable: %v", err)
+		}
+		f.Close()
+
+		if err := checkUpgradeDirWritable(dir, exePath); err == nil {
+			t.Fatal("expected an error, the directory is read-only")
+		}
+	})
+
+	// Replacing the binary only needs the directory, so its own mode does not matter.
+	t.Run("read-only binary in a writable directory", func(t *testing.T) {
+		dir := t.TempDir()
+		exePath := filepath.Join(dir, "vfox")
+		if err := os.WriteFile(exePath, []byte("vfox"), 0555); err != nil {
+			t.Fatal(err)
+		}
+		if err := checkUpgradeDirWritable(dir, exePath); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	// The root directory is root:root 755, like /usr/local/bin: the owner write
+	// bit is set, but this user is not the owner. t.TempDir() is always ours,
+	// so it can't show this.
+	t.Run("directory owned by someone else", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root can write anywhere")
+		}
+		if unix.Access("/", unix.W_OK) == nil {
+			t.Skip("/ is writable by this user")
+		}
+		if err := checkUpgradeDirWritable("/", "/vfox"); err == nil {
+			t.Fatal("expected an error for a directory this user does not own")
 		}
 	})
 }
