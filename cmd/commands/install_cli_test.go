@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -75,4 +76,52 @@ func TestInstallCommandUseFlagRefusedWithAll(t *testing.T) {
 
 	r := f.run(t, "install", "--all", "--use").mustFail(t, "install --all --use")
 	mustContain(t, "error", r.output(), "--use cannot be combined with --all")
+}
+
+// The request may resolve to a different version from one run to the next: the
+// switch has to follow the current resolution, not an older receipt that says the
+// same thing.
+const movingPlugin = `PLUGIN = {name="beta", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {{version="lts"}} end
+function PLUGIN:PreInstall(ctx)
+  if ctx.version == "lts" then return {version=os.getenv("BETA_LTS")} end
+  return {version=ctx.version}
+end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+`
+
+func TestInstallCommandUseFollowsAMovingRequest(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "beta", movingPlugin)
+
+	t.Setenv("BETA_LTS", "9.0.0")
+	f.run(t, "install", "-u", "beta@lts").mustSucceed(t, "first install -u")
+
+	t.Setenv("BETA_LTS", "10.0.0")
+	f.run(t, "install", "-u", "beta@lts").mustSucceed(t, "second install -u")
+	mustContain(t, "session config", readFile(t, filepath.Join(f.userHome, "tmp", "test-session", ".vfox.toml")), `beta = "10.0.0"`)
+}
+
+func TestInstallCommandUseWhenTheResolvedVersionIsAlreadyInstalled(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "beta", movingPlugin)
+	t.Setenv("BETA_LTS", "2.0.0")
+
+	f.run(t, "install", "beta@2.0.0").mustSucceed(t, "install beta@2.0.0")
+	f.run(t, "install", "-u", "beta@lts").mustSucceed(t, "install -u beta@lts")
+	mustContain(t, "session config", readFile(t, filepath.Join(f.userHome, "tmp", "test-session", ".vfox.toml")), `beta = "2.0.0"`)
+}
+
+func TestInstallCommandUseFlagRefusesTwoVersionsOfOneSDK(t *testing.T) {
+	f := newCLIFixture(t, false)
+
+	r := f.run(t, "install", "-u", "alpha@1.0.0", "alpha@2.0.0").mustFail(t, "install -u alpha twice")
+	mustContain(t, "error", r.output(), "--use cannot switch two versions of alpha")
+}
+
+func TestInstallCommandUseFlagNeedsAVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+
+	r := f.run(t, "install", "-u", "alpha").mustFail(t, "install -u without a version")
+	mustContain(t, "error", r.output(), "install --use needs a version for alpha")
 }

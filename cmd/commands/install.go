@@ -81,6 +81,17 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		return cli.Exit("sdk name is required", 1)
 	}
 
+	if useAfterInstall {
+		seen := make(map[string]bool, args.Len())
+		for i := 0; i < args.Len(); i++ {
+			name := strings.ToLower(strings.Split(args.Get(i), "@")[0])
+			if seen[name] {
+				return cli.Exit(fmt.Sprintf("--use cannot switch two versions of %s, give one", name), 1)
+			}
+			seen[name] = true
+		}
+	}
+
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return nil
@@ -139,6 +150,9 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			var resolvedVersion = manager.ResolveVersion(sdkMetadata.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
+				if useAfterInstall {
+					return cli.Exit(fmt.Sprintf("install --use needs a version for %s, for example %s@latest", name, name), 1)
+				}
 				if util.IsNonInteractiveTerminal() {
 					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
@@ -151,17 +165,13 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				install := sdkSource.Install
-				if reinstall {
-					install = sdkSource.Reinstall
-				}
-				if err = install(resolvedVersion); err != nil {
+				installed, err := sdkSource.InstallResolved(resolvedVersion, reinstall)
+				if err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
 				}
 				if useAfterInstall {
-					label := installedVersion(sdkSource, resolvedVersion)
-					if err = sdkSource.UseWithConfig(label, env.Session, false); err != nil {
+					if err = sdkSource.UseWithConfig(installed, env.Session, false); err != nil {
 						switchFailed = true
 						errorStore.AddAndShow(name, fmt.Errorf("installed, but switching failed: %w", err))
 						continue
@@ -182,22 +192,6 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return nil
-}
-
-// installedVersion returns what is on disk for a version that was just asked for.
-// A plugin's PreInstall hook may install something else (`lts` becomes `22.1.0`), and its
-// receipt is the only record of which version that request ended up as.
-func installedVersion(sdkSource sdk.Sdk, requested sdk.Version) sdk.Version {
-	for _, installed := range sdkSource.InstalledList() {
-		installation, err := sdkSource.Installation(installed)
-		if err != nil || installation.Receipt == nil {
-			continue
-		}
-		if sdk.Version(installation.Receipt.Requested) == requested {
-			return installed
-		}
-	}
-	return requested
 }
 
 func installAll(autoConfirm bool) error {

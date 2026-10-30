@@ -50,6 +50,7 @@ const (
 type Sdk interface {
 	Install(version Version) error                                        // Install a specific runtime of the SDK
 	Reinstall(version Version) error                                      // Replace an installed runtime with a fresh copy
+	InstallResolved(version Version, reinstall bool) (Version, error)     // Install and report the version that ended up on disk
 	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
 	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
@@ -167,7 +168,8 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 // For main runtime, it will be installed to {InstallPath}/v-{main_version}/{main_name}-{main_version}
 // For additional runtimes, it will be installed to {InstallPath}/v-{main_version}/add-{addition_name}-{addition_version}
 func (b *impl) Install(version Version) error {
-	return b.install(version, false)
+	_, err := b.InstallResolved(version, false)
+	return err
 }
 
 // Reinstall replaces an installed version with a fresh copy, for example after
@@ -176,21 +178,22 @@ func (b *impl) Install(version Version) error {
 // own its files. If the new installation fails the old one is gone, as with any
 // failed installation.
 func (b *impl) Reinstall(version Version) error {
-	return b.install(version, true)
+	_, err := b.InstallResolved(version, true)
+	return err
 }
 
-func (b *impl) install(version Version, reinstall bool) (installErr error) {
+func (b *impl) InstallResolved(version Version, reinstall bool) (installed Version, installErr error) {
 	label := b.Label(version)
 	logger.Debugf("Installing SDK: %s (reinstall: %v)\n", label, reinstall)
 
 	if reinstall {
 		if target, linked := b.linkedTarget(version); linked {
-			return fmt.Errorf("%s is linked to %s and was not installed by vfox; `vfox uninstall %s` removes the link", label, target, label)
+			return "", fmt.Errorf("%s is linked to %s and was not installed by vfox; `vfox uninstall %s` removes the link", label, target, label)
 		}
 	} else if b.CheckRuntimeExist(version) {
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists\n", label)
-		return nil
+		return version, nil
 	}
 
 	ctx := &plugin.PreInstallHookCtx{
@@ -199,14 +202,14 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 	logger.Debugf("Calling PreInstall hook for %s\n", label)
 	installInfo, err := b.plugin.PreInstall(ctx)
 	if b.plugin.IsNoResultProvided(err) {
-		return fmt.Errorf("no installable runtime provided")
+		return "", fmt.Errorf("no installable runtime provided")
 	}
 	if err != nil {
 		logger.Debugf("PreInstall hook failed for %s: %v\n", label, err)
-		return fmt.Errorf("plugin [PreInstall] method error: %w", err)
+		return "", fmt.Errorf("plugin [PreInstall] method error: %w", err)
 	}
 	if installInfo == nil || installInfo.PreInstallPackageItem == nil {
-		return fmt.Errorf("no information about the current version")
+		return "", fmt.Errorf("no information about the current version")
 	}
 
 	mainSdk := installInfo.PreInstallPackageItem
@@ -218,12 +221,12 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 	label = b.Label(sdkVersion)
 	logger.Debugf("Resolved version: %s\n", sdkVersion)
 	if reinstall && sdkVersion != version {
-		return fmt.Errorf("%s resolves to %s; give the exact installed version to reinstall it", b.Label(version), label)
+		return "", fmt.Errorf("%s resolves to %s; give the exact installed version to reinstall it", b.Label(version), label)
 	}
 	newDirPath := b.packagePath(sdkVersion)
 	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(sdkVersion)+".lock"))
 	if err != nil {
-		return fmt.Errorf("cannot install %s: %w", label, err)
+		return "", fmt.Errorf("cannot install %s: %w", label, err)
 	}
 	defer func() {
 		if err := lock.Close(); err != nil {
@@ -234,7 +237,7 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 	if !reinstall && b.CheckRuntimeExist(sdkVersion) {
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists after version resolution\n", label)
-		return nil
+		return sdkVersion, nil
 	}
 	success := false
 	logger.Debugf("Installing to path: %s\n", newDirPath)
@@ -242,7 +245,7 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 	// before removing files still held open by a child process on Windows.
 	markerPath := b.installMarkerPath(sdkVersion)
 	if err := os.WriteFile(markerPath, nil, 0600); err != nil {
-		return fmt.Errorf("mark installation in progress: %w", err)
+		return "", fmt.Errorf("mark installation in progress: %w", err)
 	}
 	// Ordinary errors clean up immediately. Process termination leaves the
 	// marker behind and releases the OS lock; the next attempt can retry.
@@ -256,14 +259,14 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 		}
 	}()
 	if err := os.RemoveAll(newDirPath); err != nil {
-		return fmt.Errorf("remove interrupted installation: %w", err)
+		return "", fmt.Errorf("remove interrupted installation: %w", err)
 	}
 	installedPackage := make(map[string]*plugin.InstalledPackageItem)
 
 	path, err := b.preInstallSdk(mainSdk, filepath.Join(newDirPath, b.runtimePathDirName(true, mainSdk)))
 
 	if err != nil {
-		return err
+		return "", err
 	}
 	installedPackage[mainSdk.Name] = &plugin.InstalledPackageItem{
 		Name:    mainSdk.Name,
@@ -276,7 +279,7 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 		for _, oSdk := range installInfo.Addition {
 			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, b.runtimePathDirName(false, oSdk)))
 			if err != nil {
-				return err
+				return "", err
 			}
 			installedPackage[oSdk.Name] = &plugin.InstalledPackageItem{
 				Name:    oSdk.Name,
@@ -294,14 +297,14 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 		logger.Debugf("Running post-installation steps...\n")
 		err = b.plugin.PostInstall(postCtx)
 		if err != nil {
-			return fmt.Errorf("plugin [PostInstall] method error: %w", err)
+			return "", fmt.Errorf("plugin [PostInstall] method error: %w", err)
 		}
 	}
 	// The receipt goes in before the marker comes off, so a finished
 	// installation always has one.
 	b.recordInstall(version, sdkVersion, installInfo, installedPackage, newDirPath)
 	if err := os.Remove(markerPath); err != nil {
-		return fmt.Errorf("finish installation: %w", err)
+		return "", fmt.Errorf("finish installation: %w", err)
 	}
 	success = true
 	pterm.Printf("Install %s success! \n", pterm.LightGreen(label))
@@ -317,7 +320,7 @@ func (b *impl) install(version Version, reinstall bool) (installErr error) {
 		// Silently ignore clipboard errors (not supported, utility not found, etc.)
 	}
 
-	return nil
+	return sdkVersion, nil
 }
 
 // recordInstall leaves the receipt of a finished installation in its version

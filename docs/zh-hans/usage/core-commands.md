@@ -54,7 +54,7 @@ vfox i <sdk-name>@<version>
 
 - `-a, --all`: 安装 .vfox.toml 中记录的所有 SDK 版本
 - `-y, --yes`: 直接安装，跳过确认提示
-- `-u, --use`: 安装完成后在当前 shell 会话中使用该版本，等同于 `vfox use`，因此同样需要已激活的 shell（`vfox activate`）。不能与 `--all` 同时使用。
+- `-u, --use`: 安装完成后在当前 shell 会话中使用该版本，等同于 `vfox use`，因此同样需要已激活的 shell（`vfox activate`）。不能与 `--all` 同时使用，必须指定版本（不会进入选择器），每个 SDK 只能指定一个版本。
 - `--reinstall`: 用全新的副本替换已安装的版本，例如 SDK 在原地改动过自己之后（见 [Doctor](#doctor)）。版本号需与已安装的完全一致。通过 [`vfox link`](#link) 登记的版本不能重装。
 
 ::: tip 自动安装
