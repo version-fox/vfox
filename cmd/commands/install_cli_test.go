@@ -112,6 +112,17 @@ func TestInstallCommandUseWhenTheResolvedVersionIsAlreadyInstalled(t *testing.T)
 	mustContain(t, "session config", readFile(t, filepath.Join(f.userHome, "tmp", "test-session", ".vfox.toml")), `beta = "2.0.0"`)
 }
 
+// A second run of a setup script asks to use a version that is already on disk:
+// that takes the early return in InstallResolved, which has to hand the version
+// back like an install does.
+func TestInstallCommandUseOnAnInstalledVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.run(t, "install", "alpha@1.0.0").mustSucceed(t, "install alpha@1.0.0")
+	out := f.run(t, "install", "-u", "alpha@1.0.0").mustSucceed(t, "install -u alpha@1.0.0").output()
+	mustContain(t, "install -u", out, "already installed", "Now using")
+	mustContain(t, "session config", readFile(t, filepath.Join(f.userHome, "tmp", "test-session", ".vfox.toml")), `alpha = "1.0.0"`)
+}
+
 func TestInstallCommandUseFlagRefusesTwoVersionsOfOneSDK(t *testing.T) {
 	f := newCLIFixture(t, false)
 
