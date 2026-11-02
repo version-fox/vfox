@@ -182,6 +182,12 @@ func (b *impl) Reinstall(version Version) error {
 	return err
 }
 
+// InstallResolved installs version, or with reinstall replaces it, and returns the
+// version that is on disk afterwards. That is the version PreInstall resolved the
+// request to, which can differ from the one asked for (`lts` becoming `2.0.0`); if
+// the version as given is already installed it is returned as is and PreInstall is
+// not called. The version is only meaningful when err is nil. Install and Reinstall
+// wrap this for callers that do not need it.
 func (b *impl) InstallResolved(version Version, reinstall bool) (installed Version, installErr error) {
 	label := b.Label(version)
 	logger.Debugf("Installing SDK: %s (reinstall: %v)\n", label, reinstall)

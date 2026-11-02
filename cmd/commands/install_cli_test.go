@@ -34,7 +34,7 @@ func TestInstallCommandUseFlag(t *testing.T) {
 }
 
 // A plugin may install something other than what was asked for: the switch has to
-// follow the receipt to the version that is really on disk.
+// follow the version InstallResolved hands back, the one that is really on disk.
 const rewritingPlugin = `PLUGIN = {name="beta", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 function PLUGIN:Available(ctx) return {{version="lts"}, {version="2.0.0"}} end
 function PLUGIN:PreInstall(ctx)
@@ -79,8 +79,7 @@ func TestInstallCommandUseFlagRefusedWithAll(t *testing.T) {
 }
 
 // The request may resolve to a different version from one run to the next: the
-// switch has to follow the current resolution, not an older receipt that says the
-// same thing.
+// switch has to follow the current resolution, not the one from an earlier run.
 const movingPlugin = `PLUGIN = {name="beta", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 function PLUGIN:Available(ctx) return {{version="lts"}} end
 function PLUGIN:PreInstall(ctx)
