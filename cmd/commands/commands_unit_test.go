@@ -55,7 +55,7 @@ func TestSplitDoctorSpec(t *testing.T) {
 		{"nodejs", "nodejs", ""},
 		{"NodeJS", "nodejs", ""},
 		{"nodejs@24.21.0", "nodejs", "24.21.0"},
-		{"nodejs@v24.21.0", "nodejs", "v24.21.0"}, // the spelling `vfox current` prints; whether the v goes is for ResolveVersionName
+		{"nodejs@v24.21.0", "nodejs", "v24.21.0"}, // a conventional spelling; whether the v goes is for ResolveVersionName
 		{"java@vendor", "java", "vendor"},
 		{"nodejs@", "nodejs", ""},
 	}
