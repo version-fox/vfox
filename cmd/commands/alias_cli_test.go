@@ -35,7 +35,7 @@ func TestAliasCommandEndToEnd(t *testing.T) {
 
 	out = f.run(t, "alias", "set", "alpha", "j17", "17.0.9-tem").mustSucceed(t, "alias set").output()
 	mustContain(t, "alias set", out, "alpha@j17", "alpha@17.0.9-tem")
-	f.run(t, "alias", "set", "alpha", "j21", "v21.0.1-graal").mustSucceed(t, "alias set with the leading v that `vfox current` prints")
+	f.run(t, "alias", "set", "alpha", "j21", "v21.0.1-graal").mustSucceed(t, "alias set with a conventional leading v")
 
 	t.Run("they are listed", func(t *testing.T) {
 		out := f.run(t, "alias", "list").mustSucceed(t, "alias list").stdout
