@@ -48,6 +48,10 @@ func (d *Downloader) Download(url *url.URL) (string, error) {
 		return "", errors.New("source file not found")
 	}
 
+	if err = UnexpectedStatusError(resp, url.String()); err != nil {
+		return "", err
+	}
+
 	path := filepath.Join(d.LocalPath, filepath.Base(url.Path))
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)

@@ -17,8 +17,11 @@
 package internal
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -261,7 +264,7 @@ func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
 	// Simulate the activate.go scenario with multiple SDKs being looked up concurrently
 	// This is what was causing the concurrent map writes error
 	sdkNames := []string{"nodejs", "python", "java", "go", "ruby", "rust"}
-	
+
 	var wg sync.WaitGroup
 	wg.Add(len(sdkNames))
 
@@ -283,3 +286,44 @@ func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
 	wg.Wait()
 }
 
+func TestDownloadPluginRejectsUnexpectedStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("<html>refused</html>"))
+	}))
+	defer srv.Close()
+
+	pluginsDir := t.TempDir()
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: pluginsDir}},
+	}}
+
+	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 403 Forbidden") {
+		t.Fatalf("downloadPlugin() error = %v, want unexpected HTTP status 403 Forbidden", err)
+	}
+
+	entries, readErr := os.ReadDir(pluginsDir)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		t.Fatalf("read plugins dir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("downloadPlugin() saved %d file(s) for an HTTP 403 response, want none", len(entries))
+	}
+}
+
+func TestDownloadPluginKeepsNotFoundMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "plugin not found") {
+		t.Fatalf("downloadPlugin() error = %v, want plugin not found", err)
+	}
+}

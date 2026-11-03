@@ -1079,12 +1079,12 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return "", errors.New("source file not found")
-		}
+	if resp.StatusCode == http.StatusNotFound {
+		return "", errors.New("source file not found")
+	}
 
-		return "", fmt.Errorf("download failed: server returned %s for %s", resp.Status, u)
+	if err = util.UnexpectedStatusError(resp, u.String()); err != nil {
+		return "", err
 	}
 
 	err = os.MkdirAll(b.InstallPath, 0755)

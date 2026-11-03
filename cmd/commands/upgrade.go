@@ -96,16 +96,22 @@ func generateUrls(currVersion string, tagName string) (string, string) {
 }
 
 func downloadFile(c *http.Client, filepath string, url string) error {
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
 	resp, err := c.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if err = util.UnexpectedStatusError(resp, url); err != nil {
+		return err
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
 	_, err = io.Copy(out, resp.Body)
 	return err
 }

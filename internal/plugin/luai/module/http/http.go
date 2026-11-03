@@ -32,6 +32,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 type Module struct {
@@ -227,6 +228,10 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		L.Push(lua.LString("file not found"))
+		return 1
+	}
+	if err := util.UnexpectedStatusError(resp, urlStr.String()); err != nil {
+		L.Push(lua.LString(err.Error()))
 		return 1
 	}
 	out, err := os.Create(fp)

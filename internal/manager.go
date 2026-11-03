@@ -457,6 +457,11 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", fmt.Errorf("plugin not found at %s", downloadUrl)
 	}
 
+	if err = util.UnexpectedStatusError(resp, downloadUrl); err != nil {
+		logger.Debugf("Unexpected HTTP status when downloading plugin: %v\n", err)
+		return "", err
+	}
+
 	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, filepath.Base(downloadUrl))
 	logger.Debugf("Saving plugin to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
