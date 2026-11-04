@@ -19,6 +19,7 @@ package internal
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -325,5 +326,34 @@ func TestDownloadPluginKeepsNotFoundMessage(t *testing.T) {
 
 	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "plugin not found") {
 		t.Fatalf("downloadPlugin() error = %v, want plugin not found", err)
+	}
+}
+
+func TestDownloadPluginNotFoundRedactsPassword(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	u, err := url.Parse(srv.URL + "/plugin.zip")
+	if err != nil {
+		t.Fatalf("parse test server URL: %v", err)
+	}
+	u.User = url.UserPassword("user", "s3cret")
+
+	_, err = m.downloadPlugin(u.String())
+	if err == nil || !strings.Contains(err.Error(), "plugin not found") {
+		t.Fatalf("downloadPlugin() error = %v, want plugin not found", err)
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("downloadPlugin() error = %v, want the URL password redacted", err)
+	}
+	if !strings.Contains(err.Error(), "user:xxxxx@") {
+		t.Fatalf("downloadPlugin() error = %v, want the redacted userinfo in the URL", err)
 	}
 }

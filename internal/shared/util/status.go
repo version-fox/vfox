@@ -30,10 +30,14 @@ func UnexpectedStatusError(resp *http.Response, sourceURL string) error {
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-	return fmt.Errorf("unexpected HTTP status %s for %s", resp.Status, redactSourceURL(sourceURL))
+	return fmt.Errorf("unexpected HTTP status %s for %s", resp.Status, RedactSourceURL(sourceURL))
 }
 
-func redactSourceURL(raw string) string {
+// RedactSourceURL hides the password in a URL's userinfo, so a source URL with
+// credentials can be shown in errors and debug logs without leaking the secret.
+// Anything that is not an absolute URL with a host is returned unchanged, so
+// local file paths pass through as given.
+func RedactSourceURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return raw
