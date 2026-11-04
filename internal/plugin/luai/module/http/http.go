@@ -18,12 +18,14 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -50,6 +52,16 @@ type Options struct {
 }
 
 type requestStateKey struct{}
+
+// redactError passes a *url.Error through util.RedactURLError, so the error a
+// plugin receives cannot echo the credentials or query tokens of its URL.
+func redactError(err error) string {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return util.RedactURLError(urlErr).Error()
+	}
+	return err.Error()
+}
 
 // RequestState identifies the invoking Lua thread for synchronous transports,
 // including requests made inside a coroutine.
@@ -94,7 +106,7 @@ func (m *Module) Get(L *lua.LState) int {
 	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 2
 	}
 
@@ -111,7 +123,7 @@ func (m *Module) Get(L *lua.LState) int {
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 2
 	}
 	defer resp.Body.Close()
@@ -148,7 +160,7 @@ func (m *Module) Head(L *lua.LState) int {
 	req, err := http.NewRequestWithContext(requestContext(L), "HEAD", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 2
 	}
 	headersTable := param.RawGetString("headers")
@@ -164,7 +176,7 @@ func (m *Module) Head(L *lua.LState) int {
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 2
 	}
 	defer resp.Body.Close()
@@ -208,7 +220,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 
 	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 1
 	}
 	headersTable := param.RawGetString("headers")
@@ -222,7 +234,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 	m.ensureUserAgent(L, req)
 	resp, err := m.downloadClient.Do(req)
 	if err != nil {
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(redactError(err)))
 		return 1
 	}
 	defer resp.Body.Close()
@@ -242,8 +254,8 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 	defer out.Close()
 
 	desc := "Downloading..."
-	if filepath.Ext(urlStr.String()) != "" {
-		desc = filepath.Base(urlStr.String())
+	if name := path.Base(req.URL.Path); filepath.Ext(name) != "" {
+		desc = name
 	}
 
 	bar := progressbar.NewOptions64(

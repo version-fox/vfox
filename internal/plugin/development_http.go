@@ -26,6 +26,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
 	luahttp "github.com/version-fox/vfox/internal/plugin/luai/module/http"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // developmentTransport is confined to one VM. RoundTrip never starts Lua work
@@ -42,7 +43,7 @@ func (t *developmentTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 	if t.handler == nil {
 		if !t.online {
-			return nil, fmt.Errorf("HTTP is disabled offline: %s %s", req.Method, req.URL)
+			return nil, fmt.Errorf("HTTP is disabled offline: %s %s", req.Method, util.RedactSourceURL(req.URL.String()))
 		}
 		return t.fallback.RoundTrip(req)
 	}

@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -301,27 +302,20 @@ func (m *Manager) Update(pluginName string) error {
 		address := m.GetRegistryAddress(pluginMetadata.Name + ".json")
 		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(address))
 		registryManifest, err := m.fetchPluginManifest(address)
+		if errors.Is(err, ManifestNotFound) && pluginMetadata.ManifestUrl != "" {
+			// A plugin installed from outside the registry is updated from the
+			// manifest its manifestUrl points to.
+			logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(pluginMetadata.ManifestUrl))
+			registryManifest, err = m.fetchPluginManifest(pluginMetadata.ManifestUrl)
+		}
+		if errors.Is(err, ManifestNotFound) {
+			return fmt.Errorf("%s plugin not support update", pluginName)
+		}
 		if err != nil {
-			if errors.Is(err, ManifestNotFound) {
-				if pluginMetadata.ManifestUrl != "" {
-					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(pluginMetadata.ManifestUrl))
-					du, err := m.fetchPluginManifest(pluginMetadata.ManifestUrl)
-					if err != nil {
-						return err
-					}
-					if util.CompareVersion(du.Version, pluginMetadata.Version) <= 0 {
-						pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
-						return nil
-					}
-					downloadUrl = du.DownloadUrl
-				} else {
-					return fmt.Errorf("%s plugin not support update", pluginName)
-				}
-			}
 			return err
 		}
 		if util.CompareVersion(registryManifest.Version, pluginMetadata.Version) <= 0 {
-			pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
+			pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
 			return nil
 		}
 		downloadUrl = registryManifest.DownloadUrl
@@ -395,6 +389,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 
 	resp, err := m.RuntimeEnvContext.HttpClient().Get(url)
 	if err != nil {
+		err = redactURLError(err)
 		logger.Debugf("Failed to fetch manifest: %v\n", err)
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
@@ -427,12 +422,35 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 	return &plugin, nil
 }
 
+// pluginFileName derives the local file name of a downloaded plugin from the
+// path of its URL, so a query is never printed or written to disk. A URL whose
+// path carries no file name falls back to "plugin" plus the extension.
+func pluginFileName(downloadUrl string) string {
+	if u, err := url.Parse(downloadUrl); err == nil {
+		if name := path.Base(u.Path); name != "." && name != "/" {
+			return name
+		}
+	}
+	return "plugin" + filepath.Ext(downloadUrl)
+}
+
+// redactURLError passes a *url.Error through util.RedactURLError, so the URL
+// it prints loses credentials and query tokens; any other error is unchanged.
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return util.RedactURLError(urlErr)
+	}
+	return err
+}
+
 // downloadPlugin download plugin from downloadUrl to plugin home directory.
 func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	logger.Debugf("Downloading plugin from: %s\n", util.RedactSourceURL(downloadUrl))
 
 	req, err := http.NewRequest("GET", downloadUrl, nil)
 	if err != nil {
+		err = redactURLError(err)
 		logger.Debugf("Failed to create HTTP request: %v\n", err)
 		return "", err
 	}
@@ -446,6 +464,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 				return "", errors.New("request timeout")
 			}
 		}
+		err = redactURLError(err)
 		logger.Debugf("Failed to download plugin: %v\n", err)
 		return "", err
 	}
@@ -462,7 +481,8 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", err
 	}
 
-	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, filepath.Base(downloadUrl))
+	fileName := pluginFileName(downloadUrl)
+	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, fileName)
 	logger.Debugf("Saving plugin to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -470,7 +490,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	fmt.Printf("Downloading %s... \n", filepath.Base(downloadUrl))
+	fmt.Printf("Downloading %s... \n", fileName)
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
 		logger.Debugf("Failed to write plugin file: %v\n", err)
@@ -585,8 +605,11 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 
 	ext := filepath.Ext(path)
 	if ext != ".lua" && ext != ".zip" {
-		logger.Debugf("Unsupported plugin type: %s\n", ext)
-		return nil, fmt.Errorf("unsupported %s type wrapper to install, only support .lua or .zip", ext)
+		// Print the extension of the redacted path: a source URL can carry
+		// credentials or a query token that the message must not echo.
+		shown := filepath.Ext(util.RedactSourceURL(path))
+		logger.Debugf("Unsupported plugin type: %s\n", shown)
+		return nil, fmt.Errorf("unsupported %s type wrapper to install, only support .lua or .zip", shown)
 	}
 	localPath := path
 	// remote file, download it first to local file.
@@ -653,7 +676,7 @@ func (m *Manager) Available() (RegistryIndex, error) {
 	client := m.RuntimeEnvContext.HttpClient()
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
-		return nil, fmt.Errorf("get plugin index error: %w", err)
+		return nil, fmt.Errorf("get plugin index error: %w", redactURLError(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

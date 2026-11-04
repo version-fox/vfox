@@ -239,6 +239,26 @@ assert(p:Available({})[1].version == "1.2.3")
 	}
 }
 
+func TestDevelopmentOfflineRedactsURL(t *testing.T) {
+	dir := t.TempDir()
+	writePluginFile(t, dir, "main.lua", minimalPlugin+`
+local http = require("http")
+function PLUGIN:Available(ctx)
+  local response, err = http.get({url="http://user:s3cret@127.0.0.1:1/releases?token=abc123"})
+  assert(response, err)
+  return {}
+end
+`)
+	file := writePluginFile(t, dir, "tests/case_test.lua", `require("vfox.test").load():Available({})`)
+	err := TestDevelopmentFile(context.Background(), dir, file, developmentOptions())
+	if err == nil || !strings.Contains(err.Error(), "HTTP is disabled offline") {
+		t.Fatalf("error = %v, want the offline message", err)
+	}
+	if strings.Contains(err.Error(), "s3cret") || strings.Contains(err.Error(), "abc123") {
+		t.Fatalf("error = %v, want the password and the query token redacted", err)
+	}
+}
+
 func TestDevelopmentVMIsolationAndStubs(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("VFOX_PLUGIN_TEST_SECRET", "host")

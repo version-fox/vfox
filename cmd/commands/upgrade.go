@@ -41,11 +41,16 @@ var Upgrade = &cli.Command{
 }
 
 func fetchLatestVersion(c *http.Client) (string, error) {
-	resp, err := c.Get("https://github.com/version-fox/vfox/tags")
+	const tagsURL = "https://github.com/version-fox/vfox/tags"
+	resp, err := c.Get(tagsURL)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if err = util.UnexpectedStatusError(resp, tagsURL); err != nil {
+		return "", err
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

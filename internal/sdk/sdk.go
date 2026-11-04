@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -354,18 +355,36 @@ func (b *impl) recordInstall(requested, version Version, info *plugin.PreInstall
 }
 
 func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath string) error {
-	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
+	pterm.Printf("Moving %s to %s...\n", util.RedactSourceURL(info.Path), targetPath)
 	if err := util.MoveFiles(info.Path, targetPath); err != nil {
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			// A PreInstall source can be a URL with credentials, and the
+			// PathError prints its Path, so the copy the user sees is redacted.
+			redacted := *pathErr
+			redacted.Path = util.RedactSourceURL(pathErr.Path)
+			err = &redacted
+		}
 		return fmt.Errorf("failed to move file, err:%w", err)
 	}
 	return nil
+}
+
+// redactURLError passes a *url.Error through util.RedactURLError, so the URL
+// it prints loses credentials and query tokens; any other error is unchanged.
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return util.RedactURLError(urlErr)
+	}
+	return err
 }
 
 func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath string) error {
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
-		return err
+		return redactURLError(err)
 	}
 	filePath, err := b.Download(u, info.Headers)
 	if err != nil {
@@ -1074,7 +1093,7 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 				return "", errors.New("request timeout")
 			}
 		}
-		return "", err
+		return "", redactURLError(err)
 	}
 
 	defer resp.Body.Close()

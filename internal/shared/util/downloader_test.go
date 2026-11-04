@@ -82,3 +82,26 @@ func TestDownloaderSavesSuccessfulResponse(t *testing.T) {
 		t.Fatalf("downloaded content = %q, want %q", got, body)
 	}
 }
+
+// The errors returned for a failed request must not echo the credentials or
+// the query tokens of the URL, whether the request fails to parse or to
+// connect.
+func TestDownloaderRedactsRequestErrors(t *testing.T) {
+	d := NewDownloader(t.TempDir())
+
+	// A space in the host is percent-encoded by URL.String, and http.NewRequest
+	// rejects the encoded escape in the host.
+	unparsable := &url.URL{Scheme: "http", User: url.UserPassword("user", "s3cret"), Host: "in valid", Path: "/repro.zip", RawQuery: "token=abc123"}
+	if _, err := d.Download(unparsable); err == nil {
+		t.Fatal("Download() error = nil, want a parse error")
+	} else if msg := err.Error(); strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Download() error = %q, want the credentials redacted", msg)
+	}
+
+	refused := &url.URL{Scheme: "http", User: url.UserPassword("user", "s3cret"), Host: "127.0.0.1:1", Path: "/repro.zip", RawQuery: "token=abc123"}
+	if _, err := d.Download(refused); err == nil {
+		t.Fatal("Download() error = nil, want a connection error")
+	} else if msg := err.Error(); strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Download() error = %q, want the credentials and the query token redacted", msg)
+	}
+}

@@ -357,3 +357,123 @@ func TestDownloadPluginNotFoundRedactsPassword(t *testing.T) {
 		t.Fatalf("downloadPlugin() error = %v, want the redacted userinfo in the URL", err)
 	}
 }
+
+func TestFetchPluginManifestRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+	}}
+
+	_, err := m.fetchPluginManifest("http://user:s3cret@127.0.0.1:1/manifest.json?token=abc123")
+	if err == nil {
+		t.Fatal("fetchPluginManifest() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("fetchPluginManifest() error = %q, want the password and the query token redacted", msg)
+	}
+	if !strings.Contains(msg, "user:xxxxx@") || !strings.Contains(msg, "token=xxxxx") {
+		t.Fatalf("fetchPluginManifest() error = %q, want the redacted userinfo and query", msg)
+	}
+}
+
+func TestDownloadPluginRedactsRequestError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	_, err := m.downloadPlugin("http://user:Zq9%ss@127.0.0.1/plugin.zip")
+	if err == nil {
+		t.Fatal("downloadPlugin() error = nil, want a parse error")
+	}
+	if msg := err.Error(); strings.Contains(msg, "Zq9") || strings.Contains(msg, "%ss") {
+		t.Fatalf("downloadPlugin() error = %q, want the rejected URL credentials hidden", msg)
+	}
+}
+
+func TestDownloadPluginRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	_, err := m.downloadPlugin("http://user:s3cret@127.0.0.1:1/plugin.zip?token=abc123")
+	if err == nil {
+		t.Fatal("downloadPlugin() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("downloadPlugin() error = %q, want the password and the query token redacted", msg)
+	}
+}
+
+func TestAvailableRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{
+			Proxy:    config.EmptyProxy,
+			Registry: &config.Registry{Address: "http://user:s3cret@127.0.0.1:1/registry?token=abc123"},
+		},
+	}}
+
+	_, err := m.Available()
+	if err == nil {
+		t.Fatal("Available() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Available() error = %q, want the registry credentials redacted", msg)
+	}
+}
+
+func TestInstallPluginToTempRedactsUnsupportedExtension(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+	}}
+
+	_, err := m.installPluginToTemp("http://user:s3cret@example.com/plugin.txt?token=abc123")
+	if err == nil {
+		t.Fatal("installPluginToTemp() error = nil, want an unsupported type error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("installPluginToTemp() error = %q, want the password and the query token redacted", msg)
+	}
+	if !strings.Contains(msg, "token=xxxxx") {
+		t.Fatalf("installPluginToTemp() error = %q, want the masked query in the extension", msg)
+	}
+}
+
+func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
+	const body = "plugin bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	// The query is never part of the saved file name.
+	path, err := m.downloadPlugin(srv.URL + "/dl?token=abc123&file=plugin.zip")
+	if err != nil {
+		t.Fatalf("downloadPlugin() error = %v", err)
+	}
+	if base := filepath.Base(path); base != "dl" {
+		t.Fatalf("downloadPlugin() file name = %q, want the base of the URL path", base)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != body {
+		t.Fatalf("downloaded content = %q, err = %v", got, err)
+	}
+
+	// A URL whose path has no file name falls back to "plugin" plus the extension.
+	path, err = m.downloadPlugin(srv.URL + "/?file=plugin.zip")
+	if err != nil {
+		t.Fatalf("downloadPlugin() error = %v", err)
+	}
+	if base := filepath.Base(path); base != "plugin.zip" {
+		t.Fatalf("downloadPlugin() file name = %q, want plugin.zip", base)
+	}
+}

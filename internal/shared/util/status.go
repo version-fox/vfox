@@ -17,9 +17,11 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // UnexpectedStatusError returns nil for HTTP 200 and otherwise an error naming
@@ -33,14 +35,108 @@ func UnexpectedStatusError(resp *http.Response, sourceURL string) error {
 	return fmt.Errorf("unexpected HTTP status %s for %s", resp.Status, RedactSourceURL(sourceURL))
 }
 
-// RedactSourceURL hides the password in a URL's userinfo, so a source URL with
-// credentials can be shown in errors and debug logs without leaking the secret.
-// Anything that is not an absolute URL with a host is returned unchanged, so
-// local file paths pass through as given.
+// RedactSourceURL masks the credentials and the query values of a URL, so a
+// source URL can be shown in errors, messages and debug logs without leaking
+// secrets. A user name that comes with a password stays visible with the
+// password hidden, a user name on its own is masked the way pip masks it
+// (****@host), and query keys are kept with their values masked. Anything that
+// is not an absolute URL with a host, such as a local file path, is returned
+// unchanged. A string that starts with scheme:// but that url.Parse rejects,
+// for example a password with a bare %, loses everything between "://" and its
+// last "@", and its query.
 func RedactSourceURL(raw string) string {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
+	if err != nil {
+		return redactUnparsableURL(raw)
+	}
+	if u.Scheme == "" || u.Host == "" {
 		return raw
 	}
-	return u.Redacted()
+	if u.RawQuery != "" {
+		u.RawQuery = redactQueryValues(u.RawQuery)
+	}
+	if u.User == nil {
+		return u.String()
+	}
+	// The masked userinfo is rendered by hand, because url.Userinfo.String
+	// escapes the "*" the masks use. A user name that comes with a password
+	// stays visible; a user name on its own is masked the way pip masks it.
+	var userinfo string
+	if _, ok := u.User.Password(); ok {
+		userinfo = url.User(u.User.Username()).String() + ":xxxxx@"
+	} else {
+		userinfo = "****@"
+	}
+	u.User = nil
+	s := u.String()
+	if i := strings.Index(s, "://"); i >= 0 {
+		return s[:i+len("://")] + userinfo + s[i+len("://"):]
+	}
+	return s
+}
+
+// redactQueryValues keeps every key of a query string and masks its value, so
+// a token passed as ?token=... cannot leak while the parameter names stay
+// readable.
+func redactQueryValues(rawQuery string) string {
+	parts := strings.Split(rawQuery, "&")
+	for i, part := range parts {
+		if key, _, found := strings.Cut(part, "="); found {
+			parts[i] = key + "=xxxxx"
+		}
+	}
+	return strings.Join(parts, "&")
+}
+
+// redactUnparsableURL handles a string that starts with scheme:// but that
+// url.Parse rejected, for example a password with a bare %: everything between
+// "://" and the last "@" is hidden and the query is dropped, so the rejected
+// credential is not echoed back as given.
+func redactUnparsableURL(raw string) string {
+	scheme, rest, found := strings.Cut(raw, "://")
+	if !found || !isURLScheme(scheme) {
+		return raw
+	}
+	if i := strings.LastIndex(rest, "@"); i >= 0 {
+		rest = "xxxxx@" + rest[i+1:]
+	}
+	if i := strings.IndexByte(rest, '?'); i >= 0 {
+		rest = rest[:i]
+	}
+	return scheme + "://" + rest
+}
+
+// isURLScheme reports whether s follows the scheme syntax of RFC 3986, so a
+// Windows path or a local path that merely contains "://" is left alone.
+func isURLScheme(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z':
+		case '0' <= c && c <= '9', c == '+', c == '-', c == '.':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+// RedactURLError returns a copy of err with its URL passed through
+// RedactSourceURL, so the errors that net/http and net/url build cannot echo
+// credentials or query tokens: net/http masks only the password, and net/url
+// quotes the input it rejects, so a parse error whose URL had something to
+// hide also gets a reason that does not quote the input.
+func RedactURLError(err *url.Error) *url.Error {
+	if err == nil {
+		return nil
+	}
+	redacted := *err
+	redacted.URL = RedactSourceURL(err.URL)
+	if err.Op == "parse" && redacted.URL != err.URL {
+		redacted.Err = errors.New("invalid URL")
+	}
+	return &redacted
 }

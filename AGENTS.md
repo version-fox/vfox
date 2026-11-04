@@ -127,6 +127,8 @@ java = { version = "21", vendor = "openjdk" }
 ## Shared utilities
 
 - Keep filesystem, network, clipboard, and process effects explicit in utility contracts; keep SDK lifecycle and scope policy in their owning packages.
+- A download checks the response status with `util.UnexpectedStatusError` ([status.go](internal/shared/util/status.go)) before the file is created.
+- A URL that goes into an error, a message or a `--debug` line goes through `util.RedactSourceURL`; the error of a request or of `url.Parse` goes through `util.RedactURLError`.
 - Review synchronization when changing shared state. A mutex in one cache instance does not establish safety between instances or processes using the same file. Logger level changes are not synchronized.
 - `internal/shared/checksum.go` belongs to the existing `shared` package. File moves and package redesign require a task that calls for that refactoring.
 

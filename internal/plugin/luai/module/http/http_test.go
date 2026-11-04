@@ -17,12 +17,14 @@
 package http
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -159,6 +161,76 @@ func eval(str string, t *testing.T) {
 
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
+	}
+}
+
+// The errors returned to a plugin must not echo the credentials or the query
+// tokens of its URL, whether the request fails to parse or to connect.
+func TestURLErrorsAreRedacted(t *testing.T) {
+	cases := []struct {
+		name    string
+		url     string
+		secrets []string
+	}{
+		{"connection refused", "http://user:s3cret@127.0.0.1:1/file.zip?token=abc123", []string{"s3cret", "abc123"}},
+		{"rejected by url.Parse", `http://user:Zq9%ss@127.0.0.1/file.zip`, []string{"Zq9", "%ss"}},
+	}
+	for _, tc := range cases {
+		for _, method := range []string{"get", "head", "download_file"} {
+			t.Run(method+"/"+tc.name, func(t *testing.T) {
+				s := lua.NewState()
+				defer s.Close()
+				Preload(s, config.EmptyProxy, nil)
+				s.SetGlobal("url", lua.LString(tc.url))
+				s.SetGlobal("dest", lua.LString(filepath.Join(t.TempDir(), "out")))
+				script := fmt.Sprintf(`local http = require("http")
+local resp, err = http.%s({url = url})
+assert(resp == nil)
+assert(err ~= nil)
+errMsg = err`, method)
+				if method == "download_file" {
+					script = `local http = require("http")
+local err = http.download_file({url = url}, dest)
+assert(err ~= nil)
+errMsg = err`
+				}
+				if err := s.DoString(script); err != nil {
+					t.Fatal(err)
+				}
+				msg := s.GetGlobal("errMsg").String()
+				for _, secret := range tc.secrets {
+					if strings.Contains(msg, secret) {
+						t.Errorf("error = %q, want %q redacted", msg, secret)
+					}
+				}
+			})
+		}
+	}
+}
+
+// The progress bar label is the base of the URL path, so a query token is not
+// printed while a download runs.
+func TestDownloadFileLabelUsesURLPath(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("archive bytes"))
+	}))
+	defer srv.Close()
+
+	var out bytes.Buffer
+	s := lua.NewState()
+	defer s.Close()
+	PreloadWithOptions(s, config.EmptyProxy, nil, Options{Output: &out})
+	s.SetGlobal("url", lua.LString(srv.URL+"/file.zip?token=abc123"))
+	s.SetGlobal("dest", lua.LString(filepath.Join(t.TempDir(), "file.zip")))
+	if err := s.DoString(`local http = require("http"); assert(http.download_file({url = url}, dest) == nil)`); err != nil {
+		t.Fatal(err)
+	}
+	printed := out.String()
+	if !strings.Contains(printed, "file.zip") {
+		t.Fatalf("progress output = %q, want the file name as the label", printed)
+	}
+	if strings.Contains(printed, "abc123") {
+		t.Fatalf("progress output = %q, want the query token redacted", printed)
 	}
 }
 

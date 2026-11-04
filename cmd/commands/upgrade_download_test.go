@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -59,5 +60,27 @@ func TestDownloadFileSavesSuccessfulResponse(t *testing.T) {
 	}
 	if string(got) != body {
 		t.Fatalf("downloaded content = %q, want %q", got, body)
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// fetchLatestVersion names the status of a refused response instead of
+// reporting that no version was found in the error page.
+func TestFetchLatestVersionNamesTheStatus(t *testing.T) {
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Status:     "429 Too Many Requests",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("<html>rate limited</html>")),
+		}, nil
+	})}
+
+	_, err := fetchLatestVersion(client)
+	if err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 429 Too Many Requests") {
+		t.Fatalf("fetchLatestVersion() error = %v, want unexpected HTTP status 429 Too Many Requests", err)
 	}
 }

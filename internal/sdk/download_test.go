@@ -17,6 +17,7 @@
 package sdk
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -26,9 +27,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pterm/pterm"
+
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/plugin"
 )
 
 func newDownloadTestSDK(t *testing.T) *impl {
@@ -154,5 +158,60 @@ func TestSdk_Download_ErrorStatusRedactsPassword(t *testing.T) {
 	}
 	if !strings.Contains(msg, "unexpected HTTP status 403 Forbidden") {
 		t.Fatalf("Download() error = %q, want it to name the status", msg)
+	}
+}
+
+func TestSdk_Download_RedactsConnectionError(t *testing.T) {
+	u, err := url.Parse("http://user:s3cret@127.0.0.1:1/repro.zip?token=abc123")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+
+	sdk := newDownloadTestSDK(t)
+	_, err = sdk.Download(u, nil)
+	if err == nil {
+		t.Fatal("Download() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Download() error = %q, want the password and the query token redacted", msg)
+	}
+	if !strings.Contains(msg, "user:xxxxx@") || !strings.Contains(msg, "token=xxxxx") {
+		t.Fatalf("Download() error = %q, want the redacted userinfo and query", msg)
+	}
+}
+
+func TestSdk_MoveRemoteFileRedactsParseError(t *testing.T) {
+	sdk := newDownloadTestSDK(t)
+	err := sdk.moveRemoteFile(&plugin.PreInstallPackageItem{Path: "http://user:Zq9%ss@127.0.0.1/repro.zip"}, t.TempDir())
+	if err == nil {
+		t.Fatal("moveRemoteFile() error = nil, want a parse error")
+	}
+	if msg := err.Error(); strings.Contains(msg, "Zq9") || strings.Contains(msg, "%ss") {
+		t.Fatalf("moveRemoteFile() error = %q, want the rejected URL credentials hidden", msg)
+	}
+}
+
+func TestSdk_MoveLocalFileRedactsURL(t *testing.T) {
+	sdk := newDownloadTestSDK(t)
+	source := "ftp://user:s3cret@127.0.0.1:1/demo-1.0.0.zip?token=abc123"
+
+	var out bytes.Buffer
+	pterm.SetDefaultOutput(&out)
+	defer pterm.SetDefaultOutput(os.Stdout)
+
+	err := sdk.moveLocalFile(&plugin.PreInstallPackageItem{Path: source}, t.TempDir())
+	if err == nil {
+		t.Fatal("moveLocalFile() error = nil, want the missing source file reported")
+	}
+	if msg := err.Error(); strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("moveLocalFile() error = %q, want the password and the query token redacted", msg)
+	}
+	printed := out.String()
+	if !strings.Contains(printed, "Moving") {
+		t.Fatalf("moveLocalFile() printed %q, want the progress line", printed)
+	}
+	if strings.Contains(printed, "s3cret") || strings.Contains(printed, "abc123") {
+		t.Fatalf("moveLocalFile() printed %q, want the password and the query token redacted", printed)
 	}
 }

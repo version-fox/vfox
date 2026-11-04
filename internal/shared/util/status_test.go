@@ -17,7 +17,9 @@
 package util
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -46,4 +48,90 @@ func TestUnexpectedStatusError(t *testing.T) {
 	if !strings.Contains(msg, "/file.zip") {
 		t.Fatalf("error = %q, want the URL path to be kept", msg)
 	}
+}
+
+func TestRedactSourceURL(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"password", "http://user:s3cret@example.com/file.zip", "http://user:xxxxx@example.com/file.zip"},
+		{"user name without password", "http://tok3n@example.com/file.zip", "http://****@example.com/file.zip"},
+		{"query", "http://example.com/file.zip?token=abc123", "http://example.com/file.zip?token=xxxxx"},
+		{"password with query", "http://user:s3cret@example.com/file.zip?token=abc123", "http://user:xxxxx@example.com/file.zip?token=xxxxx"},
+		{"nothing to hide", "http://example.com/file.zip", "http://example.com/file.zip"},
+		{"rejected by url.Parse", "http://user:Zq9%ss@example.com/file.zip", "http://xxxxx@example.com/file.zip"},
+		{"rejected by url.Parse with a query", "http://example.com/%zz?token=abc123", "http://example.com/%zz"},
+		{"absolute path", "/tmp/plugin.zip", "/tmp/plugin.zip"},
+		{"relative path", "./plugin.zip", "./plugin.zip"},
+		{"path with a bare percent", "/tmp/100%/plugin.zip", "/tmp/100%/plugin.zip"},
+		{"windows path", `C:\plugins\plugin.zip`, `C:\plugins\plugin.zip`},
+		{"windows path with slashes", "C:/plugins/plugin.zip", "C:/plugins/plugin.zip"},
+		{"empty", "", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RedactSourceURL(tt.raw); got != tt.want {
+				t.Errorf("RedactSourceURL(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRedactURLError(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		if got := RedactURLError(nil); got != nil {
+			t.Fatalf("RedactURLError(nil) = %v, want nil", got)
+		}
+	})
+
+	t.Run("connection error", func(t *testing.T) {
+		err := &url.Error{
+			Op:  "Get",
+			URL: "http://user:s3cret@127.0.0.1:1/file.zip?token=abc123",
+			Err: errors.New("dial tcp 127.0.0.1:1: connect: connection refused"),
+		}
+		redacted := RedactURLError(err)
+		msg := redacted.Error()
+		if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+			t.Errorf("error = %q, want the password and the query token redacted", msg)
+		}
+		if !strings.Contains(msg, "user:xxxxx@") || !strings.Contains(msg, "token=xxxxx") {
+			t.Errorf("error = %q, want the redacted userinfo and query", msg)
+		}
+		if !strings.Contains(msg, "connection refused") {
+			t.Errorf("error = %q, want the reason kept", msg)
+		}
+		if err.URL == redacted.URL {
+			t.Errorf("RedactURLError must not mutate the original error")
+		}
+	})
+
+	t.Run("parse error with credentials", func(t *testing.T) {
+		err := &url.Error{
+			Op:  "parse",
+			URL: "http://user:Zq9%ss@127.0.0.1/file.zip",
+			Err: url.EscapeError("%ss"),
+		}
+		redacted := RedactURLError(err)
+		msg := redacted.Error()
+		if strings.Contains(msg, "Zq9") || strings.Contains(msg, "%ss") {
+			t.Errorf("error = %q, want the rejected input hidden", msg)
+		}
+		if !strings.Contains(msg, `parse "http://xxxxx@127.0.0.1/file.zip"`) {
+			t.Errorf("error = %q, want the redacted URL", msg)
+		}
+	})
+
+	t.Run("parse error without secrets keeps the reason", func(t *testing.T) {
+		err := &url.Error{
+			Op:  "parse",
+			URL: "http://127.0.0.1/%zz",
+			Err: url.EscapeError("%zz"),
+		}
+		redacted := RedactURLError(err)
+		if !strings.Contains(redacted.Error(), "%zz") {
+			t.Errorf("error = %q, want the original reason kept", redacted.Error())
+		}
+	})
 }
