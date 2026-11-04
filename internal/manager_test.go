@@ -479,3 +479,30 @@ func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
 		t.Fatalf("downloadPlugin() file name = %q, want plugin.zip", base)
 	}
 }
+
+func TestDownloadPluginKeepsBackslashPathsInPluginDir(t *testing.T) {
+	const body = "plugin bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	plugins := t.TempDir()
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: plugins}},
+	}}
+
+	// A backslash in the URL path, literal or as %5C, must not let the
+	// download escape the plugin directory on Windows, where filepath.Join
+	// splits at it.
+	for _, p := range []string{"/..\\evil.zip", "/..%5Cevil.zip", "/sub/..%5C..%5Cevil.zip"} {
+		saved, err := m.downloadPlugin(srv.URL + p)
+		if err != nil {
+			t.Fatalf("downloadPlugin(%q) error = %v", p, err)
+		}
+		if rel, err := filepath.Rel(plugins, saved); err != nil || rel != filepath.Base(saved) {
+			t.Fatalf("downloadPlugin() saved %q, want a file directly in %q", saved, plugins)
+		}
+	}
+}
