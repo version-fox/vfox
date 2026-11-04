@@ -370,21 +370,11 @@ func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath stri
 	return nil
 }
 
-// redactURLError passes a *url.Error through util.RedactURLError, so the URL
-// it prints loses credentials and query tokens; any other error is unchanged.
-func redactURLError(err error) error {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		return util.RedactURLError(urlErr)
-	}
-	return err
-}
-
 func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath string) error {
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
-		return redactURLError(err)
+		return util.RedactError(err)
 	}
 	filePath, err := b.Download(u, info.Headers)
 	if err != nil {
@@ -1079,7 +1069,7 @@ func (b *impl) packagePath(version Version) string {
 func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return "", err
+		return "", util.RedactError(err)
 	}
 	for key, value := range headers {
 		req.Header.Add(key, value)
@@ -1093,7 +1083,7 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 				return "", errors.New("request timeout")
 			}
 		}
-		return "", redactURLError(err)
+		return "", util.RedactError(err)
 	}
 
 	defer resp.Body.Close()

@@ -69,20 +69,22 @@ func RedactSourceURL(raw string) string {
 	}
 	u.User = nil
 	s := u.String()
-	if i := strings.Index(s, "://"); i >= 0 {
-		return s[:i+len("://")] + userinfo + s[i+len("://"):]
-	}
-	return s
+	// u has a scheme and a host here, and Parse lowercases the scheme, so the
+	// rendered URL always starts with scheme + "://".
+	n := len(u.Scheme) + len("://")
+	return s[:n] + userinfo + s[n:]
 }
 
 // redactQueryValues keeps every key of a query string and masks its value, so
 // a token passed as ?token=... cannot leak while the parameter names stay
-// readable.
+// readable. A part without "=" carries no key and is masked as a whole.
 func redactQueryValues(rawQuery string) string {
 	parts := strings.Split(rawQuery, "&")
 	for i, part := range parts {
 		if key, _, found := strings.Cut(part, "="); found {
 			parts[i] = key + "=xxxxx"
+		} else {
+			parts[i] = "xxxxx"
 		}
 	}
 	return strings.Join(parts, "&")
@@ -139,4 +141,14 @@ func RedactURLError(err *url.Error) *url.Error {
 		redacted.Err = errors.New("invalid URL")
 	}
 	return &redacted
+}
+
+// RedactError passes a *url.Error found in err through RedactURLError and
+// returns any other error unchanged.
+func RedactError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return RedactURLError(urlErr)
+	}
+	return err
 }

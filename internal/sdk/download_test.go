@@ -161,6 +161,21 @@ func TestSdk_Download_ErrorStatusRedactsPassword(t *testing.T) {
 	}
 }
 
+func TestSdk_Download_RedactsRequestBuildError(t *testing.T) {
+	// A space in the host is percent-encoded by URL.String, and http.NewRequest
+	// rejects the encoded escape in the host.
+	u := &url.URL{Scheme: "http", User: url.UserPassword("user", "s3cret"), Host: "in valid", Path: "/repro.zip", RawQuery: "token=abc123"}
+
+	sdk := newDownloadTestSDK(t)
+	_, err := sdk.Download(u, nil)
+	if err == nil {
+		t.Fatal("Download() error = nil, want a request build error")
+	}
+	if msg := err.Error(); strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Download() error = %q, want the credentials and the query token redacted", msg)
+	}
+}
+
 func TestSdk_Download_RedactsConnectionError(t *testing.T) {
 	u, err := url.Parse("http://user:s3cret@127.0.0.1:1/repro.zip?token=abc123")
 	if err != nil {

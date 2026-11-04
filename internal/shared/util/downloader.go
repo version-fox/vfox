@@ -32,24 +32,14 @@ type Downloader struct {
 	LocalPath string `json:"local_path"`
 }
 
-// redactError passes a *url.Error through RedactURLError, so the error cannot
-// echo the credentials or query tokens of its URL.
-func redactError(err error) error {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		return RedactURLError(urlErr)
-	}
-	return err
-}
-
 func (d *Downloader) Download(url *url.URL) (string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		return "", redactError(err)
+		return "", RedactError(err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", redactError(err)
+		return "", RedactError(err)
 	}
 
 	defer resp.Body.Close()

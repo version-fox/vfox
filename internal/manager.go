@@ -302,20 +302,20 @@ func (m *Manager) Update(pluginName string) error {
 		address := m.GetRegistryAddress(pluginMetadata.Name + ".json")
 		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(address))
 		registryManifest, err := m.fetchPluginManifest(address)
-		if errors.Is(err, ManifestNotFound) && pluginMetadata.ManifestUrl != "" {
+		if errors.Is(err, ManifestNotFound) {
+			if pluginMetadata.ManifestUrl == "" {
+				return fmt.Errorf("%s plugin not support update", pluginName)
+			}
 			// A plugin installed from outside the registry is updated from the
 			// manifest its manifestUrl points to.
 			logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(pluginMetadata.ManifestUrl))
 			registryManifest, err = m.fetchPluginManifest(pluginMetadata.ManifestUrl)
 		}
-		if errors.Is(err, ManifestNotFound) {
-			return fmt.Errorf("%s plugin not support update", pluginName)
-		}
 		if err != nil {
 			return err
 		}
 		if util.CompareVersion(registryManifest.Version, pluginMetadata.Version) <= 0 {
-			pterm.Printf("%s is already the latest version\n", pterm.Blue(pluginName))
+			pterm.Printf("%s is already the latest version\n", pterm.LightBlue(pluginName))
 			return nil
 		}
 		downloadUrl = registryManifest.DownloadUrl
@@ -389,7 +389,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 
 	resp, err := m.RuntimeEnvContext.HttpClient().Get(url)
 	if err != nil {
-		err = redactURLError(err)
+		err = util.RedactError(err)
 		logger.Debugf("Failed to fetch manifest: %v\n", err)
 		return nil, fmt.Errorf("fetch manifest error: %w", err)
 	}
@@ -423,25 +423,18 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 }
 
 // pluginFileName derives the local file name of a downloaded plugin from the
-// path of its URL, so a query is never printed or written to disk. A URL whose
-// path carries no file name falls back to "plugin" plus the extension.
+// path of its URL, so a query is never printed or written to disk. The last
+// element of the URL path is used only when it ends with the extension the
+// whole URL was accepted by; otherwise the name falls back to "plugin" plus
+// that extension, so NewDecompressor always sees the extension it needs.
 func pluginFileName(downloadUrl string) string {
+	ext := filepath.Ext(downloadUrl)
 	if u, err := url.Parse(downloadUrl); err == nil {
-		if name := path.Base(u.Path); name != "." && name != "/" {
+		if name := path.Base(u.Path); name != "." && name != "/" && strings.HasSuffix(name, ext) {
 			return name
 		}
 	}
-	return "plugin" + filepath.Ext(downloadUrl)
-}
-
-// redactURLError passes a *url.Error through util.RedactURLError, so the URL
-// it prints loses credentials and query tokens; any other error is unchanged.
-func redactURLError(err error) error {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		return util.RedactURLError(urlErr)
-	}
-	return err
+	return "plugin" + ext
 }
 
 // downloadPlugin download plugin from downloadUrl to plugin home directory.
@@ -450,7 +443,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 
 	req, err := http.NewRequest("GET", downloadUrl, nil)
 	if err != nil {
-		err = redactURLError(err)
+		err = util.RedactError(err)
 		logger.Debugf("Failed to create HTTP request: %v\n", err)
 		return "", err
 	}
@@ -464,7 +457,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 				return "", errors.New("request timeout")
 			}
 		}
-		err = redactURLError(err)
+		err = util.RedactError(err)
 		logger.Debugf("Failed to download plugin: %v\n", err)
 		return "", err
 	}
@@ -676,7 +669,7 @@ func (m *Manager) Available() (RegistryIndex, error) {
 	client := m.RuntimeEnvContext.HttpClient()
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
-		return nil, fmt.Errorf("get plugin index error: %w", redactURLError(err))
+		return nil, fmt.Errorf("get plugin index error: %w", util.RedactError(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

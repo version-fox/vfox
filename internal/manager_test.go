@@ -455,13 +455,15 @@ func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
 		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
 	}}
 
-	// The query is never part of the saved file name.
+	// The saved name has to end with the extension the whole URL was accepted
+	// by: the base of the URL path does not, so the name falls back to
+	// "plugin" plus the extension.
 	path, err := m.downloadPlugin(srv.URL + "/dl?token=abc123&file=plugin.zip")
 	if err != nil {
 		t.Fatalf("downloadPlugin() error = %v", err)
 	}
-	if base := filepath.Base(path); base != "dl" {
-		t.Fatalf("downloadPlugin() file name = %q, want the base of the URL path", base)
+	if base := filepath.Base(path); base != "plugin.zip" {
+		t.Fatalf("downloadPlugin() file name = %q, want plugin.zip", base)
 	}
 	got, err := os.ReadFile(path)
 	if err != nil || string(got) != body {

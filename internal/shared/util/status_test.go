@@ -18,6 +18,7 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -60,12 +61,16 @@ func TestRedactSourceURL(t *testing.T) {
 		{"user name without password", "http://tok3n@example.com/file.zip", "http://****@example.com/file.zip"},
 		{"query", "http://example.com/file.zip?token=abc123", "http://example.com/file.zip?token=xxxxx"},
 		{"password with query", "http://user:s3cret@example.com/file.zip?token=abc123", "http://user:xxxxx@example.com/file.zip?token=xxxxx"},
+		{"query part without equals", "http://example.com/file.zip?abc123", "http://example.com/file.zip?xxxxx"},
+		{"query part without equals among keyed parts", "http://example.com/file.zip?abc123&b=2", "http://example.com/file.zip?xxxxx&b=xxxxx"},
 		{"nothing to hide", "http://example.com/file.zip", "http://example.com/file.zip"},
 		{"rejected by url.Parse", "http://user:Zq9%ss@example.com/file.zip", "http://xxxxx@example.com/file.zip"},
 		{"rejected by url.Parse with a query", "http://example.com/%zz?token=abc123", "http://example.com/%zz"},
+		{"rejected by url.Parse with a leading digit scheme", "1http://user:Zq9%ss@host/file.zip", "1http://user:Zq9%ss@host/file.zip"},
 		{"absolute path", "/tmp/plugin.zip", "/tmp/plugin.zip"},
 		{"relative path", "./plugin.zip", "./plugin.zip"},
 		{"path with a bare percent", "/tmp/100%/plugin.zip", "/tmp/100%/plugin.zip"},
+		{"local path containing a scheme separator", "/tmp/100%/dir://x@y", "/tmp/100%/dir://x@y"},
 		{"windows path", `C:\plugins\plugin.zip`, `C:\plugins\plugin.zip`},
 		{"windows path with slashes", "C:/plugins/plugin.zip", "C:/plugins/plugin.zip"},
 		{"empty", "", ""},
@@ -132,6 +137,45 @@ func TestRedactURLError(t *testing.T) {
 		redacted := RedactURLError(err)
 		if !strings.Contains(redacted.Error(), "%zz") {
 			t.Errorf("error = %q, want the original reason kept", redacted.Error())
+		}
+	})
+}
+
+func TestRedactError(t *testing.T) {
+	t.Run("url error", func(t *testing.T) {
+		err := &url.Error{
+			Op:  "Get",
+			URL: "http://user:s3cret@127.0.0.1:1/file.zip?token=abc123",
+			Err: errors.New("dial tcp 127.0.0.1:1: connect: connection refused"),
+		}
+		msg := RedactError(err).Error()
+		if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+			t.Errorf("error = %q, want the password and the query token redacted", msg)
+		}
+	})
+
+	t.Run("wrapped url error", func(t *testing.T) {
+		err := fmt.Errorf("download failed: %w", &url.Error{
+			Op:  "Get",
+			URL: "http://user:s3cret@127.0.0.1:1/file.zip",
+			Err: errors.New("connection refused"),
+		})
+		msg := RedactError(err).Error()
+		if strings.Contains(msg, "s3cret") {
+			t.Errorf("error = %q, want the password redacted", msg)
+		}
+	})
+
+	t.Run("other error unchanged", func(t *testing.T) {
+		err := errors.New("plain failure")
+		if got := RedactError(err); got != err {
+			t.Errorf("RedactError() = %v, want the same error", got)
+		}
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		if got := RedactError(nil); got != nil {
+			t.Errorf("RedactError(nil) = %v, want nil", got)
 		}
 	})
 }
