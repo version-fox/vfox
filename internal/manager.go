@@ -299,12 +299,12 @@ func (m *Manager) Update(pluginName string) error {
 	downloadUrl := pluginMetadata.UpdateUrl
 	if pluginMetadata.UpdateUrl == "" {
 		address := m.GetRegistryAddress(pluginMetadata.Name + ".json")
-		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, address)
+		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(address))
 		registryManifest, err := m.fetchPluginManifest(address)
 		if err != nil {
 			if errors.Is(err, ManifestNotFound) {
 				if pluginMetadata.ManifestUrl != "" {
-					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, pluginMetadata.ManifestUrl)
+					logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(pluginMetadata.ManifestUrl))
 					du, err := m.fetchPluginManifest(pluginMetadata.ManifestUrl)
 					if err != nil {
 						return err
