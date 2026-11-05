@@ -32,6 +32,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/pathmeta"
 )
 
 // Run the real command in a fresh process, as a shell hook would. This also
@@ -347,5 +348,38 @@ end
 	}
 	if got := version(withLegacy); got != "3.0.0" {
 		t.Fatalf("after editing the legacy file: LEGACY_VERSION = %s, want 3.0.0", got)
+	}
+}
+
+func TestProjectToolsKey(t *testing.T) {
+	if key := projectToolsKey(env.NewVfoxTomlChain()); key != "" {
+		t.Errorf("chain without a project scope: key = %q, want empty", key)
+	}
+
+	empty := env.NewVfoxTomlChain()
+	empty.Add(pathmeta.NewVfoxToml(), env.Project)
+	if key := projectToolsKey(empty); key != "" {
+		t.Errorf("project scope without tools: key = %q, want empty", key)
+	}
+
+	keyFor := func(version string) string {
+		chain := env.NewVfoxTomlChain()
+		project := pathmeta.NewVfoxToml()
+		project.Tools.Set("nodejs", version)
+		chain.Add(project, env.Project)
+		global := pathmeta.NewVfoxToml()
+		global.Tools.Set("python", "3.12")
+		chain.Add(global, env.Global)
+		return projectToolsKey(chain)
+	}
+	k20 := keyFor("20")
+	if k20 == "" || !strings.Contains(k20, "nodejs") || strings.Contains(k20, "python") {
+		t.Errorf("key should describe only the project tools, got %q", k20)
+	}
+	if k20 != keyFor("20") {
+		t.Error("the same project tools must give the same key")
+	}
+	if k20 == keyFor("22") {
+		t.Error("a different project version must give a different key")
 	}
 }

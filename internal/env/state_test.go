@@ -370,3 +370,35 @@ func TestConfigState_PathPolicyChanged(t *testing.T) {
 		t.Errorf("reloaded policy = %q", reloaded.CachedPathPolicy)
 	}
 }
+
+// Output rendered for one set of project tools must not be served for another.
+func TestConfigState_ProjectToolsChanged(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state := NewConfigState(stateFile)
+
+	if state.ProjectToolsChanged("") {
+		t.Fatal("no project tools must match a state that never recorded any")
+	}
+	if !state.ProjectToolsChanged("nodejs = \"20\"\n") {
+		t.Fatal("project tools must count as changed against a state without any")
+	}
+	state.SetProjectTools("nodejs = \"20\"\n")
+	if err := state.Update(map[UseScope]string{}, "export PATH=/test", "bash"); err != nil {
+		t.Fatalf("Update() failed: %v", err)
+	}
+	if state.ProjectToolsChanged("nodejs = \"20\"\n") {
+		t.Error("the recorded project tools must not count as changed")
+	}
+	if !state.ProjectToolsChanged("nodejs = \"22\"\n") || !state.ProjectToolsChanged("") {
+		t.Error("different or no project tools must count as changed")
+	}
+
+	// The tools survive a round trip through the state file, as a new prompt would see it.
+	reloaded := NewConfigState(stateFile)
+	if err := reloaded.Load(); err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if reloaded.ProjectToolsChanged("nodejs = \"20\"\n") {
+		t.Errorf("reloaded project tools = %q", reloaded.CachedProjectTools)
+	}
+}
