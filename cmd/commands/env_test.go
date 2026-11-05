@@ -264,3 +264,88 @@ func TestEnvCacheWithoutShellIsInvalidated(t *testing.T) {
 		}
 	}
 }
+
+// A legacy version file (.nvmrc and the like) is not a tracked config file, so
+// the cached output must not survive a cd into or out of a directory with one,
+// or an edit of it in place.
+func TestEnvCacheFollowsLegacyVersionFiles(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	pluginDir := filepath.Join(f.home, "plugin", "legacy")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	script := `PLUGIN = {name="legacy", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0", legacyFilenames={".legacy-version"}}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {} end
+function PLUGIN:EnvKeys(ctx) return {{key="LEGACY_VERSION", value=ctx.main.version}} end
+function PLUGIN:ParseLegacyFile(ctx)
+  local f = io.open(ctx.filepath, "r")
+  local content = f:read("*a")
+  f:close()
+  return {version=content:gsub("%s+", "")}
+end
+`
+	if err := os.WriteFile(filepath.Join(pluginDir, "main.lua"), []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []string{"1.0.0", "2.0.0", "3.0.0"} {
+		if err := os.MkdirAll(filepath.Join(f.home, "cache", "legacy", "v-"+v, "legacy-"+v), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(f.home, ".legacy_filenames"), []byte("legacy true\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	global, err := os.ReadFile(filepath.Join(f.home, "vfox.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	global = append(global, []byte("legacy = \"1.0.0\"\n")...)
+	if err := os.WriteFile(filepath.Join(f.home, "vfox.toml"), global, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	plain := f.work
+	withLegacy := filepath.Join(filepath.Dir(f.work), "with-legacy")
+	if err := os.MkdirAll(withLegacy, 0755); err != nil {
+		t.Fatal(err)
+	}
+	legacyFile := filepath.Join(withLegacy, ".legacy-version")
+	if err := os.WriteFile(legacyFile, []byte("2.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	version := func(dir string) string {
+		t.Helper()
+		f.work = dir
+		output := f.runOutput(t)
+		match := regexp.MustCompile(`LEGACY_VERSION="?([0-9.]+)`).FindStringSubmatch(output)
+		if match == nil {
+			t.Fatalf("missing LEGACY_VERSION export in %s: %s", dir, output)
+		}
+		return match[1]
+	}
+
+	for i, step := range []struct {
+		dir, want string
+	}{
+		{plain, "1.0.0"},      // global version
+		{plain, "1.0.0"},      // cache hit
+		{withLegacy, "2.0.0"}, // cd into a directory with a legacy file
+		{withLegacy, "2.0.0"}, // cache hit
+		{plain, "1.0.0"},      // cd out of it
+		{withLegacy, "2.0.0"}, // and back in
+	} {
+		if got := version(step.dir); got != step.want {
+			t.Fatalf("step %d in %s: LEGACY_VERSION = %s, want %s", i, step.dir, got, step.want)
+		}
+	}
+
+	// Edit the legacy file in place; the directory and config files stay the same.
+	if err := os.WriteFile(legacyFile, []byte("3.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if got := version(withLegacy); got != "3.0.0" {
+		t.Fatalf("after editing the legacy file: LEGACY_VERSION = %s, want 3.0.0", got)
+	}
+}

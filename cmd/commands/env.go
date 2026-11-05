@@ -183,6 +183,12 @@ func envFlag(cmd *cli.Command) error {
 	if state.PathPolicyChanged(pathPolicy) {
 		changed = true
 	}
+	// Legacy version files (.nvmrc and the like) are read into the project
+	// scope but are not in configPaths, so compare what they resolved to.
+	projectTools := projectToolsKey(chain)
+	if state.ProjectToolsChanged(projectTools) {
+		changed = true
+	}
 
 	logger.Debugf("Config changed: %v, configPaths: %+v\n", changed, configPaths)
 
@@ -326,10 +332,26 @@ func envFlag(cmd *cli.Command) error {
 
 	// 10. Update state with new output
 	state.SetPathPolicy(pathPolicy)
+	state.SetProjectTools(projectTools)
 	if err := state.Update(configPaths, exportStr, shellName); err != nil {
 		logger.Debugf("Failed to update state: %v", err)
 	}
 
 	fmt.Print(exportStr)
 	return nil
+}
+
+// projectToolsKey describes the tools of the project scope, including those
+// read from legacy version files, so that `env` can tell when they change.
+func projectToolsKey(chain env.VfoxTomlChain) string {
+	projectToml, ok := chain.GetTomlByScope(env.Project)
+	if !ok || projectToml == nil || len(projectToml.Tools) == 0 {
+		return ""
+	}
+	tools := projectToml.Tools
+	data, err := tools.MarshalTOML()
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }

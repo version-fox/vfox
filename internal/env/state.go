@@ -49,6 +49,12 @@ type ConfigState struct {
 	// the files whose modification time is tracked.
 	CachedPathPolicy string `json:"cached_path_policy,omitempty"`
 
+	// Tools the project scope resolved to when the output was rendered,
+	// including those read from legacy version files (.nvmrc and the like).
+	// Those files are not among the tracked config files, so a different set
+	// of tools means the cached output is stale.
+	CachedProjectTools string `json:"cached_project_tools,omitempty"`
+
 	// Target shell used to render CachedOutput. Empty for legacy cache files.
 	CachedShell string `json:"cached_shell,omitempty"`
 
@@ -177,6 +183,22 @@ func (s *ConfigState) SetPathPolicy(policy string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.CachedPathPolicy = policy
+}
+
+// ProjectToolsChanged reports whether the cached output was rendered for a
+// different set of project tools than tools.
+func (s *ConfigState) ProjectToolsChanged(tools string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.CachedProjectTools != tools
+}
+
+// SetProjectTools records the project tools of the output about to be stored
+// by Update.
+func (s *ConfigState) SetProjectTools(tools string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.CachedProjectTools = tools
 }
 
 // Update updates the state with new config mtimes, current PATH, and cached output
