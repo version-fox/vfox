@@ -490,6 +490,31 @@ func TestEnvCacheFollowsInstalls(t *testing.T) {
 	}
 }
 
+// sdk.NewSdk falls back to <installs>/cache/<name> for installs made by
+// v1.0.2; an install there must be seen at the next prompt as well.
+func TestEnvCacheFollowsInstallsInTheFallbackLayout(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	cache := filepath.Join(f.home, "cache")
+	installs := filepath.Join(cache, "cache", "alpha")
+	if err := os.MkdirAll(filepath.Dir(installs), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(cache, "alpha"), installs); err != nil {
+		t.Fatal(err)
+	}
+	f.writeProjectConfig(t, "[tools]\nalpha = \"2.0.0\"\n")
+	if got := alphaVersion(t, f.converge(t)); got != "1.0.0" {
+		t.Fatalf("before installing 2.0.0 into the fallback layout: ALPHA_VERSION = %s, want 1.0.0", got)
+	}
+	if err := os.MkdirAll(filepath.Join(installs, "v-2.0.0", "alpha-2.0.0", "bin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	touchAhead(t, installs)
+	if got := alphaVersion(t, f.converge(t)); got != "2.0.0" {
+		t.Fatalf("after installing 2.0.0 into the fallback layout: ALPHA_VERSION = %s, want 2.0.0", got)
+	}
+}
+
 // Adding the plugin of a configured tool must be seen at the next prompt too.
 func TestEnvCacheFollowsAddedPlugins(t *testing.T) {
 	f := newEnvCommandFixture(t)
@@ -545,6 +570,15 @@ func TestEnvCacheRepairsRemovedLinks(t *testing.T) {
 // In the home directory the project link directory would be the global one;
 // a project config there must leave the global links alone.
 func TestEnvProjectInHomeKeepsGlobalLinks(t *testing.T) {
+	testEnvProjectInHomeKeepsGlobalLinks(t, false)
+}
+
+// The same with the working directory a symlink to the home directory.
+func TestEnvProjectInHomeThroughSymlinkKeepsGlobalLinks(t *testing.T) {
+	testEnvProjectInHomeKeepsGlobalLinks(t, true)
+}
+
+func testEnvProjectInHomeKeepsGlobalLinks(t *testing.T, throughSymlink bool) {
 	f := newEnvCommandFixture(t)
 	if err := os.MkdirAll(filepath.Join(f.home, "cache", "alpha", "v-2.0.0", "alpha-2.0.0", "bin"), 0755); err != nil {
 		t.Fatal(err)
@@ -556,6 +590,13 @@ func TestEnvProjectInHomeKeepsGlobalLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.work = filepath.Dir(f.home) // HOME of the fixture
+	if throughSymlink {
+		link := filepath.Join(t.TempDir(), "home-link")
+		if err := os.Symlink(f.work, link); err != nil {
+			t.Skipf("symlinks are not available: %v", err)
+		}
+		f.work = link
+	}
 	f.writeProjectConfig(t, "[tools]\nalpha = \"2.0.0\"\n")
 	if got := alphaVersion(t, f.runOutput(t)); got != "2.0.0" {
 		t.Fatalf("in the home directory: ALPHA_VERSION = %s, want 2.0.0", got)

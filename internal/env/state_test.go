@@ -50,7 +50,7 @@ func TestConfigState_SaveAndLoad(t *testing.T) {
 	// Create state and save
 	state := NewConfigState(stateFile)
 	state.LastCheck = time.Now().Unix()
-	state.GlobalMtime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	state.GlobalMtime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixNano()
 	state.CachedOutput = "export PATH=/test"
 
 	err := state.Save()
@@ -131,11 +131,15 @@ func TestConfigState_HasChanged_FileModified(t *testing.T) {
 		t.Fatalf("Update() failed: %v", err)
 	}
 
-	// Modify config file
-	time.Sleep(time.Second + 100*time.Millisecond) // Ensure different mtime (Unix timestamp is second precision)
+	// Modify config file, with an mtime a minute ahead so the change does not
+	// depend on the clock or the timestamp precision of the file system
 	err = os.WriteFile(configFile, []byte("modified"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to modify config file: %v", err)
+	}
+	later := time.Now().Add(time.Minute)
+	if err := os.Chtimes(configFile, later, later); err != nil {
+		t.Fatalf("Failed to set the mtime of the config file: %v", err)
 	}
 
 	// Check if changed (should be true)
@@ -371,29 +375,30 @@ func TestConfigState_PathPolicyChanged(t *testing.T) {
 	}
 }
 
-// Output rendered for one set of project tools must not be served for another.
+// Output rendered under one resolution key (project tools, installs, links)
+// must not be served under another.
 func TestConfigState_ResolutionKeyChanged(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	state := NewConfigState(stateFile)
 
 	if state.ResolutionKeyChanged("") {
-		t.Fatal("no project tools must match a state that never recorded any")
+		t.Fatal("an empty key must match a state that never recorded one")
 	}
 	if !state.ResolutionKeyChanged("nodejs = \"20\"\n") {
-		t.Fatal("project tools must count as changed against a state without any")
+		t.Fatal("a key must count as changed against a state without one")
 	}
 	state.SetResolutionKey("nodejs = \"20\"\n")
 	if err := state.Update(map[UseScope]string{}, "export PATH=/test", "bash"); err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
 	if state.ResolutionKeyChanged("nodejs = \"20\"\n") {
-		t.Error("the recorded project tools must not count as changed")
+		t.Error("the recorded key must not count as changed")
 	}
 	if !state.ResolutionKeyChanged("nodejs = \"22\"\n") || !state.ResolutionKeyChanged("") {
-		t.Error("different or no project tools must count as changed")
+		t.Error("a different or empty key must count as changed")
 	}
 
-	// The tools survive a round trip through the state file, as a new prompt would see it.
+	// The key survives a round trip through the state file, as a new prompt would see it.
 	reloaded := NewConfigState(stateFile)
 	if err := reloaded.Load(); err != nil {
 		t.Fatalf("Load() failed: %v", err)

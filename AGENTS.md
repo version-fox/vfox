@@ -119,7 +119,7 @@ java = { version = "21", vendor = "openjdk" }
 - The user root uses an existing `~/.version-fox` directory, otherwise `~/.vfox`. It holds user configuration, temporary session state, and global SDK links.
 - The shared root is `VFOX_HOME`, defaulting to the user root. Its default directories are `plugin/` and `cache/`, with shared settings in `config.yaml`.
 - `storage.sdkPath` overrides the SDK installation root only. Preserve the legacy installation lookup in `sdk.NewSdk` when changing storage behavior.
-- Global links use `<user-root>/sdks`; project links use `<project>/.vfox/sdks`; session links use `PathMeta.Working.SessionSdkDir`. Use [PathMeta](internal/pathmeta/path_meta.go) and [RuntimeEnvContext](internal/env/context.go) to resolve them.
+- Global links use `<user-root>/sdks`; project links use `<project>/.vfox/sdks`, except when that is the global link directory (the project is the home directory), where they go to the session directory; session links use `PathMeta.Working.SessionSdkDir`. Use [PathMeta](internal/pathmeta/path_meta.go) and [RuntimeEnvContext](internal/env/context.go) to resolve them.
 - SDK directory links use Unix symlinks and Windows junctions. The separate `shared/shim` utility is not the SDK directory-link implementation.
 - Supported release OS/architecture combinations are defined in [.goreleaser.yaml](.goreleaser.yaml). Shell implementations live in [internal/shell/](internal/shell/).
 - Shell integration variables are defined in [env/flag.go](internal/env/flag.go) and [pathmeta/path_meta.go](internal/pathmeta/path_meta.go); preserve their contracts when changing hooks.
