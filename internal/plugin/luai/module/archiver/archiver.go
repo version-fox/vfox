@@ -1,8 +1,12 @@
 package archiver
 
 import (
-	"github.com/version-fox/vfox/internal/shared/util"
+	"fmt"
+	"path/filepath"
+
 	lua "github.com/yuin/gopher-lua"
+
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // Preload adds strings to the given Lua state's package.preload table. After it
@@ -30,7 +34,12 @@ func decompress(L *lua.LState) int {
 	archiverPath := L.CheckString(1)
 	targetPath := L.CheckString(2)
 
-	err := util.NewDecompressor(archiverPath).Decompress(targetPath)
+	d := util.NewDecompressor(archiverPath)
+	if d == nil {
+		L.Push(lua.LString(fmt.Sprintf("unsupported archive type: %s", filepath.Ext(archiverPath))))
+		return 1
+	}
+	err := d.Decompress(targetPath)
 	if err != nil {
 		L.Push(lua.LString(err.Error()))
 		return 1

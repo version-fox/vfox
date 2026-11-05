@@ -41,11 +41,16 @@ var Upgrade = &cli.Command{
 }
 
 func fetchLatestVersion(c *http.Client) (string, error) {
-	resp, err := c.Get("https://github.com/version-fox/vfox/tags")
+	const tagsURL = "https://github.com/version-fox/vfox/tags"
+	resp, err := c.Get(tagsURL)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if err = util.UnexpectedStatusError(resp, tagsURL); err != nil {
+		return "", err
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -96,16 +101,22 @@ func generateUrls(currVersion string, tagName string) (string, string) {
 }
 
 func downloadFile(c *http.Client, filepath string, url string) error {
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
 	resp, err := c.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if err = util.UnexpectedStatusError(resp, url); err != nil {
+		return err
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
 	_, err = io.Copy(out, resp.Body)
 	return err
 }

@@ -35,17 +35,21 @@ type Downloader struct {
 func (d *Downloader) Download(url *url.URL) (string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		return "", err
+		return "", RedactError(err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", RedactError(err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return "", errors.New("source file not found")
+	}
+
+	if err = UnexpectedStatusError(resp, url.String()); err != nil {
+		return "", err
 	}
 
 	path := filepath.Join(d.LocalPath, filepath.Base(url.Path))

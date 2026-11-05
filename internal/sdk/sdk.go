@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -354,8 +355,16 @@ func (b *impl) recordInstall(requested, version Version, info *plugin.PreInstall
 }
 
 func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath string) error {
-	pterm.Printf("Moving %s to %s...\n", info.Path, targetPath)
+	pterm.Printf("Moving %s to %s...\n", util.RedactSourceURL(info.Path), targetPath)
 	if err := util.MoveFiles(info.Path, targetPath); err != nil {
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			// A PreInstall source can be a URL with credentials, and the
+			// PathError prints its Path, so the copy the user sees is redacted.
+			redacted := *pathErr
+			redacted.Path = util.RedactSourceURL(pathErr.Path)
+			err = &redacted
+		}
 		return fmt.Errorf("failed to move file, err:%w", err)
 	}
 	return nil
@@ -365,7 +374,7 @@ func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath str
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
-		return err
+		return util.RedactError(err)
 	}
 	filePath, err := b.Download(u, info.Headers)
 	if err != nil {
@@ -1060,7 +1069,7 @@ func (b *impl) packagePath(version Version) string {
 func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return "", err
+		return "", util.RedactError(err)
 	}
 	for key, value := range headers {
 		req.Header.Add(key, value)
@@ -1074,13 +1083,17 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 				return "", errors.New("request timeout")
 			}
 		}
-		return "", err
+		return "", util.RedactError(err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return "", errors.New("source file not found")
+	}
+
+	if err = util.UnexpectedStatusError(resp, u.String()); err != nil {
+		return "", err
 	}
 
 	err = os.MkdirAll(b.InstallPath, 0755)
