@@ -222,7 +222,8 @@ func TestEnvCacheRespectsTargetShell(t *testing.T) {
 	} {
 		t.Setenv("VFOX_TEST_TARGET_SHELL", target.name)
 		output := f.runOutput(t)
-		if !strings.HasPrefix(output, target.prefix) {
+		// Exports are not ordered, so look for the line anywhere in the output.
+		if !strings.Contains(output, target.prefix) {
 			t.Fatalf("shell %s: unexpected output %q", target.name, output)
 		}
 		calls := f.calls(t)
