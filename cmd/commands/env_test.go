@@ -268,7 +268,7 @@ func TestEnvCacheWithoutShellIsInvalidated(t *testing.T) {
 
 // A legacy version file (.nvmrc and the like) is not a tracked config file, so
 // the cached output must not survive a cd into or out of a directory with one,
-// or an edit of it in place.
+// an edit of it in place, or a cd to another directory with the same one.
 func TestEnvCacheFollowsLegacyVersionFiles(t *testing.T) {
 	f := newEnvCommandFixture(t)
 	pluginDir := filepath.Join(f.home, "plugin", "legacy")
@@ -278,7 +278,7 @@ func TestEnvCacheFollowsLegacyVersionFiles(t *testing.T) {
 	script := `PLUGIN = {name="legacy", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0", legacyFilenames={".legacy-version"}}
 function PLUGIN:Available(ctx) return {} end
 function PLUGIN:PreInstall(ctx) return {} end
-function PLUGIN:EnvKeys(ctx) return {{key="LEGACY_VERSION", value=ctx.main.version}} end
+function PLUGIN:EnvKeys(ctx) return {{key="LEGACY_VERSION", value=ctx.main.version}, {key="LEGACY_PATH", value=ctx.path}} end
 function PLUGIN:ParseLegacyFile(ctx)
   local f = io.open(ctx.filepath, "r")
   local content = f:read("*a")
@@ -349,20 +349,45 @@ end
 	if got := version(withLegacy); got != "3.0.0" {
 		t.Fatalf("after editing the legacy file: LEGACY_VERSION = %s, want 3.0.0", got)
 	}
+
+	// A second directory whose legacy file resolves to the same tools still
+	// exports them through its own .vfox/sdks.
+	withLegacyToo := filepath.Join(filepath.Dir(f.work), "with-legacy-too")
+	if err := os.MkdirAll(withLegacyToo, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(withLegacyToo, ".legacy-version"), []byte("3.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	pathRe := regexp.MustCompile(`LEGACY_PATH=\$?['"]?([^'"\s;]+)`)
+	for _, dir := range []string{withLegacy, withLegacyToo, withLegacy, withLegacyToo} {
+		want := filepath.Join(dir, ".vfox", "sdks", "legacy")
+		for i := 0; i < 3; i++ {
+			f.work = dir
+			output := f.runOutput(t)
+			match := pathRe.FindStringSubmatch(output)
+			if match == nil {
+				t.Fatalf("missing LEGACY_PATH export in %s: %s", dir, output)
+			}
+			if match[1] != want {
+				t.Fatalf("LEGACY_PATH in %s = %s, want %s", dir, match[1], want)
+			}
+		}
+	}
 }
 
 func TestProjectToolsKey(t *testing.T) {
-	if key := projectToolsKey(env.NewVfoxTomlChain()); key != "" {
+	if key := projectToolsKey(env.NewVfoxTomlChain(), "/a/.vfox/sdks"); key != "" {
 		t.Errorf("chain without a project scope: key = %q, want empty", key)
 	}
 
 	empty := env.NewVfoxTomlChain()
 	empty.Add(pathmeta.NewVfoxToml(), env.Project)
-	if key := projectToolsKey(empty); key != "" {
+	if key := projectToolsKey(empty, "/a/.vfox/sdks"); key != "" {
 		t.Errorf("project scope without tools: key = %q, want empty", key)
 	}
 
-	keyFor := func(version string) string {
+	keyFor := func(version string, dir ...string) string {
 		chain := env.NewVfoxTomlChain()
 		project := pathmeta.NewVfoxToml()
 		project.Tools.Set("nodejs", version)
@@ -370,7 +395,11 @@ func TestProjectToolsKey(t *testing.T) {
 		global := pathmeta.NewVfoxToml()
 		global.Tools.Set("python", "3.12")
 		chain.Add(global, env.Global)
-		return projectToolsKey(chain)
+		sdkDir := "/a/.vfox/sdks"
+		if len(dir) > 0 {
+			sdkDir = dir[0]
+		}
+		return projectToolsKey(chain, sdkDir)
 	}
 	k20 := keyFor("20")
 	if k20 == "" || !strings.Contains(k20, "nodejs") || strings.Contains(k20, "python") {
@@ -381,5 +410,8 @@ func TestProjectToolsKey(t *testing.T) {
 	}
 	if k20 == keyFor("22") {
 		t.Error("a different project version must give a different key")
+	}
+	if k20 == keyFor("20", "/b/.vfox/sdks") {
+		t.Error("the same project tools in another directory must give a different key")
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/urfave/cli/v3"
@@ -184,8 +185,9 @@ func envFlag(cmd *cli.Command) error {
 		changed = true
 	}
 	// Legacy version files (.nvmrc and the like) are read into the project
-	// scope but are not in configPaths, so compare what they resolved to.
-	projectTools := projectToolsKey(chain)
+	// scope but are not in configPaths, so compare what they resolved to and
+	// the directory whose .vfox/sdks the project tools are exported through.
+	projectTools := projectToolsKey(chain, runtimeEnvContext.PathMeta.Working.ProjectSdkDir)
 	if state.ProjectToolsChanged(projectTools) {
 		changed = true
 	}
@@ -342,16 +344,19 @@ func envFlag(cmd *cli.Command) error {
 }
 
 // projectToolsKey describes the tools of the project scope, including those
-// read from legacy version files, so that `env` can tell when they change.
-func projectToolsKey(chain env.VfoxTomlChain) string {
+// read from legacy version files, and the project SDK directory they are
+// exported through, so that `env` can tell when either changes. Without
+// project tools the key is empty, so a cd between plain directories still
+// hits the cache.
+func projectToolsKey(chain env.VfoxTomlChain, projectSdkDir string) string {
 	projectToml, ok := chain.GetTomlByScope(env.Project)
 	if !ok || projectToml == nil || len(projectToml.Tools) == 0 {
 		return ""
 	}
 	tools := projectToml.Tools
-	data, err := tools.MarshalTOML()
-	if err != nil {
-		return ""
+	lines := []string{projectSdkDir}
+	for _, name := range tools.SortedKeys() {
+		lines = append(lines, name+" = "+tools[name].MarshalInline())
 	}
-	return string(data)
+	return strings.Join(lines, "\n")
 }

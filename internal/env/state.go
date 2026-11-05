@@ -50,9 +50,10 @@ type ConfigState struct {
 	CachedPathPolicy string `json:"cached_path_policy,omitempty"`
 
 	// Tools the project scope resolved to when the output was rendered,
-	// including those read from legacy version files (.nvmrc and the like).
-	// Those files are not among the tracked config files, so a different set
-	// of tools means the cached output is stale.
+	// including those read from legacy version files (.nvmrc and the like),
+	// and the project SDK directory they were exported through. Those files
+	// are not among the tracked config files, so different tools or another
+	// directory means the cached output is stale.
 	CachedProjectTools string `json:"cached_project_tools,omitempty"`
 
 	// Target shell used to render CachedOutput. Empty for legacy cache files.
