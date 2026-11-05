@@ -35,7 +35,7 @@ type ConfigState struct {
 	// Current project config path (to detect directory/project changes)
 	CurrentProjectPath string `json:"current_project_path,omitempty"`
 
-	// Config file modification times (Unix timestamps in seconds)
+	// Config file modification times (Unix timestamps in nanoseconds)
 	GlobalMtime  int64 `json:"global_mtime,omitempty"`
 	SessionMtime int64 `json:"session_mtime,omitempty"`
 	ProjectMtime int64 `json:"project_mtime,omitempty"`
@@ -49,12 +49,12 @@ type ConfigState struct {
 	// the files whose modification time is tracked.
 	CachedPathPolicy string `json:"cached_path_policy,omitempty"`
 
-	// Tools the project scope resolved to when the output was rendered,
-	// including those read from legacy version files (.nvmrc and the like),
-	// and the project SDK directory they were exported through. Those files
-	// are not among the tracked config files, so different tools or another
-	// directory means the cached output is stale.
-	CachedProjectTools string `json:"cached_project_tools,omitempty"`
+	// Key of the inputs the output was resolved from that are not tracked
+	// config files: the project SDK directory and the project tools, including
+	// those read from legacy version files (.nvmrc and the like), a stamp of
+	// the installed versions and plugins, and which of the links the output
+	// points at exist. A different key means the cached output is stale.
+	CachedResolutionKey string `json:"cached_resolution_key,omitempty"`
 
 	// Target shell used to render CachedOutput. Empty for legacy cache files.
 	CachedShell string `json:"cached_shell,omitempty"`
@@ -161,7 +161,9 @@ func (s *ConfigState) HasChanged(configPaths map[UseScope]string) (bool, error) 
 			storedMtime = s.ProjectMtime
 		}
 
-		if mtime > storedMtime {
+		// Any other time counts: a file replaced by an older one (mv of a
+		// backup, cp -p, an unpacked archive) has moved back.
+		if mtime != storedMtime {
 			// File has been modified
 			return true, nil
 		}
@@ -186,20 +188,20 @@ func (s *ConfigState) SetPathPolicy(policy string) {
 	s.CachedPathPolicy = policy
 }
 
-// ProjectToolsChanged reports whether the cached output was rendered for a
-// different set of project tools than tools.
-func (s *ConfigState) ProjectToolsChanged(tools string) bool {
+// ResolutionKeyChanged reports whether the cached output was resolved under a
+// different key (see CachedResolutionKey) than key.
+func (s *ConfigState) ResolutionKeyChanged(key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.CachedProjectTools != tools
+	return s.CachedResolutionKey != key
 }
 
-// SetProjectTools records the project tools of the output about to be stored
-// by Update.
-func (s *ConfigState) SetProjectTools(tools string) {
+// SetResolutionKey records the resolution key of the output about to be
+// stored by Update.
+func (s *ConfigState) SetResolutionKey(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.CachedProjectTools = tools
+	s.CachedResolutionKey = key
 }
 
 // Update updates the state with new config mtimes, current PATH, and cached output
@@ -253,11 +255,12 @@ func (s *ConfigState) GetCachedOutput(shellName string) string {
 	return s.CachedOutput
 }
 
-// getFileModTime returns the modification time of a file as Unix timestamp
+// getFileModTime returns the modification time of a file in Unix nanoseconds,
+// so that an edit within the second of the stored time is seen as well.
 func getFileModTime(path string) (int64, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return 0, err
 	}
-	return info.ModTime().Unix(), nil
+	return info.ModTime().UnixNano(), nil
 }

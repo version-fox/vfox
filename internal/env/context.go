@@ -23,6 +23,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
@@ -99,10 +102,25 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 		linkDir = m.PathMeta.Working.GlobalSdkDir
 	case Project:
 		linkDir = m.PathMeta.Working.ProjectSdkDir
+		// In the home directory the project link directory is the global one;
+		// linking project versions there would repoint the global links that
+		// every other shell uses, so they go to the session directory instead.
+		if samePath(linkDir, m.PathMeta.Working.GlobalSdkDir) {
+			linkDir = m.PathMeta.Working.SessionSdkDir
+		}
 	case Session:
 		linkDir = m.PathMeta.Working.SessionSdkDir
 	}
 	return linkDir
+}
+
+// samePath reports whether a and b name the same path, ignoring case on Windows.
+func samePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 // CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).

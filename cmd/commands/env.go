@@ -184,11 +184,13 @@ func envFlag(cmd *cli.Command) error {
 	if state.PathPolicyChanged(pathPolicy) {
 		changed = true
 	}
-	// Legacy version files (.nvmrc and the like) are read into the project
-	// scope but are not in configPaths, so compare what they resolved to and
-	// the directory whose .vfox/sdks the project tools are exported through.
-	projectTools := projectToolsKey(chain, runtimeEnvContext.PathMeta.Working.ProjectSdkDir)
-	if state.ProjectToolsChanged(projectTools) {
+	// What the tools resolve to also depends on files configPaths does not
+	// track: legacy version files (.nvmrc and the like) read into the project
+	// scope, the project SDK directory, the installed versions and plugins, and
+	// the links the output points at. All of them go into the resolution key.
+	projectKey := projectToolsKey(chain, runtimeEnvContext.PathMeta.Working.ProjectSdkDir)
+	installs := installsStamp(runtimeEnvContext, chain)
+	if state.ResolutionKeyChanged(resolutionKey(projectKey, installs, linksStamp(runtimeEnvContext, chain))) {
 		changed = true
 	}
 
@@ -334,7 +336,8 @@ func envFlag(cmd *cli.Command) error {
 
 	// 10. Update state with new output
 	state.SetPathPolicy(pathPolicy)
-	state.SetProjectTools(projectTools)
+	// The slow path made the links again, so take their stamp after it.
+	state.SetResolutionKey(resolutionKey(projectKey, installs, linksStamp(runtimeEnvContext, chain)))
 	if err := state.Update(configPaths, exportStr, shellName); err != nil {
 		logger.Debugf("Failed to update state: %v", err)
 	}
@@ -359,4 +362,66 @@ func projectToolsKey(chain env.VfoxTomlChain, projectSdkDir string) string {
 		lines = append(lines, name+" = "+tools[name].MarshalInline())
 	}
 	return strings.Join(lines, "\n")
+}
+
+// resolutionKey joins the parts of the key the cached output is stored under.
+func resolutionKey(projectKey, installs, links string) string {
+	return projectKey + "\n--\n" + installs + "\n--\n" + links
+}
+
+// stampNames returns the lower-cased names of all configured tools, sorted.
+func stampNames(chain env.VfoxTomlChain) []string {
+	tools := chain.GetAllTools()
+	names := make([]string, 0, len(tools))
+	for name := range tools {
+		names = append(names, strings.ToLower(name))
+	}
+	sort.Strings(names)
+	return names
+}
+
+// installsStamp describes what is installed for each configured tool: whether
+// its plugin is added and the modification time of its install directory,
+// which moves when a version is installed or removed. `vfox install` and
+// `vfox add` change these without touching a tracked file. The plugin counts
+// by presence only, since a plugin may write into its own directory.
+func installsStamp(ctx *env.RuntimeEnvContext, chain env.VfoxTomlChain) string {
+	shared := ctx.PathMeta.Shared
+	var b strings.Builder
+	for _, name := range stampNames(chain) {
+		plugin := "-"
+		if _, err := os.Stat(filepath.Join(shared.Plugins, name)); err == nil {
+			plugin = "+"
+		}
+		installed := "-"
+		// The same fallback as sdk.NewSdk.
+		for _, dir := range []string{filepath.Join(shared.Installs, name), filepath.Join(shared.Installs, "cache", name)} {
+			if info, err := os.Stat(dir); err == nil {
+				installed = fmt.Sprint(info.ModTime().UnixNano())
+				break
+			}
+		}
+		fmt.Fprintf(&b, "%s %s %s\n", name, plugin, installed)
+	}
+	return b.String()
+}
+
+// linksStamp describes which of the links the output can point at exist, in
+// the project, session and global link directories. A cache hit does not make
+// them again, so a removed .vfox directory must count as a change.
+func linksStamp(ctx *env.RuntimeEnvContext, chain env.VfoxTomlChain) string {
+	scopes := []env.UseScope{env.Project, env.Session, env.Global}
+	var b strings.Builder
+	for _, name := range stampNames(chain) {
+		b.WriteString(name)
+		for _, scope := range scopes {
+			mark := " -"
+			if _, err := os.Lstat(filepath.Join(ctx.GetLinkDirPathByScope(scope), name)); err == nil {
+				mark = " +"
+			}
+			b.WriteString(mark)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }

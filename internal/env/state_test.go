@@ -372,24 +372,24 @@ func TestConfigState_PathPolicyChanged(t *testing.T) {
 }
 
 // Output rendered for one set of project tools must not be served for another.
-func TestConfigState_ProjectToolsChanged(t *testing.T) {
+func TestConfigState_ResolutionKeyChanged(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	state := NewConfigState(stateFile)
 
-	if state.ProjectToolsChanged("") {
+	if state.ResolutionKeyChanged("") {
 		t.Fatal("no project tools must match a state that never recorded any")
 	}
-	if !state.ProjectToolsChanged("nodejs = \"20\"\n") {
+	if !state.ResolutionKeyChanged("nodejs = \"20\"\n") {
 		t.Fatal("project tools must count as changed against a state without any")
 	}
-	state.SetProjectTools("nodejs = \"20\"\n")
+	state.SetResolutionKey("nodejs = \"20\"\n")
 	if err := state.Update(map[UseScope]string{}, "export PATH=/test", "bash"); err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
-	if state.ProjectToolsChanged("nodejs = \"20\"\n") {
+	if state.ResolutionKeyChanged("nodejs = \"20\"\n") {
 		t.Error("the recorded project tools must not count as changed")
 	}
-	if !state.ProjectToolsChanged("nodejs = \"22\"\n") || !state.ProjectToolsChanged("") {
+	if !state.ResolutionKeyChanged("nodejs = \"22\"\n") || !state.ResolutionKeyChanged("") {
 		t.Error("different or no project tools must count as changed")
 	}
 
@@ -398,7 +398,45 @@ func TestConfigState_ProjectToolsChanged(t *testing.T) {
 	if err := reloaded.Load(); err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
-	if reloaded.ProjectToolsChanged("nodejs = \"20\"\n") {
-		t.Errorf("reloaded project tools = %q", reloaded.CachedProjectTools)
+	if reloaded.ResolutionKeyChanged("nodejs = \"20\"\n") {
+		t.Errorf("reloaded resolution key = %q", reloaded.CachedResolutionKey)
+	}
+}
+
+// A config file whose modification time moves back (replaced by an older
+// copy) or stays within the stored second has changed as well.
+func TestConfigState_HasChanged_AnyOtherMtime(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "vfox.toml")
+	if err := os.WriteFile(configFile, []byte("[tools]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(PathVarName, "/test")
+	state := NewConfigState(filepath.Join(dir, "state.json"))
+	configPaths := map[UseScope]string{Global: configFile}
+
+	info, err := os.Stat(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		what  string
+		mtime time.Time
+	}{
+		{"older", info.ModTime().Add(-48 * time.Hour)},
+		{"a millisecond later", info.ModTime().Add(-48 * time.Hour).Add(time.Millisecond)},
+	} {
+		if err := state.Update(configPaths, "export PATH=/test", "bash"); err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+		if changed, err := state.HasChanged(configPaths); changed || err != nil {
+			t.Fatalf("%s: before the change: changed = %v, err = %v", c.what, changed, err)
+		}
+		if err := os.Chtimes(configFile, c.mtime, c.mtime); err != nil {
+			t.Fatal(err)
+		}
+		if changed, err := state.HasChanged(configPaths); !changed || err != nil {
+			t.Errorf("%s: changed = %v, err = %v, want a change", c.what, changed, err)
+		}
 	}
 }

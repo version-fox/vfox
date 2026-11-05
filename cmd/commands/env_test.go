@@ -82,6 +82,10 @@ func newEnvCommandFixture(t *testing.T) *envCommandFixture {
 		if err := os.MkdirAll(pluginDir, 0755); err != nil {
 			t.Fatal(err)
 		}
+		extra := ""
+		if name == "alpha" {
+			extra = `, {key="ALPHA_VERSION", value=ctx.main.version}`
+		}
 		script := fmt.Sprintf(`PLUGIN = {name=%q, version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 function PLUGIN:Available(ctx) return {} end
 function PLUGIN:PreInstall(ctx) return {} end
@@ -89,9 +93,9 @@ function PLUGIN:EnvKeys(ctx)
  local log = assert(io.open(ctx.path .. "/calls", "a"))
  log:write("called\n")
  log:close()
- return {{key="PATH", value=ctx.path .. "/bin"}}
+ return {{key="PATH", value=ctx.path .. "/bin"}%s}
 end
-`, name)
+`, name, extra)
 		if err := os.WriteFile(filepath.Join(pluginDir, "main.lua"), []byte(script), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +218,7 @@ func TestEnvCacheHitsAfterApplyingPath(t *testing.T) {
 func TestEnvCacheRespectsTargetShell(t *testing.T) {
 	f := newEnvCommandFixture(t)
 	for i, target := range []struct{ name, prefix string }{
-		{"pwsh", "$env:PATH="}, {"fish", "set -x -g PATH "}, {"bash", "export PATH="}, {"pwsh", "$env:PATH="},
+		{"pwsh", "$env:ALPHA_VERSION="}, {"fish", "set -x -g 'ALPHA_VERSION' "}, {"bash", "export ALPHA_VERSION="}, {"pwsh", "$env:ALPHA_VERSION="},
 	} {
 		t.Setenv("VFOX_TEST_TARGET_SHELL", target.name)
 		output := f.runOutput(t)
@@ -413,5 +417,153 @@ func TestProjectToolsKey(t *testing.T) {
 	}
 	if k20 == keyFor("20", "/b/.vfox/sdks") {
 		t.Error("the same project tools in another directory must give a different key")
+	}
+}
+
+// converge runs env until the PATH it exports is the one it was given, as at
+// the prompts of a shell that evals the output, and returns the last output.
+func (f *envCommandFixture) converge(t *testing.T) string {
+	t.Helper()
+	var output string
+	for i := 0; i < 3; i++ {
+		output = f.runOutput(t)
+		if match := regexp.MustCompile(`export PATH="([^"]*)"`).FindStringSubmatch(output); match != nil {
+			t.Setenv(env.PathVarName, match[1])
+		}
+	}
+	return output
+}
+
+func (f *envCommandFixture) writeProjectConfig(t *testing.T, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func alphaVersion(t *testing.T, output string) string {
+	t.Helper()
+	match := regexp.MustCompile(`ALPHA_VERSION="?([0-9.]+)`).FindStringSubmatch(output)
+	if match == nil {
+		t.Fatalf("missing ALPHA_VERSION export: %s", output)
+	}
+	return match[1]
+}
+
+// touchAhead moves the modification time of dir a minute ahead, so that the
+// change is seen also on file systems with coarse clocks.
+func touchAhead(t *testing.T, dir string) {
+	t.Helper()
+	ahead := time.Now().Add(time.Minute)
+	if err := os.Chtimes(dir, ahead, ahead); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Installing or removing a version changes no tracked file and not the PATH,
+// so the cached output must also be keyed by what is installed.
+func TestEnvCacheFollowsInstalls(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	f.writeProjectConfig(t, "[tools]\nalpha = \"2.0.0\"\n")
+	if got := alphaVersion(t, f.converge(t)); got != "1.0.0" {
+		t.Fatalf("before installing 2.0.0: ALPHA_VERSION = %s, want 1.0.0", got)
+	}
+	installs := filepath.Join(f.home, "cache", "alpha")
+	v2 := filepath.Join(installs, "v-2.0.0")
+	if err := os.MkdirAll(filepath.Join(v2, "alpha-2.0.0", "bin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	touchAhead(t, installs)
+	if got := alphaVersion(t, f.converge(t)); got != "2.0.0" {
+		t.Fatalf("after installing 2.0.0: ALPHA_VERSION = %s, want 2.0.0", got)
+	}
+	if err := os.RemoveAll(v2); err != nil {
+		t.Fatal(err)
+	}
+	ahead := time.Now().Add(2 * time.Minute)
+	if err := os.Chtimes(installs, ahead, ahead); err != nil {
+		t.Fatal(err)
+	}
+	if got := alphaVersion(t, f.runOutput(t)); got != "1.0.0" {
+		t.Fatalf("after removing 2.0.0: ALPHA_VERSION = %s, want 1.0.0", got)
+	}
+}
+
+// Adding the plugin of a configured tool must be seen at the next prompt too.
+func TestEnvCacheFollowsAddedPlugins(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	if err := os.MkdirAll(filepath.Join(f.home, "cache", "epsilon", "v-1.0.0", "epsilon-1.0.0", "bin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	f.writeProjectConfig(t, "[tools]\nepsilon = \"1.0.0\"\n")
+	want := filepath.Join(f.work, ".vfox", "sdks", "epsilon", "bin")
+	if path := f.run(t); strings.Contains(path, want) {
+		t.Fatalf("epsilon is on the PATH before its plugin is added: %s", path)
+	}
+	f.converge(t)
+	pluginDir := filepath.Join(f.home, "plugin", "epsilon")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	script := `PLUGIN = {name="epsilon", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+`
+	if err := os.WriteFile(filepath.Join(pluginDir, "main.lua"), []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if path := f.run(t); !strings.Contains(path, want) {
+		t.Fatalf("after adding the plugin the PATH still lacks %s: %s", want, path)
+	}
+}
+
+// A cache hit does not make the links again, so their removal must count as
+// a change: rm -rf .vfox in the project, or of the global sdks directory.
+func TestEnvCacheRepairsRemovedLinks(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	f.writeProjectConfig(t, "[tools]\nalpha = \"1.0.0\"\n")
+	f.converge(t)
+	for _, c := range []struct{ remove, link string }{
+		{filepath.Join(f.work, ".vfox"), filepath.Join(f.work, ".vfox", "sdks", "alpha")},
+		{filepath.Join(f.home, "sdks"), filepath.Join(f.home, "sdks", "beta")},
+	} {
+		if _, err := os.Lstat(c.link); err != nil {
+			t.Fatalf("the link %s was not made: %v", c.link, err)
+		}
+		if err := os.RemoveAll(c.remove); err != nil {
+			t.Fatal(err)
+		}
+		f.runOutput(t)
+		if _, err := os.Lstat(c.link); err != nil {
+			t.Fatalf("the link %s was not made again: %v", c.link, err)
+		}
+	}
+}
+
+// In the home directory the project link directory would be the global one;
+// a project config there must leave the global links alone.
+func TestEnvProjectInHomeKeepsGlobalLinks(t *testing.T) {
+	f := newEnvCommandFixture(t)
+	if err := os.MkdirAll(filepath.Join(f.home, "cache", "alpha", "v-2.0.0", "alpha-2.0.0", "bin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	f.runOutput(t)
+	link := filepath.Join(f.home, "sdks", "alpha")
+	before, err := os.Readlink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.work = filepath.Dir(f.home) // HOME of the fixture
+	f.writeProjectConfig(t, "[tools]\nalpha = \"2.0.0\"\n")
+	if got := alphaVersion(t, f.runOutput(t)); got != "2.0.0" {
+		t.Fatalf("in the home directory: ALPHA_VERSION = %s, want 2.0.0", got)
+	}
+	after, err := os.Readlink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after != before {
+		t.Fatalf("the global link of alpha was repointed from %s to %s", before, after)
 	}
 }
