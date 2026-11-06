@@ -52,6 +52,7 @@ vfox i <sdk-name>@<version>
 
 - `-a, --all`: Install all SDK versions recorded in .vfox.toml
 - `-y, --yes`: Quick installation, skip interactive prompts​
+- `-u, --use`: Use the installed version in the current shell session, as `vfox use` would, so it needs an activated shell (`vfox activate`) the same way. Cannot be combined with `--all`, takes a version (no picker) and one version per SDK.
 - `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled.
 
 ::: tip
@@ -314,6 +315,8 @@ vfox cd [options] [<sdk-name>]
 ## Upgrade
 
 Upgrade `vfox` to the latest version.
+
+On Linux and macOS, the upgrade replaces the `vfox` binary in place, so it needs write access to the directory that holds it. If `vfox` is installed in a system directory such as `/usr/local/bin`, run it with `sudo`, for example `sudo /usr/local/bin/vfox upgrade`.
 
 **Usage**
 

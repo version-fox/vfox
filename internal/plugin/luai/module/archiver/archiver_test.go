@@ -33,3 +33,12 @@ func eval(str string, t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestDecompressUnsupportedType(t *testing.T) {
+	const str = `
+	local archiver = require("vfox.archiver")
+	local err = archiver.decompress("testdata/not-an-archive.dat", "testdata/out")
+	assert(err == "unsupported archive type: .dat", "unexpected error: " .. tostring(err))
+	`
+	eval(str, t)
+}

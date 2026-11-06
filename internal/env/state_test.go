@@ -50,7 +50,7 @@ func TestConfigState_SaveAndLoad(t *testing.T) {
 	// Create state and save
 	state := NewConfigState(stateFile)
 	state.LastCheck = time.Now().Unix()
-	state.GlobalMtime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	state.GlobalMtime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixNano()
 	state.CachedOutput = "export PATH=/test"
 
 	err := state.Save()
@@ -131,11 +131,15 @@ func TestConfigState_HasChanged_FileModified(t *testing.T) {
 		t.Fatalf("Update() failed: %v", err)
 	}
 
-	// Modify config file
-	time.Sleep(time.Second + 100*time.Millisecond) // Ensure different mtime (Unix timestamp is second precision)
+	// Modify config file, with an mtime a minute ahead so the change does not
+	// depend on the clock or the timestamp precision of the file system
 	err = os.WriteFile(configFile, []byte("modified"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to modify config file: %v", err)
+	}
+	later := time.Now().Add(time.Minute)
+	if err := os.Chtimes(configFile, later, later); err != nil {
+		t.Fatalf("Failed to set the mtime of the config file: %v", err)
 	}
 
 	// Check if changed (should be true)
@@ -368,5 +372,76 @@ func TestConfigState_PathPolicyChanged(t *testing.T) {
 	}
 	if reloaded.PathPolicyChanged("legacy") || !reloaded.PathPolicyChanged("aggressive") {
 		t.Errorf("reloaded policy = %q", reloaded.CachedPathPolicy)
+	}
+}
+
+// Output rendered under one resolution key (project tools, installs, links)
+// must not be served under another.
+func TestConfigState_ResolutionKeyChanged(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state := NewConfigState(stateFile)
+
+	if state.ResolutionKeyChanged("") {
+		t.Fatal("an empty key must match a state that never recorded one")
+	}
+	if !state.ResolutionKeyChanged("nodejs = \"20\"\n") {
+		t.Fatal("a key must count as changed against a state without one")
+	}
+	state.SetResolutionKey("nodejs = \"20\"\n")
+	if err := state.Update(map[UseScope]string{}, "export PATH=/test", "bash"); err != nil {
+		t.Fatalf("Update() failed: %v", err)
+	}
+	if state.ResolutionKeyChanged("nodejs = \"20\"\n") {
+		t.Error("the recorded key must not count as changed")
+	}
+	if !state.ResolutionKeyChanged("nodejs = \"22\"\n") || !state.ResolutionKeyChanged("") {
+		t.Error("a different or empty key must count as changed")
+	}
+
+	// The key survives a round trip through the state file, as a new prompt would see it.
+	reloaded := NewConfigState(stateFile)
+	if err := reloaded.Load(); err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if reloaded.ResolutionKeyChanged("nodejs = \"20\"\n") {
+		t.Errorf("reloaded resolution key = %q", reloaded.CachedResolutionKey)
+	}
+}
+
+// A config file whose modification time moves back (replaced by an older
+// copy) or stays within the stored second has changed as well.
+func TestConfigState_HasChanged_AnyOtherMtime(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "vfox.toml")
+	if err := os.WriteFile(configFile, []byte("[tools]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(PathVarName, "/test")
+	state := NewConfigState(filepath.Join(dir, "state.json"))
+	configPaths := map[UseScope]string{Global: configFile}
+
+	info, err := os.Stat(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		what  string
+		mtime time.Time
+	}{
+		{"older", info.ModTime().Add(-48 * time.Hour)},
+		{"a millisecond later", info.ModTime().Add(-48 * time.Hour).Add(time.Millisecond)},
+	} {
+		if err := state.Update(configPaths, "export PATH=/test", "bash"); err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+		if changed, err := state.HasChanged(configPaths); changed || err != nil {
+			t.Fatalf("%s: before the change: changed = %v, err = %v", c.what, changed, err)
+		}
+		if err := os.Chtimes(configFile, c.mtime, c.mtime); err != nil {
+			t.Fatal(err)
+		}
+		if changed, err := state.HasChanged(configPaths); !changed || err != nil {
+			t.Errorf("%s: changed = %v, err = %v, want a change", c.what, changed, err)
+		}
 	}
 }

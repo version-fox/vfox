@@ -60,8 +60,15 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
-	resolvedVersion := manager.ResolveAlias(name, source, manager.ResolveVersion(name, version))
-	cv := source.Current()
+	resolvedVersion := manager.ResolveVersionName(name, source, manager.ResolveVersion(name, version))
+	// Only the version the global scope asks for is switched away from below,
+	// in the global scope; Current() may answer with a project or session one.
+	var cv sdk.Version
+	if global, err := manager.RuntimeEnvContext.LoadVfoxTomlByScope(env.Global); err == nil {
+		if v, ok := global.GetToolVersion(name); ok {
+			cv = sdk.Version(v)
+		}
+	}
 	if err = source.Uninstall(resolvedVersion); err != nil {
 		return err
 	}

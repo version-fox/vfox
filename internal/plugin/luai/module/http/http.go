@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/codec"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 type Module struct {
@@ -93,7 +95,7 @@ func (m *Module) Get(L *lua.LState) int {
 	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 2
 	}
 
@@ -110,7 +112,7 @@ func (m *Module) Get(L *lua.LState) int {
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 2
 	}
 	defer resp.Body.Close()
@@ -147,7 +149,7 @@ func (m *Module) Head(L *lua.LState) int {
 	req, err := http.NewRequestWithContext(requestContext(L), "HEAD", urlStr.String(), nil)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 2
 	}
 	headersTable := param.RawGetString("headers")
@@ -163,7 +165,7 @@ func (m *Module) Head(L *lua.LState) int {
 	resp, err := m.client.Do(req)
 	if err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 2
 	}
 	defer resp.Body.Close()
@@ -207,7 +209,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 
 	req, err := http.NewRequestWithContext(requestContext(L), "GET", urlStr.String(), nil)
 	if err != nil {
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 1
 	}
 	headersTable := param.RawGetString("headers")
@@ -221,12 +223,16 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 	m.ensureUserAgent(L, req)
 	resp, err := m.downloadClient.Do(req)
 	if err != nil {
-		L.Push(lua.LString(err.Error()))
+		L.Push(lua.LString(util.RedactError(err).Error()))
 		return 1
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		L.Push(lua.LString("file not found"))
+		return 1
+	}
+	if err := util.UnexpectedStatusError(resp, urlStr.String()); err != nil {
+		L.Push(lua.LString(err.Error()))
 		return 1
 	}
 	out, err := os.Create(fp)
@@ -237,8 +243,8 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 	defer out.Close()
 
 	desc := "Downloading..."
-	if filepath.Ext(urlStr.String()) != "" {
-		desc = filepath.Base(urlStr.String())
+	if name := path.Base(req.URL.Path); filepath.Ext(name) != "" {
+		desc = name
 	}
 
 	bar := progressbar.NewOptions64(

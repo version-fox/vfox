@@ -159,3 +159,54 @@ func TestInfoJSONListsTheAdditionalRuntimesAndTheVariables(t *testing.T) {
 		t.Errorf("env = %+v, want the PATH entry and the variable the plugin sets", info.Env)
 	}
 }
+
+func TestInfoAcceptsConventionalVersionPrefix(t *testing.T) {
+	f := newCLIFixture(t, false)
+	home := f.installOnDisk(t, "alpha", "21.0.2+13", "alphatool")
+	pkg := filepath.Dir(home)
+
+	if out := strings.TrimSpace(f.run(t, "info", "alpha@v21.0.2+13").mustSucceed(t, "info").stdout); out != pkg {
+		t.Errorf("info = %q, want the version directory %q", out, pkg)
+	}
+	out := f.run(t, "info", "--format", "{{.Version}}|{{.Home}}", "alpha@v21.0.2+13").mustSucceed(t, "info --format").stdout
+	if want := "21.0.2+13|" + home; out != want {
+		t.Errorf("info --format = %q, want %q", out, want)
+	}
+	info := parseInfo(t, f.run(t, "info", "--json", "alpha@v21.0.2+13").mustSucceed(t, "info --json"))
+	if !info.Installed || info.Version != "21.0.2+13" || info.PackagePath != pkg {
+		t.Errorf("info = %+v, want the installed version under the name without the v", info)
+	}
+	if out := strings.TrimSpace(f.run(t, "info", "alpha@v9.9.9").mustSucceed(t, "info").stdout); out != "notfound" {
+		t.Errorf("info of an unknown version = %q, want notfound", out)
+	}
+}
+
+func TestInfoTakesTheNameAsTypedBeforeDroppingAV(t *testing.T) {
+	for _, tt := range []struct{ typed, shown string }{
+		{"v1", "2.0.0"},
+		{"vendor", "vendor"},
+		{"v1.0.0", "v1.0.0"},
+	} {
+		t.Run(tt.typed, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+			f.installOnDisk(t, "alpha", "2.0.0", "alphatool")
+			switch tt.typed {
+			case "v1":
+				f.run(t, "alias", "set", "alpha", "v1", "2.0.0").mustSucceed(t, "alias set")
+			case "vendor":
+				f.run(t, "link", "alpha@vendor", f.external(t, "alphatool")).mustSucceed(t, "link")
+			case "v1.0.0":
+				f.installOnDisk(t, "alpha", "v1.0.0", "alphatool")
+			}
+			pkg := filepath.Join(f.shared, "cache", "alpha", "v-"+tt.shown)
+			if out := strings.TrimSpace(f.run(t, "info", "alpha@"+tt.typed).mustSucceed(t, "info").stdout); out != pkg {
+				t.Errorf("info = %q, want the version directory %q", out, pkg)
+			}
+			info := parseInfo(t, f.run(t, "info", "--json", "alpha@"+tt.typed).mustSucceed(t, "info --json"))
+			if !info.Installed || info.Version != tt.shown || info.PackagePath != pkg {
+				t.Errorf("info = %+v, want %s in %q", info, tt.shown, pkg)
+			}
+		})
+	}
+}

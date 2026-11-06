@@ -17,8 +17,12 @@
 package internal
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -261,7 +265,7 @@ func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
 	// Simulate the activate.go scenario with multiple SDKs being looked up concurrently
 	// This is what was causing the concurrent map writes error
 	sdkNames := []string{"nodejs", "python", "java", "go", "ruby", "rust"}
-	
+
 	var wg sync.WaitGroup
 	wg.Add(len(sdkNames))
 
@@ -283,3 +287,222 @@ func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
 	wg.Wait()
 }
 
+func TestDownloadPluginRejectsUnexpectedStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("<html>refused</html>"))
+	}))
+	defer srv.Close()
+
+	pluginsDir := t.TempDir()
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: pluginsDir}},
+	}}
+
+	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 403 Forbidden") {
+		t.Fatalf("downloadPlugin() error = %v, want unexpected HTTP status 403 Forbidden", err)
+	}
+
+	entries, readErr := os.ReadDir(pluginsDir)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		t.Fatalf("read plugins dir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("downloadPlugin() saved %d file(s) for an HTTP 403 response, want none", len(entries))
+	}
+}
+
+func TestDownloadPluginKeepsNotFoundMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "plugin not found") {
+		t.Fatalf("downloadPlugin() error = %v, want plugin not found", err)
+	}
+}
+
+func TestDownloadPluginNotFoundRedactsPassword(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	u, err := url.Parse(srv.URL + "/plugin.zip")
+	if err != nil {
+		t.Fatalf("parse test server URL: %v", err)
+	}
+	u.User = url.UserPassword("user", "s3cret")
+
+	_, err = m.downloadPlugin(u.String())
+	if err == nil || !strings.Contains(err.Error(), "plugin not found") {
+		t.Fatalf("downloadPlugin() error = %v, want plugin not found", err)
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("downloadPlugin() error = %v, want the URL password redacted", err)
+	}
+	if !strings.Contains(err.Error(), "user:xxxxx@") {
+		t.Fatalf("downloadPlugin() error = %v, want the redacted userinfo in the URL", err)
+	}
+}
+
+func TestFetchPluginManifestRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+	}}
+
+	_, err := m.fetchPluginManifest("http://user:s3cret@127.0.0.1:1/manifest.json?token=abc123")
+	if err == nil {
+		t.Fatal("fetchPluginManifest() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("fetchPluginManifest() error = %q, want the password and the query token redacted", msg)
+	}
+	if !strings.Contains(msg, "user:xxxxx@") || !strings.Contains(msg, "token=xxxxx") {
+		t.Fatalf("fetchPluginManifest() error = %q, want the redacted userinfo and query", msg)
+	}
+}
+
+func TestDownloadPluginRedactsRequestError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	_, err := m.downloadPlugin("http://user:Zq9%ss@127.0.0.1/plugin.zip")
+	if err == nil {
+		t.Fatal("downloadPlugin() error = nil, want a parse error")
+	}
+	if msg := err.Error(); strings.Contains(msg, "Zq9") || strings.Contains(msg, "%ss") {
+		t.Fatalf("downloadPlugin() error = %q, want the rejected URL credentials hidden", msg)
+	}
+}
+
+func TestDownloadPluginRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	_, err := m.downloadPlugin("http://user:s3cret@127.0.0.1:1/plugin.zip?token=abc123")
+	if err == nil {
+		t.Fatal("downloadPlugin() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("downloadPlugin() error = %q, want the password and the query token redacted", msg)
+	}
+}
+
+func TestAvailableRedactsConnectionError(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{
+			Proxy:    config.EmptyProxy,
+			Registry: &config.Registry{Address: "http://user:s3cret@127.0.0.1:1/registry?token=abc123"},
+		},
+	}}
+
+	_, err := m.Available()
+	if err == nil {
+		t.Fatal("Available() error = nil, want a connection error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("Available() error = %q, want the registry credentials redacted", msg)
+	}
+}
+
+func TestInstallPluginToTempRedactsUnsupportedExtension(t *testing.T) {
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+	}}
+
+	_, err := m.installPluginToTemp("http://user:s3cret@example.com/plugin.txt?token=abc123")
+	if err == nil {
+		t.Fatal("installPluginToTemp() error = nil, want an unsupported type error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "s3cret") || strings.Contains(msg, "abc123") {
+		t.Fatalf("installPluginToTemp() error = %q, want the password and the query token redacted", msg)
+	}
+	if !strings.Contains(msg, "token=xxxxx") {
+		t.Fatalf("installPluginToTemp() error = %q, want the masked query in the extension", msg)
+	}
+}
+
+func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
+	const body = "plugin bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+	}}
+
+	// The saved name has to end with the extension the whole URL was accepted
+	// by: the base of the URL path does not, so the name falls back to
+	// "plugin" plus the extension.
+	path, err := m.downloadPlugin(srv.URL + "/dl?token=abc123&file=plugin.zip")
+	if err != nil {
+		t.Fatalf("downloadPlugin() error = %v", err)
+	}
+	if base := filepath.Base(path); base != "plugin.zip" {
+		t.Fatalf("downloadPlugin() file name = %q, want plugin.zip", base)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != body {
+		t.Fatalf("downloaded content = %q, err = %v", got, err)
+	}
+
+	// A URL whose path has no file name falls back to "plugin" plus the extension.
+	path, err = m.downloadPlugin(srv.URL + "/?file=plugin.zip")
+	if err != nil {
+		t.Fatalf("downloadPlugin() error = %v", err)
+	}
+	if base := filepath.Base(path); base != "plugin.zip" {
+		t.Fatalf("downloadPlugin() file name = %q, want plugin.zip", base)
+	}
+}
+
+func TestDownloadPluginKeepsBackslashPathsInPluginDir(t *testing.T) {
+	const body = "plugin bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	plugins := t.TempDir()
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: plugins}},
+	}}
+
+	// A backslash in the URL path, literal or as %5C, must not let the
+	// download escape the plugin directory on Windows, where filepath.Join
+	// splits at it.
+	for _, p := range []string{"/..\\evil.zip", "/..%5Cevil.zip", "/sub/..%5C..%5Cevil.zip"} {
+		saved, err := m.downloadPlugin(srv.URL + p)
+		if err != nil {
+			t.Fatalf("downloadPlugin(%q) error = %v", p, err)
+		}
+		if rel, err := filepath.Rel(plugins, saved); err != nil || rel != filepath.Base(saved) {
+			t.Fatalf("downloadPlugin() saved %q, want a file directly in %q", saved, plugins)
+		}
+	}
+}

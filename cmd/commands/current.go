@@ -53,7 +53,7 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 			if current == "" {
 				pterm.Printf("%s -> N/A \n", name)
 			} else {
-				pterm.Printf("%s -> %s\n", name, pterm.LightGreen("v"+string(current)))
+				pterm.Printf("%s -> %s\n", name, pterm.LightGreen(string(current)))
 			}
 		}
 
@@ -67,6 +67,6 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	if current == "" {
 		return fmt.Errorf("no current version of %s", sdkName)
 	}
-	pterm.Println("->", pterm.LightGreen("v"+string(current)))
+	pterm.Println("->", pterm.LightGreen(string(current)))
 	return nil
 }

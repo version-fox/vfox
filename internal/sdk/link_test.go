@@ -359,6 +359,58 @@ func TestUninstallStillCleansInstalledVersions(t *testing.T) {
 	}
 }
 
+// Uninstall unsets the version in the global scope only when the global
+// config asks for it; a version only the project asks for leaves it alone.
+func TestUninstallFollowsTheGlobalVersion(t *testing.T) {
+	p := (&testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil }}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "1.0.0")
+	mustInstall(t, s, "2.0.0")
+	setScopeVersion(t, s, env.Global, "1.0.0")
+	setScopeVersion(t, s, env.Project, "2.0.0")
+
+	if err := s.Uninstall("1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := scopeVersion(t, s, env.Global); got != "" {
+		t.Errorf("the global scope still asks for %s after it was uninstalled", got)
+	}
+	if got := scopeVersion(t, s, env.Project); got != "2.0.0" {
+		t.Errorf("the project asks for %q after the global version was uninstalled, want 2.0.0", got)
+	}
+
+	mustInstall(t, s, "1.0.0")
+	setScopeVersion(t, s, env.Global, "1.0.0")
+	if err := s.Uninstall("2.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := scopeVersion(t, s, env.Global); got != "1.0.0" {
+		t.Errorf("the global scope asks for %q after the project's version was uninstalled, want 1.0.0", got)
+	}
+}
+
+func setScopeVersion(t *testing.T, s *impl, scope env.UseScope, version string) {
+	t.Helper()
+	toml, err := s.envContext.LoadVfoxTomlByScope(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	toml.SetTool(s.Name, version)
+	if err := toml.Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func scopeVersion(t *testing.T, s *impl, scope env.UseScope) string {
+	t.Helper()
+	toml, err := s.envContext.LoadVfoxTomlByScope(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version, _ := toml.GetToolVersion(s.Name)
+	return version
+}
+
 // A plugin may lay its own links out inside what it installs. The receipt says
 // vfox owns that installation, so it is uninstalled like any other.
 func TestALinkInsideAnInstalledVersionIsNotALinkedVersion(t *testing.T) {

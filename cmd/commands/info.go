@@ -185,7 +185,7 @@ func infoVersion(cmd *cli.Command, manager *internal.Manager, name string, versi
 		fmt.Println(notFound)
 		return nil
 	}
-	version = manager.ResolveAlias(name, sdkSource, version)
+	version = manager.ResolveVersionName(name, sdkSource, version)
 	installation, err := sdkSource.Installation(version)
 
 	if cmd.IsSet("json") {

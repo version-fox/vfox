@@ -69,7 +69,7 @@ func aliasSetCmd(ctx context.Context, cmd *cli.Command) error {
 	name := strings.ToLower(cmd.Args().Get(0))
 	alias := cmd.Args().Get(1)
 	version := sdk.Version(cmd.Args().Get(2))
-	// `vfox current` prints versions with a leading v, so accept that spelling.
+	// A leading v is a common way to write a version, so accept that spelling.
 	if source, err := manager.LookupSdk(name); err == nil && !source.CheckRuntimeExist(version) {
 		if trimmed := sdk.Version(strings.TrimPrefix(string(version), "v")); source.CheckRuntimeExist(trimmed) {
 			version = trimmed

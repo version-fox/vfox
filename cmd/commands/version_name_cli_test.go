@@ -113,3 +113,90 @@ func TestInstallKnowsALinkedVersionThatStartsWithAV(t *testing.T) {
 	out := f.run(t, "install", "alpha@vendor").mustSucceed(t, "install alpha@vendor").output()
 	mustContain(t, "install", out, "alpha@vendor is already installed")
 }
+
+func TestCurrentPrintsVersionAsStored(t *testing.T) {
+	for _, version := range []string{"21.0.2+13", "v1.0.0", "vendor"} {
+		t.Run(version, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			if version == "vendor" {
+				f.run(t, "link", "alpha@vendor", f.external(t, "alphatool")).mustSucceed(t, "link")
+			} else {
+				f.installOnDisk(t, "alpha", version, "alphatool")
+			}
+			f.run(t, "use", "-g", "alpha@"+version).mustSucceed(t, "use")
+			// pterm forces color, so the arrow and the stored name are not adjacent until the codes are gone.
+			out := colorSequence.ReplaceAllString(f.run(t, "current", "alpha").mustSucceed(t, "current alpha").output(), "")
+			mustContain(t, "current alpha", out, "-> "+version)
+			mustNotContain(t, "current alpha", out, "-> v"+version)
+			out = colorSequence.ReplaceAllString(f.run(t, "current").mustSucceed(t, "current").output(), "")
+			mustContain(t, "current", out, "alpha -> "+version, "plain -> N/A")
+			mustNotContain(t, "current", out, "alpha -> v"+version)
+		})
+	}
+	t.Run("unselected", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		out := f.run(t, "current", "alpha").mustFail(t, "current alpha").output()
+		mustContain(t, "current alpha", out, "no current version of alpha")
+	})
+}
+
+func TestUninstallAcceptsConventionalVersionPrefix(t *testing.T) {
+	for _, version := range []string{"21.0.2+13", "21.0.8+9-tem"} {
+		for _, prefix := range []string{"v", ""} {
+			t.Run(prefix+version, func(t *testing.T) {
+				f := newCLIFixture(t, false)
+				installed := f.installOnDisk(t, "alpha", version, "alphatool")
+				f.run(t, "uninstall", "alpha@"+prefix+version).mustSucceed(t, "uninstall")
+				if exists(filepath.Dir(installed)) {
+					t.Error("the version directory was not removed")
+				}
+			})
+		}
+	}
+}
+
+func TestUninstallTakesTheNameAsTypedBeforeDroppingAV(t *testing.T) {
+	for _, tt := range []struct{ typed, removed string }{
+		{"v1", "2.0.0"},
+		{"vendor", "vendor"},
+		{"v1.0.0", "v1.0.0"},
+	} {
+		t.Run(tt.typed, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			one := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+			two := f.installOnDisk(t, "alpha", "2.0.0", "alphatool")
+			external := ""
+			switch tt.typed {
+			case "v1":
+				f.run(t, "alias", "set", "alpha", "v1", "2.0.0").mustSucceed(t, "alias set")
+			case "vendor":
+				external = f.external(t, "alphatool")
+				f.run(t, "link", "alpha@vendor", external).mustSucceed(t, "link")
+			case "v1.0.0":
+				f.installOnDisk(t, "alpha", "v1.0.0", "alphatool")
+			}
+			f.run(t, "alias", "set", "alpha", "selected", tt.removed).mustSucceed(t, "alias set")
+			out := f.run(t, "uninstall", "alpha@"+tt.typed).mustSucceed(t, "uninstall").output()
+			mustContain(t, "uninstall", out, "Removed the alias(es) selected")
+			aliases := f.run(t, "alias", "list", "alpha").mustSucceed(t, "alias list").output()
+			mustNotContain(t, "alias list", aliases, "selected", "v1")
+			if exists(filepath.Join(f.shared, "cache", "alpha", "v-"+tt.removed)) {
+				t.Error("the intended version directory was not removed")
+			}
+			if !exists(one) || (tt.removed != "2.0.0" && !exists(two)) {
+				t.Error("another installation was removed")
+			}
+			if external != "" && !exists(filepath.Join(external, "bin", "alphatool")) {
+				t.Error("the linked external target was removed")
+			}
+		})
+	}
+	t.Run("unknown", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		installed := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+		f.run(t, "uninstall", "alpha@v9.9.9").mustFail(t, "uninstall unknown version")
+		if !exists(installed) {
+			t.Error("another installation was removed")
+		}
+	})
+}

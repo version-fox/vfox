@@ -51,6 +51,11 @@ var Install = &cli.Command{
 			Name:  "reinstall",
 			Usage: "Replace an installed version with a fresh copy, for example after the SDK modified itself in place",
 		},
+		&cli.BoolFlag{
+			Name:    "use",
+			Aliases: []string{"u"},
+			Usage:   "Use the installed version in the current shell session",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -59,10 +64,14 @@ var Install = &cli.Command{
 func installCmd(ctx context.Context, cmd *cli.Command) error {
 	yes := cmd.Bool("yes")
 	reinstall := cmd.Bool("reinstall")
+	useAfterInstall := cmd.Bool("use")
 
 	if cmd.Bool("all") {
 		if reinstall {
 			return cli.Exit("--reinstall cannot be combined with --all", 1)
+		}
+		if useAfterInstall {
+			return cli.Exit("--use cannot be combined with --all", 1)
 		}
 		return installAll(yes)
 	}
@@ -72,6 +81,17 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		return cli.Exit("sdk name is required", 1)
 	}
 
+	if useAfterInstall {
+		seen := make(map[string]bool, args.Len())
+		for i := 0; i < args.Len(); i++ {
+			name := strings.ToLower(strings.Split(args.Get(i), "@")[0])
+			if seen[name] {
+				return cli.Exit(fmt.Sprintf("--use cannot switch two versions of %s, give one", name), 1)
+			}
+			seen[name] = true
+		}
+	}
+
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return nil
@@ -79,6 +99,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	defer manager.Close()
 
 	errorStore := util.NewErrorStore()
+	switchFailed := false
 
 	for i := 0; i < args.Len(); i++ {
 		sdkArg := args.Get(i)
@@ -129,6 +150,9 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 			var resolvedVersion = manager.ResolveVersion(sdkMetadata.Name, version)
 			logger.Debugf("resolved version: %s\n", resolvedVersion)
 			if resolvedVersion == "" {
+				if useAfterInstall {
+					return cli.Exit(fmt.Sprintf("install --use needs a version for %s, for example %s@latest", name, name), 1)
+				}
 				if util.IsNonInteractiveTerminal() {
 					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
@@ -141,13 +165,17 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				install := sdkSource.Install
-				if reinstall {
-					install = sdkSource.Reinstall
-				}
-				if err = install(resolvedVersion); err != nil {
+				installed, err := sdkSource.InstallResolved(resolvedVersion, reinstall)
+				if err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
+				}
+				if useAfterInstall {
+					if err = sdkSource.UseWithConfig(installed, env.Session, false); err != nil {
+						switchFailed = true
+						errorStore.AddAndShow(name, fmt.Errorf("installed, but switching failed: %w", err))
+						continue
+					}
 				}
 			}
 		}
@@ -155,7 +183,9 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 
 	notes := errorStore.GetNotesSet()
 
-	if notes.Len() == 1 {
+	if notes.Len() == 1 && switchFailed {
+		return fmt.Errorf("failed to switch %s", notes.Slice()[0])
+	} else if notes.Len() == 1 {
 		return fmt.Errorf("failed to install %s", notes.Slice()[0])
 	} else if notes.Len() > 1 {
 		return fmt.Errorf("failed to install some SDKs: %s", strings.Join(notes.Slice(), ", "))
