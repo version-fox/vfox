@@ -282,6 +282,8 @@ vfox use -g nodejs@latest
 | **Session** | `vfox use -s` | `~/.vfox/tmp/<pid>/sdks` | 当前 Shell 会话 |
 | **Global**  | `vfox use -g` | `~/.vfox/sdks`           | 全局生效        |
 
+在用户主目录中，`$PWD/.vfox/sdks` 就是全局 SDK 路径，因此 Project 作用域的链接会改为放到 Session 路径下，全局链接保持不变。
+
 ::: info 📖 工作原理
 
 vfox 通过在不同作用域创建目录软链来指向实际 SDK 安装目录，并将这些路径按优先级添加到 `PATH` 环境变量中，实现版本切换。

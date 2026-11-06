@@ -500,8 +500,10 @@ func (b *impl) Uninstall(version Version) (err error) {
 		}
 	}
 
-	// If the version to be uninstalled is currently in use, unuse it first.
-	if b.Current() == version {
+	// If the global scope asks for the version to be uninstalled, unuse it
+	// there first. A version only a project or session asks for leaves the
+	// global setting alone.
+	if b.globalVersion() == version {
 		logger.Debugf("SDK %s is currently in use, unusing it first\n", label)
 		if err = b.Unuse(env.Global); err != nil {
 			return err
@@ -816,6 +818,19 @@ func (b *impl) InstalledList() []Version {
 		return versions[i] > versions[j]
 	})
 	return versions
+}
+
+// globalVersion returns the version the global config asks for, or "".
+func (b *impl) globalVersion() Version {
+	global, err := b.envContext.LoadVfoxTomlByScope(env.Global)
+	if err != nil {
+		logger.Debugf("Failed to load the global config: %v", err)
+		return ""
+	}
+	if version, ok := global.GetToolVersion(b.Name); ok {
+		return Version(version)
+	}
+	return ""
 }
 
 // Current returns the current version of the SDK.

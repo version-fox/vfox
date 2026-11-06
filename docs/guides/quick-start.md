@@ -288,6 +288,8 @@ Always use exact version numbers to ensure project stability and reproducibility
 | **Session** | `vfox use -s` | `~/.vfox/tmp/<pid>/sdks` | Current Shell session |
 | **Global** | `vfox use -g` | `~/.vfox/sdks` | Global |
 
+In the home directory `$PWD/.vfox/sdks` is the global SDK path, so project links go to the session path there instead and the global links stay as they are.
+
 ::: info 📖 How It Works
 
 vfox creates directory symlinks in different scopes pointing to actual SDK installation directories, and adds these paths to the `PATH` environment variable in priority order, enabling version switching.

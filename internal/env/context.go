@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
@@ -99,10 +100,35 @@ func (m *RuntimeEnvContext) GetLinkDirPathByScope(scope UseScope) string {
 		linkDir = m.PathMeta.Working.GlobalSdkDir
 	case Project:
 		linkDir = m.PathMeta.Working.ProjectSdkDir
+		// In the home directory the project link directory is the global one;
+		// linking project versions there would repoint the global links that
+		// every other shell uses, so they go to the session directory instead.
+		if sameDir(linkDir, m.PathMeta.Working.GlobalSdkDir) {
+			linkDir = m.PathMeta.Working.SessionSdkDir
+		}
 	case Session:
 		linkDir = m.PathMeta.Working.SessionSdkDir
 	}
 	return linkDir
+}
+
+// sameDir reports whether a and b name the same directory. Paths that are
+// equal as text match without touching the file system; otherwise both are
+// compared with os.SameFile, so a symlink, another case on a case-insensitive
+// volume or another spelling of the drive letter does not matter.
+func sameDir(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ai, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	bi, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(ai, bi)
 }
 
 // CleanSystemPaths returns system PATH with all vfox-managed paths removed (prefix match).
