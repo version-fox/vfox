@@ -200,18 +200,28 @@ func TestEnvAggressiveModeAndPreserve(t *testing.T) {
 	}
 }
 
-func TestEnvWithoutABaselineBehavesLikeLegacyInEveryMode(t *testing.T) {
+// An old activation script never recorded a baseline, and neither did a shell
+// that was started before vfox was upgraded. The one mode that needs a baseline
+// to tell inherited entries from added ones, which is also the default, must not
+// reorder the PATH of such a shell. `aggressive` does not read the baseline, so
+// it demotes the same entries with or without one.
+func TestEnvWithoutABaselineOnlyBaselineModeFallsBackToLegacy(t *testing.T) {
 	f := newPathFixture(t)
-	// An old activation script never recorded one, and neither did a shell that
-	// was started before vfox was upgraded: the default must not reorder its PATH.
-	for _, tt := range []struct{ name, config string }{
-		{"the default", ""},
-		{"baseline", "path:\n  mode: baseline\n"},
+	legacyOrder := []string{f.inherited, f.vfoxBin, f.system}
+	demotedOrder := []string{f.vfoxBin, f.inherited, f.system}
+	for _, tt := range []struct {
+		name, config string
+		want         []string
+	}{
+		{"the default", "", legacyOrder},
+		{"baseline", "path:\n  mode: baseline\n", legacyOrder},
+		{"legacy", "path:\n  mode: legacy\n", legacyOrder},
+		{"aggressive", "path:\n  mode: aggressive\n", demotedOrder},
 	} {
 		f.writeUserConfig(t, tt.config)
 		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-		if got[0] != f.inherited {
-			t.Errorf("%s without a baseline: PATH = %v, want legacy order", tt.name, got)
+		if strings.Join(got, ":") != strings.Join(tt.want, ":") {
+			t.Errorf("%s without a baseline: PATH = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }
