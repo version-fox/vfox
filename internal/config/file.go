@@ -62,7 +62,64 @@ func LoadFile(path string) (*File, error) {
 	if f.root, err = f.topMapping(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	// References must retain their values even if their anchor is changed or
+	// removed later. Expand them before either Set or Unset can mutate a node.
+	remaining := 100000
+	doc, err := copyWithoutAliases(&f.doc, make(map[*yaml.Node]bool), &remaining)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	f.doc = *doc
+	f.root = f.doc.Content[0]
 	return f, nil
+}
+
+// copyWithoutAliases creates independent values for YAML references, keeping
+// node styles and comments. Bound expansion and detect cycles before allocating
+// an unbounded tree from a small document with repeatedly nested aliases.
+func copyWithoutAliases(node *yaml.Node, visiting map[*yaml.Node]bool, remaining *int) (*yaml.Node, error) {
+	if node == nil || visiting[node] {
+		return nil, errors.New("cannot edit a cyclic or missing YAML alias")
+	}
+	if *remaining == 0 {
+		return nil, errors.New("YAML alias expansion exceeds the config editor's node limit")
+	}
+	*remaining -= 1
+	visiting[node] = true
+	defer delete(visiting, node)
+	if node.Kind == yaml.AliasNode {
+		copy, err := copyWithoutAliases(node.Alias, visiting, remaining)
+		if err != nil {
+			return nil, err
+		}
+		if node.HeadComment != "" {
+			copy.HeadComment = node.HeadComment
+		}
+		if node.LineComment != "" {
+			// Block collections have no opening token on which the emitter
+			// can place an inline comment. Keep the alias comment above them.
+			if (copy.Kind == yaml.MappingNode || copy.Kind == yaml.SequenceNode) && copy.Style&yaml.FlowStyle == 0 {
+				copy.HeadComment = strings.TrimSpace(copy.HeadComment + "\n" + node.LineComment)
+			} else {
+				copy.LineComment = node.LineComment
+			}
+		}
+		if node.FootComment != "" {
+			copy.FootComment = node.FootComment
+		}
+		return copy, nil
+	}
+	copy := *node
+	copy.Anchor, copy.Alias = "", nil
+	copy.Content = make([]*yaml.Node, len(node.Content))
+	for i, child := range node.Content {
+		var err error
+		copy.Content[i], err = copyWithoutAliases(child, visiting, remaining)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &copy, nil
 }
 
 // Save writes the file. A file that vfox could not load is not written: it

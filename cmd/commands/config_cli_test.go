@@ -183,3 +183,12 @@ func TestConfigRefusesWhatItCannotSet(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigChangesOnlyTheNamedSettingWithYAMLAliases(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writeUserConfig(t, "proxy: &options {enable: true}\ngitignore: *options\n")
+	f.run(t, "config", "proxy.enable", "false").mustSucceed(t, "set proxy.enable")
+	if got := f.run(t, "config", "gitignore.enable").mustSucceed(t, "get gitignore.enable").stdout; strings.TrimSpace(got) != "true" {
+		t.Fatalf("setting proxy.enable changed gitignore.enable to %q", got)
+	}
+}

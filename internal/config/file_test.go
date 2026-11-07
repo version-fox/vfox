@@ -657,3 +657,99 @@ func TestFileTopMapping(t *testing.T) {
 		t.Errorf("an empty file: root = %+v, %v, want an empty mapping", root, err)
 	}
 }
+
+func TestFileEditsDoNotChangeYAMLReferences(t *testing.T) {
+	for _, tc := range []struct {
+		name, content, key, value string
+		unset                     bool
+		check                     func(*testing.T, *Config)
+	}{
+		{"anchored section", "proxy: &options {enable: true}\ngitignore: *options\n", "proxy.enable", "false", false, func(t *testing.T, c *Config) {
+			if c.Proxy.Enable || !c.Gitignore.Enable {
+				t.Fatalf("proxy=%v gitignore=%v", c.Proxy.Enable, c.Gitignore.Enable)
+			}
+		}},
+		{"aliased section", "proxy: &options {enable: true}\ngitignore: *options\n", "gitignore.enable", "false", false, func(t *testing.T, c *Config) {
+			if !c.Proxy.Enable || c.Gitignore.Enable {
+				t.Fatalf("proxy=%v gitignore=%v", c.Proxy.Enable, c.Gitignore.Enable)
+			}
+		}},
+		{"scalar anchor", "plugin:\n  http:\n    timeout: &timeout 30s\n    downloadTimeout: *timeout\n", "plugin.http.timeout", "45s", false, func(t *testing.T, c *Config) {
+			if c.Plugin.HTTP.Timeout != 45*time.Second || c.Plugin.HTTP.DownloadTimeout != 30*time.Second {
+				t.Fatalf("HTTP=%+v", c.Plugin.HTTP)
+			}
+		}},
+		{"remove anchor", "proxy: &options {enable: false}\ngitignore: *options\n", "proxy", "", true, func(t *testing.T, c *Config) {
+			if c.Gitignore.Enable {
+				t.Fatal("gitignore changed")
+			}
+		}},
+		{"remove aliased key", "proxy: &options {enable: true}\ngitignore: *options\n", "gitignore.enable", "", true, func(t *testing.T, c *Config) {
+			if !c.Proxy.Enable {
+				t.Fatal("proxy changed")
+			}
+		}},
+		{"merge reference", "proxy: &options {enable: true}\ngitignore:\n  <<: *options\n", "proxy.enable", "false", false, func(t *testing.T, c *Config) {
+			if c.Proxy.Enable || !c.Gitignore.Enable {
+				t.Fatalf("proxy=%v gitignore=%v", c.Proxy.Enable, c.Gitignore.Enable)
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeConfigFile(t, tc.content)
+			f, err := LoadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.unset {
+				removed, err := f.Unset(tc.key)
+				if err != nil || !removed {
+					t.Fatalf("Unset = %v, %v", removed, err)
+				}
+			} else if err := f.Set(tc.key, tc.value); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.Save(); err != nil {
+				t.Fatal(err)
+			}
+			c, err := NewConfigWithPath(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.check(t, c)
+		})
+	}
+}
+
+func TestFileAliasExpansionKeepsComments(t *testing.T) {
+	path := writeConfigFile(t, "proxy: &options\n  enable: true # original value\ngitignore: *options # keep this comment\n")
+	setKey(t, path, "proxy.enable", "false")
+	saved := readConfigFile(t, path)
+	for _, comment := range []string{"# original value", "# keep this comment"} {
+		if !strings.Contains(saved, comment) {
+			t.Fatalf("lost %s:\n%s", comment, saved)
+		}
+	}
+}
+
+func TestFileRefusesCyclicAliases(t *testing.T) {
+	path := writeConfigFile(t, "extra: &cycle [*cycle]\n")
+	before := readConfigFile(t, path)
+	if _, err := LoadFile(path); err == nil {
+		t.Fatal("accepted cyclic alias")
+	}
+	if got := readConfigFile(t, path); got != before {
+		t.Fatal("changed the file")
+	}
+}
+
+func TestAliasExpansionIsBounded(t *testing.T) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte("a: &a [x, y]\nb: &b [*a, *a]\nc: [*b, *b]\n"), &doc); err != nil {
+		t.Fatal(err)
+	}
+	remaining := 20
+	if _, err := copyWithoutAliases(&doc, make(map[*yaml.Node]bool), &remaining); err == nil {
+		t.Fatal("exceeded the node budget")
+	}
+}
