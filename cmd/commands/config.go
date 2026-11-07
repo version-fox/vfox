@@ -2,15 +2,11 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/version-fox/vfox/internal/config"
-	"github.com/version-fox/vfox/internal/shared/cache"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
@@ -28,7 +24,7 @@ var Config = &cli.Command{
 		&cli.BoolFlag{
 			Name:    "unset",
 			Aliases: []string{"un"},
-			Usage:   "remove a config",
+			Usage:   "remove a config from your config file",
 		},
 	},
 	Action: configCmd,
@@ -53,23 +49,33 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 		return cli.ShowSubcommandHelp(cmd)
 	}
 
-	keys := strings.Split(args.First(), ".")
+	key := args.First()
 	unset := cmd.Bool("unset")
 	if !unset && args.Len() == 1 {
-		configGet(conf, keys)
+		configGet(conf, strings.Split(key, "."))
 		return nil
 	}
 
-	var value any
-	value = args.Get(1)
-	if unset {
-		value = defaultConfig(keys)
-	}
-	err = configSet(conf, keys, value)
+	// What is listed and read above is the merged config. What is written is
+	// the user's own file, and in it only the key that is set or unset: the
+	// merged config holds the defaults and the shared values too, and writing
+	// them would turn them into the user's own.
+	file, err := config.LoadFile(runtimeEnvContext.PathMeta.User.Config)
 	if err != nil {
 		return err
 	}
-	return runtimeEnvContext.UserConfig.SaveConfig(runtimeEnvContext.PathMeta.User.Home)
+	if unset {
+		removed, err := file.Unset(key)
+		if err != nil {
+			return err
+		}
+		if !removed {
+			return nil // the file does not have the key, so there is nothing to remove
+		}
+	} else if err := file.Set(key, args.Get(1)); err != nil {
+		return err
+	}
+	return file.Save()
 }
 
 func configList(prefix string, v reflect.Value) {
@@ -109,83 +115,4 @@ func configGet(v reflect.Value, keys []string) {
 			fmt.Printf("%v\n", v.Interface())
 		}
 	}
-}
-
-func configSet(v reflect.Value, keys []string, value any) error {
-	key := keys[0]
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	for i := 0; i < v.NumField(); i++ {
-		if v.Type().Field(i).Tag.Get("yaml") == key {
-			if len(keys) > 1 {
-				err := configSet(v.Field(i), keys[1:], value)
-				if err != nil {
-					return err
-				}
-			} else {
-				switch v.Field(i).Kind() {
-				case reflect.String:
-					v.Field(i).SetString(fmt.Sprintf("%v", value))
-				case reflect.Bool:
-					value := fmt.Sprintf("%v", value)
-					parseBool, _ := strconv.ParseBool(value)
-					v.Field(i).SetBool(parseBool)
-				case reflect.Int64:
-					value := fmt.Sprintf("%v", value)
-					if v.Field(i).Type() == reflect.TypeOf(time.Duration(0)) {
-						duration, err := time.ParseDuration(value)
-						if err != nil {
-							return err
-						}
-						if duration < 0 {
-							return fmt.Errorf("timeout must not be negative")
-						}
-						v.Field(i).SetInt(int64(duration))
-					} else if v.Field(i).Type() == reflect.TypeOf(cache.Duration(0)) {
-						if value == "-1" {
-							v.Field(i).SetInt(-1)
-						} else {
-							duration, err := time.ParseDuration(strings.ToLower(value))
-							if err != nil {
-								return err
-							}
-							v.Field(i).SetInt(int64(duration))
-						}
-					} else {
-						atoi, err := strconv.Atoi(value)
-						if err != nil {
-							return err
-						}
-						v.Field(i).SetInt(int64(atoi))
-					}
-				case reflect.Ptr:
-					if _, ok := value.(string); ok {
-						return fmt.Errorf("key does not contain a section: %v", key)
-					}
-					v.Field(i).Set(reflect.ValueOf(value))
-				default:
-					return errors.New("unsupported configuration type")
-				}
-			}
-			break
-		}
-	}
-	return nil
-}
-
-func defaultConfig(keys []string) any {
-	v := reflect.ValueOf(config.DefaultConfig)
-	for _, key := range keys {
-		if v.Kind() == reflect.Ptr {
-			v = v.Elem()
-		}
-		for i := 0; i < v.NumField(); i++ {
-			if v.Type().Field(i).Tag.Get("yaml") == key {
-				v = v.Field(i)
-				break
-			}
-		}
-	}
-	return v.Interface()
 }

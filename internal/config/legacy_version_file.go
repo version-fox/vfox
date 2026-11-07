@@ -16,6 +16,8 @@
 
 package config
 
+import "gopkg.in/yaml.v3"
+
 const (
 	LatestInstalledStrategy = "latest_installed"
 	LatestAvailableStrategy = "latest_available"
@@ -37,4 +39,17 @@ type LegacyVersionFile struct {
 var EmptyLegacyVersionFile = &LegacyVersionFile{
 	Enable:   true,
 	Strategy: DefaultStrategy,
+}
+
+// UnmarshalYAML keeps the defaults for keys the file does not mention. `vfox
+// config` writes only the key it sets, so a file that holds nothing but
+// "strategy" must not switch the parsing off.
+func (l *LegacyVersionFile) UnmarshalYAML(value *yaml.Node) error {
+	type plain LegacyVersionFile
+	decoded := plain(*EmptyLegacyVersionFile)
+	if err := value.Decode(&decoded); err != nil {
+		return err
+	}
+	*l = LegacyVersionFile(decoded)
+	return nil
 }
