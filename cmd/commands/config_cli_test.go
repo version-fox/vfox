@@ -26,7 +26,8 @@ import (
 // that a shared VFOX_HOME decides, or they stop applying from the second run on.
 func TestAFreshUserFollowsTheSharedConfig(t *testing.T) {
 	f := newCLIFixture(t, true)
-	must(t, os.WriteFile(filepath.Join(f.shared, "config.yaml"), []byte("path:\n  mode: baseline\ndiagnostics:\n  onUse: false\n"), 0644))
+	// Settings that differ from the defaults, so that losing them shows.
+	must(t, os.WriteFile(filepath.Join(f.shared, "config.yaml"), []byte("path:\n  mode: legacy\ndiagnostics:\n  onUse: false\n"), 0644))
 	userConfig := filepath.Join(f.userHome, "config.yaml")
 	if exists(userConfig) {
 		t.Fatal("the user has a config file already: this is not a first run")
@@ -35,8 +36,8 @@ func TestAFreshUserFollowsTheSharedConfig(t *testing.T) {
 	for run := 1; run <= 3; run++ {
 		f.run(t, "list").mustSucceed(t, "list")
 		settings := f.manager(t).RuntimeEnvContext.UserConfig
-		if mode := settings.Path.EffectiveMode(); mode != "baseline" {
-			t.Errorf("run %d: path.mode = %q, want the shared baseline", run, mode)
+		if mode := settings.Path.EffectiveMode(); mode != "legacy" {
+			t.Errorf("run %d: path.mode = %q, want the shared legacy", run, mode)
 		}
 		if settings.Diagnostics.OnUse {
 			t.Errorf("run %d: diagnostics.onUse is on, but the shared config switched it off", run)

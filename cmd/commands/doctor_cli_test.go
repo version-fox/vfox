@@ -359,15 +359,19 @@ func TestUseStaysQuietAboutAnActiveVirtualenv(t *testing.T) {
 
 func TestUseUnderTheBaselineMode(t *testing.T) {
 	// A directory that was in PATH when vfox was activated, and a mode that puts
-	// such directories behind vfox's: nothing shadows vfox any more.
+	// such directories behind vfox's: nothing shadows vfox any more. That mode is
+	// the default, so it makes no difference whether the file says so.
 	f := newShadowFixture(t, "system-path-helper")
-	f.writeUserConfig(t, "path:\n  mode: baseline\n")
 	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.shadowDir, f.system}, ":")
-	out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
-	mustNotContain(t, "use", out, "comes before vfox")
+	for _, content := range []string{"", "path:\n  mode: baseline\n"} {
+		f.writeUserConfig(t, content)
+		out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
+		mustNotContain(t, "use", out, "comes before vfox")
+	}
 
-	// The default mode keeps it in front, and now says where it came from.
-	f.writeUserConfig(t, "")
-	out = f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
-	mustContain(t, "use", out, "comes before vfox", "already in PATH when vfox was activated", "path.mode baseline")
+	// The legacy mode keeps it in front, and says where it came from and how to
+	// change that.
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
+	out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
+	mustContain(t, "use", out, "comes before vfox", "already in PATH when vfox was activated", "`path.mode` is `legacy`", "path.mode baseline")
 }

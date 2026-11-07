@@ -202,20 +202,6 @@ vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 </TabItem>
 </Tabs>
 
-### 让 vfox 的版本优先于系统自带的
-
-挂载完成后，请执行一次：
-
-```shell
-vfox config path.mode baseline
-```
-
-不执行的话，macOS、Windows 排到 `vfox` 目录之前的系统目录可能一直优先：`vfox use` 提示已切换，`node` 或 `java` 却还是系统自带的那个。设为 `baseline` 后，`vfox` 会把自己的目录放到激活时 `PATH` 里原有内容之前，只有激活**之后**才加入的内容（比如之后激活的 Python 虚拟环境）继续排在它前面。执行后请重新打开终端。如果你依赖某个自己放在 `vfox` 之前的目录，请把它列入 `path.preserve`，详见 [PATH 顺序设置](./configuration.md#path-顺序设置)。
-
-::: info 📌 默认值将会改变
-未来的版本会把 `path.mode` 的默认值改为 `baseline`。在那之前默认值是 `legacy`，`PATH` 的处理方式与 `vfox` 1.0.x 相同。现在就设为 `baseline`，以后升级时就不会有任何变化。
-:::
-
 
 ## 3. 添加插件
 
