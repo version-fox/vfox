@@ -195,8 +195,23 @@ Type `Y` and press Enter to confirm.
 </TabItem>
 <TabItem label="Nushell">
 
+Add the hook to your Nushell configuration:
+
 ```shell
-vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
+vfox activate nu $nu.default-config-dir | save --append $nu.config-path
+```
+
+Alternatively, you can directly generate and append the activation script without specifying a config directory:
+
+```shell
+vfox activate nu | save --append $nu.config-path
+```
+
+Or save the activation script to Nushell's vendor autoload directory (Nushell 0.96+):
+
+```shell
+mkdir ($nu.data-dir | path join "vendor/autoload")
+vfox activate nu | save -f ($nu.data-dir | path join "vendor/autoload/vfox.nu")
 ```
 
 </TabItem>
