@@ -145,6 +145,25 @@ func installWindowsExecOverrides(L *lua.LState) {
 			ls.Push(value)
 			return 1
 		}))
+		// lines mirrors gopher-lua's file:lines(): it returns an iterator that
+		// yields one line without its trailing newline and nil at EOF, which
+		// lets plugin code use generic-for over command output.
+		f.RawSetString("lines", ls.NewFunction(func(ls *lua.LState) int {
+			if h.mode != "r" {
+				ls.RaiseError("cannot read from a write-only popen handle")
+				return 0
+			}
+			ls.Push(ls.NewClosure(func(iter *lua.LState) int {
+				value, err := readPopen(h, "*l")
+				if err != nil {
+					iter.RaiseError("%s", err.Error())
+					return 0
+				}
+				iter.Push(value)
+				return 1
+			}))
+			return 1
+		}))
 		f.RawSetString("write", ls.NewFunction(func(ls *lua.LState) int {
 			if h.mode != "w" {
 				ls.RaiseError("cannot write to a read-only popen handle")
