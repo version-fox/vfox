@@ -119,7 +119,7 @@ func TestAHandMadeLinkIsFoundByEveryCommand(t *testing.T) {
 	pkg := filepath.Join(f.shared, "cache", "alpha", "v-ext")
 	home := filepath.Join(pkg, "alpha-ext")
 	must(t, os.MkdirAll(pkg, 0755))
-	must(t, os.Symlink(external, home))
+	linkDirectory(t, external, home)
 
 	mustContain(t, "list", f.run(t, "list", "alpha").mustSucceed(t, "list").output(), "ext")
 	if out := strings.TrimSpace(f.run(t, "info", "alpha@ext").mustSucceed(t, "info").stdout); out != pkg {
@@ -132,7 +132,7 @@ func TestAHandMadeLinkIsFoundByEveryCommand(t *testing.T) {
 	out := f.run(t, "use", "-g", "alpha@ext").mustSucceed(t, "use").output()
 	mustContain(t, "use", out, "Now using", "alpha@ext")
 	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "ext"`)
-	if !exists(filepath.Join(f.userHome, "sdks", "alpha", "bin", "alphatool")) {
+	if !exists(filepath.Join(f.userHome, "sdks", "alpha", "bin", commandFile("alphatool"))) {
 		t.Error("the global link does not reach the linked SDK")
 	}
 }
