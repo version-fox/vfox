@@ -161,7 +161,7 @@ vfox un <sdk-name>@<version>
 ```shell
 vfox list [<sdk-name>]
 
-vfox ls[<sdk-name>]
+vfox ls [<sdk-name>]
 ```
 
 `sdk-name`: SDK 名称， 不传展示所有。
