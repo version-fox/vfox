@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -70,11 +71,21 @@ func TestDoctorOnAnEmptyHome(t *testing.T) {
 func TestDoctorNeedsAnActivatedShell(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.env["__VFOX_SHELL"] = "-"
-	r := f.run(t, "doctor").mustFail(t, "doctor in a shell that did not activate vfox")
-	mustContain(t, "doctor", r.output(), "error", "path.not-activated", "vfox activate")
 
-	report := parseDoctor(t, f.run(t, "doctor", "--json").mustFail(t, "doctor --json"))
-	if severity, ok := report.find("path.not-activated"); !ok || severity != "error" || report.OK {
+	// Without a hook only the global scope works on Windows, which is still
+	// something: there it is a warning, and it does not fail the check.
+	severity, passes := "error", false
+	if runtime.GOOS == "windows" {
+		severity, passes = "warn", true
+	}
+	r := f.run(t, "doctor")
+	if (r.code == 0) != passes {
+		t.Fatalf("doctor in a shell that did not activate vfox exited with %d, want success: %v\nstdout: %s\nstderr: %s", r.code, passes, r.stdout, r.stderr)
+	}
+	mustContain(t, "doctor", r.output(), severity, "path.not-activated", "vfox activate")
+
+	report := parseDoctor(t, f.run(t, "doctor", "--json"))
+	if got, ok := report.find("path.not-activated"); !ok || got != severity || report.OK != passes {
 		t.Errorf("report = %+v", report)
 	}
 }
@@ -215,8 +226,8 @@ func newShadowFixture(t *testing.T, dirName string) shadowFixture {
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
 	shadowDir := filepath.Join(f.root, dirName, "bin")
 	must(t, os.MkdirAll(shadowDir, 0755))
-	must(t, os.WriteFile(filepath.Join(shadowDir, "alphatool"), []byte("#!/bin/sh\n"), 0755))
-	f.env["PATH"] = strings.Join([]string{shadowDir, filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system}, ":")
+	writeCommand(t, shadowDir, "alphatool")
+	f.env["PATH"] = pathList(shadowDir, filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system)
 	return shadowFixture{cliFixture: f, shadowDir: shadowDir}
 }
 
@@ -227,7 +238,7 @@ func TestUseSaysWhenACommandIsShadowed(t *testing.T) {
 	out := r.output()
 	mustContain(t, "use", out,
 		"Now using", "alpha@1.0.0",
-		"`alphatool` runs "+filepath.Join(f.shadowDir, "alphatool")+" instead of alpha@1.0.0",
+		"`alphatool` runs "+filepath.Join(f.shadowDir, commandFile("alphatool"))+" instead of alpha@1.0.0",
 		"comes before vfox in PATH",
 		"pnpm put its own alphatool first. See https://example.com/pnpm",
 		"path.mode aggressive")
@@ -248,7 +259,7 @@ func TestDoctorChecksTheVersionEnvFallsBackTo(t *testing.T) {
 	must(t, os.WriteFile(project, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644)) // not installed
 
 	// What the shell uses is the global version.
-	mustContain(t, "env", f.run(t, "env", "-s", "bash").mustSucceed(t, "env").stdout, vfoxBin)
+	mustContain(t, "env", f.run(t, "env", "-s", "bash").mustSucceed(t, "env").stdout, shellPath(vfoxBin))
 
 	out := f.run(t, "doctor", "alpha").mustSucceed(t, "doctor alpha").stdout
 	mustContain(t, "doctor alpha", out, "warn   path.shadowed  alpha@1.0.0", "pnpm put its own alphatool first.")
@@ -282,8 +293,8 @@ func TestDoctorFollowsALegacyVersionFileLikeEnv(t *testing.T) {
 	must(t, os.WriteFile(filepath.Join(f.work, ".legacy-version"), []byte("1.0.0\n"), 0644))
 	shadowDir := filepath.Join(f.root, "pnpm", "bin")
 	must(t, os.MkdirAll(shadowDir, 0755))
-	must(t, os.WriteFile(filepath.Join(shadowDir, "legacytool"), []byte("#!/bin/sh\n"), 0755))
-	f.env["PATH"] = strings.Join([]string{shadowDir, filepath.Join(f.userHome, "sdks", "legacy", "bin"), f.system}, ":")
+	writeCommand(t, shadowDir, "legacytool")
+	f.env["PATH"] = pathList(shadowDir, filepath.Join(f.userHome, "sdks", "legacy", "bin"), f.system)
 
 	out := f.run(t, "doctor", "legacy").mustSucceed(t, "doctor legacy").stdout
 	mustContain(t, "doctor legacy", out, "warn   path.shadowed  legacy@1.0.0")
@@ -301,9 +312,9 @@ func TestDoctorDoesNotCallALinkToTheSDKsOwnCommandAShadow(t *testing.T) {
 	f.run(t, "link", "alpha@sys", external).mustSucceed(t, "link")
 	front := filepath.Join(f.root, "homebrew", "bin")
 	must(t, os.MkdirAll(front, 0755))
-	command := filepath.Join(front, "alphatool")
-	must(t, os.Symlink(filepath.Join(external, "bin", "alphatool"), command))
-	f.env["PATH"] = strings.Join([]string{front, filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system}, ":")
+	command := filepath.Join(front, commandFile("alphatool"))
+	linkFile(t, filepath.Join(external, "bin", commandFile("alphatool")), command)
+	f.env["PATH"] = pathList(front, filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system)
 
 	out := f.run(t, "use", "-g", "alpha@sys").mustSucceed(t, "use").output()
 	mustContain(t, "use", out, "Now using", "alpha@sys")
@@ -312,7 +323,7 @@ func TestDoctorDoesNotCallALinkToTheSDKsOwnCommandAShadow(t *testing.T) {
 
 	// Another file of that name in the same place is a shadow.
 	must(t, os.Remove(command))
-	must(t, os.WriteFile(command, []byte("#!/bin/sh\n"), 0755))
+	writeCommand(t, front, "alphatool")
 	out = f.run(t, "use", "-g", "alpha@sys").mustSucceed(t, "use").output()
 	mustContain(t, "use", out, "`alphatool` runs "+command+" instead of alpha@sys")
 	mustContain(t, "doctor", f.run(t, "doctor", "alpha").mustSucceed(t, "doctor").stdout, "warn   path.shadowed  alpha@sys")
@@ -321,7 +332,7 @@ func TestDoctorDoesNotCallALinkToTheSDKsOwnCommandAShadow(t *testing.T) {
 func TestUseStaysQuietWhenNothingIsShadowed(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
-	f.env["PATH"] = strings.Join([]string{filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system}, ":")
+	f.env["PATH"] = pathList(filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system)
 	out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()
 	mustContain(t, "use", out, "Now using")
 	mustNotContain(t, "use", out, "comes before vfox", "WARNING")
@@ -362,7 +373,7 @@ func TestUseUnderTheBaselineMode(t *testing.T) {
 	// such directories behind vfox's: nothing shadows vfox any more. That mode is
 	// the default, so it makes no difference whether the file says so.
 	f := newShadowFixture(t, "system-path-helper")
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.shadowDir, f.system}, ":")
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.shadowDir, f.system)
 	for _, content := range []string{"", "path:\n  mode: baseline\n"} {
 		f.writeUserConfig(t, content)
 		out := f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output()

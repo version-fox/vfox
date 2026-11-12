@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/env"
 )
 
 // The scenario of #706 and #669: a JDK that is already on the machine.
@@ -80,7 +82,7 @@ func TestLinkCommandEndToEnd(t *testing.T) {
 		if content, err := os.ReadFile(data); err != nil || string(content) != "precious" {
 			t.Errorf("the linked SDK's file: %q, %v", content, err)
 		}
-		if !exists(filepath.Join(external, "bin", "alphatool")) {
+		if !exists(filepath.Join(external, "bin", commandFile("alphatool"))) {
 			t.Error("the linked SDK lost a command")
 		}
 		if exists(pkg) {
@@ -136,7 +138,7 @@ func TestLinkCommandForce(t *testing.T) {
 	f.run(t, "link", "--force", "alpha@sys", second).mustSucceed(t, "link --force")
 	out := f.run(t, "list", "alpha").mustSucceed(t, "list").output()
 	mustContain(t, "list", out, "(linked → "+second+")")
-	if !exists(filepath.Join(first, "bin", "alphatool")) {
+	if !exists(filepath.Join(first, "bin", commandFile("alphatool"))) {
 		t.Error("the old target must stay as it was")
 	}
 
@@ -200,12 +202,12 @@ func TestLinkedVersionCanBeSelected(t *testing.T) {
 
 	// The shell gets the linked SDK's commands through the global link.
 	link := filepath.Join(f.userHome, "sdks", "alpha")
-	if !exists(filepath.Join(link, "bin", "alphatool")) {
+	if !exists(filepath.Join(link, "bin", commandFile("alphatool"))) {
 		t.Errorf("%s does not reach the linked SDK", link)
 	}
-	info, err := os.Lstat(link)
-	if err != nil || info.Mode()&os.ModeSymlink == 0 {
-		t.Errorf("global link: %v, %v", info, err)
+	// A symlink, or a junction on Windows.
+	if !env.IsDirSymlink(link) {
+		t.Errorf("%s is not a link", link)
 	}
 
 	// And `list` says it is the one in use.
