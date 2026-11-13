@@ -285,3 +285,15 @@ func TestSdk_Download_UserAgent(t *testing.T) {
 		})
 	}
 }
+
+func TestSdk_Download_InvalidProxyURL(t *testing.T) {
+	sdk := newDownloadTestSDK(t)
+	sdk.envContext.UserConfig.Proxy = &config.Proxy{Enable: true, Url: "http://user:secret@proxy.example.com:80%80"}
+	u, err := url.Parse("http://vfox.invalid/repro.zip")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	if _, err = sdk.Download(u, nil); err == nil {
+		t.Fatal("Download() error = nil, want an error for the proxy URL")
+	}
+}

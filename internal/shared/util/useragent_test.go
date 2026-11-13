@@ -17,6 +17,7 @@
 package util
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,10 +75,12 @@ func TestWithDefaultUserAgent(t *testing.T) {
 				t.Fatalf("Do() error = %v", err)
 			}
 			defer resp.Body.Close()
-			got := make([]byte, 64)
-			n, _ := resp.Body.Read(got)
-			if string(got[:n]) != tt.want {
-				t.Fatalf("server saw User-Agent %q, want %q", got[:n], tt.want)
+			got, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
+			}
+			if string(got) != tt.want {
+				t.Fatalf("server saw User-Agent %q, want %q", got, tt.want)
 			}
 			if tt.header == nil && req.Header.Get("User-Agent") != "" {
 				t.Fatalf("the caller's request was modified: %v", req.Header)

@@ -76,12 +76,13 @@ func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (VfoxT
 
 // HttpClient creates an HTTP client based on the proxy settings in the user configuration.
 // Its requests carry the vfox User-Agent unless they set one themselves.
-func (m *RuntimeEnvContext) HttpClient() *http.Client {
+// It returns an error when the proxy is enabled and its URL does not parse.
+func (m *RuntimeEnvContext) HttpClient() (*http.Client, error) {
 	var transport http.RoundTripper = http.DefaultTransport
 	if m.UserConfig.Proxy.Enable {
 		uri, err := url.Parse(m.UserConfig.Proxy.Url)
 		if err != nil {
-			return nil
+			return nil, fmt.Errorf("invalid proxy url: %w", util.RedactError(err))
 		}
 		transport = &http.Transport{
 			Proxy: http.ProxyURL(uri),
@@ -89,7 +90,7 @@ func (m *RuntimeEnvContext) HttpClient() *http.Client {
 	}
 	return &http.Client{
 		Transport: util.WithDefaultUserAgent(transport, util.UserAgent(m.RuntimeVersion, "", "")),
-	}
+	}, nil
 }
 
 // GetLinkDirPathByScope returns the symlink directory path for the given scope.
