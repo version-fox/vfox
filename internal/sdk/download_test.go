@@ -230,3 +230,70 @@ func TestSdk_MoveLocalFileRedactsURL(t *testing.T) {
 		t.Fatalf("moveLocalFile() printed %q, want the password and the query token redacted", printed)
 	}
 }
+
+func TestSdk_Download_UserAgent(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugin  *plugin.Wrapper
+		headers map[string]string
+		want    string
+	}{
+		{
+			name:   "the agent of the plugin",
+			plugin: &plugin.Wrapper{Metadata: &plugin.Metadata{Name: "gradle", Version: "0.0.3"}},
+			want:   "vfox/1.0.13 vfox-gradle/0.0.3",
+		},
+		{
+			name:    "an agent from PreInstall wins",
+			plugin:  &plugin.Wrapper{Metadata: &plugin.Metadata{Name: "gradle", Version: "0.0.3"}},
+			headers: map[string]string{"User-Agent": "custom"},
+			want:    "custom",
+		},
+		{
+			name:    "an agent from PreInstall in lower case wins",
+			plugin:  &plugin.Wrapper{Metadata: &plugin.Metadata{Name: "gradle", Version: "0.0.3"}},
+			headers: map[string]string{"user-agent": "custom"},
+			want:    "custom",
+		},
+		{
+			name: "no plugin",
+			want: "vfox/1.0.13",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = r.Header.Values("User-Agent")
+				_, _ = w.Write([]byte("the archive bytes"))
+			}))
+			defer srv.Close()
+
+			sdk := newDownloadTestSDK(t)
+			sdk.envContext.RuntimeVersion = "1.0.13"
+			sdk.plugin = tt.plugin
+			u, err := url.Parse(srv.URL + "/repro.zip")
+			if err != nil {
+				t.Fatalf("parse url: %v", err)
+			}
+			if _, err = sdk.Download(u, tt.headers); err != nil {
+				t.Fatalf("Download() error = %v", err)
+			}
+			if len(got) != 1 || got[0] != tt.want {
+				t.Fatalf("server saw User-Agent %q, want [%q]", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSdk_Download_InvalidProxyURL(t *testing.T) {
+	sdk := newDownloadTestSDK(t)
+	sdk.envContext.UserConfig.Proxy = &config.Proxy{Enable: true, Url: "http://user:secret@proxy.example.com:80%80"}
+	u, err := url.Parse("http://vfox.invalid/repro.zip")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	if _, err = sdk.Download(u, nil); err == nil {
+		t.Fatal("Download() error = nil, want an error for the proxy URL")
+	}
+}

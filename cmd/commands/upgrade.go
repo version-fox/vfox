@@ -136,7 +136,10 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	defer manager.Close()
-	httpClient := manager.RuntimeEnvContext.HttpClient()
+	httpClient, err := manager.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return cli.Exit("Failed to create the HTTP client: "+err.Error(), 1)
+	}
 
 	currVersion := fmt.Sprintf("v%s", internal.RuntimeVersion)
 	latestVersion, err := fetchLatestVersion(httpClient)

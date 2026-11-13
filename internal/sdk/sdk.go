@@ -1089,7 +1089,16 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
-	resp, err := b.envContext.HttpClient().Do(req)
+	// The archive is asked for with the agent of the plugin's own requests,
+	// unless PreInstall returned one in its headers.
+	if req.Header.Get("User-Agent") == "" && b.plugin != nil && b.plugin.Metadata != nil {
+		req.Header.Set("User-Agent", util.UserAgent(b.envContext.RuntimeVersion, b.plugin.Name, b.plugin.Version))
+	}
+	client, err := b.envContext.HttpClient()
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
