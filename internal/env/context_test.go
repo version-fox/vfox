@@ -17,6 +17,9 @@
 package env
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"runtime"
 	"strings"
@@ -227,5 +230,29 @@ func TestCleanSystemPaths_BackwardCompatibility(t *testing.T) {
 	expected := []string{"/usr/local/bin", "/usr/bin"}
 	if len(got) != len(expected) {
 		t.Errorf("CleanSystemPaths() = %v, want %v", got, expected)
+	}
+}
+
+func TestHttpClient_SendsVfoxUserAgent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.UserAgent()))
+	}))
+	defer srv.Close()
+
+	ctx := &RuntimeEnvContext{
+		UserConfig:     &config.Config{Proxy: config.EmptyProxy},
+		RuntimeVersion: "1.0.13",
+	}
+	resp, err := ctx.HttpClient().Get(srv.URL)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	defer resp.Body.Close()
+	got, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if string(got) != "vfox/1.0.13" {
+		t.Fatalf("server saw User-Agent %q, want vfox/1.0.13", got)
 	}
 }

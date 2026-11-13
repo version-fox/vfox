@@ -27,6 +27,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // RuntimeEnvContext represents the runtime environment context.
@@ -74,22 +75,21 @@ func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (VfoxT
 }
 
 // HttpClient creates an HTTP client based on the proxy settings in the user configuration.
+// Its requests carry the vfox User-Agent unless they set one themselves.
 func (m *RuntimeEnvContext) HttpClient() *http.Client {
-	var client *http.Client
+	var transport http.RoundTripper = http.DefaultTransport
 	if m.UserConfig.Proxy.Enable {
-		if uri, err := url.Parse(m.UserConfig.Proxy.Url); err == nil {
-			transPort := &http.Transport{
-				Proxy: http.ProxyURL(uri),
-			}
-			client = &http.Client{
-				Transport: transPort,
-			}
+		uri, err := url.Parse(m.UserConfig.Proxy.Url)
+		if err != nil {
+			return nil
 		}
-	} else {
-		client = http.DefaultClient
+		transport = &http.Transport{
+			Proxy: http.ProxyURL(uri),
+		}
 	}
-
-	return client
+	return &http.Client{
+		Transport: util.WithDefaultUserAgent(transport, util.UserAgent(m.RuntimeVersion, "", "")),
+	}
 }
 
 // GetLinkDirPathByScope returns the symlink directory path for the given scope.
