@@ -186,10 +186,10 @@ finally {
     }
     Write-Host "files in ${WorkDir}:"
     Get-ChildItem -LiteralPath $WorkDir | ForEach-Object { Write-Host "  $($_.Name)" }
+    Write-Host '--- result.txt'
+    Get-Content -LiteralPath (Join-Path $WorkDir 'result.txt') -ErrorAction SilentlyContinue | Write-Host
 }
 
 $exitCode = (Get-Content -LiteralPath (Join-Path $WorkDir 'exit.txt') -Raw).Trim()
-Write-Host '--- result.txt'
-Get-Content -LiteralPath (Join-Path $WorkDir 'result.txt') -ErrorAction SilentlyContinue | Write-Host
 if ($exitCode -ne '0') { throw "the test failed in mintty ($Stdio) with exit code $exitCode" }
 Write-Host "Git Bash in mintty ($Stdio): selection and confirmation passed."
