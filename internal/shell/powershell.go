@@ -17,8 +17,10 @@
 package shell
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/version-fox/vfox/internal/env"
 )
@@ -29,13 +31,16 @@ type pwsh struct{}
 // Pwsh shell instance
 var Pwsh Shell = pwsh{}
 
+// hook is a template. {{.EnvContent}} is the export of the environment, and
+// {{.SelfPath}} stands for the vfox executable: Activate puts that in as a
+// PowerShell expression, see PowerShellEscape.
 const hook = `
 {{.EnvContent}}
 
 <#
 Due to a bug in PowerShell, we have to cleanup first when the shell open.
 #>
-& '{{.SelfPath}}' env --cleanup 2>$null | Out-Null;
+& {{.SelfPath}} env --cleanup 2>$null | Out-Null;
 
 $env:__VFOX_PID = $pid;
 $env:__VFOX_SHELL = 'pwsh';
@@ -46,7 +51,7 @@ if (-not $env:__VFOX_INITIALIZED) {
 	$env:__VFOX_INITIALIZED = '1';
 	$originalPrompt = $function:prompt;
 	function prompt {
-		$export = &"{{.SelfPath}}" env -s pwsh;
+		$export = & {{.SelfPath}} env -s pwsh;
 		if ($export) {
 			Invoke-Expression -Command $export;
 		}
@@ -54,13 +59,19 @@ if (-not $env:__VFOX_INITIALIZED) {
 	}
 		
 	Register-EngineEvent -SourceIdentifier VfoxCleanup -Action {
-        &"{{.SelfPath}}" env --cleanup
+        & {{.SelfPath}} env --cleanup
     } | Out-Null;
 }
 `
 
 func (sh pwsh) Activate(config ActivateConfig) (string, error) {
-	return hook, nil
+	// text/template reads "{{" in a path as the start of an action. A path that
+	// has it takes the encoded form, which has no braces.
+	self := PowerShellEscape(config.SelfPath)
+	if strings.Contains(config.SelfPath, "{{") {
+		self = powerShellUTF8(config.SelfPath)
+	}
+	return strings.ReplaceAll(hook, "{{.SelfPath}}", self), nil
 }
 
 func (sh pwsh) Export(e env.Vars) (out string) {
@@ -75,103 +86,53 @@ func (sh pwsh) Export(e env.Vars) (out string) {
 }
 
 func (sh pwsh) export(key, value string) string {
-	value = sh.escape(value)
-	if !regexp.MustCompile(`'.*'`).MatchString(value) {
-		value = fmt.Sprintf("'%s'", value)
+	if !isEnvName(key) {
+		return fmt.Sprintf("[System.Environment]::SetEnvironmentVariable(%s,%s);", PowerShellEscape(key), PowerShellEscape(value))
 	}
-	return fmt.Sprintf("$env:%s=%s;", sh.escape(key), value)
+	return fmt.Sprintf("$env:%s=%s;", key, PowerShellEscape(value))
 }
 
 func (sh pwsh) unset(key string) string {
-	return fmt.Sprintf("Remove-Item -Path 'env:/%s';", sh.escape(key))
+	if !isEnvName(key) {
+		return fmt.Sprintf("[System.Environment]::SetEnvironmentVariable(%s,$null);", PowerShellEscape(key))
+	}
+	return fmt.Sprintf("Remove-Item -Path 'env:/%s';", key)
 }
 
-func (pwsh) escape(str string) string {
-	return PowerShellEscape(str)
+// envName matches the names that $env: can spell without quotes.
+var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func isEnvName(key string) bool {
+	return envName.MatchString(key)
 }
 
+// PowerShellEscape returns a PowerShell expression that evaluates to str.
+//
+// PowerShell decodes the output of a native command with the console's code
+// page, and the hook can switch the console to UTF-8 only after the output of
+// `vfox activate` has been decoded. On many Windows systems that page is not
+// UTF-8, so the output must be ASCII. Printable ASCII becomes a single-quoted
+// literal, in which the only escape is a doubled quote. Anything else becomes
+// the base64 of its UTF-8 bytes, which PowerShell decodes when the expression runs.
 func PowerShellEscape(str string) string {
-	if str == "" {
-		return "''"
+	if isPrintableASCII(str) {
+		return "'" + strings.ReplaceAll(str, "'", "''") + "'"
 	}
-	in := []byte(str)
-	out := ""
-	i := 0
-	l := len(in)
-	escape := false
+	return powerShellUTF8(str)
+}
 
-	hex := func(char byte) {
-		escape = true
-		out += fmt.Sprintf("\\x%02x", char)
-	}
+// powerShellUTF8 is the expression that decodes the base64 of the UTF-8 bytes of str.
+func powerShellUTF8(str string) string {
+	return "([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('" +
+		base64.StdEncoding.EncodeToString([]byte(str)) + "')))"
+}
 
-	backslash := func(char byte) {
-		escape = true
-		out += string([]byte{BACKTICK, char})
-	}
-
-	escaped := func(str string) {
-		escape = true
-		out += str
-	}
-
-	quoted := func(char byte) {
-		escape = true
-		out += string([]byte{char})
-	}
-
-	literal := func(char byte) {
-		out += string([]byte{char})
-	}
-
-	for i < l {
-		char := in[i]
-		switch {
-		case char == ACK:
-			hex(char)
-		case char == TAB:
-			escaped("`t")
-		case char == LF:
-			escaped("`n")
-		case char == CR:
-			escaped("`r")
-		case char <= US:
-			hex(char)
-		// case char <= AMPERSTAND:
-		// 	quoted(char)
-		case char == SINGLE_QUOTE:
-			backslash(char)
-		case char <= PLUS:
-			quoted(char)
-		case char <= NINE:
-			literal(char)
-		// case char <= QUESTION:
-		// 	quoted(char)
-		case char <= UPPERCASE_Z:
-			literal(char)
-		// case char == OPEN_BRACKET:
-		// 	quoted(char)
-		// case char == BACKSLASH:
-		// 	quoted(char)
-		case char == UNDERSCORE:
-			literal(char)
-		// case char <= CLOSE_BRACKET:
-		// 	quoted(char)
-		// case char <= BACKTICK:
-		// 	quoted(char)
-		// case char <= TILDA:
-		// 	quoted(char)
-		case char == DEL:
-			hex(char)
-		default:
-			quoted(char)
+// isPrintableASCII reports whether every byte of str is a printable ASCII character.
+func isPrintableASCII(str string) bool {
+	for i := 0; i < len(str); i++ {
+		if str[i] < 0x20 || str[i] > 0x7e {
+			return false
 		}
-		i++
 	}
-
-	if escape {
-		out = "'" + out + "'"
-	}
-
-	return out
+	return true
 }
