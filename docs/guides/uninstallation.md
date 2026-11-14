@@ -97,7 +97,17 @@ After saving the file, reload your PowerShell profile:
 
 ::: details Nushell
 
-Open your Nushell config file (location shown by `$nu.config-path`) and remove the vfox activation line that was appended during installation.
+Depending on the configuration method used:
+
+- **Config directory setup**: Open your Nushell configuration file (shown by `$nu.config-path`) and remove the line sourcing `vfox.nu`. Then delete the generated `vfox.nu` file:
+  ```shell
+  rm ($nu.default-config-dir | path join "vfox.nu")
+  ```
+- **Direct configuration**: Open your Nushell configuration file (shown by `$nu.config-path`) and remove the appended `vfox` activation script block.
+- **Vendor autoload**: Delete the activation script from the vendor autoload directory:
+  ```shell
+  rm ($nu.data-dir | path join "vendor/autoload/vfox.nu")
+  ```
 
 :::
 
