@@ -1,0 +1,23 @@
+name: Git Bash in mintty
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mintty:
+    name: Select and confirm in a Git Bash mintty window
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build the test binary
+        shell: pwsh
+        run: go test -c -o "$env:RUNNER_TEMP\commands.test.exe" ./cmd/commands
+      - name: Type the answers into Git Bash in mintty
+        shell: pwsh
+        run: ./scripts/gitbash-mintty-test.ps1 -TestBinary "$env:RUNNER_TEMP\commands.test.exe" -WorkDir "$env:RUNNER_TEMP\gitbash-mintty"
