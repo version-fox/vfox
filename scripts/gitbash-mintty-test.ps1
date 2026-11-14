@@ -27,9 +27,59 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Add-Type -Namespace Vfox -Name Win32 -MemberDefinition @'
-[DllImport("user32.dll", CharSet = CharSet.Auto)]
-public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class VfoxWindow
+{
+    public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll")]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    public static List<IntPtr> TopLevel()
+    {
+        List<IntPtr> found = new List<IntPtr>();
+        EnumWindows(delegate (IntPtr hWnd, IntPtr lParam) { found.Add(hWnd); return true; }, IntPtr.Zero);
+        return found;
+    }
+
+    public static string ClassOf(IntPtr hWnd)
+    {
+        StringBuilder text = new StringBuilder(256);
+        GetClassName(hWnd, text, text.Capacity);
+        return text.ToString();
+    }
+
+    public static string TitleOf(IntPtr hWnd)
+    {
+        StringBuilder text = new StringBuilder(512);
+        GetWindowText(hWnd, text, text.Capacity);
+        return text.ToString();
+    }
+
+    public static uint ProcessOf(IntPtr hWnd)
+    {
+        uint processId;
+        GetWindowThreadProcessId(hWnd, out processId);
+        return processId;
+    }
+}
 '@
 
 $WM_CHAR = 0x0102
@@ -59,25 +109,41 @@ $runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__TEST__', $unixT
 [System.IO.File]::WriteAllText((Join-Path $WorkDir 'run.sh'), $runScript.Replace("`r`n", "`n") + "`n")
 
 $window = Start-Process -FilePath $mintty -ArgumentList "-e `"$bash`" --noprofile --norc `"$unixScript`"" -PassThru
+Write-Host "started $mintty as process $($window.Id)"
+
+function Find-MinttyWindow {
+    foreach ($candidate in [VfoxWindow]::TopLevel()) {
+        if ([VfoxWindow]::ClassOf($candidate) -eq 'mintty') { return $candidate }
+    }
+    return [IntPtr]::Zero
+}
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-while ($window.MainWindowHandle -eq [IntPtr]::Zero) {
+$handle = Find-MinttyWindow
+while ($handle -eq [IntPtr]::Zero) {
+    if ($window.HasExited) { throw "mintty exited with code $($window.ExitCode) before it showed a window" }
     if ((Get-Date) -gt $deadline) {
         Write-Host "UserInteractive: $([Environment]::UserInteractive)"
-        throw 'mintty opened no window: is there a desktop session?'
+        foreach ($candidate in [VfoxWindow]::TopLevel()) {
+            $title = [VfoxWindow]::TitleOf($candidate)
+            if ($title) {
+                Write-Host ("window {0} class '{1}' title '{2}' process {3}" -f $candidate, [VfoxWindow]::ClassOf($candidate), $title, [VfoxWindow]::ProcessOf($candidate))
+            }
+        }
+        Get-CimInstance Win32_Process -Filter "Name = 'mintty.exe'" | ForEach-Object { Write-Host "mintty.exe $($_.ProcessId): $($_.CommandLine)" }
+        throw 'no mintty window appeared'
     }
     Start-Sleep -Milliseconds 300
-    $window.Refresh()
+    $handle = Find-MinttyWindow
 }
-$handle = $window.MainWindowHandle
-Write-Host "mintty window $handle, process $($window.Id)"
+Write-Host "mintty window $handle, process $([VfoxWindow]::ProcessOf($handle))"
 
 function Send-Line([IntPtr] $target, [string] $text) {
     foreach ($char in $text.ToCharArray()) {
-        [void][Vfox.Win32]::PostMessage($target, $WM_CHAR, [IntPtr][int][char]$char, [IntPtr]1)
+        [void][VfoxWindow]::PostMessage($target, $WM_CHAR, [IntPtr][int][char]$char, [IntPtr]1)
         Start-Sleep -Milliseconds 100
     }
-    [void][Vfox.Win32]::PostMessage($target, $WM_CHAR, [IntPtr]13, [IntPtr]1)
+    [void][VfoxWindow]::PostMessage($target, $WM_CHAR, [IntPtr]13, [IntPtr]1)
 }
 
 function Wait-Marker([string] $name) {
