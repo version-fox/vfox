@@ -117,6 +117,7 @@ $unixScript = "$unixWork/run.sh"
 # the window closes when the script ends.
 $runScript = @'
 #!/usr/bin/env bash
+echo started > '__UNIXWORK__/started.txt'
 export VFOX_TEST_GITBASH_MINTTY_DIR='__WORK__'
 export VFOX_TEST_GITBASH_MINTTY_STDIO='__STDIO__'
 '__TEST__' -test.run '^__RUN__$' -test.v
@@ -125,13 +126,15 @@ echo $? > '__UNIXWORK__/exit.txt'
 $runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__STDIO__', $Stdio).Replace('__TEST__', $unixTest).Replace('__UNIXWORK__', $unixWork).Replace('__RUN__', $TestRun)
 [System.IO.File]::WriteAllText((Join-Path $WorkDir 'run.sh'), $runScript.Replace("`r`n", "`n") + "`n")
 
-# A window left over from an earlier run would be taken for this one.
-Get-Process -Name mintty -ErrorAction SilentlyContinue | Stop-Process -Force
 if ($MsysOptions) { $env:MSYS = $MsysOptions }
 Write-Host "MSYS for mintty: '$($env:MSYS)' (stdio: $Stdio)"
 
-$window = Start-Process -FilePath $mintty -ArgumentList "-e `"$bash`" --noprofile --norc `"$unixScript`"" -PassThru
-Write-Host "started $mintty as process $($window.Id)"
+# Ends what an earlier launch left running: the windows, the shell and the test. A
+# window left over would be taken for the new one.
+function Stop-MinttyRun {
+    $test = [IO.Path]::GetFileNameWithoutExtension($TestBinary)
+    Get-Process -Name mintty, bash, $test -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
 
 function Find-MinttyWindow {
     foreach ($candidate in [VfoxWindow]::TopLevel()) {
@@ -140,24 +143,39 @@ function Find-MinttyWindow {
     return [IntPtr]::Zero
 }
 
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-$handle = Find-MinttyWindow
-while ($handle -eq [IntPtr]::Zero) {
-    if ($window.HasExited) { throw "mintty exited with code $($window.ExitCode) before it showed a window" }
-    if ((Get-Date) -gt $deadline) {
-        Write-Host "UserInteractive: $([Environment]::UserInteractive)"
-        foreach ($candidate in [VfoxWindow]::TopLevel()) {
-            $title = [VfoxWindow]::TitleOf($candidate)
-            if ($title) {
-                Write-Host ("window {0} class '{1}' title '{2}' process {3}" -f $candidate, [VfoxWindow]::ClassOf($candidate), $title, [VfoxWindow]::ProcessOf($candidate))
-            }
+# mintty.exe may hand its window to a process of its own and exit once it has, so the
+# process started here is never a failure by itself: the window is looked for by its
+# class until 30 seconds have passed. A launch that shows no window is tried once more.
+function Start-MinttyWindow {
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        Stop-MinttyRun
+        Get-ChildItem -LiteralPath $WorkDir -Exclude run.sh | Remove-Item -Force
+        $launcher = Start-Process -FilePath $mintty -ArgumentList "-e `"$bash`" --noprofile --norc `"$unixScript`"" -PassThru
+        Write-Host "attempt ${attempt}: started $mintty as process $($launcher.Id)"
+        $deadline = (Get-Date).AddSeconds(30)
+        $handle = Find-MinttyWindow
+        while ($handle -eq [IntPtr]::Zero -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 300
+            $handle = Find-MinttyWindow
         }
-        throw 'no mintty window appeared'
+        if ($handle -ne [IntPtr]::Zero) {
+            Write-Host "mintty window $handle, process $([VfoxWindow]::ProcessOf($handle))"
+            return $handle
+        }
+        $state = if ($launcher.HasExited) { "exited with code $($launcher.ExitCode)" } else { 'still running' }
+        $started = Test-Path -LiteralPath (Join-Path $WorkDir 'started.txt')
+        Write-Host "attempt ${attempt}: no mintty window within 30 seconds; the process started here $state; bash started: $started"
     }
-    Start-Sleep -Milliseconds 300
-    $handle = Find-MinttyWindow
+    foreach ($candidate in [VfoxWindow]::TopLevel()) {
+        $title = [VfoxWindow]::TitleOf($candidate)
+        if ($title) {
+            Write-Host ("window {0} class '{1}' title '{2}' process {3}" -f $candidate, [VfoxWindow]::ClassOf($candidate), $title, [VfoxWindow]::ProcessOf($candidate))
+        }
+    }
+    throw 'no mintty window appeared'
 }
-Write-Host "mintty window $handle, process $([VfoxWindow]::ProcessOf($handle))"
+
+$handle = Start-MinttyWindow
 
 function Send-Char([IntPtr] $target, [int] $char) {
     [void][VfoxWindow]::PostMessage($target, $WM_CHAR, [IntPtr]$char, [IntPtr]1)
@@ -205,9 +223,10 @@ try {
     Wait-Marker 'exit.txt'
 }
 finally {
-    if (-not $window.HasExited -and -not $window.WaitForExit(10000)) {
-        Stop-Process -Id $window.Id -Force
-    }
+    # The window closes once the script has ended, after it wrote exit.txt. A window
+    # that stays open is stopped, so that exit.txt is read after the shell is done.
+    Get-Process -Name mintty -ErrorAction SilentlyContinue | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+    Stop-MinttyRun
     Write-Host "files in ${WorkDir}:"
     Get-ChildItem -LiteralPath $WorkDir | ForEach-Object { Write-Host "  $($_.Name)" }
     Write-Host '--- result.txt'
