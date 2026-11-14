@@ -22,7 +22,7 @@ Traditional solutions require installing multiple version managers (such as `nvm
 | Shell      | Support | Note                                                                             |
 |------------|---------|----------------------------------------------------------------------------------|
 | PowerShell | ✅       |                                                                                  |
-| Git Bash   | ✅       | [FAQ](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
+| Git Bash   | ✅       | [FAQ](./faq.md#how-do-i-select-a-version-with-use-and-search-in-gitbash) |
 | Bash       | ✅       |                                                                                  |
 | ZSH        | ✅       |                                                                                  |
 | Fish       | ✅       |                                                                                  |

@@ -60,10 +60,8 @@ On a CI runner, `vfox link --detect java -y` links the JDKs the plugin can find.
 Put it back with `vfox install --reinstall <sdk>@<version>`, and move to a newer version by installing that version
 with `vfox` instead.
 
-## Why can't I select when use `use` and `search` commands in GitBash?
+## How do I select a version with `use` and `search` in GitBash?
 
 Related ISSUE: [Unable to select in GitBash](https://github.com/version-fox/vfox/issues/98)
 
-In the native GitBash (MinTTY), vfox cannot read single key presses, so `use`, `search` and the other prompts read a line instead: type a number from the list or a version and press Enter. Typing text narrows the list, and an empty line cancels. For arrow-key selection, run GitBash in one of these:
-1. Run `GitBash` through `Windows Terminal`
-2. Run `GitBash` in `VS Code`
+In the native GitBash (MinTTY), the arrow keys select a version in `use`, `search` and the other prompts. The up and down arrows move the highlight, typing filters the list, Enter chooses, Ctrl-C cancels, and a confirmation takes `y` or `n` without Enter. To read single keys, vfox switches the terminal to raw mode with `stty`, which comes with Git for Windows, and restores it afterwards. Without `stty`, the prompts read a line instead: type a number from the list or a version and press Enter, and an empty line cancels.

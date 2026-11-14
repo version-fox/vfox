@@ -22,7 +22,7 @@
 | Shell      | 支持 | 说明                                                                            |
 |------------|------|---------------------------------------------------------------------------------|
 | PowerShell | ✅   |                                                                                 |
-| Git Bash   | ✅   | [常见问题](./faq.md#why-can-t-i-select-when-use-use-and-search-commands-in-gitbash) |
+| Git Bash   | ✅   | [常见问题](./faq.md#how-do-i-select-a-version-with-use-and-search-in-gitbash) |
 | Bash       | ✅   |                                                                                 |
 | ZSH        | ✅   |                                                                                 |
 | Fish       | ✅   |                                                                                 |
