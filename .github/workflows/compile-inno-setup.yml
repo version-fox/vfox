@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   compile-inno-setup:
+    if: github.repository == 'version-fox/vfox'
     name: Compile setup and publish
     runs-on: windows-latest
     defaults:

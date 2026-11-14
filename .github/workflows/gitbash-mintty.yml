@@ -7,6 +7,7 @@ on:
 
 jobs:
   mintty:
+    if: github.repository == 'version-fox/vfox'
     name: Select and confirm in a Git Bash mintty window
     runs-on: windows-latest
     timeout-minutes: 20

@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   compile-msix:
+    if: github.repository == 'version-fox/vfox'
     name: Build MSIX bundle and publish
     runs-on: windows-latest
     defaults:
