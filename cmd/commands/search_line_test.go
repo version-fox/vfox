@@ -51,12 +51,13 @@ func searchOptions() []*printer.KV {
 	}
 }
 
-func TestInstallByLineInstallsTheChosenVersion(t *testing.T) {
+func TestInstallChosenInstallsTheChosenVersion(t *testing.T) {
 	var installer recordingInstaller
 	var out bytes.Buffer
-	err := installByLine(&installer, strings.NewReader("2\n"), &out, searchOptions(), util.NewSet[string](), "nodejs")
+	prompt := printer.Prompt{Input: printer.Line, In: strings.NewReader("2\n"), Out: &out}
+	err := installChosen(&installer, prompt, searchOptions(), util.NewSet[string](), "nodejs")
 	if err != nil {
-		t.Fatalf("installByLine() error: %v", err)
+		t.Fatalf("installChosen() error: %v", err)
 	}
 	if len(installer.installed) != 1 || installer.installed[0] != "20.19.0" {
 		t.Errorf("installed %v, want [20.19.0]", installer.installed)
@@ -66,25 +67,40 @@ func TestInstallByLineInstallsTheChosenVersion(t *testing.T) {
 	}
 }
 
-func TestInstallByLineCancelInstallsNothing(t *testing.T) {
+func TestInstallChosenWithRawKeys(t *testing.T) {
 	var installer recordingInstaller
 	var out bytes.Buffer
-	if err := installByLine(&installer, strings.NewReader("\n"), &out, searchOptions(), util.NewSet[string](), "nodejs"); err != nil {
-		t.Fatalf("installByLine() error: %v", err)
+	prompt := printer.Prompt{Input: printer.RawKeys, In: strings.NewReader("\x1b[B\r"), Out: &out}
+	err := installChosen(&installer, prompt, searchOptions(), util.NewSet[string](), "nodejs")
+	if err != nil {
+		t.Fatalf("installChosen() error: %v", err)
+	}
+	if len(installer.installed) != 1 || installer.installed[0] != "20.19.0" {
+		t.Errorf("installed %v, want [20.19.0]", installer.installed)
+	}
+}
+
+func TestInstallChosenCancelInstallsNothing(t *testing.T) {
+	var installer recordingInstaller
+	var out bytes.Buffer
+	prompt := printer.Prompt{Input: printer.Line, In: strings.NewReader("\n"), Out: &out}
+	if err := installChosen(&installer, prompt, searchOptions(), util.NewSet[string](), "nodejs"); err != nil {
+		t.Fatalf("installChosen() error: %v", err)
 	}
 	if len(installer.installed) != 0 {
 		t.Errorf("installed %v after a cancelled selection, want nothing", installer.installed)
 	}
 }
 
-func TestInstallByLineRefusesAnInstalledVersion(t *testing.T) {
+func TestInstallChosenRefusesAnInstalledVersion(t *testing.T) {
 	var installer recordingInstaller
 	var out bytes.Buffer
 	installed := util.NewSet[string]()
 	installed.Add("20.19.0")
-	err := installByLine(&installer, strings.NewReader("2\n1\n"), &out, searchOptions(), installed, "nodejs")
+	prompt := printer.Prompt{Input: printer.Line, In: strings.NewReader("2\n1\n"), Out: &out}
+	err := installChosen(&installer, prompt, searchOptions(), installed, "nodejs")
 	if err != nil {
-		t.Fatalf("installByLine() error: %v", err)
+		t.Fatalf("installChosen() error: %v", err)
 	}
 	if len(installer.installed) != 1 || installer.installed[0] != "18.20.8" {
 		t.Errorf("installed %v, want [18.20.8] after the installed version was refused", installer.installed)
@@ -94,12 +110,13 @@ func TestInstallByLineRefusesAnInstalledVersion(t *testing.T) {
 	}
 }
 
-func TestInstallByLineReportsReadError(t *testing.T) {
+func TestInstallChosenReportsReadError(t *testing.T) {
 	var installer recordingInstaller
 	var out bytes.Buffer
-	err := installByLine(&installer, failingReader{}, &out, searchOptions(), util.NewSet[string](), "nodejs")
+	prompt := printer.Prompt{Input: printer.Line, In: failingReader{}, Out: &out}
+	err := installChosen(&installer, prompt, searchOptions(), util.NewSet[string](), "nodejs")
 	if err == nil || !strings.Contains(err.Error(), "select version error") {
-		t.Fatalf("installByLine() error = %v, want a select version error", err)
+		t.Fatalf("installChosen() error = %v, want a select version error", err)
 	}
 	if len(installer.installed) != 0 {
 		t.Errorf("installed %v after a failed read, want nothing", installer.installed)

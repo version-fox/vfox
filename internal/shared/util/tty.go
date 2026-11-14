@@ -35,3 +35,10 @@ func IsTTY() bool {
 func CanReadKeys() bool {
 	return canReadKeysFrom(os.Stdin.Fd())
 }
+
+// IsPtyInput reports whether stdin is a Cygwin or MSYS2 pty, such as Git Bash in
+// mintty. Its input reaches the program as a pipe, and stty can switch it to raw
+// mode.
+func IsPtyInput() bool {
+	return isCygwinTerminal(os.Stdin.Fd())
+}

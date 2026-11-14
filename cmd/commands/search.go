@@ -19,7 +19,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"strings"
@@ -95,8 +94,9 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		return nil
 	}
 
-	if !util.CanReadKeys() {
-		return installByLine(source, os.Stdin, os.Stdout, options, installedVersions, sdkName)
+	prompt := printer.StdinPrompt()
+	if prompt.Input != printer.Keyboard {
+		return installChosen(source, prompt, options, installedVersions, sdkName)
 	}
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
@@ -135,17 +135,10 @@ type versionInstaller interface {
 	Install(version sdk.Version) error
 }
 
-// installByLine lets the person choose a version by reading a line, and installs
-// it, for a terminal that cannot deliver single key presses. Cancelling installs
-// nothing.
-func installByLine(installer versionInstaller, in io.Reader, out io.Writer, options []*printer.KV, installed util.Set[string], sdkName string) error {
-	selected, err := (&printer.LineSelect{
-		TopText:         "Please select a version of " + sdkName + " to install",
-		Options:         options,
-		DisabledOptions: installed,
-		In:              in,
-		Out:             out,
-	}).Show()
+// installChosen lets the person choose a version with prompt, which is not the
+// keyboard, and installs it. Cancelling installs nothing.
+func installChosen(installer versionInstaller, prompt printer.Prompt, options []*printer.KV, installed util.Set[string], sdkName string) error {
+	selected, err := prompt.Choose("Please select a version of "+sdkName+" to install", options, installed)
 	if err != nil {
 		return fmt.Errorf("select version error: %w", err)
 	}

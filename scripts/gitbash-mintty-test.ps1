@@ -32,6 +32,11 @@ param(
 
     [string] $MsysOptions = '',
 
+    [string] $TestRun = 'TestGitBashMinttySelection',
+
+    [ValidateSet('selection', 'probe')]
+    [string] $Script = 'selection',
+
     [ValidateRange(10, 1800)]
     [int] $TimeoutSeconds = 180
 )
@@ -114,10 +119,10 @@ $runScript = @'
 #!/usr/bin/env bash
 export VFOX_TEST_GITBASH_MINTTY_DIR='__WORK__'
 export VFOX_TEST_GITBASH_MINTTY_STDIO='__STDIO__'
-'__TEST__' -test.run '^TestGitBashMinttySelection$' -test.v
+'__TEST__' -test.run '^__RUN__$' -test.v
 echo $? > '__UNIXWORK__/exit.txt'
 '@
-$runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__STDIO__', $Stdio).Replace('__TEST__', $unixTest).Replace('__UNIXWORK__', $unixWork)
+$runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__STDIO__', $Stdio).Replace('__TEST__', $unixTest).Replace('__UNIXWORK__', $unixWork).Replace('__RUN__', $TestRun)
 [System.IO.File]::WriteAllText((Join-Path $WorkDir 'run.sh'), $runScript.Replace("`r`n", "`n") + "`n")
 
 # A window left over from an earlier run would be taken for this one.
@@ -154,6 +159,20 @@ while ($handle -eq [IntPtr]::Zero) {
 }
 Write-Host "mintty window $handle, process $([VfoxWindow]::ProcessOf($handle))"
 
+function Send-Char([IntPtr] $target, [int] $char) {
+    [void][VfoxWindow]::PostMessage($target, $WM_CHAR, [IntPtr]$char, [IntPtr]1)
+}
+
+# A key press as the window sees it: WM_KEYDOWN and WM_KEYUP with the scan code.
+function Send-VirtualKey([IntPtr] $target, [int] $key, [int] $scanCode, [bool] $extended) {
+    $extendedBit = if ($extended) { [long]1 -shl 24 } else { [long]0 }
+    $down = [long]1 -bor ([long]$scanCode -shl 16) -bor $extendedBit
+    $up = $down -bor ([long]3 -shl 30)
+    [void][VfoxWindow]::PostMessage($target, 0x0100, [IntPtr]$key, [IntPtr]$down)
+    Start-Sleep -Milliseconds 50
+    [void][VfoxWindow]::PostMessage($target, 0x0101, [IntPtr]$key, [IntPtr]$up)
+}
+
 function Send-Line([IntPtr] $target, [string] $text) {
     foreach ($char in $text.ToCharArray()) {
         [void][VfoxWindow]::PostMessage($target, $WM_CHAR, [IntPtr][int][char]$char, [IntPtr]1)
@@ -174,10 +193,15 @@ function Wait-Marker([string] $name) {
 try {
     Wait-Marker 'select.ready'
     Start-Sleep -Seconds 1
-    Send-Line $handle '20.19.0'
-    Wait-Marker 'confirm.ready'
-    Start-Sleep -Seconds 1
-    Send-Line $handle 'y'
+    # The down arrow: virtual key 0x28, scan code 0x50, an extended key.
+    Send-VirtualKey $handle 0x28 0x50 $true
+    if ($Script -eq 'selection') {
+        Start-Sleep -Milliseconds 300
+        Send-Char $handle 13
+        Wait-Marker 'confirm.ready'
+        Start-Sleep -Seconds 1
+        Send-Char $handle 0x79
+    }
     Wait-Marker 'exit.txt'
 }
 finally {

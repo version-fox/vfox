@@ -27,12 +27,11 @@ import (
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
-// lineSelectLimit is how many matches LineSelect lists at a time.
+// lineSelectLimit is how many matches a selection lists at a time.
 const lineSelectLimit = 20
 
 // LineSelect chooses one of Options by reading lines. It serves terminals that
-// cannot deliver single key presses (see util.CanReadKeys), such as Git Bash in
-// mintty.
+// cannot deliver single key presses (see util.CanReadKeys), such as a pipe.
 type LineSelect struct {
 	TopText string
 	Options []*KV
@@ -77,7 +76,7 @@ func (s *LineSelect) Show() (*KV, error) {
 			filter = line
 			continue
 		}
-		if s.isDisabled(chosen.Key) {
+		if isDisabledIn(s.DisabledOptions, chosen.Key) {
 			fmt.Fprintf(s.Out, "%s is already installed, choose another version.\n", chosen.Key)
 			continue
 		}
@@ -85,16 +84,25 @@ func (s *LineSelect) Show() (*KV, error) {
 	}
 }
 
-// matches returns the options whose value fuzzily contains filter, in the order
-// the plugin gave them. An empty filter matches every option.
-func (s *LineSelect) matches(filter string) []*KV {
+// fuzzyMatches returns the options whose value fuzzily contains filter, in the
+// order the plugin gave them. An empty filter matches every option.
+func fuzzyMatches(options []*KV, filter string) []*KV {
 	var found []*KV
-	for _, option := range s.Options {
+	for _, option := range options {
 		if fuzzy.MatchFold(filter, option.Value) {
 			found = append(found, option)
 		}
 	}
 	return found
+}
+
+// isDisabledIn reports whether key is among disabled, which may be nil.
+func isDisabledIn(disabled util.Set[string], key string) bool {
+	return disabled != nil && disabled.Contains(key)
+}
+
+func (s *LineSelect) matches(filter string) []*KV {
+	return fuzzyMatches(s.Options, filter)
 }
 
 // choose returns the option that line picks, or nil when line is a filter. A
@@ -113,10 +121,6 @@ func (s *LineSelect) choose(line string, listed []*KV) *KV {
 	return nil
 }
 
-func (s *LineSelect) isDisabled(key string) bool {
-	return s.DisabledOptions != nil && s.DisabledOptions.Contains(key)
-}
-
 // render writes the title, the listed matches numbered, and the prompt.
 func (s *LineSelect) render(filter string, matches, listed []*KV) {
 	if filter == "" {
@@ -129,7 +133,7 @@ func (s *LineSelect) render(filter string, matches, listed []*KV) {
 	}
 	for i, option := range listed {
 		label := option.Value
-		if s.isDisabled(option.Key) {
+		if isDisabledIn(s.DisabledOptions, option.Key) {
 			label += " (installed)"
 		}
 		fmt.Fprintf(s.Out, "  %d) %s\n", i+1, label)

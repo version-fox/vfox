@@ -177,16 +177,13 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 	return sdk.Version(selectedVersion), nil
 }
 
-// selectFromOptions displays an interactive selection prompt
+// selectFromOptions displays an interactive selection prompt. Where the keys of
+// the terminal cannot be read by the keyboard library, the choice is made with
+// the arrow keys in raw mode, or else as a line (see printer.Prompt).
 func selectFromOptions(options []string, sdkName string) (string, error) {
-	return chooseVersion(util.CanReadKeys(), options, sdkName)
-}
-
-// chooseVersion shows the selection and takes the arrow keys when keys is true.
-// Without key presses it reads the choice as a line.
-func chooseVersion(keys bool, options []string, sdkName string) (string, error) {
-	if !keys {
-		return selectVersionByLine(os.Stdin, os.Stdout, options, sdkName)
+	prompt := printer.StdinPrompt()
+	if prompt.Input != printer.Keyboard {
+		return selectVersionWith(prompt, options, sdkName)
 	}
 	selectPrinter := pterm.InteractiveSelectPrinter{
 		TextStyle:     &pterm.ThemeDefault.DefaultText,
@@ -211,20 +208,20 @@ func chooseVersion(keys bool, options []string, sdkName string) (string, error) 
 	return result, nil
 }
 
-// selectVersionByLine chooses a version by reading lines, for a terminal that
-// cannot deliver single key presses (Git Bash in mintty). A cancelled selection
-// is an error, since there is then no version to use.
+// selectVersionByLine chooses a version by reading a line from in, for a terminal
+// that cannot deliver single key presses.
 func selectVersionByLine(in io.Reader, out io.Writer, options []string, sdkName string) (string, error) {
+	return selectVersionWith(printer.Prompt{Input: printer.Line, In: in, Out: out}, options, sdkName)
+}
+
+// selectVersionWith chooses a version with prompt, which is not the keyboard. A
+// cancelled selection is an error, since there is then no version to use.
+func selectVersionWith(prompt printer.Prompt, options []string, sdkName string) (string, error) {
 	entries := make([]*printer.KV, len(options))
 	for i, option := range options {
 		entries[i] = &printer.KV{Key: option, Value: option}
 	}
-	selected, err := (&printer.LineSelect{
-		TopText: fmt.Sprintf("Please select a version of %s", sdkName),
-		Options: entries,
-		In:      in,
-		Out:     out,
-	}).Show()
+	selected, err := prompt.Choose(fmt.Sprintf("Please select a version of %s", sdkName), entries, nil)
 	if err != nil {
 		return "", fmt.Errorf("version selection failed: %w", err)
 	}

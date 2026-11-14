@@ -34,12 +34,13 @@ import (
 // TestGitBashMinttySelection runs the terminal code in a Git Bash window: the
 // test binary runs under Git for Windows' bash.exe in a mintty window, as it
 // does for a person at mintty. scripts/gitbash-mintty-test.ps1 starts it and
-// types the answers. When the test waits for one it creates a marker file in
+// presses the keys. When the test waits for an answer it creates a marker file in
 // VFOX_TEST_GITBASH_MINTTY_DIR, and it writes its result there too.
 //
 // VFOX_TEST_GITBASH_MINTTY_STDIO says what the window gives the program: "pipe"
-// for a pseudo terminal that reaches it as a pipe (the line input of the fix),
-// or "console" for a pseudo console (the arrow-key selection).
+// for a pseudo terminal that reaches it as a pipe, where the arrow keys work in
+// raw mode, or "console" for a pseudo console, where the keyboard library reads
+// them.
 func TestGitBashMinttySelection(t *testing.T) {
 	dir := os.Getenv("VFOX_TEST_GITBASH_MINTTY_DIR")
 	if dir == "" {
@@ -54,7 +55,8 @@ func TestGitBashMinttySelection(t *testing.T) {
 	fmt.Fprintf(&report, "stdin: %s\n", gitBashHandleKind(os.Stdin.Fd()))
 	fmt.Fprintf(&report, "stdout: %s\n", gitBashHandleKind(os.Stdout.Fd()))
 	isTTY, canReadKeys := util.IsTTY(), util.CanReadKeys()
-	fmt.Fprintf(&report, "IsTTY: %v\nCanReadKeys: %v\n", isTTY, canReadKeys)
+	input := printer.InputFor()
+	fmt.Fprintf(&report, "IsTTY: %v\nCanReadKeys: %v\ninput: %v\n", isTTY, canReadKeys, input)
 
 	markWaiting(t, dir, "select")
 	version, selectErr := selectFromOptions([]string{"18.20.8", "20.19.0"}, "nodejs")
@@ -64,12 +66,11 @@ func TestGitBashMinttySelection(t *testing.T) {
 	confirmed, confirmErr := printer.Confirm(&pterm.DefaultInteractiveConfirm, "Proceed with the check?")
 	fmt.Fprintf(&report, "confirmed: %v, error: %v\n", confirmed, confirmErr)
 
-	ok := isTTY && selectErr == nil && version == "20.19.0" && confirmErr == nil && confirmed
-	if stdio == "pipe" {
-		ok = ok && !canReadKeys
-	} else {
-		ok = ok && canReadKeys
+	want := printer.RawKeys
+	if stdio == "console" {
+		want = printer.Keyboard
 	}
+	ok := isTTY && input == want && selectErr == nil && version == "20.19.0" && confirmErr == nil && confirmed
 	if err := os.WriteFile(filepath.Join(dir, "result.txt"), []byte(report.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +79,7 @@ func TestGitBashMinttySelection(t *testing.T) {
 	}
 }
 
-// markWaiting tells the driver that the test is about to wait for the input of step.
+// markWaiting tells the driver that the test is about to wait for the answer to step.
 func markWaiting(t *testing.T, dir, step string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, step+".ready"), nil, 0o644); err != nil {

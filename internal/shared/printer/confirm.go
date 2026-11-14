@@ -20,25 +20,15 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/version-fox/vfox/internal/shared/util"
 )
 
-// Confirm asks a yes-or-no question with p. Where key presses can be read it
-// behaves as p.Show; elsewhere the answer is a line (see util.CanReadKeys).
+// Confirm asks a yes-or-no question with p, on the terminal of the process: see
+// StdinPrompt.
 func Confirm(p *pterm.InteractiveConfirmPrinter, text string) (bool, error) {
-	return confirm(util.CanReadKeys(), p, text, os.Stdin, os.Stdout)
-}
-
-// confirm asks with p when keys is true, and otherwise reads the answer as a line from in.
-func confirm(keys bool, p *pterm.InteractiveConfirmPrinter, text string, in io.Reader, out io.Writer) (bool, error) {
-	if keys {
-		return p.Show(text)
-	}
-	return lineConfirm(in, out, *p, text)
+	return StdinPrompt().Confirm(p, text)
 }
 
 // lineConfirm asks text and reads an answer line. The confirm or reject text, or

@@ -70,27 +70,6 @@ func TestLineConfirmReportsReadError(t *testing.T) {
 	}
 }
 
-func TestConfirmWithoutKeysReadsALine(t *testing.T) {
-	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
-	var out bytes.Buffer
-	got, err := confirm(false, &p, "Install?", strings.NewReader("y\n"), &out)
-	if err != nil || !got {
-		t.Fatalf("confirm(false) = %v, %v, want true", got, err)
-	}
-}
-
-func TestShortAnswer(t *testing.T) {
-	for _, tc := range []struct{ text, fallback, want string }{
-		{"", "y", "y"},
-		{"Yes", "n", "y"},
-		{"No", "y", "n"},
-	} {
-		if got := shortAnswer(tc.text, tc.fallback); got != tc.want {
-			t.Errorf("shortAnswer(%q, %q) = %q, want %q", tc.text, tc.fallback, got, tc.want)
-		}
-	}
-}
-
 func TestLineConfirmShowsDefaultInUpperCase(t *testing.T) {
 	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
 	var out bytes.Buffer
@@ -119,5 +98,56 @@ func TestLineConfirmUsesDefaultTextWhenNoQuestion(t *testing.T) {
 	}
 	if !strings.HasPrefix(out.String(), "Please confirm ") {
 		t.Errorf("prompt = %q, want the default text", out.String())
+	}
+}
+
+func TestPromptConfirmOnALine(t *testing.T) {
+	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+	var out bytes.Buffer
+	got, err := Prompt{Input: Line, In: strings.NewReader("y\n"), Out: &out}.Confirm(&p, "Install?")
+	if err != nil || !got {
+		t.Fatalf("Confirm() = %v, %v, want true", got, err)
+	}
+}
+
+func TestPromptConfirmWithKeys(t *testing.T) {
+	cases := []struct {
+		name         string
+		input        string
+		defaultValue bool
+		want         bool
+	}{
+		{"y", "y", false, true},
+		{"Y", "Y", false, true},
+		{"n after a stray key", "xn", true, false},
+		{"enter takes the default", "\r", true, true},
+		{"enter takes the default no", "\r", false, false},
+		{"ctrl-c refuses", "\x03", true, false},
+		{"end of input refuses", "", true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := pterm.InteractiveConfirmPrinter{DefaultValue: tc.defaultValue, ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+			var out bytes.Buffer
+			got, err := Prompt{Input: RawKeys, In: strings.NewReader(tc.input), Out: &out}.Confirm(&p, "Install?")
+			if err != nil {
+				t.Fatalf("Confirm() error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("Confirm() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestShortAnswer(t *testing.T) {
+	for _, tc := range []struct{ text, fallback, want string }{
+		{"", "y", "y"},
+		{"Yes", "n", "y"},
+		{"No", "y", "n"},
+	} {
+		if got := shortAnswer(tc.text, tc.fallback); got != tc.want {
+			t.Errorf("shortAnswer(%q, %q) = %q, want %q", tc.text, tc.fallback, got, tc.want)
+		}
 	}
 }

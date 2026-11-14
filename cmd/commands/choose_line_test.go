@@ -18,8 +18,10 @@ package commands
 
 import (
 	"bytes"
-	"os"
+	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/shared/printer"
 )
 
 func TestSelectVersionByLineReportsReadError(t *testing.T) {
@@ -30,29 +32,27 @@ func TestSelectVersionByLineReportsReadError(t *testing.T) {
 	}
 }
 
-// Without key presses chooseVersion reads the choice from stdin, so the test
-// gives stdin a pipe that holds the choice.
-func TestChooseVersionWithoutKeysReadsALine(t *testing.T) {
-	reader, writer, err := os.Pipe()
+// The down arrow in raw mode, then Enter, chooses the second version.
+func TestSelectVersionWithRawKeys(t *testing.T) {
+	var out bytes.Buffer
+	prompt := printer.Prompt{Input: printer.RawKeys, In: strings.NewReader("\x1b[B\r"), Out: &out}
+	version, err := selectVersionWith(prompt, []string{"18.20.8", "20.19.0"}, "nodejs")
 	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		reader.Close()
-		writer.Close()
-	})
-	if _, err := writer.WriteString("20.19.0\n"); err != nil {
-		t.Fatal(err)
-	}
-	previous := os.Stdin
-	os.Stdin = reader
-	t.Cleanup(func() { os.Stdin = previous })
-
-	version, err := chooseVersion(false, []string{"18.20.8", "20.19.0"}, "nodejs")
-	if err != nil {
-		t.Fatalf("chooseVersion() error: %v", err)
+		t.Fatalf("selectVersionWith() error: %v", err)
 	}
 	if version != "20.19.0" {
-		t.Errorf("chooseVersion() = %q, want %q", version, "20.19.0")
+		t.Errorf("selectVersionWith() = %q, want %q", version, "20.19.0")
+	}
+}
+
+func TestSelectVersionWithLineReadsTheChoice(t *testing.T) {
+	var out bytes.Buffer
+	prompt := printer.Prompt{Input: printer.Line, In: strings.NewReader("2\n"), Out: &out}
+	version, err := selectVersionWith(prompt, []string{"18.20.8", "20.19.0"}, "nodejs")
+	if err != nil {
+		t.Fatalf("selectVersionWith() error: %v", err)
+	}
+	if version != "20.19.0" {
+		t.Errorf("selectVersionWith() = %q, want %q", version, "20.19.0")
 	}
 }
