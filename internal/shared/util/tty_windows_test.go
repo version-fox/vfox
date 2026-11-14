@@ -92,6 +92,9 @@ func TestCanReadKeysRejectsPipe(t *testing.T) {
 
 func TestIsCygwinPipeName(t *testing.T) {
 	cases := map[string]bool{
+		// The names a real MSYS2 pty gives a native program, seen under script(1).
+		`\msys-a64f078b8998658e-pty0-from-master-nat`:            true,
+		`\msys-a64f078b8998658e-pty0-to-master-nat`:              true,
 		`\msys-1888ae32e00d56aa-pty0-to-master`:                  true,
 		`\msys-1888ae32e00d56aa-pty1-from-master`:                true,
 		`\cygwin-ab12cd34-pty2-to-master`:                        true,
