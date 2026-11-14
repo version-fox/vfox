@@ -195,9 +195,32 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 </TabItem>
 <TabItem label="Nushell">
 
+> 需要 Nushell 0.106.0+。
+
+将 Hook 添加到 Nushell 配置文件：
+
 ```shell
-vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
+vfox activate nu $nu.default-config-dir | save --append $nu.config-path
 ```
+
+或者直接生成激活脚本并追加到配置中（无需指定配置目录参数）：
+
+```shell
+vfox activate nu | save --append $nu.config-path
+```
+
+也可以将激活脚本保存到 Nushell 的 vendor autoload 目录：
+
+```shell
+mkdir ($nu.data-dir | path join "vendor/autoload")
+vfox activate nu | save -f ($nu.data-dir | path join "vendor/autoload/vfox.nu")
+```
+
+::: tip 💡 提示
+直接追加（`vfox activate nu | save --append ...`）以及 vendor autoload 方式生成的是激活脚本的静态快照。与配置目录方式不同，它们在升级 vfox 时不会自动更新。升级 vfox 时：
+- 对于 vendor autoload 配置，重新运行该命令即可安全覆盖原文件（`save -f`）。
+- 对于直接追加到 `$nu.config-path` 的配置，在重新追加前需先从 `$nu.config-path` 中移除原有的 vfox hook 代码块，以避免重复添加 hook。
+:::
 
 </TabItem>
 </Tabs>

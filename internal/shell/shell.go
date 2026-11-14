@@ -57,7 +57,7 @@ func NewShell(name string) Shell {
 		return Fish
 	case "clink":
 		return Clink
-	case "nushell":
+	case "nu", "nushell":
 		return Nushell
 	}
 	return nil

@@ -97,7 +97,17 @@ Invoke-Expression "$(vfox activate pwsh)"
 
 ::: details Nushell
 
-打开您的 Nushell 配置文件（位置由 `$nu.config-path` 显示）并删除安装期间添加的 vfox 激活行。
+根据您采用的配置方式：
+
+- **配置目录方式**：打开您的 Nushell 配置文件（位置由 `$nu.config-path` 显示）并删除引用 `vfox.nu` 的行。然后删除生成的 `vfox.nu` 文件：
+  ```shell
+  rm ($nu.default-config-dir | path join "vfox.nu")
+  ```
+- **直接写入配置方式**：打开您的 Nushell 配置文件（位置由 `$nu.config-path` 显示）并删除追加的 `vfox` 激活脚本代码块。
+- **Vendor autoload 方式**：删除 vendor autoload 目录下的激活脚本：
+  ```shell
+  rm ($nu.data-dir | path join "vendor/autoload/vfox.nu")
+  ```
 
 :::
 
