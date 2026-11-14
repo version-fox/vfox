@@ -42,9 +42,9 @@ type LineSelect struct {
 	Out             io.Writer
 }
 
-// Show lists the options and reads lines until one is chosen. A number chooses
-// the entry at that position in the list, the key of an option chooses that
-// option, and other text filters the list. An empty line clears the filter, or
+// Show lists the options and reads lines until one is chosen. The key of an
+// option chooses that option, a number chooses the entry at that position in the
+// list, and other text filters the list. An empty line clears the filter, or
 // cancels when there is none. Show returns nil when the selection is cancelled
 // or the input ends.
 func (s *LineSelect) Show() (*KV, error) {
@@ -98,15 +98,17 @@ func (s *LineSelect) matches(filter string) []*KV {
 }
 
 // choose returns the option that line picks, or nil when line is a filter. A
-// number picks from the listed entries; a key picks from all options.
+// key picks from all options and wins over a number, so that a version such as
+// "17" is never mistaken for the seventeenth entry; a number picks from the
+// listed entries.
 func (s *LineSelect) choose(line string, listed []*KV) *KV {
-	if n, err := strconv.Atoi(line); err == nil && n >= 1 && n <= len(listed) {
-		return listed[n-1]
-	}
 	for _, option := range s.Options {
 		if option.Key == line {
 			return option
 		}
+	}
+	if n, err := strconv.Atoi(line); err == nil && n >= 1 && n <= len(listed) {
+		return listed[n-1]
 	}
 	return nil
 }

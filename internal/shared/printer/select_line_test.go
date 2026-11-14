@@ -77,6 +77,17 @@ func TestLineSelectChoosesByKey(t *testing.T) {
 	assertChosen(t, chosen, err, "18.20.8")
 }
 
+func TestLineSelectVersionWinsOverPosition(t *testing.T) {
+	// "2" is the version of the first entry, so it chooses that entry and not
+	// the second one.
+	options := []*KV{
+		{Key: "2", Value: "2"},
+		{Key: "1.0.0", Value: "1.0.0"},
+	}
+	chosen, _, err := runLineSelect(t, "2\n", options, nil)
+	assertChosen(t, chosen, err, "2")
+}
+
 func TestLineSelectNumberWithoutNewlineAtEndOfInput(t *testing.T) {
 	chosen, _, err := runLineSelect(t, "2", lineSelectOptions(), nil)
 	assertChosen(t, chosen, err, "22.15.0")
