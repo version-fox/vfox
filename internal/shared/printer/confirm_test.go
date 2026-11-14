@@ -62,6 +62,35 @@ func TestLineConfirmAnswers(t *testing.T) {
 	}
 }
 
+func TestLineConfirmReportsReadError(t *testing.T) {
+	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+	var out bytes.Buffer
+	if _, err := lineConfirm(brokenReader{}, &out, p, "Install?"); err == nil {
+		t.Fatal("lineConfirm() error = nil for a failing read, want an error")
+	}
+}
+
+func TestConfirmWithoutKeysReadsALine(t *testing.T) {
+	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+	var out bytes.Buffer
+	got, err := confirm(false, &p, "Install?", strings.NewReader("y\n"), &out)
+	if err != nil || !got {
+		t.Fatalf("confirm(false) = %v, %v, want true", got, err)
+	}
+}
+
+func TestShortAnswer(t *testing.T) {
+	for _, tc := range []struct{ text, fallback, want string }{
+		{"", "y", "y"},
+		{"Yes", "n", "y"},
+		{"No", "y", "n"},
+	} {
+		if got := shortAnswer(tc.text, tc.fallback); got != tc.want {
+			t.Errorf("shortAnswer(%q, %q) = %q, want %q", tc.text, tc.fallback, got, tc.want)
+		}
+	}
+}
+
 func TestLineConfirmShowsDefaultInUpperCase(t *testing.T) {
 	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
 	var out bytes.Buffer

@@ -30,10 +30,15 @@ import (
 // Confirm asks a yes-or-no question with p. Where key presses can be read it
 // behaves as p.Show; elsewhere the answer is a line (see util.CanReadKeys).
 func Confirm(p *pterm.InteractiveConfirmPrinter, text string) (bool, error) {
-	if util.CanReadKeys() {
+	return confirm(util.CanReadKeys(), p, text, os.Stdin, os.Stdout)
+}
+
+// confirm asks with p when keys is true, and otherwise reads the answer as a line from in.
+func confirm(keys bool, p *pterm.InteractiveConfirmPrinter, text string, in io.Reader, out io.Writer) (bool, error) {
+	if keys {
 		return p.Show(text)
 	}
-	return lineConfirm(os.Stdin, os.Stdout, *p, text)
+	return lineConfirm(in, out, *p, text)
 }
 
 // lineConfirm asks text and reads an answer line. The confirm or reject text, or

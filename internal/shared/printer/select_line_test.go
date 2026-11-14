@@ -117,6 +117,27 @@ func TestLineSelectEmptyLineClearsFilterThenCancels(t *testing.T) {
 	}
 }
 
+// brokenReader fails every read, as a terminal that went away does.
+type brokenReader struct{}
+
+func (brokenReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("terminal gone")
+}
+
+func TestLineSelectReportsReadError(t *testing.T) {
+	var out bytes.Buffer
+	s := &LineSelect{
+		TopText: "Please select a version of nodejs",
+		Options: lineSelectOptions(),
+		In:      brokenReader{},
+		Out:     &out,
+	}
+	chosen, err := s.Show()
+	if err == nil || chosen != nil {
+		t.Fatalf("Show() = %v, %v, want an error for a failing read", chosen, err)
+	}
+}
+
 func TestLineSelectCancelsOnEndOfInput(t *testing.T) {
 	chosen, _, err := runLineSelect(t, "", lineSelectOptions(), nil)
 	if err != nil {

@@ -179,7 +179,13 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 
 // selectFromOptions displays an interactive selection prompt
 func selectFromOptions(options []string, sdkName string) (string, error) {
-	if !util.CanReadKeys() {
+	return chooseVersion(util.CanReadKeys(), options, sdkName)
+}
+
+// chooseVersion shows the selection and takes the arrow keys when keys is true.
+// Without key presses it reads the choice as a line.
+func chooseVersion(keys bool, options []string, sdkName string) (string, error) {
+	if !keys {
 		return selectVersionByLine(os.Stdin, os.Stdout, options, sdkName)
 	}
 	selectPrinter := pterm.InteractiveSelectPrinter{
