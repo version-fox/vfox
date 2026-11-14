@@ -34,8 +34,9 @@ func TestPathKeepsDefaultsForUnsetKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Path.EffectiveMode() != PathModeLegacy {
-		t.Errorf("path.mode = %q, want legacy when the file only sets preserve", c.Path.Mode)
+	// `vfox config path.mode` prints the stored value, so it has to be the default itself, not just resolve to it.
+	if c.Path.Mode != PathModeBaseline || c.Path.EffectiveMode() != PathModeBaseline {
+		t.Errorf("path.mode = %q, want baseline when the file only sets preserve", c.Path.Mode)
 	}
 	if !reflect.DeepEqual(c.Path.Preserve, []string{"~/.cargo/bin"}) {
 		t.Errorf("preserve = %v", c.Path.Preserve)
@@ -54,19 +55,20 @@ func TestMissingPathGetsDefaults(t *testing.T) {
 	if c.Path != EmptyPath {
 		t.Error("a section the file does not declare must be the shared default")
 	}
-	if c.Path.EffectiveMode() != PathModeLegacy {
-		t.Error("defaults changed")
+	if c.Path.Mode != PathModeBaseline || c.Path.EffectiveMode() != PathModeBaseline {
+		t.Errorf("defaults changed: path.mode = %q", c.Path.Mode)
 	}
 }
 
 func TestPathEffectiveMode(t *testing.T) {
 	tests := map[string]string{
-		"":           PathModeLegacy,
+		"":           PathModeBaseline, // not configured: the default
 		"legacy":     PathModeLegacy,
+		" Legacy ":   PathModeLegacy,
 		"baseline":   PathModeBaseline,
 		" Baseline ": PathModeBaseline,
 		"AGGRESSIVE": PathModeAggressive,
-		"whatever":   PathModeLegacy, // unknown falls back instead of failing
+		"whatever":   PathModeBaseline, // unknown falls back to the default instead of failing
 	}
 	for in, want := range tests {
 		if got := (&Path{Mode: in}).EffectiveMode(); got != want {
@@ -74,18 +76,32 @@ func TestPathEffectiveMode(t *testing.T) {
 		}
 	}
 	var none *Path
-	if none.EffectiveMode() != PathModeLegacy {
-		t.Error("a missing section must mean legacy")
+	if none.EffectiveMode() != PathModeBaseline {
+		t.Error("a missing section must mean the default, baseline")
+	}
+}
+
+// The default is the one setting that every fallback has to agree on.
+func TestDefaultPathModeIsBaseline(t *testing.T) {
+	if DefaultPathMode != PathModeBaseline {
+		t.Errorf("DefaultPathMode = %q, want baseline", DefaultPathMode)
+	}
+	if EmptyPath.Mode != DefaultPathMode || EmptyPath.EffectiveMode() != DefaultPathMode {
+		t.Errorf("EmptyPath = %+v, want the default mode", EmptyPath)
+	}
+	if DefaultConfig.Path != EmptyPath {
+		t.Error("the default configuration must use EmptyPath")
 	}
 }
 
 func TestMergePath(t *testing.T) {
-	shared := &Config{Path: &Path{Mode: PathModeBaseline}}
+	// Not the default, so that a setting that gets lost shows.
+	shared := &Config{Path: &Path{Mode: PathModeLegacy}}
 
 	t.Run("user declares nothing: shared wins", func(t *testing.T) {
 		user := &Config{Path: EmptyPath}
 		got := Merge(shared, user)
-		if got.Path.EffectiveMode() != PathModeBaseline {
+		if got.Path.EffectiveMode() != PathModeLegacy {
 			t.Errorf("shared settings were lost: %+v", got.Path)
 		}
 	})
@@ -99,7 +115,7 @@ func TestMergePath(t *testing.T) {
 	})
 
 	t.Run("one side only", func(t *testing.T) {
-		if got := Merge(shared, nil); got.Path.EffectiveMode() != PathModeBaseline {
+		if got := Merge(shared, nil); got.Path.EffectiveMode() != PathModeLegacy {
 			t.Errorf("shared settings were lost: %+v", got.Path)
 		}
 		if got := Merge(&Config{}, &Config{}); got.Path != EmptyPath {
@@ -111,7 +127,8 @@ func TestMergePath(t *testing.T) {
 func TestPathRoundTripThroughYAML(t *testing.T) {
 	dir := t.TempDir()
 	c := *DefaultConfig
-	c.Path = &Path{Mode: PathModeBaseline, Preserve: []string{"/opt/tools/bin"}}
+	// legacy is what people write down to keep the behavior of vfox 1.0.x, and it is not the default.
+	c.Path = &Path{Mode: PathModeLegacy, Preserve: []string{"/opt/tools/bin"}}
 	if err := c.SaveConfig(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +136,7 @@ func TestPathRoundTripThroughYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Path.Mode != PathModeBaseline || !reflect.DeepEqual(loaded.Path.Preserve, c.Path.Preserve) {
+	if loaded.Path.Mode != PathModeLegacy || !reflect.DeepEqual(loaded.Path.Preserve, c.Path.Preserve) {
 		t.Errorf("path = %+v", loaded.Path)
 	}
 }

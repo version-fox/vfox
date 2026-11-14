@@ -155,21 +155,22 @@ vfox config diagnostics.onUse false
 
 ## PATH Order Settings
 
-`vfox` puts its own directories at the front of `PATH`, but it leaves in front of them what was put there before it
-ran, so a Python virtualenv you activated after `vfox` keeps winning. Not everything in front of `vfox` is a
-virtualenv, though: macOS `path_helper` moves the system directories to the front of a login shell, the Windows
-machine `PATH` comes before the user `PATH` that `vfox use -g` writes to, and `pnpm setup` appends a line to your shell
-startup file that puts `$PNPM_HOME` first. With those in front, `node` or `java` keeps being the one from the system
-(or from pnpm) no matter what `vfox use` says. `vfox doctor` tells you when this happens.
+`vfox` puts its own directories at the front of `PATH`, but it can leave other directories in front of them. That is
+what you want for a Python virtualenv that you activate after `vfox`, but not for the system directories: macOS
+`path_helper` moves them to the front of a login shell, and the Windows machine `PATH` comes before the user `PATH`
+that `vfox use -g` writes to. `pnpm setup` also appends a line to your shell startup file that puts `$PNPM_HOME` first.
+With such a directory in front, `node` or `java` keeps being the one from the system (or from pnpm) no matter what
+`vfox use` says. `vfox doctor` tells you when this happens. `path.mode` decides which of the directories in front of
+`vfox`'s stay there.
 
 ```yaml
 path:
-  mode: legacy # legacy | baseline | aggressive
+  mode: baseline # legacy | baseline | aggressive
   preserve: [] # directories that always stay in front of vfox's, e.g. ["~/.cargo/bin"]
 ```
 
-- `legacy` (the default for now): everything in front of the first `vfox` directory stays in front of it.
-- `baseline` (recommended): only what was added to `PATH` **after** `vfox activate` ran stays in front. What was already
+- `legacy`: everything in front of the first `vfox` directory stays in front of it. This is how `vfox` 1.0.x behaved.
+- `baseline` (the default): only what was added to `PATH` **after** `vfox activate` ran stays in front. What was already
   in `PATH` when `vfox` was activated, such as the system directories above, goes behind the `vfox` directories.
   `vfox activate` records that `PATH` in `__VFOX_ORIG_PATH`. A directory you rely on being in front of `vfox`'s can be
   listed in `preserve`.
@@ -177,14 +178,10 @@ path:
 
 The directories of an active virtualenv or conda environment (`VIRTUAL_ENV`, `CONDA_PREFIX`) always stay in front.
 
-```shell
-vfox config path.mode baseline
-```
-
-::: warning ⚠️ The default will change
-`baseline` is going to become the default of `path.mode` in a future release, so that the system directories above stop
-winning without any setting. [Quick Start](./quick-start.md#_2-hook-vfox-to-your-shell) already asks new installations
-to set it. To keep today's behavior after the change, set `legacy` explicitly: `vfox config path.mode legacy`.
+::: info 📌 Coming from vfox 1.0.x
+`vfox` 1.0.x kept everything in front of its first directory in front of it, which is what `legacy` does. If you rely on
+that, run `vfox config path.mode legacy`. If only a few directories have to stay in front, list them in `path.preserve`
+instead.
 :::
 
 ::: tip
@@ -219,13 +216,27 @@ vfox config [<key>] [<value>]
 vfox config proxy.enable true
 vfox config proxy.url http://localhost:7890
 vfox config storage.sdkPath /tmp
-vfox config path.mode baseline
+vfox config path.mode legacy
 ```
 
 `key`: Configuration item, separated by `. `.
 `value`: If not passed, look at the value of the configuration item.
 
+`vfox config <key> <value>` changes your own `config.yaml`, and in it only the key you name: the other keys and the
+comments of the file stay as they are, and a section you have not set is not added to it, so it keeps following the
+defaults and the shared configuration. Lists and tables (`path.preserve`, `diagnostics.ignore`, `aliases`) cannot be set
+this way: edit the file, or use [`vfox alias`](../usage/core-commands.md#alias) for aliases.
+
 **Options**
 
 - `-l, --list`: list all config.
-- `-un, --unset`: remove a config.
+- `-un, --unset`: remove a config. The key is taken out of your `config.yaml`, and so is a section that this leaves
+  empty. A whole section can be removed too (`vfox config --unset path`). A key that the file does not have is not an
+  error.
+
+::: tip Shared configuration
+Your `config.yaml` is the only file `vfox config` changes. A `path` or `diagnostics` section that your file declares
+replaces the section of the [shared configuration](./multi-user-sharing.md) as a whole: after
+`vfox config path.mode baseline`, the `path.preserve` of the shared configuration no longer applies to you.
+`vfox config --unset path` removes the section from your file, and the shared one applies again.
+:::

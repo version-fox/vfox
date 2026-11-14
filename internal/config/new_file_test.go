@@ -34,7 +34,7 @@ func TestANewConfigFileLeavesOutTheSectionsThatAreSetOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Path.EffectiveMode() != PathModeLegacy || !created.Diagnostics.OnUse {
+	if created.Path.EffectiveMode() != PathModeBaseline || !created.Diagnostics.OnUse {
 		t.Errorf("the first run works with the defaults: %+v %+v", created.Path, created.Diagnostics)
 	}
 
@@ -48,7 +48,7 @@ func TestANewConfigFileLeavesOutTheSectionsThatAreSetOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Path.EffectiveMode() != PathModeLegacy || !loaded.Diagnostics.OnUse || loaded.Aliases != nil {
+	if loaded.Path.EffectiveMode() != PathModeBaseline || !loaded.Diagnostics.OnUse || loaded.Aliases != nil {
 		t.Errorf("the second run: path %+v, diagnostics %+v, aliases %v", loaded.Path, loaded.Diagnostics, loaded.Aliases)
 	}
 	if loaded.LegacyVersionFile.Enable != DefaultConfig.LegacyVersionFile.Enable || loaded.Cache.AvailableHookDuration != DefaultConfig.Cache.AvailableHookDuration {
@@ -61,7 +61,8 @@ func TestANewConfigFileLeavesOutTheSectionsThatAreSetOnDemand(t *testing.T) {
 func TestSharedSettingsApplyOverANewUserConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	shared := filepath.Join(dir, "shared.yaml")
-	if err := os.WriteFile(shared, []byte("path:\n  mode: baseline\ndiagnostics:\n  onUse: false\n"), 0644); err != nil {
+	// Settings that differ from the defaults, so that losing them shows.
+	if err := os.WriteFile(shared, []byte("path:\n  mode: legacy\ndiagnostics:\n  onUse: false\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	user := filepath.Join(dir, "config.yaml") // does not exist yet
@@ -71,8 +72,8 @@ func TestSharedSettingsApplyOverANewUserConfigFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if mode := c.Path.EffectiveMode(); mode != PathModeBaseline {
-			t.Errorf("run %d: path.mode = %q, want the shared baseline", run, mode)
+		if mode := c.Path.EffectiveMode(); mode != PathModeLegacy {
+			t.Errorf("run %d: path.mode = %q, want the shared legacy", run, mode)
 		}
 		if c.Diagnostics.OnUse {
 			t.Errorf("run %d: diagnostics.onUse is on, but the shared config switched it off", run)

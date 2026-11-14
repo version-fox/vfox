@@ -386,7 +386,11 @@ func (m *Manager) Update(pluginName string) error {
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
 	logger.Debugf("Fetching plugin manifest from: %s\n", util.RedactSourceURL(url))
 
-	resp, err := m.RuntimeEnvContext.HttpClient().Get(url)
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("fetch manifest error: %w", err)
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		err = util.RedactError(err)
 		logger.Debugf("Failed to fetch manifest: %v\n", err)
@@ -448,7 +452,11 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		logger.Debugf("Failed to create HTTP request: %v\n", err)
 		return "", err
 	}
-	resp, err := m.RuntimeEnvContext.HttpClient().Do(req)
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
@@ -667,7 +675,10 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 }
 
 func (m *Manager) Available() (RegistryIndex, error) {
-	client := m.RuntimeEnvContext.HttpClient()
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("get plugin index error: %w", err)
+	}
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", util.RedactError(err))

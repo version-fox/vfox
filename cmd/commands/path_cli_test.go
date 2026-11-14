@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -29,6 +30,8 @@ var (
 	exportedPath = regexp.MustCompile(`export PATH="([^"]*)"`)
 	// bash quotes a value that holds ':' as $'...'
 	exportedOrig = regexp.MustCompile(`export __VFOX_ORIG_PATH=(?:\$'([^']*)'|([^;']*));`)
+	// PowerShell is told $env:PATH='...'
+	exportedPwshPath = regexp.MustCompile(`\$env:PATH='([^']*)'`)
 )
 
 // exportedBaseline returns the value the script exports as __VFOX_ORIG_PATH.
@@ -68,7 +71,7 @@ func newPathFixture(t *testing.T) pathFixture {
 		inherited:  filepath.Join(f.root, "usr-local", "bin"),
 		vfoxBin:    filepath.Join(f.userHome, "sdks", "alpha", "bin"),
 	}
-	f.env["PATH"] = strings.Join([]string{p.inherited, p.vfoxBin, f.system}, ":")
+	f.env["PATH"] = pathList(p.inherited, p.vfoxBin, f.system)
 	return p
 }
 
@@ -83,37 +86,94 @@ func indexOf(entries []string, want string) int {
 
 func TestEnvPathModeDecidesWhatStaysInFront(t *testing.T) {
 	f := newPathFixture(t)
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
-
-	// vfox 1.0.x: everything in front of vfox's directory stays there.
-	legacy := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{f.inherited, f.vfoxBin, f.system}; strings.Join(legacy, ":") != strings.Join(want, ":") {
-		t.Errorf("legacy PATH = %v, want %v", legacy, want)
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.inherited, f.system)
+	legacyOrder := shellPaths(f.inherited, f.vfoxBin, f.system) // vfox 1.0.x: everything in front of vfox's directory stays there
+	baselineOrder := shellPaths(f.vfoxBin, f.inherited, f.system)
+	check := func(what string, want []string) {
+		t.Helper()
+		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+		if strings.Join(got, ":") != strings.Join(want, ":") {
+			t.Errorf("%s: PATH = %v, want %v (a cached answer was served?)", what, got, want)
+		}
 	}
+
+	// Nothing configured: what the shell brought goes behind vfox's directory.
+	check("the default", baselineOrder)
 
 	// Changing the setting must show at the next prompt, not when the PATH
 	// happens to change: the output of the previous prompt is cached.
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
+	check("legacy", legacyOrder)
+
 	f.writeUserConfig(t, "path:\n  mode: baseline\n")
-	baseline := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{f.vfoxBin, f.inherited, f.system}; strings.Join(baseline, ":") != strings.Join(want, ":") {
-		t.Errorf("baseline PATH = %v, want %v (a cached legacy answer was served?)", baseline, want)
-	}
+	check("baseline", baselineOrder)
 
 	f.writeUserConfig(t, "path:\n  mode: legacy\n")
-	back := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if strings.Join(back, ":") != strings.Join(legacy, ":") {
-		t.Errorf("PATH after switching back = %v, want %v", back, legacy)
-	}
+	check("legacy again", legacyOrder)
+
+	// Dropping the setting brings the default back.
+	f.writeUserConfig(t, "")
+	check("the default again", baselineOrder)
 }
 
 // `path.preserve` is read from config.yaml, which the cache does not watch by
 // modification time, and the mode can stay the same while the directories to
 // preserve change. The next prompt must still follow the setting.
+// PowerShell gets the PATH the way the operating system spells it, where bash
+// gets a POSIX list: `;` between C:\a\b on Windows, `:` elsewhere. The order is
+// the same one.
+func TestEnvWritesThePathTheWayPowerShellSpellsIt(t *testing.T) {
+	f := newPathFixture(t)
+	f.env["__VFOX_SHELL"] = "pwsh" // vfox spells the PATH after the hook it runs in
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.inherited, f.system)
+	check := func(what string, want ...string) {
+		t.Helper()
+		r := f.run(t, "env", "-s", "pwsh").mustSucceed(t, "env")
+		match := exportedPwshPath.FindStringSubmatch(r.stdout)
+		if match == nil {
+			t.Fatalf("%s: no PATH export in:\n%s\nstderr: %s", what, r.stdout, r.stderr)
+		}
+		if got := strings.Split(match[1], string(os.PathListSeparator)); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("%s: PATH = %v, want %v", what, got, want)
+		}
+	}
+
+	check("the default", f.vfoxBin, f.inherited, f.system)
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
+	check("legacy", f.inherited, f.vfoxBin, f.system)
+}
+
+// Git Bash and MSYS2 keep the lists of their shell in POSIX form (/c/a:/c/b) and
+// hand a native program that or, converted, the Windows form (C:\a;C:\b). The
+// baseline that `vfox activate` recorded has to be understood in both: this is
+// the machine PATH of #732.
+func TestEnvReadsTheBaselineInTheFormGitBashHoldsIt(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("only Windows has two spellings of a path list")
+	}
+	for _, tt := range []struct {
+		name string
+		orig func(inherited, system string) string
+	}{
+		{"the Windows form", func(inherited, system string) string { return pathList(inherited, system) }},
+		{"the POSIX form", func(inherited, system string) string { return strings.Join(shellPaths(inherited, system), ":") }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newPathFixture(t) // a fixture of its own: the output of a prompt is cached
+			f.env["__VFOX_ORIG_PATH"] = tt.orig(f.inherited, f.system)
+			got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
+			if want := shellPaths(f.vfoxBin, f.inherited, f.system); strings.Join(got, ":") != strings.Join(want, ":") {
+				t.Errorf("PATH = %v, want %v: the inherited directory belongs behind vfox's", got, want)
+			}
+		})
+	}
+}
+
 func TestEnvFollowsPathPreserveAtTheNextPrompt(t *testing.T) {
 	f := newPathFixture(t)
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
-	inFront := []string{f.inherited, f.vfoxBin, f.system}
-	behind := []string{f.vfoxBin, f.inherited, f.system}
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.inherited, f.system)
+	inFront := shellPaths(f.inherited, f.vfoxBin, f.system)
+	behind := shellPaths(f.vfoxBin, f.inherited, f.system)
 	check := func(what string, want []string) {
 		t.Helper()
 		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
@@ -137,17 +197,17 @@ func TestEnvFollowsPathPreserveAtTheNextPrompt(t *testing.T) {
 // without the PATH changing.
 func TestEnvFollowsAnEnvironmentVariableOfPathPreserve(t *testing.T) {
 	f := newPathFixture(t)
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.inherited, f.system)
 	f.writeUserConfig(t, "path:\n  mode: baseline\n  preserve:\n    - $PNPM_HOME\n")
 
 	f.env["PNPM_HOME"] = f.inherited
 	got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if got[0] != f.inherited {
+	if got[0] != shellPath(f.inherited) {
 		t.Fatalf("PNPM_HOME is preserved, so it stays in front: PATH = %v", got)
 	}
 	delete(f.env, "PNPM_HOME")
 	got = pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if got[0] != f.vfoxBin {
+	if got[0] != shellPath(f.vfoxBin) {
 		t.Errorf("PNPM_HOME is gone, so nothing is preserved: PATH = %v, want vfox first (a cached answer was served?)", got)
 	}
 }
@@ -155,12 +215,12 @@ func TestEnvFollowsAnEnvironmentVariableOfPathPreserve(t *testing.T) {
 func TestEnvKeepsWhatWasAddedAfterActivation(t *testing.T) {
 	f := newPathFixture(t)
 	pnpm := filepath.Join(f.root, "pnpm", "bin")
-	f.env["PATH"] = strings.Join([]string{pnpm, f.inherited, f.vfoxBin, f.system}, ":")
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{f.inherited, f.system}, ":")
+	f.env["PATH"] = pathList(pnpm, f.inherited, f.vfoxBin, f.system)
+	f.env["__VFOX_ORIG_PATH"] = pathList(f.inherited, f.system)
 	f.writeUserConfig(t, "path:\n  mode: baseline\n")
 
 	got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{pnpm, f.vfoxBin, f.inherited, f.system}; strings.Join(got, ":") != strings.Join(want, ":") {
+	if want := shellPaths(pnpm, f.vfoxBin, f.inherited, f.system); strings.Join(got, ":") != strings.Join(want, ":") {
 		t.Errorf("PATH = %v, want %v: pnpm was added after activation and stays in front, the inherited directory does not", got, want)
 	}
 }
@@ -169,13 +229,13 @@ func TestEnvKeepsAnActiveVirtualenvInFrontInEveryMode(t *testing.T) {
 	f := newPathFixture(t)
 	venv := filepath.Join(f.root, "venv")
 	f.env["VIRTUAL_ENV"] = venv
-	f.env["PATH"] = strings.Join([]string{filepath.Join(venv, "bin"), f.inherited, f.vfoxBin, f.system}, ":")
-	f.env["__VFOX_ORIG_PATH"] = strings.Join([]string{filepath.Join(venv, "bin"), f.inherited, f.system}, ":")
+	f.env["PATH"] = pathList(filepath.Join(venv, "bin"), f.inherited, f.vfoxBin, f.system)
+	f.env["__VFOX_ORIG_PATH"] = pathList(filepath.Join(venv, "bin"), f.inherited, f.system)
 
 	for _, mode := range []string{"legacy", "baseline", "aggressive"} {
 		f.writeUserConfig(t, "path:\n  mode: "+mode+"\n")
 		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-		if got[0] != filepath.Join(venv, "bin") {
+		if got[0] != shellPath(filepath.Join(venv, "bin")) {
 			t.Errorf("%s: PATH = %v, the active virtualenv must stay first", mode, got)
 		}
 	}
@@ -184,36 +244,51 @@ func TestEnvKeepsAnActiveVirtualenvInFrontInEveryMode(t *testing.T) {
 func TestEnvAggressiveModeAndPreserve(t *testing.T) {
 	f := newPathFixture(t)
 	cargo := filepath.Join(f.root, "cargo", "bin")
-	f.env["PATH"] = strings.Join([]string{cargo, f.inherited, f.vfoxBin, f.system}, ":")
+	f.env["PATH"] = pathList(cargo, f.inherited, f.vfoxBin, f.system)
 	f.writeUserConfig(t, fmt.Sprintf("path:\n  mode: aggressive\n  preserve:\n    - %s\n", cargo))
 
 	got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-	if want := []string{cargo, f.vfoxBin, f.inherited, f.system}; strings.Join(got, ":") != strings.Join(want, ":") {
+	if want := shellPaths(cargo, f.vfoxBin, f.inherited, f.system); strings.Join(got, ":") != strings.Join(want, ":") {
 		t.Errorf("PATH = %v, want %v", got, want)
 	}
 }
 
-func TestEnvWithoutABaselineBehavesLikeLegacyInEveryMode(t *testing.T) {
+// An old activation script never recorded a baseline, and neither did a shell
+// that was started before vfox was upgraded. The one mode that needs a baseline
+// to tell inherited entries from added ones, which is also the default, must not
+// reorder the PATH of such a shell. `aggressive` does not read the baseline, so
+// it demotes the same entries with or without one.
+func TestEnvWithoutABaselineOnlyBaselineModeFallsBackToLegacy(t *testing.T) {
 	f := newPathFixture(t)
-	// An old activation script never recorded one.
-	for _, mode := range []string{"baseline"} {
-		f.writeUserConfig(t, "path:\n  mode: "+mode+"\n")
+	legacyOrder := shellPaths(f.inherited, f.vfoxBin, f.system)
+	demotedOrder := shellPaths(f.vfoxBin, f.inherited, f.system)
+	for _, tt := range []struct {
+		name, config string
+		want         []string
+	}{
+		{"the default", "", legacyOrder},
+		{"baseline", "path:\n  mode: baseline\n", legacyOrder},
+		{"legacy", "path:\n  mode: legacy\n", legacyOrder},
+		{"aggressive", "path:\n  mode: aggressive\n", demotedOrder},
+	} {
+		f.writeUserConfig(t, tt.config)
 		got := pathOf(t, f.run(t, "env", "-s", "bash").mustSucceed(t, "env"))
-		if got[0] != f.inherited {
-			t.Errorf("%s without a baseline: PATH = %v, want legacy order", mode, got)
+		if strings.Join(got, ":") != strings.Join(tt.want, ":") {
+			t.Errorf("%s without a baseline: PATH = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }
 
 func TestActivateRecordsTheBaselineOncePerSession(t *testing.T) {
 	f := newPathFixture(t)
-	f.env["PATH"] = strings.Join([]string{f.inherited, f.system}, ":") // nothing of vfox's yet
+	f.env["PATH"] = pathList(f.inherited, f.system) // nothing of vfox's yet
 	delete(f.env, "__VFOX_SHELL")
+	baseline := strings.Join(shellPaths(f.inherited, f.system), ":") // as the bash hook holds it
 
 	// A fresh shell: the PATH it found is recorded.
 	r := f.run(t, "activate", "bash").mustSucceed(t, "activate")
-	if got, ok := exportedBaseline(r.stdout); !ok || got != f.inherited+":"+f.system {
-		t.Fatalf("baseline export = %q (%v), want %s:%s\n%s", got, ok, f.inherited, f.system, r.stdout)
+	if got, ok := exportedBaseline(r.stdout); !ok || got != baseline {
+		t.Fatalf("baseline export = %q (%v), want %s\n%s", got, ok, baseline, r.stdout)
 	}
 
 	// The same session running activate again (a re-sourced rc file) keeps the
@@ -226,7 +301,7 @@ func TestActivateRecordsTheBaselineOncePerSession(t *testing.T) {
 	// A shell started from another shell inherited the variable, not the session.
 	f.env["__VFOX_PID"] = "1"
 	r = f.run(t, "activate", "bash").mustSucceed(t, "activate")
-	if got, ok := exportedBaseline(r.stdout); !ok || got != f.inherited+":"+f.system {
+	if got, ok := exportedBaseline(r.stdout); !ok || got != baseline {
 		t.Fatalf("an inherited session must record its own baseline, got %q (%v)\n%s", got, ok, r.stdout)
 	}
 }
@@ -235,7 +310,7 @@ func TestActivateBaselineLeavesOutVfoxDirectories(t *testing.T) {
 	f := newPathFixture(t) // PATH: inherited, vfox, system
 	delete(f.env, "__VFOX_SHELL")
 	r := f.run(t, "activate", "bash").mustSucceed(t, "activate")
-	if got, ok := exportedBaseline(r.stdout); !ok || got != f.inherited+":"+f.system {
+	if got, ok := exportedBaseline(r.stdout); !ok || got != strings.Join(shellPaths(f.inherited, f.system), ":") {
 		t.Fatalf("baseline = %q (%v): vfox's own directory is not part of what the shell brought", got, ok)
 	}
 }
@@ -247,14 +322,22 @@ func TestActivateAppliesThePathMode(t *testing.T) {
 	f := newPathFixture(t)
 	delete(f.env, "__VFOX_SHELL")
 
-	legacy := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
-	if legacy[0] != f.inherited {
-		t.Errorf("legacy: PATH = %v, want the inherited directory first as before", legacy)
+	for _, tt := range []struct{ name, config string }{
+		{"the default", ""},
+		{"baseline", "path:\n  mode: baseline\n"},
+	} {
+		f.writeUserConfig(t, tt.config)
+		got := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
+		if got[0] != shellPath(f.vfoxBin) || indexOf(got, shellPath(f.inherited)) < 1 {
+			t.Errorf("%s: PATH = %v, want vfox's directory first and the inherited one behind it", tt.name, got)
+		}
 	}
-	f.writeUserConfig(t, "path:\n  mode: baseline\n")
-	baseline := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
-	if baseline[0] != f.vfoxBin || indexOf(baseline, f.inherited) < 1 {
-		t.Errorf("baseline: PATH = %v, want vfox's directory first and the inherited one behind it", baseline)
+
+	// What vfox 1.0.x did has to be asked for.
+	f.writeUserConfig(t, "path:\n  mode: legacy\n")
+	legacy := pathOf(t, f.run(t, "activate", "bash").mustSucceed(t, "activate"))
+	if legacy[0] != shellPath(f.inherited) {
+		t.Errorf("legacy: PATH = %v, want the inherited directory first as before", legacy)
 	}
 }
 
@@ -272,34 +355,35 @@ func TestConfigCommandHandlesTheNewSettings(t *testing.T) {
 	f := newCLIFixture(t, false)
 	userConfig := filepath.Join(f.userHome, "config.yaml")
 
-	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "legacy" {
+	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "baseline" {
 		t.Errorf("default path.mode = %q", out)
 	}
 	if out := f.run(t, "config", "diagnostics.onUse").mustSucceed(t, "config diagnostics.onUse").stdout; strings.TrimSpace(out) != "true" {
 		t.Errorf("default diagnostics.onUse = %q", out)
 	}
 
-	f.run(t, "config", "path.mode", "baseline").mustSucceed(t, "config path.mode baseline")
+	// The documentation tells people to run this to keep the behavior of vfox 1.0.x.
+	f.run(t, "config", "path.mode", "legacy").mustSucceed(t, "config path.mode legacy")
 	f.run(t, "config", "diagnostics.onUse", "false").mustSucceed(t, "config diagnostics.onUse false")
 	saved := readFile(t, userConfig)
-	mustContain(t, "config.yaml", saved, "mode: baseline", "onUse: false")
+	mustContain(t, "config.yaml", saved, "mode: legacy", "onUse: false")
 
-	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "baseline" {
+	if out := f.run(t, "config", "path.mode").mustSucceed(t, "config path.mode").stdout; strings.TrimSpace(out) != "legacy" {
 		t.Errorf("path.mode = %q after setting it", out)
 	}
 	list := f.run(t, "config", "--list").mustSucceed(t, "config --list").stdout
-	mustContain(t, "config --list", list, "path.mode = baseline", "diagnostics.onUse = false", "path.preserve = []", "diagnostics.ignore = []")
+	mustContain(t, "config --list", list, "path.mode = legacy", "diagnostics.onUse = false", "path.preserve = []", "diagnostics.ignore = []")
 
 	// What was set is what the other commands see.
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
-	f.env["PATH"] = strings.Join([]string{filepath.Join(f.root, "pnpm", "bin"), filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system}, ":")
+	f.env["PATH"] = pathList(filepath.Join(f.root, "pnpm", "bin"), filepath.Join(f.userHome, "sdks", "alpha", "bin"), f.system)
 	must(t, os.MkdirAll(filepath.Join(f.root, "pnpm", "bin"), 0755))
-	must(t, os.WriteFile(filepath.Join(f.root, "pnpm", "bin", "alphatool"), []byte("#!/bin/sh\n"), 0755))
+	writeCommand(t, filepath.Join(f.root, "pnpm", "bin"), "alphatool")
 	mustNotContain(t, "use with diagnostics.onUse false", f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output(), "comes before vfox")
 
 	f.run(t, "config", "--unset", "diagnostics.onUse").mustSucceed(t, "config --unset diagnostics.onUse")
 	f.run(t, "config", "--unset", "path.mode").mustSucceed(t, "config --unset path.mode")
 	list = f.run(t, "config", "--list").mustSucceed(t, "config --list").stdout
-	mustContain(t, "config --list after unset", list, "path.mode = legacy", "diagnostics.onUse = true")
+	mustContain(t, "config --list after unset", list, "path.mode = baseline", "diagnostics.onUse = true")
 	mustContain(t, "use with the default settings", f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use").output(), "comes before vfox")
 }

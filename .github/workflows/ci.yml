@@ -26,6 +26,11 @@ jobs:
         run: |
           go build .
       - name: Test and coverage
+        env:
+          # The CLI tests in cmd/commands run on Windows as well. There, selecting
+          # an SDK globally writes the PATH that the registry holds for the user,
+          # so they only run where that may happen: a runner that is thrown away.
+          VFOX_TEST_WINDOWS_REGISTRY: '1'
         run: |
           go test ./... -coverprofile=coverage.out -covermode=atomic
       - name: Upload coverage to Codecov
@@ -58,6 +63,39 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test ./internal/sdk -run '^TestInstall' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  nushell:
+    name: Nushell integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # A release and the digest of its archive, so that this job tests the vfox
+      # change and not whatever Nushell published last. Bump them together: the
+      # digest is listed with the archive on the release page.
+      NU_VERSION: 0.117.0
+      NU_SHA256: 33b907da92b0e80bd10fea9fa0e8a1624cabfebd89ee2568e365da3c492ffc68
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install Nushell
+        run: |
+          archive="nu-${NU_VERSION}-x86_64-unknown-linux-gnu"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/nu.tar.gz" \
+            "https://github.com/nushell/nushell/releases/download/${NU_VERSION}/${archive}.tar.gz"
+          echo "${NU_SHA256}  ${RUNNER_TEMP}/nu.tar.gz" | sha256sum --check --strict -
+          mkdir "${RUNNER_TEMP}/nu"
+          tar --extract --gzip --file "${RUNNER_TEMP}/nu.tar.gz" --directory "${RUNNER_TEMP}/nu"
+          echo "${RUNNER_TEMP}/nu/${archive}" >> "${GITHUB_PATH}"
+      - name: Exercise a native Nushell session
+        env:
+          # Without it a Nushell that failed to install would skip the test.
+          VFOX_TEST_NUSHELL: '1'
+        run: |
+          nu --version
+          go test ./cmd/commands -run '^TestNushell' -count=1 -v
 
   fish-completion:
     name: Fish completion integration

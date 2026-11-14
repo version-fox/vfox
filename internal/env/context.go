@@ -27,6 +27,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // RuntimeEnvContext represents the runtime environment context.
@@ -74,22 +75,22 @@ func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (VfoxT
 }
 
 // HttpClient creates an HTTP client based on the proxy settings in the user configuration.
-func (m *RuntimeEnvContext) HttpClient() *http.Client {
-	var client *http.Client
+// Its requests carry the vfox User-Agent unless they set one themselves.
+// It returns an error when the proxy is enabled and its URL does not parse.
+func (m *RuntimeEnvContext) HttpClient() (*http.Client, error) {
+	var transport http.RoundTripper = http.DefaultTransport
 	if m.UserConfig.Proxy.Enable {
-		if uri, err := url.Parse(m.UserConfig.Proxy.Url); err == nil {
-			transPort := &http.Transport{
-				Proxy: http.ProxyURL(uri),
-			}
-			client = &http.Client{
-				Transport: transPort,
-			}
+		uri, err := url.Parse(m.UserConfig.Proxy.Url)
+		if err != nil {
+			return nil, fmt.Errorf("invalid proxy url: %w", util.RedactError(err))
 		}
-	} else {
-		client = http.DefaultClient
+		transport = &http.Transport{
+			Proxy: http.ProxyURL(uri),
+		}
 	}
-
-	return client
+	return &http.Client{
+		Transport: util.WithDefaultUserAgent(transport, util.UserAgent(m.RuntimeVersion, "", "")),
+	}, nil
 }
 
 // GetLinkDirPathByScope returns the symlink directory path for the given scope.
@@ -152,8 +153,8 @@ func (m *RuntimeEnvContext) PathPolicyKey() string {
 //
 // This preserves the priority of paths like Python virtual environments that users activate
 // after vfox has set up the environment. Which of the entries in front of vfox's directories
-// count as such is decided by the `path.mode` setting: "legacy" (the default) keeps all of
-// them, "baseline" keeps only those added after `vfox activate` ran, and "aggressive" keeps
+// count as such is decided by the `path.mode` setting: "baseline" (the default) keeps only
+// those added after `vfox activate` ran, "legacy" keeps all of them, and "aggressive" keeps
 // only active virtualenv/conda directories and `path.preserve`.
 func (m *RuntimeEnvContext) SplitSystemPaths() (prefixPaths *Paths, cleanPaths *Paths) {
 	return splitSystemPaths(os.Getenv("PATH"), m.pathPolicy())

@@ -150,26 +150,22 @@ vfox config diagnostics.onUse false
 
 ## PATH 顺序设置
 
-`vfox` 会把自己的目录放到 `PATH` 的最前面，但会保留在它之前就已经排在前面的内容，所以你在 `vfox` 之后才激活的 Python 虚拟环境仍然优先。不过排在 `vfox` 前面的并不都是虚拟环境：macOS 的 `path_helper` 会把系统目录挪到登录 shell 的最前面；Windows 的系统 `PATH` 排在 `vfox use -g` 写入的用户 `PATH` 之前；`pnpm setup` 会往 shell 启动文件末尾追加一行，把 `$PNPM_HOME` 放到最前面。有了这些在前面，不管 `vfox use` 怎么说，`node` 或 `java` 依然是系统（或 pnpm）的那一个。出现这种情况时 `vfox doctor` 会告诉你。
+`vfox` 会把自己的目录放到 `PATH` 的最前面，但可以让其他目录继续排在它们前面。对你在 `vfox` 之后才激活的 Python 虚拟环境，这正是想要的；对系统目录则不是：macOS 的 `path_helper` 会把系统目录挪到登录 shell 的最前面，Windows 的系统 `PATH` 排在 `vfox use -g` 写入的用户 `PATH` 之前；`pnpm setup` 也会往 shell 启动文件末尾追加一行，把 `$PNPM_HOME` 放到最前面。有了这样的目录在前面，不管 `vfox use` 怎么说，`node` 或 `java` 依然是系统（或 pnpm）的那一个。出现这种情况时 `vfox doctor` 会告诉你。`path.mode` 决定排在 `vfox` 目录之前的内容里哪些继续留在前面。
 
 ```yaml
 path:
-  mode: legacy # legacy | baseline | aggressive
+  mode: baseline # legacy | baseline | aggressive
   preserve: [] # 始终排在 vfox 目录之前的目录，例如 ["~/.cargo/bin"]
 ```
 
-- `legacy`（目前的默认值）：第一个 `vfox` 目录之前的所有内容都继续排在它前面。
-- `baseline`（推荐）：只有在 `vfox activate` 运行**之后**才加入 `PATH` 的内容继续排在前面。`vfox` 激活时 `PATH` 里已经有的内容（比如上面说的系统目录）会排到 `vfox` 目录之后。`vfox activate` 会把当时的 `PATH` 记录在 `__VFOX_ORIG_PATH` 中。如果你依赖某个目录排在 `vfox` 之前，可以把它列入 `preserve`。
+- `legacy`：第一个 `vfox` 目录之前的所有内容都继续排在它前面。这是 `vfox` 1.0.x 的行为。
+- `baseline`（默认值）：只有在 `vfox activate` 运行**之后**才加入 `PATH` 的内容继续排在前面。`vfox` 激活时 `PATH` 里已经有的内容（比如上面说的系统目录）会排到 `vfox` 目录之后。`vfox activate` 会把当时的 `PATH` 记录在 `__VFOX_ORIG_PATH` 中。如果你依赖某个目录排在 `vfox` 之前，可以把它列入 `preserve`。
 - `aggressive`：只有处于激活状态的虚拟环境 / conda 环境的目录，以及 `preserve` 中的目录继续排在前面。
 
 处于激活状态的虚拟环境或 conda 环境的目录（`VIRTUAL_ENV`、`CONDA_PREFIX`）始终排在前面。
 
-```shell
-vfox config path.mode baseline
-```
-
-::: warning ⚠️ 默认值将会改变
-未来的版本会把 `path.mode` 的默认值从 `legacy` 改为 `baseline`，这样上面说的系统目录不用任何设置就不再压过 `vfox`。[快速入门](./quick-start.md#_2-挂载vfox到你的shell)已经要求新安装的用户设置它。想在改动之后继续保持现在的行为，请显式设置：`vfox config path.mode legacy`。
+::: info 📌 从 vfox 1.0.x 升级
+`vfox` 1.0.x 会让第一个 `vfox` 目录之前的所有内容继续排在它前面，`legacy` 就是这种做法。如果你依赖这一点，请执行 `vfox config path.mode legacy`。如果只有少数几个目录必须排在前面，请改为把它们列入 `path.preserve`。
 :::
 
 ::: tip
@@ -199,13 +195,19 @@ vfox config [<key>] [<value>]
 vfox config proxy.enable true
 vfox config proxy.url http://localhost:7890
 vfox config storage.sdkPath /tmp
-vfox config path.mode baseline
+vfox config path.mode legacy
 ```
 
 `key`：配置项，以`.`分割。
 `value`：不传为查看配置项的值。
 
+`vfox config <key> <value>` 只修改你自己的 `config.yaml`，并且只改你指定的那一项：文件里的其他配置项和注释保持原样，你没有设置过的配置段也不会被写进去，所以它们会继续沿用默认值和共享配置。列表和表（`path.preserve`、`diagnostics.ignore`、`aliases`）不能用这种方式设置：请直接编辑文件，别名请使用 [`vfox alias`](../usage/core-commands.md#alias)。
+
 **选项**
 
 - `-l, --list`：列出所有配置。
-- `-un, --unset`：删除一个配置。
+- `-un, --unset`：删除一个配置。这一项会从你的 `config.yaml` 中移除；如果它是所在配置段的最后一项，这个配置段也会一起移除。也可以整段移除（`vfox config --unset path`）。文件里本来就没有的配置项不会报错。
+
+::: tip 共享配置
+`vfox config` 只会修改你自己的 `config.yaml`。你的文件只要声明了 `path` 或 `diagnostics` 配置段，它就会整段替换[共享配置](./multi-user-sharing.md)里的同名配置段：执行 `vfox config path.mode baseline` 之后，共享配置里的 `path.preserve` 对你不再生效。`vfox config --unset path` 会把这个配置段从你的文件里移除，共享配置的配置段就重新生效。
+:::

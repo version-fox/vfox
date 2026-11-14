@@ -18,6 +18,7 @@ package commands
 
 import (
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -54,6 +55,11 @@ func TestInstallCommandUseFollowsTheInstalledVersion(t *testing.T) {
 }
 
 func TestInstallCommandUseOnShellWithoutHookSaysWhatFailed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// There, a shell without a hook still gets the global scope and a new
+		// shell, which vfox opens for the user and which would wait for input.
+		t.Skip("use succeeds on Windows without a hook")
+	}
 	f := newCLIFixture(t, false)
 	// What a container build step gives vfox: no activated shell, hence no hook.
 	f.env["__VFOX_SHELL"] = "-"

@@ -36,6 +36,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/env"
 )
 
 // TestCLIProcess is the child of cliFixture.runProcess: it runs one vfox command line
@@ -127,12 +128,24 @@ type cliFixture struct {
 // newCLIFixture sets up a vfox home with the alpha and plain plugins. When
 // splitShared is true the shared root is separate from the user's directory,
 // as with a VFOX_HOME that several users share.
+//
+// On Windows the tests select SDKs globally, which puts the SDK's directories in
+// the PATH that the registry holds for the user who runs them. They only run
+// where that does not matter: a CI runner, or a VM that is thrown away.
 func newCLIFixture(t *testing.T, splitShared bool) *cliFixture {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the fixture uses a POSIX shell environment")
+	if runtime.GOOS == "windows" && os.Getenv("VFOX_TEST_WINDOWS_REGISTRY") != "1" {
+		t.Skip("these tests change the user PATH in the Windows registry: set VFOX_TEST_WINDOWS_REGISTRY=1 on a runner or VM that is thrown away (CI does)")
 	}
 	root := t.TempDir()
+	if runtime.GOOS == "windows" {
+		// TEMP can name the user's directory by its short name (RUNNER~1) while
+		// calls that resolve a path report the long one, and the tests compare
+		// paths as text: use the long spelling throughout.
+		resolved, err := filepath.EvalSymlinks(root)
+		must(t, err)
+		root = resolved
+	}
 	f := &cliFixture{
 		root:     root,
 		userHome: filepath.Join(root, ".vfox"),
@@ -173,7 +186,7 @@ func (f *cliFixture) installOnDisk(t *testing.T, sdk, version string, commands .
 	main := filepath.Join(f.shared, "cache", sdk, "v-"+version, sdk+"-"+version)
 	must(t, os.MkdirAll(filepath.Join(main, "bin"), 0755))
 	for _, name := range commands {
-		must(t, os.WriteFile(filepath.Join(main, "bin", name), []byte("#!/bin/sh\n"), 0755))
+		writeCommand(t, filepath.Join(main, "bin"), name)
 	}
 	return main
 }
@@ -181,10 +194,15 @@ func (f *cliFixture) installOnDisk(t *testing.T, sdk, version string, commands .
 // external creates an SDK that belongs to somebody else.
 func (f *cliFixture) external(t *testing.T, commands ...string) string {
 	t.Helper()
-	dir := filepath.Join(f.root, "external", fmt.Sprintf("sdk-%d", time.Now().UnixNano()))
+	parent := filepath.Join(f.root, "external")
+	must(t, os.MkdirAll(parent, 0755))
+	// Two calls within one tick of the clock would get the same name from it, and
+	// the clock on Windows ticks slowly: let the file system pick a free one.
+	dir, err := os.MkdirTemp(parent, "sdk-")
+	must(t, err)
 	must(t, os.MkdirAll(filepath.Join(dir, "bin"), 0755))
 	for _, name := range commands {
-		must(t, os.WriteFile(filepath.Join(dir, "bin", name), []byte("#!/bin/sh\n"), 0755))
+		writeCommand(t, filepath.Join(dir, "bin"), name)
 	}
 	return dir
 }
@@ -203,10 +221,10 @@ func (r cliResult) output() string { return r.stdout + r.stderr }
 
 // inProcess lists the commands that run inside the test process, which is where
 // the coverage report can see them. The others set variables for a shell
-// (activate, env), change defaults that every command shares (config) or may
-// hand over to a shell (use), so each run of them gets a process of its own.
+// (activate, env) or may hand over to a shell (use), so each run of them gets a
+// process of its own.
 var inProcess = map[string]bool{
-	"alias": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
+	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
 }
 
 // run executes `vfox <args>` inside the fixture: in this process for the
@@ -223,6 +241,9 @@ func (f *cliFixture) run(t *testing.T, args ...string) cliResult {
 // it gives to vfox: everything vfox reads from the environment of whoever runs
 // the tests.
 func stripped(key string) bool {
+	if runtime.GOOS == "windows" {
+		key = strings.ToUpper(key) // the names are case-insensitive there: Path is PATH
+	}
 	return strings.HasPrefix(key, "VFOX_") || strings.HasPrefix(key, "__VFOX_") || key == "HOME" || key == "PATH" ||
 		key == "VIRTUAL_ENV" || key == "CONDA_PREFIX" || key == "TMUX" ||
 		key == "VSCODE_RESOLVING_ENVIRONMENT" || key == "INTELLIJ_ENVIRONMENT_READER"
@@ -238,10 +259,50 @@ func (f *cliFixture) environ() map[string]string {
 		"__VFOX_CURTMPPATH": filepath.Join(f.userHome, "tmp", "test-session"),
 		"__VFOX_SHELL":      "bash", // an activated shell, unless a test says otherwise
 	}
+	if runtime.GOOS == "windows" {
+		environ["USERPROFILE"] = f.root // where os.UserHomeDir looks, instead of HOME
+	}
 	for k, v := range f.env {
 		environ[k] = v
 	}
 	return environ
+}
+
+// command is a process that runs in the fixture: in the project directory, with
+// the environment of the fixture and nothing of vfox from the environment of
+// whoever runs the tests.
+func (f *cliFixture) command(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = f.work
+	for _, kv := range os.Environ() {
+		if key, _, _ := strings.Cut(kv, "="); !stripped(key) {
+			cmd.Env = append(cmd.Env, kv)
+		}
+	}
+	for k, v := range f.environ() {
+		if v != "-" {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
+	}
+	return cmd
+}
+
+// runCommand runs cmd to its end. A process that exits with a code is a result;
+// one that cannot be started fails the test.
+func runCommand(t *testing.T, cmd *exec.Cmd) cliResult {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	result := cliResult{}
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("%v: %v", cmd.Args, err)
+		}
+		result.code = exitErr.ExitCode()
+	}
+	result.stdout, result.stderr = stdout.String(), stderr.String()
+	return result
 }
 
 // runProcess executes `vfox <args>` in a fresh process inside the fixture.
@@ -252,32 +313,9 @@ func (f *cliFixture) runProcess(t *testing.T, args ...string) cliResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, exe, append([]string{"-test.run=^TestCLIProcess$", "--"}, args...)...)
-	cmd.Dir = f.work
-	for _, kv := range os.Environ() {
-		if key, _, _ := strings.Cut(kv, "="); !stripped(key) {
-			cmd.Env = append(cmd.Env, kv)
-		}
-	}
-	environ := f.environ()
-	environ["VFOX_TEST_CLI"] = "1"
-	for k, v := range environ {
-		if v != "-" {
-			cmd.Env = append(cmd.Env, k+"="+v)
-		}
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	result := cliResult{}
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("vfox %v: %v", args, err)
-		}
-		result.code = exitErr.ExitCode()
-	}
-	result.stdout, result.stderr = stdout.String(), stderr.String()
-	return result
+	cmd := f.command(ctx, exe, append([]string{"-test.run=^TestCLIProcess$", "--"}, args...)...)
+	cmd.Env = append(cmd.Env, "VFOX_TEST_CLI=1")
+	return runCommand(t, cmd)
 }
 
 // manager is a vfox manager in the environment of the fixture, for the tests
@@ -431,6 +469,74 @@ func mustNotContain(t *testing.T, what, text string, unwanted ...string) {
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
+}
+
+// pathList is the value of a PATH that holds the given directories.
+func pathList(dirs ...string) string {
+	return strings.Join(dirs, string(os.PathListSeparator))
+}
+
+// shellPath is how vfox writes a directory for the bash hook that the fixture
+// pretends to run in: Git Bash spells C:\a\b as /c/a/b, which is what the
+// PATH a command tells the shell to export holds on Windows.
+func shellPath(dir string) string {
+	if runtime.GOOS != "windows" {
+		return dir
+	}
+	dir = filepath.ToSlash(dir)
+	if len(dir) > 1 && dir[1] == ':' {
+		dir = "/" + strings.ToLower(dir[:1]) + dir[2:]
+	}
+	return dir
+}
+
+// shellPaths are the entries of the PATH that bash gets for the directories.
+func shellPaths(dirs ...string) []string {
+	paths := make([]string, len(dirs))
+	for i, dir := range dirs {
+		paths[i] = shellPath(dir)
+	}
+	return paths
+}
+
+// commandFile is the file that provides a command in a bin directory. Windows
+// runs a file only if its name has an extension from PATHEXT.
+func commandFile(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".cmd"
+	}
+	return name
+}
+
+// writeCommand puts a command in dir and returns its file. No test runs it.
+func writeCommand(t *testing.T, dir, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, commandFile(name))
+	content := "#!/bin/sh\n"
+	if runtime.GOOS == "windows" {
+		content = "@echo off\r\n"
+	}
+	must(t, os.WriteFile(path, []byte(content), 0755))
+	return path
+}
+
+// linkDirectory makes link lead to the directory target, the way a user does by
+// hand: with a symlink, or with a junction on Windows, which needs no privilege.
+func linkDirectory(t *testing.T, target, link string) {
+	t.Helper()
+	must(t, env.CreateDirSymlink(target, link))
+}
+
+// linkFile gives the file a second name, the way Homebrew does with a symlink.
+// A symlink takes a privilege on Windows, so a hard link stands in there, which
+// os.SameFile sees through as well.
+func linkFile(t *testing.T, target, link string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		must(t, os.Link(target, link))
+		return
+	}
+	must(t, os.Symlink(target, link))
 }
 
 func readFile(t *testing.T, path string) string {

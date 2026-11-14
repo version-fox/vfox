@@ -338,7 +338,8 @@ func (b *impl) shadowHints(winner string) []string {
 func shadowSourceHint(source env.ShadowSource) []string {
 	switch source {
 	case env.ShadowSourceInherited:
-		return []string{"That directory was already in PATH when vfox was activated. `vfox config path.mode baseline` puts such directories behind vfox's."}
+		// Only the legacy mode keeps such a directory in front; the default moves it behind vfox's.
+		return []string{"That directory was already in PATH when vfox was activated, and `path.mode` is `legacy`, which keeps it in front. `vfox config path.mode baseline` puts such directories behind vfox's."}
 	case env.ShadowSourceAdded:
 		return []string{"That directory was added to PATH after `vfox activate` ran. Activate vfox after the line that adds it in your shell's startup file, or run `vfox config path.mode aggressive`."}
 	case env.ShadowSourceUnknown:

@@ -202,25 +202,6 @@ vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
 </TabItem>
 </Tabs>
 
-### Let vfox's versions win over the system's
-
-Run this once, after hooking `vfox` into your shell:
-
-```shell
-vfox config path.mode baseline
-```
-
-Without it, the system directories that macOS and Windows put in front of `vfox`'s can keep winning: `vfox use` says it
-switched, but `node` or `java` is still the system's. With `baseline`, `vfox` puts its directories before everything
-that was already in `PATH` when it was activated, and only what is added afterwards, such as a Python virtualenv you
-activate later, stays in front of it. Open a new terminal afterwards. If you rely on a directory of your own being in
-front of `vfox`'s, list it in `path.preserve`; see [PATH Order Settings](./configuration.md#path-order-settings).
-
-::: info 📌 The default will change
-`baseline` is going to become the default of `path.mode` in a future release. Until then the default is `legacy`, which
-leaves `PATH` the way `vfox` 1.0.x did. Setting `baseline` now means that upgrading will not change anything for you.
-:::
-
 
 ## 3. Add a Plugin
 
