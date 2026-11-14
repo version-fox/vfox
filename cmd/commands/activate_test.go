@@ -44,6 +44,27 @@ func TestRenderActivateScriptForIDEEnvironmentResolutionSkipsHookSessionState(t 
 	}
 }
 
+func TestRenderActivateScriptPowerShellIsASCII(t *testing.T) {
+	path := `C:\用户\bin;C:\Windows`
+	got, err := renderActivateScript("pwsh", "C:/用户/vfox.exe", nil, env.Vars{
+		"PATH":           &path,
+		env.OrigPathFlag: &path,
+	}, false)
+	if err != nil {
+		t.Fatalf("renderActivateScript() failed: %v", err)
+	}
+	// PowerShell reads what `vfox activate` prints with the console's code page,
+	// which is not UTF-8 on a Chinese Windows, before the script can change it.
+	for i := 0; i < len(got); i++ {
+		if got[i] >= 0x80 {
+			t.Fatalf("the PowerShell activation script has a non-ASCII byte at %d:\n%s", i, got)
+		}
+	}
+	if !strings.Contains(got, "$env:PATH=") {
+		t.Fatalf("the PowerShell activation script does not set PATH:\n%s", got)
+	}
+}
+
 func TestRenderActivateScriptPassesNushellConfigPath(t *testing.T) {
 	configDir := t.TempDir()
 
