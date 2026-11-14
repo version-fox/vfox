@@ -18,7 +18,7 @@ package util
 
 import (
 	"encoding/binary"
-	"strings"
+	"regexp"
 	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
@@ -63,20 +63,12 @@ func pipeName(handle windows.Handle) (string, error) {
 	return string(utf16.Decode(units)), nil
 }
 
-// isCygwinPipeName matches the names of Cygwin and MSYS2 ptys, the way go-isatty
+// cygwinPipeName matches the names of Cygwin and MSYS2 ptys, the way go-isatty
 // does: \msys-<id>-pty<N>-(from|to)-master, or the same with cygwin for msys.
+// Native programs get the -nat suffix, and nothing else may follow the name.
+var cygwinPipeName = regexp.MustCompile(`^\\(?:Device\\NamedPipe\\)?(?:msys|cygwin)-[0-9A-Za-z]+-pty[0-9]+-(?:from|to)-master(?:-nat)?$`)
+
+// isCygwinPipeName reports whether name is the name of a Cygwin or MSYS2 pty.
 func isCygwinPipeName(name string) bool {
-	token := strings.Split(name, "-")
-	if len(token) < 5 {
-		return false
-	}
-	switch token[0] {
-	case `\msys`, `\cygwin`, `\Device\NamedPipe\msys`, `\Device\NamedPipe\cygwin`:
-	default:
-		return false
-	}
-	return token[1] != "" &&
-		strings.HasPrefix(token[2], "pty") &&
-		(token[3] == "from" || token[3] == "to") &&
-		token[4] == "master"
+	return cygwinPipeName.MatchString(name)
 }

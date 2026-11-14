@@ -92,6 +92,12 @@ func TestCanReadKeysRejectsPipe(t *testing.T) {
 
 func TestIsCygwinPipeName(t *testing.T) {
 	cases := map[string]bool{
+		// Anything after the documented forms makes a name something else.
+		`\msys-1888ae32e00d56aa-pty0-to-master-not-a-pty`: false,
+		`\msys-1888ae32e00d56aa-pty0-to-master-nat-extra`: false,
+		`\msys-1888ae32e00d56aa-pty0-to-master-`:          false,
+		`\msys-1888ae32e00d56aa-pty0-to-masterx`:          false,
+		`\msys-1888ae32e00d56aa-ptyx-to-master`:           false,
 		// The names a real MSYS2 pty gives a native program, seen under script(1).
 		`\msys-a64f078b8998658e-pty0-from-master-nat`:            true,
 		`\msys-a64f078b8998658e-pty0-to-master-nat`:              true,
