@@ -94,6 +94,22 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		return nil
 	}
 
+	if !util.CanReadKeys() {
+		selected, err := (&printer.LineSelect{
+			TopText:         "Please select a version of " + sdkName + " to install",
+			Options:         options,
+			DisabledOptions: installedVersions,
+			In:              os.Stdin,
+			Out:             os.Stdout,
+		}).Show()
+		if err != nil {
+			return fmt.Errorf("select version error: %w", err)
+		}
+		if selected == nil {
+			return nil
+		}
+		return source.Install(sdk.Version(selected.Key))
+	}
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText:          "Please select a version of " + sdkName + " to install",

@@ -59,6 +59,6 @@ with `vfox` instead.
 
 Related ISSUE: [Unable to select in GitBash](https://github.com/version-fox/vfox/issues/98)
 
-The problem of not being able to select in GitBash only occurs when you directly open the native GitBash to run `vfox`. A temporary solution is:
+In the native GitBash (MinTTY), vfox cannot read single key presses, so `use`, `search` and the other prompts read a line instead: type a number from the list or a version and press Enter. Typing text narrows the list, and an empty line cancels. For arrow-key selection, run GitBash in one of these:
 1. Run `GitBash` through `Windows Terminal`
 2. Run `GitBash` in `VS Code`

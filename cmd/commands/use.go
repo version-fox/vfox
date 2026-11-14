@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/printer"
 
 	"github.com/urfave/cli/v3"
 )
@@ -177,6 +179,9 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 
 // selectFromOptions displays an interactive selection prompt
 func selectFromOptions(options []string, sdkName string) (string, error) {
+	if !util.CanReadKeys() {
+		return selectVersionByLine(os.Stdin, os.Stdout, options, sdkName)
+	}
 	selectPrinter := pterm.InteractiveSelectPrinter{
 		TextStyle:     &pterm.ThemeDefault.DefaultText,
 		OptionStyle:   &pterm.ThemeDefault.DefaultText,
@@ -198,4 +203,28 @@ func selectFromOptions(options []string, sdkName string) (string, error) {
 
 	logger.Debugf("Selected version: %s for SDK: %s\n", result, sdkName)
 	return result, nil
+}
+
+// selectVersionByLine chooses a version by reading lines, for a terminal that
+// cannot deliver single key presses (Git Bash in mintty). A cancelled selection
+// is an error, since there is then no version to use.
+func selectVersionByLine(in io.Reader, out io.Writer, options []string, sdkName string) (string, error) {
+	entries := make([]*printer.KV, len(options))
+	for i, option := range options {
+		entries[i] = &printer.KV{Key: option, Value: option}
+	}
+	selected, err := (&printer.LineSelect{
+		TopText: fmt.Sprintf("Please select a version of %s", sdkName),
+		Options: entries,
+		In:      in,
+		Out:     out,
+	}).Show()
+	if err != nil {
+		return "", fmt.Errorf("version selection failed: %w", err)
+	}
+	if selected == nil {
+		return "", cli.Exit(fmt.Sprintf("No version of %s selected", sdkName), 1)
+	}
+	logger.Debugf("Selected version: %s for SDK: %s\n", selected.Key, sdkName)
+	return selected.Key, nil
 }

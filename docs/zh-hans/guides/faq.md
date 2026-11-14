@@ -52,6 +52,6 @@ vfox use java@17-system
 
 相关ISSUE: [GitBash下无法进行选择](https://github.com/version-fox/vfox/issues/98)
 
-仅限直接打开原生GitBash运行`vfox`会出现无法进行选择的问题, 临时解决办法:
+原生GitBash(MinTTY)无法读取单个按键, 因此`use`、`search`等命令改为按行读取输入: 输入列表中的序号或版本号后回车即可, 输入文字可以过滤列表, 空行则取消。如需使用方向键选择, 可以:
 1. 通过`Windows Terminal`运行`GitBash`
 2. 在`VS Code`中运行`GitBash`

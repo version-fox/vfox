@@ -22,7 +22,16 @@ import (
 	"golang.org/x/term"
 )
 
-// IsTTY checks if the process is running in a TTY (interactive terminal)
+// IsTTY checks if the process is running in a TTY (interactive terminal). On
+// Windows, Git Bash in mintty counts as one: its pty reaches native programs as
+// a pipe, which isCygwinTerminal recognizes.
 func IsTTY() bool {
-	return term.IsTerminal(int(os.Stdout.Fd()))
+	return term.IsTerminal(int(os.Stdout.Fd())) || isCygwinTerminal(os.Stdout.Fd())
+}
+
+// CanReadKeys reports whether single key presses can be read from stdin, as
+// arrow-key selection and y/n prompts need. On Windows the key reader needs a
+// console, so a stdin that is a pipe (Git Bash in mintty) gets line input instead.
+func CanReadKeys() bool {
+	return canReadKeysFrom(os.Stdin.Fd())
 }

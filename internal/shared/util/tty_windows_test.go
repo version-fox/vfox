@@ -71,3 +71,41 @@ func TestIsTTYRejectsOrdinaryPipe(t *testing.T) {
 		t.Error("IsTTY() = true for an ordinary pipe, want false")
 	}
 }
+
+// Git Bash's stdin is a pipe too, which the key reader cannot read.
+func TestCanReadKeysRejectsPipe(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		reader.Close()
+		writer.Close()
+	})
+	previous := os.Stdin
+	os.Stdin = reader
+	t.Cleanup(func() { os.Stdin = previous })
+	if CanReadKeys() {
+		t.Error("CanReadKeys() = true for a pipe, want false")
+	}
+}
+
+func TestIsCygwinPipeName(t *testing.T) {
+	cases := map[string]bool{
+		`\msys-1888ae32e00d56aa-pty0-to-master`:                  true,
+		`\msys-1888ae32e00d56aa-pty1-from-master`:                true,
+		`\cygwin-ab12cd34-pty2-to-master`:                        true,
+		`\Device\NamedPipe\msys-1888ae32e00d56aa-pty0-to-master`: true,
+		`\msys-1888ae32e00d56aa-pty0-to-slave`:                   false,
+		`\msys--pty0-to-master`:                                  false,
+		`\msys-1888ae32e00d56aa-tty0-to-master`:                  false,
+		`\other-1888ae32e00d56aa-pty0-to-master`:                 false,
+		`\Win32Pipes.1234.5678`:                                  false,
+		``:                                                       false,
+	}
+	for name, want := range cases {
+		if got := isCygwinPipeName(name); got != want {
+			t.Errorf("isCygwinPipeName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
