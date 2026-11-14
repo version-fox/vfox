@@ -63,6 +63,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test ./internal/sdk -run '^TestInstall' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Activate vfox in PowerShell with a non-ASCII PATH
+        shell: pwsh
+        env:
+          # The test changes nothing in the registry, but its fixture selects SDKs
+          # like the build job does, so it needs the same runner.
+          VFOX_TEST_WINDOWS_REGISTRY: '1'
+        run: |
+          go test ./cmd/commands -run '^TestPowerShellSessionKeepsNonASCIIPath$' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   nushell:
     name: Nushell integration
