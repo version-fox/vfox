@@ -94,6 +94,10 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		return nil
 	}
 
+	prompt := printer.StdinPrompt()
+	if prompt.Input != printer.Keyboard {
+		return installChosen(source, prompt, options, installedVersions, sdkName)
+	}
 	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText:          "Please select a version of " + sdkName + " to install",
@@ -124,6 +128,24 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		return nil
 	}
 	return source.Install(sdk.Version(version.Key))
+}
+
+// versionInstaller is what installing a chosen version needs from sdk.Sdk.
+type versionInstaller interface {
+	Install(version sdk.Version) error
+}
+
+// installChosen lets the person choose a version with prompt, which is not the
+// keyboard, and installs it. Cancelling installs nothing.
+func installChosen(installer versionInstaller, prompt printer.Prompt, options []*printer.KV, installed util.Set[string], sdkName string) error {
+	selected, err := prompt.Choose("Please select a version of "+sdkName+" to install", options, installed)
+	if err != nil {
+		return fmt.Errorf("select version error: %w", err)
+	}
+	if selected == nil {
+		return nil
+	}
+	return installer.Install(sdk.Version(selected.Key))
 }
 
 func searchCmd(ctx context.Context, cmd *cli.Command) error {

@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   build:
+    if: github.repository == 'version-fox/vfox'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,6 +61,7 @@ jobs:
           path: docs/.vitepress/dist
   # Deployment job
   deploy:
+    if: github.repository == 'version-fox/vfox'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

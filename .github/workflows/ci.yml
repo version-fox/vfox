@@ -8,6 +8,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.repository == 'version-fox/vfox'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,6 +38,7 @@ jobs:
         uses: codecov/codecov-action@v7
 
   windows-regressions:
+    if: github.repository == 'version-fox/vfox'
     name: Windows shell and interrupted installation regressions
     runs-on: windows-latest
     timeout-minutes: 15
@@ -65,6 +67,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   nushell:
+    if: github.repository == 'version-fox/vfox'
     name: Nushell integration
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -98,6 +101,7 @@ jobs:
           go test ./cmd/commands -run '^TestNushell' -count=1 -v
 
   fish-completion:
+    if: github.repository == 'version-fox/vfox'
     name: Fish completion integration
     runs-on: ubuntu-latest
     timeout-minutes: 10
