@@ -7,8 +7,13 @@
     that bash the test binary built from cmd/commands: TestGitBashMinttySelection.
     The test creates a marker file in -WorkDir when it waits for a choice. This
     script then types the choice into the window with WM_CHAR messages, each
-    followed by Enter: "2" for the selection, then "y" for the confirmation. It
-    fails unless the test passes.
+    followed by Enter: "20.19.0" for the selection, then "y" for the confirmation.
+    It fails unless the test passes.
+
+    -Stdio says what the window gives the program: "pipe" for a pseudo terminal
+    that reaches it as a pipe, which is how mintty's classic terminal works; the
+    MSYS option disable_pcon asks the MSYS2 runtime for that. "console" leaves the
+    runtime's default, which may be a pseudo console.
 
     It needs a desktop session, which GitHub-hosted Windows runners have, and it
     types into a terminal window. Run it on a disposable runner or VM only.
@@ -20,6 +25,12 @@ param(
 
     [Parameter(Mandatory)]
     [string] $WorkDir,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('pipe', 'console')]
+    [string] $Stdio,
+
+    [string] $MsysOptions = '',
 
     [ValidateRange(10, 1800)]
     [int] $TimeoutSeconds = 180
@@ -102,11 +113,17 @@ $unixScript = "$unixWork/run.sh"
 $runScript = @'
 #!/usr/bin/env bash
 export VFOX_TEST_GITBASH_MINTTY_DIR='__WORK__'
+export VFOX_TEST_GITBASH_MINTTY_STDIO='__STDIO__'
 '__TEST__' -test.run '^TestGitBashMinttySelection$' -test.v
 echo $? > '__UNIXWORK__/exit.txt'
 '@
-$runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__TEST__', $unixTest).Replace('__UNIXWORK__', $unixWork)
+$runScript = $runScript.Replace('__WORK__', $WorkDir).Replace('__STDIO__', $Stdio).Replace('__TEST__', $unixTest).Replace('__UNIXWORK__', $unixWork)
 [System.IO.File]::WriteAllText((Join-Path $WorkDir 'run.sh'), $runScript.Replace("`r`n", "`n") + "`n")
+
+# A window left over from an earlier run would be taken for this one.
+Get-Process -Name mintty -ErrorAction SilentlyContinue | Stop-Process -Force
+if ($MsysOptions) { $env:MSYS = $MsysOptions }
+Write-Host "MSYS for mintty: '$($env:MSYS)' (stdio: $Stdio)"
 
 $window = Start-Process -FilePath $mintty -ArgumentList "-e `"$bash`" --noprofile --norc `"$unixScript`"" -PassThru
 Write-Host "started $mintty as process $($window.Id)"
@@ -130,7 +147,6 @@ while ($handle -eq [IntPtr]::Zero) {
                 Write-Host ("window {0} class '{1}' title '{2}' process {3}" -f $candidate, [VfoxWindow]::ClassOf($candidate), $title, [VfoxWindow]::ProcessOf($candidate))
             }
         }
-        Get-CimInstance Win32_Process -Filter "Name = 'mintty.exe'" | ForEach-Object { Write-Host "mintty.exe $($_.ProcessId): $($_.CommandLine)" }
         throw 'no mintty window appeared'
     }
     Start-Sleep -Milliseconds 300
@@ -158,7 +174,7 @@ function Wait-Marker([string] $name) {
 try {
     Wait-Marker 'select.ready'
     Start-Sleep -Seconds 1
-    Send-Line $handle '2'
+    Send-Line $handle '20.19.0'
     Wait-Marker 'confirm.ready'
     Start-Sleep -Seconds 1
     Send-Line $handle 'y'
@@ -175,5 +191,5 @@ finally {
 $exitCode = (Get-Content -LiteralPath (Join-Path $WorkDir 'exit.txt') -Raw).Trim()
 Write-Host '--- result.txt'
 Get-Content -LiteralPath (Join-Path $WorkDir 'result.txt') -ErrorAction SilentlyContinue | Write-Host
-if ($exitCode -ne '0') { throw "the test failed in mintty with exit code $exitCode" }
-Write-Host 'Git Bash in mintty: selection and confirmation passed.'
+if ($exitCode -ne '0') { throw "the test failed in mintty ($Stdio) with exit code $exitCode" }
+Write-Host "Git Bash in mintty ($Stdio): selection and confirmation passed."

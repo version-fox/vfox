@@ -9,7 +9,7 @@ jobs:
   mintty:
     name: Select and confirm in a Git Bash mintty window
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -18,6 +18,10 @@ jobs:
       - name: Build the test binary
         shell: pwsh
         run: go test -c -o "$env:RUNNER_TEMP\commands.test.exe" ./cmd/commands
-      - name: Type the answers into Git Bash in mintty
+      - name: Classic pseudo terminal, which reaches the program as a pipe
         shell: pwsh
-        run: ./scripts/gitbash-mintty-test.ps1 -TestBinary "$env:RUNNER_TEMP\commands.test.exe" -WorkDir "$env:RUNNER_TEMP\gitbash-mintty"
+        run: ./scripts/gitbash-mintty-test.ps1 -TestBinary "$env:RUNNER_TEMP\commands.test.exe" -WorkDir "$env:RUNNER_TEMP\gitbash-mintty-pipe" -Stdio pipe -MsysOptions disable_pcon
+      - name: Pseudo console, the default of the MSYS2 runtime here
+        if: always()
+        shell: pwsh
+        run: ./scripts/gitbash-mintty-test.ps1 -TestBinary "$env:RUNNER_TEMP\commands.test.exe" -WorkDir "$env:RUNNER_TEMP\gitbash-mintty-console" -Stdio console
