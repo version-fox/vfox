@@ -98,7 +98,7 @@ func TestPwshExportIsASCII(t *testing.T) {
 			t.Errorf("Export is missing %q:\n%s", want, out)
 		}
 	}
-	if got := Pwsh.Export(env.Vars{"WITH.DOT": nil}); got != "[System.Environment]::SetEnvironmentVariable('WITH.DOT',$null);" {
+	if got := Pwsh.Export(env.Vars{"WITH.DOT": nil}); got != "[System.Environment]::SetEnvironmentVariable('WITH.DOT',[NullString]::Value);" {
 		t.Errorf("unset of a name that $env: cannot spell = %q", got)
 	}
 }

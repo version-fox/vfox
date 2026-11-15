@@ -94,7 +94,9 @@ func (sh pwsh) export(key, value string) string {
 
 func (sh pwsh) unset(key string) string {
 	if !isEnvName(key) {
-		return fmt.Sprintf("[System.Environment]::SetEnvironmentVariable(%s,$null);", PowerShellEscape(key))
+		// From PowerShell 7.5 on, a $null value only empties the variable;
+		// [NullString]::Value removes it.
+		return fmt.Sprintf("[System.Environment]::SetEnvironmentVariable(%s,[NullString]::Value);", PowerShellEscape(key))
 	}
 	return fmt.Sprintf("Remove-Item -Path 'env:/%s';", key)
 }
