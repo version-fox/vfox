@@ -2,12 +2,17 @@ package shell
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // powerShellValue evaluates an expression the way PowerShell reads it, for the
@@ -136,6 +141,59 @@ func TestPwshActivateHookIsASCIIAndStillATemplate(t *testing.T) {
 		}
 		if got := powerShellValue(t, head[start+len("& "):]); got != self {
 			t.Errorf("the hook runs %q for %q", got, self)
+		}
+	}
+}
+
+// powerShells returns the PowerShells on this machine: Windows PowerShell and
+// PowerShell 7, whichever is installed. The native test skips without one.
+func powerShells(t *testing.T) []string {
+	t.Helper()
+	var found []string
+	for _, name := range []string{"powershell", "pwsh"} {
+		if path, err := exec.LookPath(name); err == nil {
+			found = append(found, path)
+		}
+	}
+	if len(found) == 0 {
+		t.Skip("neither powershell nor pwsh is installed")
+	}
+	return found
+}
+
+// TestPwshUnsetRemovesVariableInPowerShell runs the export of a value and then
+// its unset, as Export writes them, in each PowerShell on this machine, and
+// checks what the session holds afterwards. The text assertions cannot show the
+// difference: from PowerShell 7.5 on, SetEnvironmentVariable(name, $null) only
+// empties the variable, so a name that $env: cannot spell must be unset with
+// [NullString]::Value instead.
+func TestPwshUnsetRemovesVariableInPowerShell(t *testing.T) {
+	shells := powerShells(t)
+	for _, name := range []string{"PLAIN_NAME", "WITH.DOT"} {
+		value := "present"
+		script := "$ErrorActionPreference = 'Stop';\n" +
+			Pwsh.Export(env.Vars{name: &value}) + "\n" +
+			"$before = [System.Environment]::GetEnvironmentVariable('" + name + "');\n" +
+			Pwsh.Export(env.Vars{name: nil}) + "\n" +
+			"$exists = Test-Path -LiteralPath 'Env:" + name + "';\n" +
+			"$after = [System.Environment]::GetEnvironmentVariable('" + name + "');\n" +
+			"Write-Output ('set=' + $before + ' exists=' + $exists + ' null=' + ($null -eq $after));\n"
+		for _, shell := range shells {
+			t.Run(name+" in "+filepath.Base(shell), func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, shell, "-NoProfile", "-NonInteractive", "-EncodedCommand", util.PowerShellEncodedCommand(script))
+				var stderr bytes.Buffer
+				cmd.Stderr = &stderr
+				out, err := cmd.Output()
+				if err != nil {
+					t.Fatalf("%s: %v\nstdout: %s\nstderr: %s", shell, err, out, stderr.String())
+				}
+				const want = "set=present exists=False null=True"
+				if got := strings.TrimSpace(strings.ReplaceAll(string(out), "\r\n", "\n")); got != want {
+					t.Errorf("%s reports %q after the unset of %s, want %q\nstderr: %s", shell, got, name, want, stderr.String())
+				}
+			})
 		}
 	}
 }
