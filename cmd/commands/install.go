@@ -29,6 +29,7 @@ import (
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -156,7 +157,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 				if util.IsNonInteractiveTerminal() {
 					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
-				showAvailable, _ := pterm.DefaultInteractiveConfirm.Show(fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
+				showAvailable, _ := printer.Confirm(&pterm.DefaultInteractiveConfirm, fmt.Sprintf("No %s version provided, do you want to select a version to install?", pterm.Red(name)))
 				if showAvailable {
 					err := RunSearch(name, []string{})
 					if err != nil {
@@ -218,9 +219,8 @@ func installAll(autoConfirm bool) error {
 		if util.IsNonInteractiveTerminal() {
 			return cli.Exit("Use the -y flag to automatically confirm installation in non-interactive environments", 1)
 		}
-		result, _ := pterm.DefaultInteractiveConfirm.
-			WithDefaultValue(true).
-			Show("Do you want to install these plugins and SDKs?")
+		result, _ := printer.Confirm(pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true), "Do you want to install these plugins and SDKs?")
 		if !result {
 			return nil
 		}

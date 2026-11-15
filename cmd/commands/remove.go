@@ -22,6 +22,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -58,12 +59,11 @@ func removeCmd(ctx context.Context, cmd *cli.Command) error {
 		if util.IsNonInteractiveTerminal() {
 			return cli.Exit("Use the -y flag to skip confirmation in non-interactive environments", 1)
 		}
-		result, _ := pterm.DefaultInteractiveConfirm.
+		result, _ := printer.Confirm(pterm.DefaultInteractiveConfirm.
 			WithTextStyle(&pterm.ThemeDefault.DefaultText).
 			WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
 			WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-			WithDefaultText("Please confirm").
-			Show()
+			WithDefaultText("Please confirm"), "")
 		if !result {
 			return cli.Exit("remove canceled", 1)
 		}
