@@ -62,6 +62,39 @@ func TestLineConfirmAnswers(t *testing.T) {
 	}
 }
 
+func TestConfirmFromReader(t *testing.T) {
+	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+	for _, tc := range []struct {
+		name                string
+		input               string
+		confirmed, answered bool
+	}{
+		{"yes", "y\n", true, true},
+		{"no", "n\n", false, true},
+		{"invalid then yes", "maybe\ny\n", true, true},
+		{"empty stdin has no answer", "", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			confirmed, answered, err := confirmFromReader(strings.NewReader(tc.input), &out, p, "Install?")
+			if err != nil {
+				t.Fatalf("confirmFromReader() error: %v", err)
+			}
+			if confirmed != tc.confirmed || answered != tc.answered {
+				t.Errorf("confirmFromReader() = %v, %v; want %v, %v", confirmed, answered, tc.confirmed, tc.answered)
+			}
+		})
+	}
+}
+
+func TestConfirmFromReaderReportsReadError(t *testing.T) {
+	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
+	var out bytes.Buffer
+	if _, _, err := confirmFromReader(brokenReader{}, &out, p, "Install?"); err == nil {
+		t.Fatal("confirmFromReader() error = nil for a failing read, want an error")
+	}
+}
+
 func TestLineConfirmReportsReadError(t *testing.T) {
 	p := pterm.InteractiveConfirmPrinter{ConfirmText: "Yes", RejectText: "No", Delimiter: ": "}
 	var out bytes.Buffer

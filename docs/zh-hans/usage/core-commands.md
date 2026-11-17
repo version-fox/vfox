@@ -74,6 +74,9 @@ vfox install --yes nodejs@20
 vfox install --yes --all
 ```
 
+在非交互式 shell 中，也可以把确认结果通过 stdin 传入，例如
+`yes | vfox install --all`。若 stdin 没有输入，vfox 会提示使用 `-y`。
+
 :::
 
 ## Use

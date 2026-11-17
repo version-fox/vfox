@@ -18,8 +18,10 @@ package printer
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -29,6 +31,33 @@ import (
 // StdinPrompt.
 func Confirm(p *pterm.InteractiveConfirmPrinter, text string) (bool, error) {
 	return StdinPrompt().Confirm(p, text)
+}
+
+// ConfirmFromPipe asks text and takes the answer from a piped stdin, as in
+// `yes | vfox install --all`. answered is false when stdin is a terminal, empty
+// or cannot be read: there is no answer to act on, so the caller can explain
+// how to skip the prompt instead of silently assuming "no".
+func ConfirmFromPipe(p *pterm.InteractiveConfirmPrinter, text string) (confirmed, answered bool, err error) {
+	info, statErr := os.Stdin.Stat()
+	if statErr != nil || info.Mode()&os.ModeCharDevice != 0 {
+		return false, false, nil
+	}
+	return confirmFromReader(os.Stdin, os.Stdout, *p, text)
+}
+
+// confirmFromReader reads one answer line from in. It reports answered false
+// when in ends before it yields a byte, distinguishing an empty pipe from a
+// refusal. Peeking keeps the byte for lineConfirm to read.
+func confirmFromReader(in io.Reader, out io.Writer, p pterm.InteractiveConfirmPrinter, text string) (confirmed, answered bool, err error) {
+	buffered := bufio.NewReader(in)
+	if _, err := buffered.Peek(1); err != nil {
+		if errors.Is(err, io.EOF) {
+			return false, false, nil
+		}
+		return false, false, err
+	}
+	confirmed, err = lineConfirm(buffered, out, p, text)
+	return confirmed, true, err
 }
 
 // lineConfirm asks text and reads an answer line. The confirm or reject text, or

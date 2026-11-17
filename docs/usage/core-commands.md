@@ -72,6 +72,10 @@ vfox install --yes nodejs@20
 vfox install --yes --all
 ```
 
+In a non-interactive shell you can also pipe the confirmation into stdin, for
+example `yes | vfox install --all`. With no answer on stdin, vfox asks you to
+pass `-y`.
+
 :::
 
 ## Use

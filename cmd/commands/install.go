@@ -216,13 +216,27 @@ func installAll(autoConfirm bool) error {
 	printSdk(sdks, nil)
 
 	if !autoConfirm {
+		confirm := pterm.DefaultInteractiveConfirm.WithDefaultValue(true)
+		const text = "Do you want to install these plugins and SDKs?"
 		if util.IsNonInteractiveTerminal() {
-			return cli.Exit("Use the -y flag to automatically confirm installation in non-interactive environments", 1)
-		}
-		result, _ := printer.Confirm(pterm.DefaultInteractiveConfirm.
-			WithDefaultValue(true), "Do you want to install these plugins and SDKs?")
-		if !result {
-			return nil
+			// A pipe can carry the answer even without a terminal, so that
+			// `yes | vfox install --all` works in CI. Only point at -y when
+			// there is nothing on stdin to answer with.
+			confirmed, answered, err := printer.ConfirmFromPipe(confirm, text)
+			if err != nil {
+				return err
+			}
+			if !answered {
+				return cli.Exit("Use the -y flag to automatically confirm installation in non-interactive environments", 1)
+			}
+			if !confirmed {
+				return nil
+			}
+		} else {
+			result, _ := printer.Confirm(confirm, text)
+			if !result {
+				return nil
+			}
 		}
 	}
 

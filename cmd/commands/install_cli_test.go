@@ -17,10 +17,32 @@
 package commands
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
+
+// withStdin runs fn with stdin reading input, restoring the process's stdin
+// afterwards. The tests here are not parallel, so this does not race.
+func withStdin(t *testing.T, input string, fn func()) {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "stdin")
+	must(t, err)
+	_, err = file.WriteString(input)
+	must(t, err)
+	_, err = file.Seek(0, 0)
+	must(t, err)
+	old := os.Stdin
+	os.Stdin = file
+	defer func() { os.Stdin = old; _ = file.Close() }()
+	fn()
+}
+
+func projectWithAlpha(t *testing.T, f *cliFixture) {
+	t.Helper()
+	must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nalpha = \"1.0.0\"\n"), 0644))
+}
 
 // #717: one command that installs and switches, instead of install followed by use.
 func TestInstallCommandUseFlag(t *testing.T) {
@@ -140,4 +162,42 @@ func TestInstallCommandUseFlagNeedsAVersion(t *testing.T) {
 
 	r := f.run(t, "install", "-u", "alpha").mustFail(t, "install -u without a version")
 	mustContain(t, "error", r.output(), "install --use needs a version for alpha")
+}
+
+// #327: a CI job cannot answer an interactive prompt, but it can pipe an
+// answer into stdin, as in `yes | vfox install --all`.
+func TestInstallAllTakesConfirmationFromPipedStdin(t *testing.T) {
+	f := newCLIFixture(t, false)
+	projectWithAlpha(t, f)
+
+	withStdin(t, "y\n", func() {
+		out := f.run(t, "install", "--all").mustSucceed(t, "install --all with piped yes").output()
+		mustContain(t, "install --all", out, "Do you want to install these plugins and SDKs?", "alpha@1.0.0")
+	})
+	if !exists(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0", "alpha-1.0.0")) {
+		t.Fatal("a piped yes did not install alpha")
+	}
+}
+
+func TestInstallAllPipedNoCancels(t *testing.T) {
+	f := newCLIFixture(t, false)
+	projectWithAlpha(t, f)
+
+	withStdin(t, "n\n", func() {
+		out := f.run(t, "install", "--all").mustSucceed(t, "install --all with piped no").output()
+		mustContain(t, "install --all", out, "alpha@1.0.0")
+	})
+	if exists(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0")) {
+		t.Fatal("a piped no still installed alpha")
+	}
+}
+
+func TestInstallAllWithoutAnAnswerPointsAtYes(t *testing.T) {
+	f := newCLIFixture(t, false)
+	projectWithAlpha(t, f)
+
+	withStdin(t, "", func() {
+		r := f.run(t, "install", "--all").mustFail(t, "install --all with an empty stdin")
+		mustContain(t, "error", r.output(), "Use the -y flag")
+	})
 }
