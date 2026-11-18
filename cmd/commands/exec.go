@@ -167,9 +167,11 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 	}
 	if sdkSpec.Version != "" && !sdkSource.CheckRuntimeExist(resolvedVersion) {
 		fmt.Printf("SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
-		if err := sdkSource.Install(resolvedVersion); err != nil {
+		installedVersion, err := sdkSource.InstallResolved(resolvedVersion, false)
+		if err != nil {
 			return nil, fmt.Errorf("failed to install %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
 		}
+		resolvedVersion = installedVersion
 	}
 
 	runtimePackage, err := sdkSource.GetRuntimePackage(resolvedVersion)
