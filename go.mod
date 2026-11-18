@@ -14,7 +14,7 @@ require (
 	github.com/pterm/pterm v0.12.79
 	github.com/schollz/progressbar/v3 v3.14.2
 	github.com/shirou/gopsutil/v4 v4.25.3
-	github.com/ulikunitz/xz v0.5.14
+	github.com/ulikunitz/xz v0.5.15
 	github.com/urfave/cli/v3 v3.4.1
 	github.com/yuin/gopher-lua v1.1.1
 	golang.org/x/crypto v0.35.0
