@@ -125,7 +125,9 @@ func TestExecRunsAPartialVersionWithoutInstallingIt(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
 
-	r := f.run(t, "exec", "alpha@1", "--", "alphatool").mustSucceed(t, "exec alpha@1")
+	// On Windows the command is a .cmd file, and exec looks up a bare name only in the
+	// caller's PATH there, so the test names the file. A bare name is a separate problem.
+	r := f.run(t, "exec", "alpha@1", "--", commandFile("alphatool")).mustSucceed(t, "exec alpha@1")
 	mustNotContain(t, "exec alpha@1", r.output(), "not found, installing")
 }
 
