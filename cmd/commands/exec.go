@@ -189,7 +189,21 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 func resolveExecSDKVersion(manager *internal.Manager, sdkSpec execSDKSpec) (sdk.Version, error) {
 	if sdkSpec.Version != "" {
 		source, _ := manager.LookupSdk(sdkSpec.Name)
-		return manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version), nil
+		version := manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version)
+		if source == nil || source.CheckRuntimeExist(version) {
+			return version, nil
+		}
+		// A partial version stands for the installed version it extends (4.5 for an
+		// installed 4.5.0), as it does for `vfox use`, rather than for a version to
+		// install. Only a version nothing installed matches is left to be installed.
+		installed, err := source.ResolveInstalledVersion(version)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve %s@%s: %w", sdkSpec.Name, version, err)
+		}
+		if source.CheckRuntimeExist(installed) {
+			return installed, nil
+		}
+		return version, nil
 	}
 
 	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)

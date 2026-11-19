@@ -60,6 +60,7 @@ type Sdk interface {
 	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
 	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
+	ResolveInstalledVersion(version Version) (Version, error)             // The installed version a typed one stands for, as `vfox use` selects it
 	InstalledList() []Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
@@ -629,6 +630,14 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 	}
 
 	return Version(newVersion), nil
+}
+
+// ResolveInstalledVersion returns the installed version that version stands for,
+// selected the way `vfox use` does: what the plugin's PreUse hook answers, else an
+// exact match, else the newest installed version that extends it (4.5.0 for 4.5).
+// The version comes back as given when nothing installed matches.
+func (b *impl) ResolveInstalledVersion(version Version) (Version, error) {
+	return b.preUse(version, env.Session)
 }
 
 type VersionNotExistsError struct {
