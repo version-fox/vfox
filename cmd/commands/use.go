@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/printer"
 
 	"github.com/urfave/cli/v3"
 )
@@ -175,8 +177,14 @@ func resolveVersion(sdkSource sdk.Sdk, manager *internal.Manager, version sdk.Ve
 	return sdk.Version(selectedVersion), nil
 }
 
-// selectFromOptions displays an interactive selection prompt
+// selectFromOptions displays an interactive selection prompt. Where the keys of
+// the terminal cannot be read by the keyboard library, the choice is made with
+// the arrow keys in raw mode, or else as a line (see printer.Prompt).
 func selectFromOptions(options []string, sdkName string) (string, error) {
+	prompt := printer.StdinPrompt()
+	if prompt.Input != printer.Keyboard {
+		return selectVersionWith(prompt, options, sdkName)
+	}
 	selectPrinter := pterm.InteractiveSelectPrinter{
 		TextStyle:     &pterm.ThemeDefault.DefaultText,
 		OptionStyle:   &pterm.ThemeDefault.DefaultText,
@@ -198,4 +206,28 @@ func selectFromOptions(options []string, sdkName string) (string, error) {
 
 	logger.Debugf("Selected version: %s for SDK: %s\n", result, sdkName)
 	return result, nil
+}
+
+// selectVersionByLine chooses a version by reading a line from in, for a terminal
+// that cannot deliver single key presses.
+func selectVersionByLine(in io.Reader, out io.Writer, options []string, sdkName string) (string, error) {
+	return selectVersionWith(printer.Prompt{Input: printer.Line, In: in, Out: out}, options, sdkName)
+}
+
+// selectVersionWith chooses a version with prompt, which is not the keyboard. A
+// cancelled selection is an error, since there is then no version to use.
+func selectVersionWith(prompt printer.Prompt, options []string, sdkName string) (string, error) {
+	entries := make([]*printer.KV, len(options))
+	for i, option := range options {
+		entries[i] = &printer.KV{Key: option, Value: option}
+	}
+	selected, err := prompt.Choose(fmt.Sprintf("Please select a version of %s", sdkName), entries, nil)
+	if err != nil {
+		return "", fmt.Errorf("version selection failed: %w", err)
+	}
+	if selected == nil {
+		return "", cli.Exit(fmt.Sprintf("No version of %s selected", sdkName), 1)
+	}
+	logger.Debugf("Selected version: %s for SDK: %s\n", selected.Key, sdkName)
+	return selected.Key, nil
 }

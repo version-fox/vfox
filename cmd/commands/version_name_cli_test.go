@@ -186,7 +186,7 @@ func TestUninstallTakesTheNameAsTypedBeforeDroppingAV(t *testing.T) {
 			if !exists(one) || (tt.removed != "2.0.0" && !exists(two)) {
 				t.Error("another installation was removed")
 			}
-			if external != "" && !exists(filepath.Join(external, "bin", "alphatool")) {
+			if external != "" && !exists(filepath.Join(external, "bin", commandFile("alphatool"))) {
 				t.Error("the linked external target was removed")
 			}
 		})

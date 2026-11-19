@@ -52,7 +52,7 @@ if (-not (Test-Path -Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force
 # 3. 复制 internal/shell/clink_vfox.lua 到脚本路径
 
 # 对于 Nushell:
-vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
+vfox activate nu $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > 请记住重启你的 Shell 以应用更改。

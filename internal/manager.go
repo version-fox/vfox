@@ -41,6 +41,7 @@ import (
 	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
+	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -145,12 +146,11 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, 
 				return nil, cli.Exit(fmt.Sprintf("Plugin %s is not installed. Use the -y flag to automatically install plugins in non-interactive environments", name), 1)
 			} else {
 				fmt.Printf("[%s] not added yet, confirm that you want to use [%s]? \n", pterm.LightBlue(name), pterm.LightRed(name))
-				result, _ := pterm.DefaultInteractiveConfirm.
+				result, _ := printer.Confirm(pterm.DefaultInteractiveConfirm.
 					WithTextStyle(&pterm.ThemeDefault.DefaultText).
 					WithConfirmStyle(&pterm.ThemeDefault.DefaultText).
 					WithRejectStyle(&pterm.ThemeDefault.DefaultText).
-					WithDefaultText("Please confirm").
-					Show()
+					WithDefaultText("Please confirm"), "")
 				if !result {
 					return nil, cli.Exit(fmt.Sprintf("Plugin %s is not installed. Installation cancelled by user", name), 1)
 				}
@@ -386,7 +386,11 @@ func (m *Manager) Update(pluginName string) error {
 func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, error) {
 	logger.Debugf("Fetching plugin manifest from: %s\n", util.RedactSourceURL(url))
 
-	resp, err := m.RuntimeEnvContext.HttpClient().Get(url)
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("fetch manifest error: %w", err)
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		err = util.RedactError(err)
 		logger.Debugf("Failed to fetch manifest: %v\n", err)
@@ -448,7 +452,11 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		logger.Debugf("Failed to create HTTP request: %v\n", err)
 		return "", err
 	}
-	resp, err := m.RuntimeEnvContext.HttpClient().Do(req)
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
@@ -667,7 +675,10 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 }
 
 func (m *Manager) Available() (RegistryIndex, error) {
-	client := m.RuntimeEnvContext.HttpClient()
+	client, err := m.RuntimeEnvContext.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("get plugin index error: %w", err)
+	}
 	resp, err := client.Get(m.GetRegistryAddress("index.json"))
 	if err != nil {
 		return nil, fmt.Errorf("get plugin index error: %w", util.RedactError(err))
