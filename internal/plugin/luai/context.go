@@ -17,8 +17,7 @@
 package luai
 
 import (
-	"fmt"
-	"strings"
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 // ComputeUserAgent constructs a user agent string for the vfox runtime and plugin.
@@ -33,31 +32,5 @@ import (
 //	A user agent string in the format "vfox/<runtimeVersion> vfox-<pluginName>/<pluginVersion>",
 //	omitting version information if not provided, and trimming extra spaces.
 func ComputeUserAgent(runtimeVersion, pluginName, pluginVersion string) string {
-	components := make([]string, 0, 2)
-	if runtimeVersion != "" {
-		components = append(components, fmt.Sprintf("vfox/%s", runtimeVersion))
-	} else {
-		components = append(components, "vfox")
-	}
-
-	name := ensurePrefix(pluginName)
-	if name != "" {
-		if pluginVersion != "" {
-			components = append(components, fmt.Sprintf("%s/%s", name, pluginVersion))
-		} else {
-			components = append(components, name)
-		}
-	}
-
-	return strings.TrimSpace(strings.Join(components, " "))
-}
-
-func ensurePrefix(name string) string {
-	if name == "" {
-		return ""
-	}
-	if strings.HasPrefix(name, "vfox-") {
-		return name
-	}
-	return "vfox-" + name
+	return util.UserAgent(runtimeVersion, pluginName, pluginVersion)
 }

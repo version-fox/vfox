@@ -50,10 +50,8 @@ vfox use java@17-system
 
 `vfox` 按目录管理版本，没办法阻止 SDK 自己在原地更新。不过它能发现：当插件报告某个已安装的版本和安装时不一样了，`vfox use` 和 `vfox doctor` 会给出警告。用 `vfox install --reinstall <sdk>@<version>` 把它恢复原样；想换到更新的版本，请用 `vfox` 安装那个版本，而不是在原地更新。
 
-## GitBash下`use`和`search`命令无法进行选择?
+## GitBash下如何用`use`和`search`命令选择版本?
 
 相关ISSUE: [GitBash下无法进行选择](https://github.com/version-fox/vfox/issues/98)
 
-仅限直接打开原生GitBash运行`vfox`会出现无法进行选择的问题, 临时解决办法:
-1. 通过`Windows Terminal`运行`GitBash`
-2. 在`VS Code`中运行`GitBash`
+原生GitBash(MinTTY)中, `use`、`search`等命令可以用方向键选择版本: 上下键移动高亮, 输入文字过滤列表, 回车选择, Ctrl+C取消; 确认提示直接按`y`或`n`即可。vfox读取单个按键时, 会用随Git for Windows提供的`stty`把终端切换到单键模式, 结束后再恢复。如果找不到`stty`, 则改为按行读取输入: 输入列表中的序号或版本号后回车, 空行则取消。

@@ -519,3 +519,31 @@ func TestToolConfig_MarshalInline(t *testing.T) {
 		})
 	}
 }
+
+// String attributes that merely look like numbers must survive a save and
+// reload unchanged, and must never produce a file that cannot be parsed.
+func TestVfoxToml_StringAttrRoundTrip(t *testing.T) {
+	values := []string{"17.0", "1.50", "007", "1e3", "1_000", "+5", "nan", "inf", "21", "true", "openjdk"}
+	for _, value := range values {
+		t.Run(value, func(t *testing.T) {
+			dir := t.TempDir()
+			config := NewVfoxToml()
+			config.SetToolWithAttr("java", "21", Attr{"dist": value})
+			if err := config.SaveTo(dir); err != nil {
+				t.Fatalf("SaveTo() error: %v", err)
+			}
+
+			loaded, err := LoadVfoxToml(DetermineConfigPath(dir))
+			if err != nil {
+				t.Fatalf("LoadVfoxToml() error: %v", err)
+			}
+			tool, ok := loaded.GetToolConfig("java")
+			if !ok {
+				t.Fatal("java not found after reload")
+			}
+			if got := tool.Attr["dist"]; got != value {
+				t.Errorf("dist = %q after round trip, want %q", got, value)
+			}
+		})
+	}
+}

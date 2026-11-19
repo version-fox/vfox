@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   create-release:
+    if: github.repository == 'version-fox/vfox'
     runs-on: ubuntu-latest
     environment: production
     steps:

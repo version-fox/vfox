@@ -18,6 +18,8 @@ package commands
 
 import (
 	"path/filepath"
+	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -54,6 +56,11 @@ func TestInstallCommandUseFollowsTheInstalledVersion(t *testing.T) {
 }
 
 func TestInstallCommandUseOnShellWithoutHookSaysWhatFailed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// There, a shell without a hook still gets the global scope and a new
+		// shell, which vfox opens for the user and which would wait for input.
+		t.Skip("use succeeds on Windows without a hook")
+	}
 	f := newCLIFixture(t, false)
 	// What a container build step gives vfox: no activated shell, hence no hook.
 	f.env["__VFOX_SHELL"] = "-"
@@ -134,4 +141,58 @@ func TestInstallCommandUseFlagNeedsAVersion(t *testing.T) {
 
 	r := f.run(t, "install", "-u", "alpha").mustFail(t, "install -u without a version")
 	mustContain(t, "error", r.output(), "install --use needs a version for alpha")
+}
+
+// `vfox exec` installs missing versions on demand; when PreInstall resolves a
+// request to a different version on disk (or finds that target already installed),
+// loading its environment must follow the installed version rather than looking up
+// the unresolved request string.
+func TestExecFollowsTheInstalledVersion(t *testing.T) {
+	t.Run("fresh install", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		f.writePlugin(t, "beta", rewritingPlugin)
+		manager := f.manager(t)
+
+		envs, err := resolveExecSDKEnv(manager, execSDKSpec{Name: "beta", Version: "lts"})
+		if err != nil {
+			t.Fatalf("resolveExecSDKEnv(beta@lts) = %v, want nil", err)
+		}
+		wantBin := filepath.Join(f.shared, "cache", "beta", "v-2.0.0", "beta-2.0.0", "bin")
+		if !slices.Contains(envs.Paths.Slice(), wantBin) {
+			t.Errorf("PATH = %v, want entry %q", envs.Paths.Slice(), wantBin)
+		}
+	})
+
+	t.Run("already installed target", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		f.writePlugin(t, "beta", movingPlugin)
+		t.Setenv("BETA_LTS", "2.0.0")
+		f.run(t, "install", "beta@2.0.0").mustSucceed(t, "install beta@2.0.0")
+		manager := f.manager(t)
+
+		envs, err := resolveExecSDKEnv(manager, execSDKSpec{Name: "beta", Version: "lts"})
+		if err != nil {
+			t.Fatalf("resolveExecSDKEnv(beta@lts) = %v, want nil", err)
+		}
+		wantBin := filepath.Join(f.shared, "cache", "beta", "v-2.0.0", "beta-2.0.0", "bin")
+		if !slices.Contains(envs.Paths.Slice(), wantBin) {
+			t.Errorf("PATH = %v, want entry %q", envs.Paths.Slice(), wantBin)
+		}
+	})
+
+	t.Run("moving target", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		f.writePlugin(t, "beta", movingPlugin)
+		manager := f.manager(t)
+
+		t.Setenv("BETA_LTS", "3.0.0")
+		envs, err := resolveExecSDKEnv(manager, execSDKSpec{Name: "beta", Version: "lts"})
+		if err != nil {
+			t.Fatalf("resolveExecSDKEnv(beta@lts) = %v, want nil", err)
+		}
+		wantBin := filepath.Join(f.shared, "cache", "beta", "v-3.0.0", "beta-3.0.0", "bin")
+		if !slices.Contains(envs.Paths.Slice(), wantBin) {
+			t.Errorf("PATH = %v, want entry %q", envs.Paths.Slice(), wantBin)
+		}
+	})
 }

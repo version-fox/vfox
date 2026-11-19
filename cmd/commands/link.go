@@ -28,6 +28,7 @@ import (
 
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -134,9 +135,8 @@ func linkDetected(cmd *cli.Command) error {
 		if util.IsNonInteractiveTerminal() {
 			return cli.Exit("Use the -y flag to link what was found in non-interactive environments", 1)
 		}
-		confirmed, _ := pterm.DefaultInteractiveConfirm.
-			WithDefaultValue(true).
-			Show(fmt.Sprintf("Link %d %s installation(s)?", len(candidates), name))
+		confirmed, _ := printer.Confirm(pterm.DefaultInteractiveConfirm.
+			WithDefaultValue(true), fmt.Sprintf("Link %d %s installation(s)?", len(candidates), name))
 		if !confirmed {
 			return nil
 		}

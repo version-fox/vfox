@@ -367,23 +367,18 @@ func (t *ToolConfig) MarshalInline() string {
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
 
-// formatAttributeValue formats an attribute value based on its type
+// formatAttributeValue formats an attribute value based on its type.
+// Only booleans and canonical integers are written bare; every other value is
+// quoted, because a bare "17.0", "007" or "nan" would be read back as a
+// different value (or fail to parse) instead of the string it was.
 func formatAttributeValue(value string) string {
-	// Check if it's a boolean
 	if value == "true" || value == "false" {
 		return value
 	}
 
-	// Check if it's an integer
-	if _, err := strconv.ParseInt(value, 10, 64); err == nil {
+	if n, err := strconv.ParseInt(value, 10, 64); err == nil && strconv.FormatInt(n, 10) == value {
 		return value
 	}
 
-	// Check if it's a float
-	if _, err := strconv.ParseFloat(value, 64); err == nil {
-		return value
-	}
-
-	// Default: quote as string
 	return strconv.Quote(value)
 }

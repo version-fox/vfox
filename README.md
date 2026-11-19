@@ -57,7 +57,7 @@ echo 'Invoke-Expression "$(vfox activate pwsh)"' >> $PROFILE
 # 3. copy internal/shell/clink_vfox.lua to script path
 
 # For Nushell:
-vfox activate nushell $nu.default-config-dir | save --append $nu.config-path
+vfox activate nu $nu.default-config-dir | save --append $nu.config-path
 ```
 
 > Remember to restart your shell to apply the changes.
