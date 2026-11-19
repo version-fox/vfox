@@ -223,6 +223,10 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 	mainSdk.Name = b.plugin.Name
 
 	sdkVersion := Version(mainSdk.Version)
+	if sdkVersion == "" {
+		// Without a version the runtime has no directory name, and its receipt would record none.
+		return "", fmt.Errorf("plugin [PreInstall] method error: no version number provided for %s", b.Label(version))
+	}
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
 	label = b.Label(sdkVersion)

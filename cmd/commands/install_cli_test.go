@@ -135,3 +135,20 @@ func TestInstallCommandUseFlagNeedsAVersion(t *testing.T) {
 	r := f.run(t, "install", "-u", "alpha").mustFail(t, "install -u without a version")
 	mustContain(t, "error", r.output(), "install --use needs a version for alpha")
 }
+
+// A plugin whose PreInstall returns a table without a version has nothing to
+// install the runtime under. The install must fail rather than report success.
+const versionlessPlugin = `PLUGIN = {name="gamma", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
+function PLUGIN:PreInstall(ctx) return {} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`
+
+func TestInstallCommandFailsWhenPreInstallNamesNoVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "gamma", versionlessPlugin)
+
+	r := f.run(t, "install", "gamma@1.0.0").mustFail(t, "install gamma@1.0.0")
+	mustContain(t, "error", r.output(), "no version number provided for gamma@1.0.0")
+	mustNotContain(t, "install", r.output(), "success")
+}

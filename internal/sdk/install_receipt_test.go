@@ -92,6 +92,26 @@ func TestFailedInstallLeavesNoReceipt(t *testing.T) {
 	}
 }
 
+// A PreInstall that names no version gives the installation nothing to be
+// recorded under. The install must stop before it creates anything.
+func TestInstallRefusesAPreInstallWithoutAVersion(t *testing.T) {
+	p := &testPlugin{preInstall: func(*plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		return &plugin.PreInstallHookResult{PreInstallPackageItem: &plugin.PreInstallPackageItem{}}, nil
+	}}
+	s := newTestSDK(t, p)
+
+	err := s.Install("1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "no version number provided") {
+		t.Fatalf("Install(1.0.0) = %v, want an error saying PreInstall provided no version", err)
+	}
+	if exists(s.packagePath("")) {
+		t.Error("an install without a version left a directory and receipt behind")
+	}
+	if got := s.InstalledList(); len(got) != 0 {
+		t.Errorf("InstalledList() = %v, want nothing installed", got)
+	}
+}
+
 func TestInstallRecordsTheFacts(t *testing.T) {
 	var seen *plugin.FingerprintHookCtx
 	p := (&testPlugin{fingerprint: func(ctx *plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error) {
