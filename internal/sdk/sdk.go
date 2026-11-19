@@ -61,6 +61,9 @@ type Sdk interface {
 	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
 	InstalledList() []Version
+	// ResolveInstalled turns a partial version into the installed version it names, as Use does
+	// when no PreUse hook answers. It returns version unchanged when no installed version matches.
+	ResolveInstalled(version Version) Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
 	// installation, a link whose target is gone, an interrupted installation. CheckRuntimeExist is
@@ -606,29 +609,41 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 		if b.CheckRuntimeExist(version) {
 			return version, nil
 		}
-		installedVersions := make(util.VersionSort, 0, len(installedSdks))
-		for _, sdk := range installedSdks {
-			installedVersions = append(installedVersions, string(sdk.Runtime.Version))
-		}
-		sort.Sort(installedVersions)
-		version := string(version)
-		prefix := version + "."
-		for _, v := range installedVersions {
-			if version == v {
-				newVersion = v
-				break
-			}
-			if strings.HasPrefix(v, prefix) {
-				newVersion = v
-				break
-			}
-		}
-	}
-	if newVersion == "" {
-		return version, nil
+		return matchInstalledPrefix(version, installedSdks), nil
 	}
 
 	return Version(newVersion), nil
+}
+
+// ResolveInstalled returns the installed version that a version as typed names.
+// It is the choice Use makes when the plugin's PreUse hook gives no answer: version
+// itself when it is installed, otherwise the highest installed version whose name is
+// version followed by a dot. It returns version unchanged when nothing matches.
+func (b *impl) ResolveInstalled(version Version) Version {
+	// Before fuzzy matching, perform exact matching first.
+	if b.CheckRuntimeExist(version) {
+		return version
+	}
+	installedSdks, _ := b.getAllRuntimes()
+	return matchInstalledPrefix(version, installedSdks)
+}
+
+// matchInstalledPrefix returns the first installed version, highest first, that is
+// version or starts with version followed by a dot. It returns version when there is none.
+func matchInstalledPrefix(version Version, installedSdks []*RuntimePackage) Version {
+	installedVersions := make(util.VersionSort, 0, len(installedSdks))
+	for _, sdk := range installedSdks {
+		installedVersions = append(installedVersions, string(sdk.Runtime.Version))
+	}
+	sort.Sort(installedVersions)
+	name := string(version)
+	prefix := name + "."
+	for _, v := range installedVersions {
+		if name == v || strings.HasPrefix(v, prefix) {
+			return Version(v)
+		}
+	}
+	return version
 }
 
 type VersionNotExistsError struct {

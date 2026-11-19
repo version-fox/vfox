@@ -89,6 +89,46 @@ func TestExecTakesTheNameAsTypedBeforeDroppingAV(t *testing.T) {
 	}
 }
 
+// exec reads a partial version the way use does: it stands for the installed
+// version that starts with it, and the highest one when several do. Only a
+// version with no installed match is left to be installed.
+func TestExecResolvesAPartialVersionToTheInstalledOne(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, version := range []string{"1.0.0", "1.9.0", "1.10.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", version, "alphatool")
+	}
+	manager := f.manager(t)
+
+	for _, tt := range []struct {
+		arg  string
+		want sdk.Version
+	}{
+		{"alpha@2", "2.0.0"},
+		{"alpha@2.0", "2.0.0"},
+		{"alpha@1.9", "1.9.0"},
+		{"alpha@1", "1.10.0"},
+		{"alpha@1.1", "1.1"}, // 1.10.0 does not start with "1.1."
+		{"alpha@3", "3"},     // nothing installed starts with it
+	} {
+		spec, err := parseExecSDKSpec(tt.arg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := resolveExecSDKVersion(manager, spec)
+		if err != nil || got != tt.want {
+			t.Errorf("exec %s resolved to (%q, %v), want %q", tt.arg, got, err, tt.want)
+		}
+	}
+}
+
+func TestExecRunsAPartialVersionWithoutInstallingIt(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+
+	r := f.run(t, "exec", "alpha@1", "--", "alphatool").mustSucceed(t, "exec alpha@1")
+	mustNotContain(t, "exec alpha@1", r.output(), "not found, installing")
+}
+
 func TestDoctorTakesTheNameAsTypedBeforeDroppingAV(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "3.0.0") // a version without a command, which doctor notices

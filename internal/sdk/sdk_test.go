@@ -593,3 +593,32 @@ func countOccurrences(content, search string) int {
 func splitLines(content string) []string {
 	return strings.Split(content, "\n")
 }
+
+// ResolveInstalled is how exec turns a partial version into an installed one, so
+// it has to pick the version that use selects for the same request.
+func TestResolveInstalledMatchesWhatUseSelects(t *testing.T) {
+	s := newTestSDK(t, &testPlugin{})
+	for _, version := range []Version{"1.9.0", "1.10.0", "2.0.0"} {
+		mustInstall(t, s, version)
+	}
+
+	for _, tt := range []struct{ typed, want Version }{
+		{"2", "2.0.0"},
+		{"2.0.0", "2.0.0"},
+		{"1", "1.10.0"},
+		{"1.9", "1.9.0"},
+		{"1.1", "1.1"}, // 1.10.0 does not start with "1.1."
+		{"3", "3"},     // nothing installed starts with it
+	} {
+		use, err := s.preUse(tt.typed, env.Session)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if use != tt.want {
+			t.Fatalf("use selects %s for %s, want %s", use, tt.typed, tt.want)
+		}
+		if got := s.ResolveInstalled(tt.typed); got != tt.want {
+			t.Errorf("ResolveInstalled(%s) = %s, want %s", tt.typed, got, tt.want)
+		}
+	}
+}

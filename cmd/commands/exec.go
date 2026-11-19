@@ -187,7 +187,12 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 func resolveExecSDKVersion(manager *internal.Manager, sdkSpec execSDKSpec) (sdk.Version, error) {
 	if sdkSpec.Version != "" {
 		source, _ := manager.LookupSdk(sdkSpec.Name)
-		return manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version), nil
+		version := manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version)
+		if source == nil {
+			return version, nil
+		}
+		// A partial version resolves to the installed version it starts, the same way use resolves it.
+		return source.ResolveInstalled(version), nil
 	}
 
 	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
