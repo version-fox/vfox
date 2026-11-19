@@ -151,7 +151,9 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 			envMap[key] = *value
 		}
 	}
-	envMap["PATH"] = mergedEnvs.Paths.String()
+	// The command runs with the PATH of its platform. Paths.String spells the PATH for a
+	// bash hook on Windows (":" and /c/ paths), which lookPathInEnv cannot split.
+	envMap["PATH"] = strings.Join(mergedEnvs.Paths.Slice(), string(os.PathListSeparator))
 	return executeCommand(command, cmdArgs, envMap)
 }
 
