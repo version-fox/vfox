@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -290,20 +291,47 @@ func lookPathInEnv(command, pathEnv string) (string, error) {
 	}
 
 	// Search in PATH
+	names := executableNames(command)
 	paths := strings.Split(pathEnv, string(os.PathListSeparator))
 	for _, dir := range paths {
 		if dir == "" {
 			continue
 		}
-		fullPath := dir + string(os.PathSeparator) + command
-		// Check if file is executable
-		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-			// On Unix systems, check executable permissions
-			// On Windows, .exe/.bat extensions are handled by exec.LookPath
-			return fullPath, nil
+		for _, name := range names {
+			fullPath := dir + string(os.PathSeparator) + name
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+				return fullPath, nil
+			}
 		}
 	}
 
 	// If not found in custom PATH, fallback to exec.LookPath
 	return exec.LookPath(command)
+}
+
+// executableNames lists the files a command typed without a path may stand for.
+// On Windows a bare name such as "npm" is run as npm.cmd or npm.exe, so the name
+// gets each PATHEXT extension in turn, the way a shell resolves it; a name that
+// already carries one of those extensions is taken as it is. PowerShell scripts
+// are left out because the process can not start one directly. Elsewhere the
+// name is the file.
+func executableNames(command string) []string {
+	exts := env.PathExts()
+	if len(exts) == 0 {
+		return []string{command}
+	}
+	ext := filepath.Ext(command)
+	for _, candidate := range exts {
+		if ext != "" && strings.EqualFold(ext, candidate) {
+			return []string{command}
+		}
+	}
+	names := make([]string, 0, len(exts))
+	for _, candidate := range exts {
+		if strings.EqualFold(candidate, ".ps1") {
+			continue
+		}
+		names = append(names, command+candidate)
+	}
+	return names
 }
