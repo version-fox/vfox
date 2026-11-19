@@ -222,6 +222,11 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 
 	mainSdk := installInfo.PreInstallPackageItem
 	mainSdk.Name = b.plugin.Name
+	if mainSdk.Version == "" {
+		// Without a version there is nothing to name the installation after: it
+		// would land in v- and be recorded with an empty version.
+		return "", fmt.Errorf("plugin [PreInstall] method error: no version number provided")
+	}
 
 	sdkVersion := Version(mainSdk.Version)
 	// A second check is required because the plug-in may change the version number,
