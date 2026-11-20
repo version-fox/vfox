@@ -103,6 +103,8 @@ vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins
 vfox config github.baseUrl https://gh-proxy.org/https://github.com
 ```
 
+Only `github.com` and path-proxy bases ending in `/https://github.com` get the release API rewritten to `api.github.com`; a host-only mirror (such as `https://kkgithub.com`) is used as-is for the release API, so it must serve the GitHub API under its own host.
+
 If sudo uses root’s home, set root’s mirror with `sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`.
 
 ::: warning

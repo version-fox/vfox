@@ -34,7 +34,15 @@ func (g *GitHub) WebBase() string {
 }
 
 func (g *GitHub) APIBase() string {
-	return strings.ReplaceAll(g.WebBase(), "github.com", "api.github.com")
+	base := g.WebBase()
+	switch {
+	case base == "https://github.com", base == "http://github.com",
+		strings.HasSuffix(base, "/https://github.com"),
+		strings.HasSuffix(base, "/http://github.com"):
+		return strings.TrimSuffix(base, "github.com") + "api.github.com"
+	default:
+		return base
+	}
 }
 
 func (g *GitHub) DownloadURL(source string) string {

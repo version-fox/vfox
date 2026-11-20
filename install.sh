@@ -31,8 +31,14 @@ main() {
       --vfox-installer-github-base-url=*)
         GITHUB_BASE_URL="${1#--vfox-installer-github-base-url=}"
         GITHUB_BASE_URL="${GITHUB_BASE_URL%/}"
-        GITHUB_API_URL="${GITHUB_BASE_URL//github.com/api.github.com}"
-        GITHUB_API_URL="${GITHUB_API_URL%/}"
+        case "$GITHUB_BASE_URL" in
+          https://github.com | http://github.com | */https://github.com | */http://github.com)
+            GITHUB_API_URL="${GITHUB_BASE_URL%github.com}api.github.com"
+            ;;
+          *)
+            GITHUB_API_URL="$GITHUB_BASE_URL"
+            ;;
+        esac
         shift
         ;;
       *)

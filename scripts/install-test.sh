@@ -65,3 +65,17 @@ fi
 if grep -Fq "dummy-token" "$MIRROR_VERSION_ARGS"; then
   fail "mirror --version run leaked GITHUB_TOKEN in arguments"
 fi
+
+HOST_MIRROR_ARGS="$TMP_ROOT/host-mirror.args"
+run_installer "$HOST_MIRROR_ARGS" --vfox-installer-github-base-url=https://kkgithub.com
+grep -Eq '^https://kkgithub\.com/' "$HOST_MIRROR_ARGS" || fail "host mirror run did not keep https://kkgithub.com/ API URL"
+grep -Fxq "https://kkgithub.com/repos/version-fox/vfox/releases/latest" "$HOST_MIRROR_ARGS" || fail "host mirror run did not query host mirror latest URL"
+if grep -Fq "kkapi.github.com" "$HOST_MIRROR_ARGS"; then
+  fail "host mirror run unexpectedly rewrote host to kkapi.github.com"
+fi
+if grep -qi "authorization" "$HOST_MIRROR_ARGS"; then
+  fail "host mirror run unexpectedly sent Authorization header"
+fi
+if grep -Fq "dummy-token" "$HOST_MIRROR_ARGS"; then
+  fail "host mirror run leaked GITHUB_TOKEN in arguments"
+fi
