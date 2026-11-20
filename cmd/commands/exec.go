@@ -151,8 +151,16 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 			envMap[key] = *value
 		}
 	}
-	envMap["PATH"] = mergedEnvs.Paths.String()
+	envMap["PATH"] = buildExecPath(mergedEnvs.Paths)
 	return executeCommand(command, cmdArgs, envMap)
+}
+
+// buildExecPath builds the PATH passed to the process that exec launches.
+// Paths.String() is shell-facing and uses a POSIX ":" separator in bash/zsh
+// sessions on Windows, which a native child process cannot split (it uses ";").
+// Join with the platform separator so exec can locate SDK tools in every shell.
+func buildExecPath(paths *env.Paths) string {
+	return strings.Join(paths.Slice(), string(os.PathListSeparator))
 }
 
 func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Envs, error) {
