@@ -91,8 +91,17 @@ registry:
 
 - https://gitee.com/version-fox/vfox-plugins/raw/main/plugins
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
-- https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
+- https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
   :::
+
+插件清单由注册表提供。升级和下载清单中的 GitHub 归档时使用 GitHub 镜像。
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+如果 sudo 使用 root 的主目录，请为 root 配置镜像：`sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`。
 
 ## 缓存
 

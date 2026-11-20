@@ -18,6 +18,7 @@ package config_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/config"
@@ -78,5 +79,42 @@ func TestStorageWithWritePermission(t *testing.T) {
 	}
 	if err = s.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGitHubMirrorInheritance(t *testing.T) {
+	dir := t.TempDir()
+	shared, user := filepath.Join(dir, "shared.yaml"), filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(shared, []byte("github:\n  baseUrl: https://shared.example\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"https://shared.example", "https://user.example", "https://shared.example"} {
+		cfg, err := config.LoadConfigWithFallback(shared, user)
+		if err != nil || cfg.GitHub.WebBase() != want {
+			t.Fatalf("expected %s, config %v, error %v", want, cfg, err)
+		}
+		f, err := config.LoadFile(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want == "https://shared.example" {
+			err = f.Set("github.baseUrl", "https://user.example")
+		} else {
+			_, err = f.Unset("github.baseUrl")
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = f.Save(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := config.DefaultConfig.GitHub
+	if g.WebBase() != "https://github.com" || g.APIBase() != "https://api.github.com" {
+		t.Fatal("unexpected GitHub defaults")
+	}
+	const thirdParty = "https://github.com.example/plugin.zip"
+	if got := (&config.GitHub{BaseURL: "https://mirror.example"}).DownloadURL(thirdParty); got != thirdParty {
+		t.Fatalf("rewrote %s", got)
 	}
 }

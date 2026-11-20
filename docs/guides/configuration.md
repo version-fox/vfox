@@ -93,8 +93,17 @@ registry:
 ::: tip Available Mirrors
 
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
-- https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
+- https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
   :::
+
+Set the registry for plugin manifests and the GitHub mirror for upgrades and GitHub archives listed in those manifests.
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+If sudo uses root’s home, set root’s mirror with `sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`.
 
 ## Cache Settings
 

@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/config"
 )
 
 func TestDownloadFileRejectsUnexpectedStatus(t *testing.T) {
@@ -79,8 +81,75 @@ func TestFetchLatestVersionNamesTheStatus(t *testing.T) {
 		}, nil
 	})}
 
-	_, err := fetchLatestVersion(client)
+	_, err := fetchLatestVersion(client, nil)
 	if err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 429 Too Many Requests") {
 		t.Fatalf("fetchLatestVersion() error = %v, want unexpected HTTP status 429 Too Many Requests", err)
+	}
+}
+
+func TestUpgradeWithGitHubMirror(t *testing.T) {
+	for _, body := range []string{`{"tag_name":"v1.2.3"}`, "invalid", "{}"} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/https://api.github.com/repos/version-fox/vfox/releases/latest" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = io.WriteString(w, body)
+		}))
+		mirror := &config.GitHub{BaseURL: srv.URL + "/https://github.com/"}
+		tag, err := fetchLatestVersion(srv.Client(), mirror)
+		srv.Close()
+		if body == "invalid" || body == "{}" {
+			if err == nil {
+				t.Fatalf("accepted release %s", body)
+			}
+			continue
+		}
+		if err != nil || tag != "v1.2.3" {
+			t.Fatalf("tag = %q, err = %v", tag, err)
+		}
+		archive, diff := generateUrls("v1", tag, mirror)
+		base := srv.URL + "/https://github.com/version-fox/vfox/"
+		if archive != base+"releases/download/"+tag+"/"+constructBinaryName(tag) || diff != base+"compare/v1..."+tag {
+			t.Fatalf("unexpected URLs %q, %q", archive, diff)
+		}
+	}
+}
+
+type endlessReleaseReader struct {
+	prefix string
+	read   int64
+}
+
+func (r *endlessReleaseReader) Read(p []byte) (int, error) {
+	n := 0
+	if int(r.read) < len(r.prefix) {
+		n = copy(p, r.prefix[r.read:])
+		r.read += int64(n)
+	}
+	for i := n; i < len(p); i++ {
+		p[i] = 'a'
+	}
+	r.read += int64(len(p) - n)
+	return len(p), nil
+}
+
+func TestFetchLatestVersionBoundsOversizedResponse(t *testing.T) {
+	stream := &endlessReleaseReader{prefix: `{"tag_name":"v9.9.9","body":"`}
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(stream),
+		}, nil
+	})}
+
+	mirror := &config.GitHub{BaseURL: "https://mirror.example.com"}
+	if tag, err := fetchLatestVersion(client, mirror); err == nil {
+		t.Fatalf("fetchLatestVersion() = %q, nil; want error for oversized response", tag)
+	}
+	if stream.read != maxReleaseResponseBytes {
+		t.Fatalf("bytes read = %d, want %d", stream.read, maxReleaseResponseBytes)
 	}
 }

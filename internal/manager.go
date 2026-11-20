@@ -422,6 +422,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 		logger.Debugf("Plugin requires vfox >= %s, current version: %s\n", plugin.MinRuntimeVersion, RuntimeVersion)
 		return nil, fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(plugin.MinRuntimeVersion))
 	}
+	plugin.DownloadUrl = m.RuntimeEnvContext.UserConfig.GitHub.DownloadURL(plugin.DownloadUrl)
 	return &plugin, nil
 }
 

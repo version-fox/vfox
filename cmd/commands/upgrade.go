@@ -18,21 +18,26 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/urfave/cli/v3"
+
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
-const SelfUpgradeName = "upgrade"
+const (
+	SelfUpgradeName         = "upgrade"
+	maxReleaseResponseBytes = 1 << 20
+)
 
 var Upgrade = &cli.Command{
 	Name:   SelfUpgradeName,
@@ -40,34 +45,28 @@ var Upgrade = &cli.Command{
 	Action: upgradeCmd,
 }
 
-func fetchLatestVersion(c *http.Client) (string, error) {
-	const tagsURL = "https://github.com/version-fox/vfox/tags"
-	resp, err := c.Get(tagsURL)
+func fetchLatestVersion(c *http.Client, github *config.GitHub) (string, error) {
+	releaseURL := github.APIBase() + "/repos/version-fox/vfox/releases/latest"
+	resp, err := c.Get(releaseURL)
 	if err != nil {
-		return "", err
+		return "", util.RedactError(err)
 	}
 	defer resp.Body.Close()
 
-	if err = util.UnexpectedStatusError(resp, tagsURL); err != nil {
+	if err = util.UnexpectedStatusError(resp, releaseURL); err != nil {
 		return "", err
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	var release struct {
+		Tag string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxReleaseResponseBytes)).Decode(&release); err != nil {
 		return "", err
 	}
-	re, err := regexp.Compile(`href="/version-fox/vfox/releases/tag/(v[0-9.]+)"`)
-	if err != nil {
-		return "", err
+	if release.Tag == "" {
+		return "", fmt.Errorf("latest release has no tag_name")
 	}
-	matches := re.FindAllStringSubmatch(string(body), -1)
-
-	if len(matches) == 0 {
-		return "", fmt.Errorf("Failed to fetch the version.")
-	}
-
-	latestVersion := matches[0][1]
-	return latestVersion, nil
+	return release.Tag, nil
 }
 
 func constructBinaryName(tagName string) string {
@@ -93,17 +92,17 @@ func constructBinaryName(tagName string) string {
 	return fileName
 }
 
-func generateUrls(currVersion string, tagName string) (string, string) {
+func generateUrls(currVersion string, tagName string, github *config.GitHub) (string, string) {
 	fileName := constructBinaryName(tagName)
-	binURL := fmt.Sprintf("https://github.com/version-fox/vfox/releases/download/%s/%s", tagName, fileName)
-	diffURL := fmt.Sprintf("https://github.com/version-fox/vfox/compare/%s...%s", currVersion, tagName)
+	binURL := github.WebBase() + fmt.Sprintf("/version-fox/vfox/releases/download/%s/%s", tagName, fileName)
+	diffURL := github.WebBase() + fmt.Sprintf("/version-fox/vfox/compare/%s...%s", currVersion, tagName)
 	return binURL, diffURL
 }
 
 func downloadFile(c *http.Client, filepath string, url string) error {
 	resp, err := c.Get(url)
 	if err != nil {
-		return err
+		return util.RedactError(err)
 	}
 	defer resp.Body.Close()
 
@@ -142,7 +141,8 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	currVersion := fmt.Sprintf("v%s", internal.RuntimeVersion)
-	latestVersion, err := fetchLatestVersion(httpClient)
+	github := manager.RuntimeEnvContext.UserConfig.GitHub
+	latestVersion, err := fetchLatestVersion(httpClient, github)
 	if err != nil {
 		return cli.Exit("Failed to fetch the latest version: "+err.Error(), 1)
 	}
@@ -155,7 +155,7 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	exeDir, exeName := filepath.Split(exePath)
-	binURL, diffURL := generateUrls(currVersion, latestVersion)
+	binURL, diffURL := generateUrls(currVersion, latestVersion, github)
 	tempFile := "vfox_latest.tar.gz"
 	if runtime.GOOS == "windows" {
 		tempFile = "vfox_latest.zip"
@@ -180,7 +180,7 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 	}()
 
-	fmt.Println("Fetching", binURL)
+	fmt.Println("Fetching", util.RedactSourceURL(binURL))
 
 	if err := downloadFile(httpClient, tempFile, binURL); err != nil {
 		return cli.Exit("Failed to download file: "+err.Error(), 1)
@@ -224,7 +224,7 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	fmt.Printf("Updated to version: %s\nSee the diff at: %s\n", latestVersion, diffURL)
+	fmt.Printf("Updated to version: %s\nSee the diff at: %s\n", latestVersion, util.RedactSourceURL(diffURL))
 
 	if runtime.GOOS == "windows" {
 		fmt.Println("Press any key to continue...")
