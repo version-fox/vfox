@@ -1,6 +1,6 @@
 module github.com/version-fox/vfox
 
-go 1.24.0
+go 1.25.0
 
 require (
 	atomicgo.dev/cursor v0.2.0
@@ -17,10 +17,10 @@ require (
 	github.com/ulikunitz/xz v0.5.15
 	github.com/urfave/cli/v3 v3.4.1
 	github.com/yuin/gopher-lua v1.1.1
-	golang.org/x/crypto v0.35.0
-	golang.org/x/sync v0.19.0
-	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.29.0
+	golang.org/x/crypto v0.52.0
+	golang.org/x/sync v0.20.0
+	golang.org/x/sys v0.45.0
+	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -48,6 +48,6 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
-	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
