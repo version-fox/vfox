@@ -153,3 +153,75 @@ func TestFetchLatestVersionBoundsOversizedResponse(t *testing.T) {
 		t.Fatalf("bytes read = %d, want %d", stream.read, maxReleaseResponseBytes)
 	}
 }
+
+func TestFetchLatestVersionSendsTokenToDefaultAPIBase(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	var gotURL, gotAuth string
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		gotURL = req.URL.String()
+		gotAuth = req.Header.Get("Authorization")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v1.0.14"}`)),
+		}, nil
+	})}
+
+	tag, err := fetchLatestVersion(client, &config.GitHub{})
+	if err != nil || tag != "v1.0.14" {
+		t.Fatalf("fetchLatestVersion() = %q, %v; want v1.0.14, nil", tag, err)
+	}
+	if gotURL != "https://api.github.com/repos/version-fox/vfox/releases/latest" {
+		t.Fatalf("request URL = %q", gotURL)
+	}
+	if gotAuth != "Bearer secret-token" {
+		t.Fatalf("Authorization = %q, want %q", gotAuth, "Bearer secret-token")
+	}
+}
+
+func TestFetchLatestVersionOmitsTokenForMirrorBase(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	var gotURL string
+	var gotAuth []string
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		gotURL = req.URL.String()
+		gotAuth = req.Header.Values("Authorization")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v1.0.14"}`)),
+		}, nil
+	})}
+
+	mirror := &config.GitHub{BaseURL: "https://gh-proxy.org/https://github.com"}
+	tag, err := fetchLatestVersion(client, mirror)
+	if err != nil || tag != "v1.0.14" {
+		t.Fatalf("fetchLatestVersion() = %q, %v; want v1.0.14, nil", tag, err)
+	}
+	if gotURL != "https://gh-proxy.org/https://api.github.com/repos/version-fox/vfox/releases/latest" {
+		t.Fatalf("request URL = %q", gotURL)
+	}
+	if len(gotAuth) != 0 {
+		t.Fatalf("Authorization = %v, want none", gotAuth)
+	}
+}
+
+func TestFetchLatestVersionRejectsInvalidTag(t *testing.T) {
+	for _, rawTag := range []string{"1.0.14", "v", "v1.0.14-rc1", "../v1.0.14"} {
+		client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"tag_name":"` + rawTag + `"}`)),
+			}, nil
+		})}
+		if tag, err := fetchLatestVersion(client, nil); err == nil {
+			t.Fatalf("fetchLatestVersion(%q) = %q, nil; want error", rawTag, tag)
+		}
+	}
+}

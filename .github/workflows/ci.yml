@@ -34,6 +34,9 @@ jobs:
           VFOX_TEST_WINDOWS_REGISTRY: '1'
         run: |
           go test ./... -coverprofile=coverage.out -covermode=atomic
+      - name: Test install.sh
+        if: matrix.os == 'ubuntu-latest'
+        run: bash scripts/install-test.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
 

@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/shared/util"
 )
 
 func TestSelect_Show(t *testing.T) {
-	if os.Getenv("CI") != "" {
+	if os.Getenv("CI") != "" || !util.IsTTY() {
 		t.Skip("Skipping TestSelect_Show in CI environment because it requires user input")
 	}
 

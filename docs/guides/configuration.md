@@ -105,6 +105,10 @@ vfox config github.baseUrl https://gh-proxy.org/https://github.com
 
 If sudo uses root’s home, set root’s mirror with `sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`.
 
+::: warning
+`github.baseUrl` decides where `vfox upgrade` downloads the new binary and plugins from. The archive is not verified against a checksum or signature, and both `http://` and `https://` are accepted, so only set it to a mirror you trust. A value in a shared `config.yaml` applies to every user of that `VFOX_HOME`.
+:::
+
 ## Cache Settings
 
 `vfox` will cache the results of the `search` command (`available` hook) by default to reduce the number of network requests. The default

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -37,7 +38,10 @@ import (
 const (
 	SelfUpgradeName         = "upgrade"
 	maxReleaseResponseBytes = 1 << 20
+	defaultGitHubAPIBase    = "https://api.github.com"
 )
+
+var releaseTagPattern = regexp.MustCompile(`^v[0-9.]+$`)
 
 var Upgrade = &cli.Command{
 	Name:   SelfUpgradeName,
@@ -46,8 +50,16 @@ var Upgrade = &cli.Command{
 }
 
 func fetchLatestVersion(c *http.Client, github *config.GitHub) (string, error) {
-	releaseURL := github.APIBase() + "/repos/version-fox/vfox/releases/latest"
-	resp, err := c.Get(releaseURL)
+	apiBase := strings.TrimSuffix(github.APIBase(), "/")
+	releaseURL := apiBase + "/repos/version-fox/vfox/releases/latest"
+	req, err := http.NewRequest(http.MethodGet, releaseURL, nil)
+	if err != nil {
+		return "", util.RedactError(err)
+	}
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" && apiBase == defaultGitHubAPIBase {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := c.Do(req)
 	if err != nil {
 		return "", util.RedactError(err)
 	}
@@ -65,6 +77,9 @@ func fetchLatestVersion(c *http.Client, github *config.GitHub) (string, error) {
 	}
 	if release.Tag == "" {
 		return "", fmt.Errorf("latest release has no tag_name")
+	}
+	if !releaseTagPattern.MatchString(release.Tag) {
+		return "", fmt.Errorf("invalid release tag %q", release.Tag)
 	}
 	return release.Tag, nil
 }
