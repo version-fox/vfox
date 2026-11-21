@@ -58,6 +58,7 @@ type Sdk interface {
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
 	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
 	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
+	UseGlobal(version Version) error                                      // Make version the global one, without the hook or a new shell
 	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
 	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
 	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
@@ -806,7 +807,30 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 		return &VersionNotExistsError{Label: label}
 	}
 
-	return b.useInHook(resolvedVersion, scope, unlink, hookEnv)
+	if err := b.useInHook(resolvedVersion, scope, unlink, hookEnv); err != nil {
+		return err
+	}
+
+	// In non-hook environment, spawn a new shell so the user can use the new version immediately
+	if !hookEnv {
+		return shell.Open(os.Getppid())
+	}
+	return nil
+}
+
+// UseGlobal makes version the global one. Unlike Use, it needs no shell hook and
+// opens no shell: the global scope is the config file and its links, and the
+// caller (uninstall moving the global version away from the one it removed) is
+// not where the user asked to start using a version.
+func (b *impl) UseGlobal(version Version) error {
+	resolvedVersion, err := b.preUse(version, env.Global)
+	if err != nil {
+		return err
+	}
+	if !b.CheckRuntimeExist(resolvedVersion) {
+		return &VersionNotExistsError{Label: b.Label(resolvedVersion)}
+	}
+	return b.useInHook(resolvedVersion, env.Global, false, env.IsHookEnv())
 }
 
 func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookEnv bool) error {
@@ -914,11 +938,6 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 	// Say so when the shell is not going to run what was just selected. This
 	// comes before the hand-off to a new shell below, which blocks.
 	b.reportFindings(version, hookEnv)
-
-	// In non-hook environment, spawn a new shell so the user can use the new version immediately
-	if !hookEnv {
-		return shell.Open(os.Getppid())
-	}
 
 	return nil
 }

@@ -46,3 +46,21 @@ func TestUninstallLeavesTheGlobalVersionOfOtherScopes(t *testing.T) {
 		mustContain(t, "global config", readFile(t, globalConfig), `alpha = "1.0.0"`)
 	})
 }
+
+// Uninstalling the global version in a shell that was not activated still moves
+// the global version to one that is left, and succeeds: the global scope does not
+// need the hook, and uninstall must not open a shell either.
+func TestUninstallSwitchesTheGlobalVersionWithoutAHook(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
+	f.env["__VFOX_SHELL"] = "-"
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "Auto switch", "alpha@1.0.0")
+	mustNotContain(t, "uninstall", out, "hook support")
+	mustContain(t, "global config", readFile(t, globalConfig), `alpha = "1.0.0"`)
+}
