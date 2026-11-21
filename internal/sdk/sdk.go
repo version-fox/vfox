@@ -52,6 +52,7 @@ type Sdk interface {
 	Install(version Version) error                                        // Install a specific runtime of the SDK
 	Reinstall(version Version) error                                      // Replace an installed runtime with a fresh copy
 	InstallResolved(version Version, reinstall bool) (Version, error)     // Install and report the version that ended up on disk
+	InstallAs(version Version, name Version) (Version, error)             // Install version as a second copy kept under name
 	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
 	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
@@ -190,11 +191,49 @@ func (b *impl) Reinstall(version Version) error {
 // the version as given is already installed it is returned as is and PreInstall is
 // not called. The version is only meaningful when err is nil. Install and Reinstall
 // wrap this for callers that do not need it.
-func (b *impl) InstallResolved(version Version, reinstall bool) (installed Version, installErr error) {
+func (b *impl) InstallResolved(version Version, reinstall bool) (Version, error) {
+	return b.install(version, "", reinstall)
+}
+
+// InstallAs installs version as a second copy of it, kept under name, which is what
+// `vfox install --as` does. The copy is used, listed and uninstalled by that name, and
+// the installation under the version it resolves to is left alone, so both can be on
+// disk at once. PreInstall is asked for version, as usual. Nothing installed or linked
+// may have name yet, and name cannot be the version the request resolves to.
+func (b *impl) InstallAs(version Version, name Version) (Version, error) {
+	if name == "" {
+		return "", fmt.Errorf("a copy of %s needs a name", version)
+	}
+	return b.install(version, name, false)
+}
+
+// install is InstallResolved and InstallAs. Without a name the installation is kept
+// under the version PreInstall resolves the request to; with one, under name, and the
+// version it resolves to is recorded in the receipt.
+func (b *impl) install(version, name Version, reinstall bool) (installed Version, installErr error) {
+	// PreInstall does not know the name of a copy, so a copy is reinstalled from the
+	// version it was asked for, and the reinstall has to resolve to the version it has.
+	exact := version
+	if reinstall && name == "" {
+		if receipt := b.copyReceipt(version); receipt != nil {
+			version, name, exact = Version(receipt.Requested), version, Version(receipt.Resolved)
+		}
+	}
+	named := name != ""
 	label := b.Label(version)
+	if named {
+		label = b.Label(name)
+	}
 	logger.Debugf("Installing SDK: %s (reinstall: %v)\n", label, reinstall)
 
-	if reinstall {
+	if named {
+		if !ValidVersionName(string(name)) {
+			return "", fmt.Errorf("%q is not a usable name: use letters, digits, '.', '_', '+' and '-', and not \"latest\"", name)
+		}
+		if !reinstall && b.nameTaken(name) {
+			return "", b.nameTakenError(name)
+		}
+	} else if reinstall {
 		if target, linked := b.linkedTarget(version); linked {
 			return "", fmt.Errorf("%s is linked to %s and was not installed by vfox; `vfox uninstall %s` removes the link", label, target, label)
 		}
@@ -229,15 +268,26 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 	}
 
 	sdkVersion := Version(mainSdk.Version)
+	// The installation is kept under its name, or under the version it resolved to.
+	key := sdkVersion
+	if named {
+		key = name
+	}
 	// A second check is required because the plug-in may change the version number,
 	// for example, latest is resolved to a specific version number.
-	label = b.Label(sdkVersion)
+	label = b.Label(key)
 	logger.Debugf("Resolved version: %s\n", sdkVersion)
-	if reinstall && sdkVersion != version {
+	if reinstall && sdkVersion != exact {
+		if named {
+			return "", fmt.Errorf("%s is a copy of %s, which now resolves to %s, not the %s it was installed as; uninstall it and install it again with --as to get %s", label, version, sdkVersion, exact, sdkVersion)
+		}
 		return "", fmt.Errorf("%s resolves to %s; give the exact installed version to reinstall it", b.Label(version), label)
 	}
-	newDirPath := b.packagePath(sdkVersion)
-	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(sdkVersion)+".lock"))
+	if named && sdkVersion == name {
+		return "", fmt.Errorf("%s resolves to %s, so a copy of it cannot be named %s: name the copy differently", b.Label(version), sdkVersion, name)
+	}
+	newDirPath := b.packagePath(key)
+	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(key)+".lock"))
 	if err != nil {
 		return "", fmt.Errorf("cannot install %s: %w", label, err)
 	}
@@ -247,16 +297,20 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 		}
 	}()
 	// Recheck while holding the lock, before cleaning an interrupted attempt.
-	if !reinstall && b.CheckRuntimeExist(sdkVersion) {
+	if named {
+		if !reinstall && b.nameTaken(key) {
+			return "", b.nameTakenError(key)
+		}
+	} else if !reinstall && b.CheckRuntimeExist(key) {
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists after version resolution\n", label)
-		return sdkVersion, nil
+		return key, nil
 	}
 	success := false
 	logger.Debugf("Installing to path: %s\n", newDirPath)
 	// Keep the marker outside the payload so failed cleanup cannot erase it
 	// before removing files still held open by a child process on Windows.
-	markerPath := b.installMarkerPath(sdkVersion)
+	markerPath := b.installMarkerPath(key)
 	if err := os.WriteFile(markerPath, nil, 0600); err != nil {
 		return "", fmt.Errorf("mark installation in progress: %w", err)
 	}
@@ -276,21 +330,23 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 	}
 	installedPackage := make(map[string]*plugin.InstalledPackageItem)
 
-	path, err := b.preInstallSdk(mainSdk, filepath.Join(newDirPath, b.runtimePathDirName(true, mainSdk)))
+	// The main runtime is where mainRuntimePath looks for it, so it is named after the
+	// installation, which for a copy is not the version the plugin resolved to.
+	path, err := b.preInstallSdk(mainSdk, b.mainRuntimePath(key))
 
 	if err != nil {
 		return "", err
 	}
 	installedPackage[mainSdk.Name] = &plugin.InstalledPackageItem{
 		Name:    mainSdk.Name,
-		Version: mainSdk.Version,
+		Version: string(key),
 		Path:    path,
 		Note:    mainSdk.Note,
 	}
 	if len(installInfo.Addition) > 0 {
 		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Addition))
 		for _, oSdk := range installInfo.Addition {
-			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, b.runtimePathDirName(false, oSdk)))
+			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, additionDirName(oSdk)))
 			if err != nil {
 				return "", err
 			}
@@ -315,7 +371,7 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 	}
 	// The receipt goes in before the marker comes off, so a finished
 	// installation always has one.
-	b.recordInstall(version, sdkVersion, installInfo, installedPackage, newDirPath)
+	b.recordInstall(version, key, installInfo, installedPackage, newDirPath)
 	if err := os.Remove(markerPath); err != nil {
 		return "", fmt.Errorf("finish installation: %w", err)
 	}
@@ -333,7 +389,37 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 		// Silently ignore clipboard errors (not supported, utility not found, etc.)
 	}
 
-	return sdkVersion, nil
+	return key, nil
+}
+
+// copyReceipt returns the receipt of a copy made by InstallAs, and nil for anything
+// else: only a copy records the version its request resolved to.
+func (b *impl) copyReceipt(name Version) *Receipt {
+	receipt, err := readReceipt(b.packagePath(name))
+	if err != nil {
+		logger.Debugf("Ignoring unreadable receipt of %s: %v\n", b.Label(name), err)
+		return nil
+	}
+	if receipt == nil || receipt.Resolved == "" || receipt.Requested == "" {
+		return nil
+	}
+	return receipt
+}
+
+// nameTaken reports whether a version is installed or linked under name, a link
+// whose target has gone included. What an interrupted installation left behind does
+// not count: installing under the name replaces it.
+func (b *impl) nameTaken(name Version) bool {
+	return b.CheckRuntimeExist(name) || b.brokenLink(name)
+}
+
+// nameTakenError says what holds name and how to free it.
+func (b *impl) nameTakenError(name Version) error {
+	label := b.Label(name)
+	if target, linked := b.linkedTarget(name); linked {
+		return fmt.Errorf("%s is already linked to %s; choose another name for the copy, or `vfox uninstall %s` removes the link", label, target, label)
+	}
+	return fmt.Errorf("%s is already installed; choose another name for the copy, or `vfox uninstall %s` removes it first", label, label)
 }
 
 // recordInstall leaves the receipt of a finished installation in its version
@@ -342,6 +428,10 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (installed Versi
 func (b *impl) recordInstall(requested, version Version, info *plugin.PreInstallHookResult, installed map[string]*plugin.InstalledPackageItem, packagePath string) {
 	receipt := b.newReceipt(version, OriginInstalled)
 	receipt.Requested = string(requested)
+	// A copy kept under a name records the version the request resolved to.
+	if resolved := Version(info.PreInstallPackageItem.Version); resolved != version {
+		receipt.Resolved = string(resolved)
+	}
 	receipt.Sources = append(receipt.Sources, receiptSource(info.PreInstallPackageItem))
 	for _, addition := range info.Addition {
 		receipt.Sources = append(receipt.Sources, receiptSource(addition))
@@ -414,26 +504,14 @@ func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath str
 	return nil
 }
 
-func (b *impl) runtimePathDirName(isMain bool, info *plugin.PreInstallPackageItem) string {
-	var name string
-	if isMain {
-		if info.Version == "" {
-			// {name}
-			name = info.Name
-		} else {
-			// {name}-{version}
-			name = info.Name + "-" + info.Version
-		}
-	} else {
-		if info.Version == "" {
-			// add-{name}
-			name = additionRuntimePrefix + info.Name
-		} else {
-			// add-{name}-{version}
-			name = additionRuntimePrefix + info.Name + "-" + info.Version
-		}
+// additionDirName names the directory of an additional runtime inside its version
+// directory: add-{name}-{version}, or add-{name} when it has no version. The main
+// runtime is named by mainRuntimePath.
+func additionDirName(info *plugin.PreInstallPackageItem) string {
+	if info.Version == "" {
+		return additionRuntimePrefix + info.Name
 	}
-	return name
+	return additionRuntimePrefix + info.Name + "-" + info.Version
 }
 
 func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string) (string, error) {

@@ -89,21 +89,25 @@ func TestSdkArgumentsKeepTheVersionAsTyped(t *testing.T) {
 
 func TestFormatVersionLabel(t *testing.T) {
 	tests := []struct {
-		name    string
-		version sdk.Version
-		origin  sdk.Origin
-		target  string
-		aliases []string
-		want    string
+		name     string
+		version  sdk.Version
+		origin   sdk.Origin
+		target   string
+		resolved string
+		aliases  []string
+		want     string
 	}{
-		{"installed", "17.0.9", sdk.OriginInstalled, "", nil, "17.0.9"},
-		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", nil, "17-sys (linked → /usr/lib/jvm/x)"},
-		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", nil, "17-sys (linked)"},
-		{"aliased", "17.0.9", sdk.OriginInstalled, "", []string{"j17", "lts"}, "17.0.9 [alias: j17, lts]"},
-		{"both", "17-sys", sdk.OriginLinked, "/jdk", []string{"sys"}, "17-sys (linked → /jdk) [alias: sys]"},
+		{"installed", "17.0.9", sdk.OriginInstalled, "", "", nil, "17.0.9"},
+		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", "", nil, "17-sys (linked → /usr/lib/jvm/x)"},
+		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", "", nil, "17-sys (linked)"},
+		{"aliased", "17.0.9", sdk.OriginInstalled, "", "", []string{"j17", "lts"}, "17.0.9 [alias: j17, lts]"},
+		{"both", "17-sys", sdk.OriginLinked, "/jdk", "", []string{"sys"}, "17-sys (linked → /jdk) [alias: sys]"},
+		{"copy under a name", "17-db", sdk.OriginInstalled, "", "17.0.9", nil, "17-db (17.0.9)"},
+		{"copy, aliased", "17-db", sdk.OriginInstalled, "", "17.0.9", []string{"cuda"}, "17-db (17.0.9) [alias: cuda]"},
+		{"resolved to its own name", "17.0.9", sdk.OriginInstalled, "", "17.0.9", nil, "17.0.9"},
 	}
 	for _, tt := range tests {
-		if got := formatVersionLabel(tt.version, tt.origin, tt.target, tt.aliases); got != tt.want {
+		if got := formatVersionLabel(tt.version, tt.origin, tt.target, tt.resolved, tt.aliases); got != tt.want {
 			t.Errorf("%s: label = %q, want %q", tt.name, got, tt.want)
 		}
 	}

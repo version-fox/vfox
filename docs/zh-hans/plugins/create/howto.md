@@ -185,6 +185,8 @@ function PLUGIN:PostInstall(ctx)
 end
 ```
 
+用 `vfox install --as` 安装的副本，`sdkInfo.version` 是副本的名字（例如 `3.12-db`），也是它所在目录的名字。`PreInstall` 仍然以用户请求的版本（例如 `3.12`）调用，它返回的版本则是副本实际解析到的版本。
+
 ### PreUse
 
 当用户使用 `vfox use` 的时候，会调用插件的 `PreUse` 函数。这个函数的作用是返回用户输入的版本信息。

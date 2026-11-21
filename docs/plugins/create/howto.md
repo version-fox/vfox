@@ -192,6 +192,8 @@ function PLUGIN:PostInstall(ctx)
 end
 ```
 
+For a copy made with `vfox install --as`, `sdkInfo.version` is the name of the copy (for example `3.12-db`), the same name as its directory. `PreInstall` is still called with the version the user asked for, and the version it returns is the one the copy resolved to.
+
 ### PreUse
 
 When the user uses `vfox use`, the plugin's `PreUse` function is called. The purpose of this function is to return the

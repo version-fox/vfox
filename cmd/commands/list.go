@@ -91,15 +91,23 @@ func aliasesByVersion(aliases map[string]string) map[string][]string {
 // versionLabel is how `vfox list` shows a version: its name, where it is linked
 // to if it is a link, and the aliases it has.
 func versionLabel(s sdk.Sdk, version sdk.Version, aliases map[string][]string) string {
-	origin, target := sdk.OriginInstalled, ""
+	origin, target, resolved := sdk.OriginInstalled, "", ""
 	if installation, err := s.Installation(version); err == nil {
 		origin, target = installation.Origin, installation.Target
+		if installation.Receipt != nil {
+			resolved = installation.Receipt.Resolved
+		}
 	}
-	return formatVersionLabel(version, origin, target, aliases[string(version)])
+	return formatVersionLabel(version, origin, target, resolved, aliases[string(version)])
 }
 
-func formatVersionLabel(version sdk.Version, origin sdk.Origin, target string, aliases []string) string {
+// formatVersionLabel shows a copy made with install --as next to the version it is a
+// copy of, as "3.12-db (3.12.7)"; resolved is that version, or "" for anything else.
+func formatVersionLabel(version sdk.Version, origin sdk.Origin, target, resolved string, aliases []string) string {
 	label := string(version)
+	if resolved != "" && resolved != string(version) {
+		label += " (" + resolved + ")"
+	}
 	if origin == sdk.OriginLinked {
 		label += " (linked"
 		if target != "" {

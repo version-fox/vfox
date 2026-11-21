@@ -57,6 +57,10 @@ var Install = &cli.Command{
 			Aliases: []string{"u"},
 			Usage:   "Use the installed version in the current shell session",
 		},
+		&cli.StringFlag{
+			Name:  "as",
+			Usage: "Install the version as a second copy under this name, so that the same version can be installed more than once, for example python@3.12 --as 3.12-db",
+		},
 	},
 	Action:   installCmd,
 	Category: CategorySDK,
@@ -66,6 +70,8 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	yes := cmd.Bool("yes")
 	reinstall := cmd.Bool("reinstall")
 	useAfterInstall := cmd.Bool("use")
+	asName := cmd.String("as")
+	named := cmd.IsSet("as")
 
 	if cmd.Bool("all") {
 		if reinstall {
@@ -74,12 +80,27 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		if useAfterInstall {
 			return cli.Exit("--use cannot be combined with --all", 1)
 		}
+		if named {
+			return cli.Exit("--as cannot be combined with --all", 1)
+		}
 		return installAll(yes)
 	}
 
 	args := cmd.Args()
 	if args.First() == "" {
 		return cli.Exit("sdk name is required", 1)
+	}
+
+	if named {
+		if reinstall {
+			return cli.Exit("--as cannot be combined with --reinstall", 1)
+		}
+		if !sdk.ValidVersionName(asName) {
+			return cli.Exit(fmt.Sprintf("%q is not a usable name for --as: use letters, digits, '.', '_', '+' and '-', and not \"latest\"", asName), 1)
+		}
+		if args.Len() != 1 {
+			return cli.Exit("--as names one installation, so give one sdk@version", 1)
+		}
 	}
 
 	if useAfterInstall {
@@ -154,6 +175,9 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 				if useAfterInstall {
 					return cli.Exit(fmt.Sprintf("install --use needs a version for %s, for example %s@latest", name, name), 1)
 				}
+				if named {
+					return cli.Exit(fmt.Sprintf("install --as needs a version for %s, for example %s@latest", name, name), 1)
+				}
 				if util.IsNonInteractiveTerminal() {
 					return cli.Exit(fmt.Sprintf("install requires specifying a version for %s", name), 1)
 				}
@@ -166,7 +190,12 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 					continue
 				}
 			} else {
-				installed, err := sdkSource.InstallResolved(resolvedVersion, reinstall)
+				var installed sdk.Version
+				if named {
+					installed, err = sdkSource.InstallAs(resolvedVersion, sdk.Version(asName))
+				} else {
+					installed, err = sdkSource.InstallResolved(resolvedVersion, reinstall)
+				}
 				if err != nil {
 					errorStore.AddAndShow(name, err)
 					continue
