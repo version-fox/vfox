@@ -49,7 +49,7 @@ func TestUninstallLeavesTheGlobalVersionOfOtherScopes(t *testing.T) {
 
 // Uninstalling the global version in a shell that was not activated still moves
 // the global version to one that is left, and succeeds: the global scope does not
-// need the hook, and uninstall must not open a shell either.
+// need the hook.
 func TestUninstallSwitchesTheGlobalVersionWithoutAHook(t *testing.T) {
 	f := newCLIFixture(t, false)
 	for _, v := range []string{"1.0.0", "2.0.0"} {

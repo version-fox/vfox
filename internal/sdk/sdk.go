@@ -818,10 +818,10 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 	return nil
 }
 
-// UseGlobal makes version the global one. Unlike Use, it needs no shell hook and
-// opens no shell: the global scope is the config file and its links, and the
-// caller (uninstall moving the global version away from the one it removed) is
-// not where the user asked to start using a version.
+// UseGlobal makes version the global version of the SDK. It resolves version
+// through the plugin's PreUse hook, checks that it is installed, and writes it to
+// the global config and links. Unlike Use, it does not need the shell hook and
+// never opens a new shell.
 func (b *impl) UseGlobal(version Version) error {
 	resolvedVersion, err := b.preUse(version, env.Global)
 	if err != nil {
@@ -935,8 +935,8 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 	pterm.Printf("Now using %s.\n", pterm.LightGreen(b.Label(version)))
 	logger.Debugf("Successfully using SDK: %s\n", b.Label(version))
 
-	// Say so when the shell is not going to run what was just selected. This
-	// comes before the hand-off to a new shell below, which blocks.
+	// Say so when the shell is not going to run what was just selected. A caller
+	// that hands off to a new shell does so after this returns, and that blocks.
 	b.reportFindings(version, hookEnv)
 
 	return nil
