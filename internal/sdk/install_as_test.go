@@ -329,3 +329,102 @@ func TestReinstallOfACopyKeepsItsName(t *testing.T) {
 		t.Error("a refused reinstall changed the copy")
 	}
 }
+
+// Another process can finish the same copy while this one waits in PreInstall. The
+// name is checked again once the installation lock is held, and the copy that is
+// there stays as it is.
+func TestInstallAsRefusesANameTakenWhileItWasResolved(t *testing.T) {
+	s, p := newCopyTestSDK(t)
+	other := s.mainRuntimePath("3.12-db")
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		if err := os.MkdirAll(other, 0755); err != nil {
+			t.Fatal(err)
+		}
+		// A file the other process left behind: it is gone if this installation
+		// removed the directory, even though PostInstall would recreate a command.
+		if err := os.WriteFile(filepath.Join(other, "kept"), nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+		return resolves312(ctx)
+	}
+
+	_, err := s.InstallAs("3.12", "3.12-db")
+	if err == nil || !strings.Contains(err.Error(), "3.12-db is already installed") {
+		t.Fatalf("err = %v, want the name to be reported as taken", err)
+	}
+	if !exists(filepath.Join(other, "kept")) {
+		t.Error("the refused copy changed the installation that holds its name")
+	}
+	if exists(s.installMarkerPath("3.12-db")) {
+		t.Error("the refused copy left an installation marker behind")
+	}
+}
+
+// The same recheck covers a plain installation: a version that appears while
+// PreInstall runs is the one returned, and it is not installed again.
+func TestInstallReturnsAVersionInstalledWhileItWasResolved(t *testing.T) {
+	s, p := newCopyTestSDK(t)
+	other := s.mainRuntimePath("3.12.7")
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		if err := os.MkdirAll(other, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(other, "kept"), nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+		return resolves312(ctx)
+	}
+
+	got, err := s.InstallResolved("3.12", false)
+	if err != nil {
+		t.Fatalf("InstallResolved: %v", err)
+	}
+	if got != "3.12.7" {
+		t.Errorf("InstallResolved returned %q, want the version that is installed", got)
+	}
+	if !exists(filepath.Join(other, "kept")) || exists(s.installMarkerPath("3.12.7")) {
+		t.Error("the installation that was already there was changed")
+	}
+}
+
+// A receipt that cannot be read is advisory. It must not stop a version from being
+// reinstalled, which is how a broken installation gets repaired.
+func TestReinstallSurvivesAnUnreadableReceipt(t *testing.T) {
+	s := newTestSDK(t, (&testPlugin{}).withCommand(t, "tool"))
+	mustInstall(t, s, "1.0.0")
+	main := s.mainRuntimePath("1.0.0")
+	if err := os.WriteFile(filepath.Join(main, "changed-in-place"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(receiptPath(s.packagePath("1.0.0")), []byte("{not json"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Reinstall("1.0.0"); err != nil {
+		t.Fatalf("Reinstall with an unreadable receipt: %v", err)
+	}
+	if exists(filepath.Join(main, "changed-in-place")) {
+		t.Error("the reinstall kept what the SDK changed in place")
+	}
+	inst, err := s.Installation("1.0.0")
+	if err != nil || inst.Receipt == nil || inst.Receipt.Version != "1.0.0" {
+		t.Errorf("after the reinstall: installation = %+v, err = %v; want a readable receipt", inst, err)
+	}
+}
+
+// An additional runtime the plugin does not version keeps the add-<name> directory
+// that it had before installations were kept under their names.
+func TestInstallKeepsTheDirectoryOfAnUnversionedAddition(t *testing.T) {
+	p := (&testPlugin{preInstall: func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		return &plugin.PreInstallHookResult{
+			PreInstallPackageItem: &plugin.PreInstallPackageItem{Version: ctx.Version},
+			Addition:              []*plugin.PreInstallPackageItem{{Name: "tools"}},
+		}, nil
+	}}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "1.0.0")
+
+	if !exists(filepath.Join(s.packagePath("1.0.0"), "add-tools")) {
+		t.Error("the unversioned addition has no add-tools directory")
+	}
+}
