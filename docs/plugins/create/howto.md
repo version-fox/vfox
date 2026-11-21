@@ -193,11 +193,13 @@ function PLUGIN:PostInstall(ctx)
 end
 ```
 
+For a copy made with `vfox install --as`, `sdkInfo.version` is the name of the copy (for example `3.12-db`), the same name as its directory. `PreInstall` is still called with the version the user asked for, and the version it returns is the one the copy resolved to.
+
 ### PreUse
 
 When the user uses `vfox use`, the plugin's `PreUse` function is called. The purpose of this function is to return the
 version information entered by the user. If the `PreUse` function returns version information, `vfox` will use this new
-version.
+version. `ctx.installedSdks` lists the installations of versions only: a copy made with `vfox install --as` is left out, since it is selected only by its own name.
 
 ```lua
 function PLUGIN:PreUse(ctx)
@@ -240,6 +242,10 @@ This hook must be used with the `legacyFilenames` configuration item to tell `vf
 
 ::: tip Strategy Configuration
 When implementing this hook function, you can access the user-configured parsing strategy through `ctx.strategy`. For detailed strategy configuration, please refer to the [Configuration Documentation](../../guides/configuration.md#legacy-version-file).
+:::
+
+::: tip Copies
+`getInstalledVersions()` lists the installations of versions only: a copy made with `vfox install --as` is left out, since it is selected only by its own name.
 :::
 
 **location**: `metadata.lua`
@@ -340,7 +346,7 @@ package manager, of an IDE or of a CI runner. `vfox link --detect <sdk>` calls i
 
 Return the SDK directory (the one `EnvKeys` expects as `ctx.path`) and the name to link it under. The name is used as
 written, so make it something a user would type, like `21.0.3-tem`. It may contain letters, digits, `.`, `_`, `+` and
-`-`, and must not be `latest`. Entries that are already linked or installed are skipped by `vfox`.
+`-`, and must not be `latest`. Entries that are already linked or installed, or whose name is an alias of the SDK, are skipped by `vfox`.
 
 **Location**: `hooks/detect.lua`
 

@@ -186,10 +186,12 @@ function PLUGIN:PostInstall(ctx)
 end
 ```
 
+用 `vfox install --as` 安装的副本，`sdkInfo.version` 是副本的名字（例如 `3.12-db`），也是它所在目录的名字。`PreInstall` 仍然以用户请求的版本（例如 `3.12`）调用，它返回的版本则是副本实际解析到的版本。
+
 ### PreUse
 
 当用户使用 `vfox use` 的时候，会调用插件的 `PreUse` 函数。这个函数的作用是返回用户输入的版本信息。
-如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。
+如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。`ctx.installedSdks` 只包含各版本的安装。用 `vfox install --as` 做出的副本不在其中，因为它只能通过自己的名字选中。
 
 **位置**: `hooks/pre_use.lua`
 
@@ -231,6 +233,10 @@ end
 
 ::: tip 策略配置
 在实现此钩子函数时，你可以通过 `ctx.strategy` 获取用户配置的解析策略。详细的策略配置请参考[配置文档](../../guides/configuration.md#兼容版本文件)。
+:::
+
+::: tip 副本
+`getInstalledVersions()` 只包含各版本的安装。用 `vfox install --as` 做出的副本不在其中，因为它只能通过自己的名字选中。
 :::
 
 **位置**: `metadata.lua`
@@ -322,7 +328,7 @@ end
 
 这个钩子用来找出本机上已经存在、但不是 `vfox` 安装的 SDK，例如系统包管理器、IDE 或 CI runner 装的 JDK。`vfox link --detect <sdk>` 会调用它，并把返回的内容链接进来。
 
-返回 SDK 的目录（也就是 `EnvKeys` 里 `ctx.path` 期望的那个目录）和链接时使用的名字。名字会原样使用，所以请取用户会输入的名字，比如 `21.0.3-tem`。它可以包含字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`。已经链接或已经安装的条目，`vfox` 会自动跳过。
+返回 SDK 的目录（也就是 `EnvKeys` 里 `ctx.path` 期望的那个目录）和链接时使用的名字。名字会原样使用，所以请取用户会输入的名字，比如 `21.0.3-tem`。它可以包含字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`。已经链接或已经安装的条目，以及名字是该 SDK 别名的条目，`vfox` 会自动跳过。
 
 **位置**: `hooks/detect.lua`
 

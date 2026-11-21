@@ -53,7 +53,22 @@ vfox i <sdk-name>@<version>
 - `-a, --all`: Install all SDK versions recorded in .vfox.toml
 - `-y, --yes`: Quick installation, skip interactive prompts​
 - `-u, --use`: Use the installed version in the current shell session, as `vfox use` would, so it needs an activated shell (`vfox activate`) the same way. Cannot be combined with `--all`, takes a version (no picker) and one version per SDK.
-- `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled.
+- `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled. A copy made with `--as` is reinstalled from the version it was asked for, under its own name, and only if that still resolves to the version it was installed as.
+- `--as <name>`: Install the version as a second copy under this name, so that the same version can be installed more than once. The name cannot be only digits and dots, such as `3.12` or `3.12.7`, since that reads as a version number, and it cannot be an [alias](#alias) of the SDK. Cannot be combined with `--all` or `--reinstall`, and takes one version. The note on named copies below explains it.
+
+::: tip Named copies
+`--as` gives a second installation of a version you already have, for example one Python 3.12 for CUDA work and another for database work:
+
+```shell
+vfox install python@3.12
+vfox install python@3.12 --as 3.12-db
+vfox use python@3.12-db
+```
+
+`python@3.12` still means the plain installation, and `vfox list python` shows the copy next to the version it copies, as `3.12-db (3.12.7)`. A copy is used, listed, aliased and uninstalled by its own name, and uninstalling it leaves the version it was copied from alone. The name follows the rules of [`vfox link`](#link), with one addition: it cannot be only digits and dots. It must not be installed or linked already, and it cannot be an alias of the SDK. When the version in use is uninstalled, `vfox` switches to another installation of a version, and to a copy only when no other installation is left.
+
+A name exists only on the machine that made it, so a `.vfox.toml` that uses it needs the same `vfox install ... --as` on each machine.
+:::
 
 ::: tip
 You can install multiple SDKs at the same time by separating them with space.
@@ -191,7 +206,7 @@ vfox link --detect [-y] <sdk-name>
 
 `sdk-name`: SDK name. Its plugin must be added already.
 
-`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed.
+`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed, and neither is the name of an [alias](#alias) of the SDK.
 
 `path`: The directory of the SDK, the one that holds `bin`.
 
@@ -244,7 +259,7 @@ vfox use java@j17
 Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info`, `exec` and `doctor`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
 :::
 
-A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. Uninstalling a version removes the aliases that name it.
+A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. `vfox link` and `vfox install --as` refuse such a name too, so that no installation hides an alias without a word. Uninstalling a version removes the aliases that name it.
 
 A leading `v` in a version you type (`v20.1.0` for `20.1.0`) is dropped only when no installed version and no alias is called what you typed. So an alias, like a [linked](#link) version, may start with a `v`.
 

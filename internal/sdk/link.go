@@ -47,6 +47,24 @@ func ValidVersionName(name string) bool {
 	return versionNamePattern.MatchString(name) && name != "latest"
 }
 
+// versionNumberPattern matches a name made of digits and dots only, which reads as a
+// version number.
+var versionNumberPattern = regexp.MustCompile(`^[0-9.]+$`)
+
+// ValidCopyName returns nil when name can name a copy made with InstallAs, and says
+// why not otherwise. A copy's name is a valid version name that is not only digits and
+// dots: such a name reads as a version number, and a copy under it would take the
+// lookups of that version.
+func ValidCopyName(name string) error {
+	if !ValidVersionName(name) {
+		return fmt.Errorf("%q is not a usable name: use letters, digits, '.', '_', '+' and '-', and not \"latest\"", name)
+	}
+	if versionNumberPattern.MatchString(name) {
+		return fmt.Errorf("%q is only a version number: a copy needs a name with something besides digits and dots, for example 3.12-db", name)
+	}
+	return nil
+}
+
 // StripVersionPrefix returns the version a user means by what they typed after
 // "@". A leading "v" is the usual way to spell a version (v20.1.0 for 20.1.0),
 // but a name the user picked can start with one too, such as a linked version
