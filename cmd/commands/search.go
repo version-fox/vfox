@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 	"golang.org/x/crypto/ssh/terminal"
@@ -35,7 +37,8 @@ var Search = &cli.Command{
 	Name:  "search",
 	Usage: "Search a version of the target SDK",
 	// The arguments after the SDK name belong to the plugin's Available hook,
-	// also the ones that start with a dash: vfox search clang --no-cache
+	// also the ones that start with a dash: vfox search clang --no-cache.
+	// searchArgs reads vfox's own options.
 	SkipFlagParsing: true,
 	Action:          searchCmd,
 	Category:        CategorySDK,
@@ -151,20 +154,67 @@ func installChosen(installer versionInstaller, prompt printer.Prompt, options []
 	return installer.Install(sdk.Version(selected.Key))
 }
 
+// searchCall is the search arguments split between vfox and the plugin.
+type searchCall struct {
+	sdkName    string
+	pluginArgs []string
+	help       bool
+	debug      bool
+}
+
+// searchArgs splits the search arguments. Before a "--", vfox reads its own
+// options wherever they are: -h, --help and --debug. The first other argument
+// is the SDK name, and the rest go to the plugin in their order. After a "--",
+// every argument goes to the plugin, except the SDK name if it is not given yet.
+func searchArgs(args []string) (searchCall, error) {
+	var opts searchCall
+	own := true
+	for _, arg := range args {
+		if own {
+			if arg == "--" {
+				own = false
+				continue
+			}
+			if arg == "-h" || arg == "--help" {
+				opts.help = true
+				continue
+			}
+			if name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "="); name == "-debug" || name == "debug" {
+				if !hasValue {
+					opts.debug = true
+					continue
+				}
+				on, err := strconv.ParseBool(value)
+				if err != nil {
+					return opts, fmt.Errorf("invalid value %q for flag -debug: parse error", value)
+				}
+				opts.debug = on
+				continue
+			}
+		}
+		if opts.sdkName == "" {
+			opts.sdkName = arg
+			continue
+		}
+		opts.pluginArgs = append(opts.pluginArgs, arg)
+	}
+	return opts, nil
+}
+
 func searchCmd(ctx context.Context, cmd *cli.Command) error {
-	sdkName := cmd.Args().First()
-	// Flags are not parsed, so a help flag arrives as the first argument.
-	if sdkName == "-h" || sdkName == "--help" {
+	opts, err := searchArgs(cmd.Args().Slice())
+	if err != nil {
+		return cli.Exit(err.Error(), 1)
+	}
+	if opts.help {
 		cli.HelpPrinter(cmd.Root().Writer, cli.CommandHelpTemplate, cmd)
 		return nil
 	}
-	if sdkName == "" {
+	if opts.debug {
+		logger.SetLevel(logger.DebugLevel)
+	}
+	if opts.sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	args := cmd.Args().Tail()
-	// Keep the old way of passing them working: vfox search clang -- --no-cache
-	if len(args) > 0 && args[0] == "--" {
-		args = args[1:]
-	}
-	return RunSearch(sdkName, args)
+	return RunSearch(opts.sdkName, opts.pluginArgs)
 }

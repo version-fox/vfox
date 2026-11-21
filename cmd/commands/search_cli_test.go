@@ -16,7 +16,10 @@
 
 package commands
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // echoPlugin lists the arguments its Available hook receives as versions.
 const echoPlugin = `PLUGIN = {name="echo", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
@@ -48,11 +51,62 @@ func TestSearchStillAcceptsADoubleDashBeforeThePluginArguments(t *testing.T) {
 	mustNotContain(t, "search output", out, " - --\n")
 }
 
+func TestSearchStillAcceptsADoubleDashBeforeTheSDKName(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "echo", echoPlugin)
+
+	out := f.runHere(t, "search", "--", "echo", "--no-cache").mustSucceed(t, "search -- echo").output()
+
+	mustContain(t, "search output", out, " - --no-cache")
+}
+
 func TestSearchStillShowsItsHelp(t *testing.T) {
 	f := newCLIFixture(t, false)
 
-	for _, flag := range []string{"--help", "-h"} {
-		out := f.runHere(t, "search", flag).mustSucceed(t, "search "+flag).output()
-		mustContain(t, "search "+flag, out, "Search a version of the target SDK")
+	for _, args := range [][]string{{"--help"}, {"-h"}, {"echo", "--help"}, {"echo", "-x", "-h"}} {
+		out := f.runHere(t, append([]string{"search"}, args...)...).mustSucceed(t, "search help").output()
+		mustContain(t, "search help", out, "Search a version of the target SDK")
+	}
+}
+
+func TestSearchPassesHelpAndDebugAfterADoubleDashToThePlugin(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "echo", echoPlugin)
+
+	out := f.runHere(t, "search", "echo", "--", "--help", "--debug").mustSucceed(t, "search with -- --help").output()
+
+	mustContain(t, "search output", out, " - --help", " - --debug")
+}
+
+func TestSearchArgs(t *testing.T) {
+	for _, tc := range []struct {
+		args  []string
+		want  searchCall
+		error bool
+	}{
+		{args: []string{"clang", "--no-cache"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--no-cache"}}},
+		{args: []string{"--", "clang", "--no-cache"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--no-cache"}}},
+		{args: []string{"clang", "--debug"}, want: searchCall{sdkName: "clang", debug: true}},
+		{args: []string{"--debug", "clang"}, want: searchCall{sdkName: "clang", debug: true}},
+		{args: []string{"clang", "-debug=true"}, want: searchCall{sdkName: "clang", debug: true}},
+		{args: []string{"clang", "--debug=false"}, want: searchCall{sdkName: "clang"}},
+		{args: []string{"clang", "--debug=maybe"}, error: true},
+		{args: []string{"clang", "--", "--debug", "--help"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--debug", "--help"}}},
+		{args: []string{"clang", "--help"}, want: searchCall{sdkName: "clang", help: true}},
+	} {
+		got, err := searchArgs(tc.args)
+		if tc.error {
+			if err == nil {
+				t.Errorf("searchArgs(%q): want an error, got %+v", tc.args, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("searchArgs(%q): %v", tc.args, err)
+			continue
+		}
+		if got.sdkName != tc.want.sdkName || got.help != tc.want.help || got.debug != tc.want.debug || strings.Join(got.pluginArgs, " ") != strings.Join(tc.want.pluginArgs, " ") {
+			t.Errorf("searchArgs(%q) = %+v, want %+v", tc.args, got, tc.want)
+		}
 	}
 }

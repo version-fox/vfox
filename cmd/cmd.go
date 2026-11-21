@@ -71,7 +71,10 @@ func newCmd() *cmd {
 		Name:  "debug",
 		Usage: "show debug information",
 		Action: func(ctx context.Context, cmd *cli.Command, b bool) error {
-			logger.SetLevel(logger.DebugLevel)
+			// --debug=false leaves debug logging off.
+			if b {
+				logger.SetLevel(logger.DebugLevel)
+			}
 			return nil
 		},
 	}
