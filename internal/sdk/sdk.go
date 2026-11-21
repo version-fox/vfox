@@ -199,7 +199,9 @@ func (b *impl) InstallResolved(version Version, reinstall bool) (Version, error)
 // `vfox install --as` does. The copy is used, listed and uninstalled by that name, and
 // the installation under the version it resolves to is left alone, so both can be on
 // disk at once. PreInstall is asked for version, as usual. Nothing installed or linked
-// may have name yet, and name cannot be the version the request resolves to.
+// may have name yet, and name cannot be the version the request resolves to. A copy is
+// selected by its name only: no typed version reaches it, by prefix or through what a
+// plugin is given in PreUse and ParseLegacyFile.
 func (b *impl) InstallAs(version Version, name Version) (Version, error) {
 	if name == "" {
 		return "", fmt.Errorf("a copy of %s needs a name", version)
@@ -227,8 +229,8 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 	logger.Debugf("Installing SDK: %s (reinstall: %v)\n", label, reinstall)
 
 	if named {
-		if !ValidVersionName(string(name)) {
-			return "", fmt.Errorf("%q is not a usable name: use letters, digits, '.', '_', '+' and '-', and not \"latest\"", name)
+		if err := ValidCopyName(string(name)); err != nil {
+			return "", err
 		}
 		if !reinstall && b.nameTaken(name) {
 			return "", b.nameTakenError(name)
@@ -404,6 +406,35 @@ func (b *impl) copyReceipt(name Version) *Receipt {
 		return nil
 	}
 	return receipt
+}
+
+// isCopy reports whether an installed version is a copy made with InstallAs.
+func (b *impl) isCopy(version Version) bool {
+	return b.copyReceipt(version) != nil
+}
+
+// matchableRuntimes returns the installed runtimes a typed version can stand for. A
+// copy is selected only by its own name, so it is not among them.
+func (b *impl) matchableRuntimes(runtimes []*RuntimePackage) []*RuntimePackage {
+	kept := make([]*RuntimePackage, 0, len(runtimes))
+	for _, pkg := range runtimes {
+		if !b.isCopy(pkg.Runtime.Version) {
+			kept = append(kept, pkg)
+		}
+	}
+	return kept
+}
+
+// matchableVersions is InstalledList without the copies, for the same purpose as
+// matchableRuntimes.
+func (b *impl) matchableVersions() []Version {
+	var versions []Version
+	for _, version := range b.InstalledList() {
+		if !b.isCopy(version) {
+			versions = append(versions, version)
+		}
+	}
+	return versions
 }
 
 // nameTaken reports whether a version is installed or linked under name, a link
@@ -654,6 +685,9 @@ func (b *impl) EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error) {
 
 func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 	installedSdks, _ := b.getAllRuntimes()
+	// A copy is selected only by its own name, so the plugin is not given it and the
+	// prefix matching below does not reach it.
+	installedSdks = b.matchableRuntimes(installedSdks)
 	sdks := make(map[string]*plugin.InstalledPackageItem)
 
 	for _, sdk := range installedSdks {
@@ -962,7 +996,7 @@ func (b *impl) ParseLegacyFile(path string) (Version, error) {
 			Filepath: legacyFilePath,
 			Filename: filename,
 			GetInstalledVersions: func() []string {
-				versions := b.InstalledList()
+				versions := b.matchableVersions()
 				logger.Debugf("Invoking GetInstalledVersions result: %+v \n", versions)
 				convertVersions := make([]string, 0, len(versions))
 				for _, v := range versions {

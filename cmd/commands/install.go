@@ -95,8 +95,8 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		if reinstall {
 			return cli.Exit("--as cannot be combined with --reinstall", 1)
 		}
-		if !sdk.ValidVersionName(asName) {
-			return cli.Exit(fmt.Sprintf("%q is not a usable name for --as: use letters, digits, '.', '_', '+' and '-', and not \"latest\"", asName), 1)
+		if err := sdk.ValidCopyName(asName); err != nil {
+			return cli.Exit(err.Error(), 1)
 		}
 		if args.Len() != 1 {
 			return cli.Exit("--as names one installation, so give one sdk@version", 1)
@@ -119,6 +119,14 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 	defer manager.Close()
+
+	if named {
+		// An alias of the same name would stop working once the copy is installed.
+		sdkName := strings.ToLower(strings.Split(args.First(), "@")[0])
+		if err := manager.CheckCopyName(sdkName, sdk.Version(asName)); err != nil {
+			return cli.Exit(err.Error(), 1)
+		}
+	}
 
 	errorStore := util.NewErrorStore()
 	switchFailed := false

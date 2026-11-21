@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin"
 )
 
@@ -158,8 +159,8 @@ func TestInstallAsRefusesANameInUse(t *testing.T) {
 
 	t.Run("installed version", func(t *testing.T) {
 		s, _ := newCopyTestSDK(t)
-		mustInstall(t, s, "3.12.6")
-		if _, err := s.InstallAs("3.12", "3.12.6"); err == nil || !strings.Contains(err.Error(), "3.12.6 is already installed") {
+		mustInstall(t, s, "nightly")
+		if _, err := s.InstallAs("3.12", "nightly"); err == nil || !strings.Contains(err.Error(), "nightly is already installed") {
 			t.Fatalf("err = %v, want the installed version to hold its name", err)
 		}
 	})
@@ -182,12 +183,138 @@ func TestInstallAsRefusesANameInUse(t *testing.T) {
 // installation, and would shadow it for every later lookup.
 func TestInstallAsRefusesTheVersionItself(t *testing.T) {
 	s, _ := newCopyTestSDK(t)
-	_, err := s.InstallAs("3.12", "3.12.7")
-	if err == nil || !strings.Contains(err.Error(), "cannot be named 3.12.7") {
+	// nightly resolves to itself: the name is the version, and not a version number.
+	_, err := s.InstallAs("nightly", "nightly")
+	if err == nil || !strings.Contains(err.Error(), "cannot be named nightly") {
 		t.Fatalf("err = %v, want the copy refused", err)
 	}
-	if exists(s.packagePath("3.12.7")) {
+	if exists(s.packagePath("nightly")) {
 		t.Error("a refused copy must leave nothing behind")
+	}
+}
+
+// A name made of digits and dots reads as a version number, and a copy under it
+// would take the lookups of that version. It is refused before PreInstall runs.
+func TestInstallAsRefusesAVersionNumberAsItsName(t *testing.T) {
+	s, p := newCopyTestSDK(t)
+	for _, name := range []Version{"3", "3.12", "3.12.7", "3.12."} {
+		if _, err := s.InstallAs("3.12", name); err == nil || !strings.Contains(err.Error(), "only a version number") {
+			t.Errorf("InstallAs with name %q: err = %v, want it refused as a version number", name, err)
+		}
+	}
+	if p.preInstallCalls != 0 {
+		t.Errorf("PreInstall was called %d times for version-number names", p.preInstallCalls)
+	}
+}
+
+// A copy is selected only by its own name, so a typed version never reaches it by
+// prefix: the copy 3.12-db is not an installation of 3.12, nor of 3.
+func TestUseDoesNotMatchACopyByPrefix(t *testing.T) {
+	t.Run("copy alone", func(t *testing.T) {
+		s, _ := newCopyTestSDK(t)
+		if _, err := s.InstallAs("3.12", "3.12-db"); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.ResolveInstalledVersion("3"); err != nil || got != "3" {
+			t.Errorf("ResolveInstalledVersion(3) = %q, %v; want 3, which is not installed", got, err)
+		}
+		if got, err := s.ResolveInstalledVersion("3.12-db"); err != nil || got != "3.12-db" {
+			t.Errorf("ResolveInstalledVersion(3.12-db) = %q, %v; want the copy", got, err)
+		}
+	})
+
+	t.Run("copy beside an installation of the same version", func(t *testing.T) {
+		s, _ := newCopyTestSDK(t)
+		mustInstall(t, s, "3.12.0")
+		// Its name sorts as 3.12.0 when it is compared as a version, so it would win the tie.
+		if _, err := s.InstallAs("3.12", "3.12.5-db"); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.ResolveInstalledVersion("3.12"); err != nil || got != "3.12.0" {
+			t.Errorf("ResolveInstalledVersion(3.12) = %q, %v; want the installation 3.12.0", got, err)
+		}
+	})
+}
+
+// copyAwarePlugin reports the versions it is given to PreUse and ParseLegacyFile,
+// sorted, so that the test can read them back as the version it resolves to.
+const copyAwarePlugin = `PLUGIN = {name="gamma", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0", legacyFilenames={".gamma-version"}}
+function PLUGIN:Available(ctx) return {{version="3.12.7"}} end
+function PLUGIN:PreInstall(ctx)
+  if ctx.version == "3.12" then return {version="3.12.7"} end
+  return {version=ctx.version}
+end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+function PLUGIN:PreUse(ctx)
+  local names = {}
+  for name in pairs(ctx.installedSdks) do table.insert(names, name) end
+  table.sort(names)
+  return {version=table.concat(names, ",")}
+end
+function PLUGIN:ParseLegacyFile(ctx)
+  local names = ctx.getInstalledVersions()
+  table.sort(names)
+  return {version=table.concat(names, ",")}
+end
+`
+
+// Plugins are given the installed versions to choose from, in PreUse and in
+// ParseLegacyFile. A copy is not one of them: a plugin that picks a version from
+// the list would pick the copy for a version it is asked for.
+func TestPluginsAreNotGivenCopies(t *testing.T) {
+	s := newTestSDK(t, &testPlugin{})
+	dir := filepath.Join(t.TempDir(), "gamma")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.lua"), []byte(copyAwarePlugin), 0644); err != nil {
+		t.Fatal(err)
+	}
+	plug, err := plugin.CreatePlugin(dir, s.envContext)
+	if err != nil {
+		t.Fatalf("CreatePlugin: %v", err)
+	}
+	defer plug.Close()
+	s.plugin = plug
+	s.Name = "gamma"
+	// ParseLegacyFile reads the legacy file settings, which the test context leaves out.
+	s.envContext.UserConfig = config.DefaultConfig
+
+	mustInstall(t, s, "3.12.7")
+	if _, err := s.InstallAs("3.12", "3.12-db"); err != nil {
+		t.Fatalf("InstallAs: %v", err)
+	}
+
+	if given, err := s.ResolveInstalledVersion("3.12"); err != nil || given != "3.12.7" {
+		t.Errorf("PreUse was given %q, want the installation of 3.12.7 only (err %v)", given, err)
+	}
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".gamma-version"), []byte("3.12\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if given, err := s.ParseLegacyFile(project); err != nil || given != "3.12.7" {
+		t.Errorf("ParseLegacyFile was given %q, want the installation of 3.12.7 only (err %v)", given, err)
+	}
+}
+
+func TestValidCopyName(t *testing.T) {
+	for _, name := range []string{"3.12-db", "db", "cuda", "3.12.7-db", "v3.12", "3.12-1"} {
+		if err := ValidCopyName(name); err != nil {
+			t.Errorf("ValidCopyName(%q) = %v, want it accepted", name, err)
+		}
+	}
+	for name, want := range map[string]string{
+		"":       "not a usable name",
+		"latest": "not a usable name",
+		"a/b":    "not a usable name",
+		"3":      "only a version number",
+		"3.12":   "only a version number",
+		"3.12.7": "only a version number",
+		"3.12.":  "only a version number",
+	} {
+		if err := ValidCopyName(name); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("ValidCopyName(%q) = %v, want an error with %q", name, err, want)
+		}
 	}
 }
 

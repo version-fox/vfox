@@ -54,7 +54,7 @@ vfox i <sdk-name>@<version>
 - `-y, --yes`: Quick installation, skip interactive prompts​
 - `-u, --use`: Use the installed version in the current shell session, as `vfox use` would, so it needs an activated shell (`vfox activate`) the same way. Cannot be combined with `--all`, takes a version (no picker) and one version per SDK.
 - `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled. A copy made with `--as` is reinstalled from the version it was asked for, under its own name, and only if that still resolves to the version it was installed as.
-- `--as <name>`: Install the version as a second copy under this name, so that the same version can be installed more than once. Cannot be combined with `--all` or `--reinstall`, and takes one version. The note on named copies below explains it.
+- `--as <name>`: Install the version as a second copy under this name, so that the same version can be installed more than once. The name cannot be only digits and dots, such as `3.12` or `3.12.7`, since that reads as a version number, and it cannot be an [alias](#alias) of the SDK. Cannot be combined with `--all` or `--reinstall`, and takes one version. The note on named copies below explains it.
 
 ::: tip Named copies
 `--as` gives a second installation of a version you already have, for example one Python 3.12 for CUDA work and another for database work:
@@ -65,7 +65,7 @@ vfox install python@3.12 --as 3.12-db
 vfox use python@3.12-db
 ```
 
-`python@3.12` still means the plain installation, and `vfox list python` shows the copy next to the version it copies, as `3.12-db (3.12.7)`. A copy is used, listed, aliased and uninstalled by its own name, and uninstalling it leaves the version it was copied from alone. The name follows the rules of [`vfox link`](#link) and must not be installed or linked already.
+`python@3.12` still means the plain installation, and `vfox list python` shows the copy next to the version it copies, as `3.12-db (3.12.7)`. A copy is used, listed, aliased and uninstalled by its own name, and uninstalling it leaves the version it was copied from alone. The name follows the rules of [`vfox link`](#link), with one addition: it cannot be only digits and dots. It must not be installed or linked already, and it cannot be an alias of the SDK. When the version in use is uninstalled, `vfox` switches to another installation of a version, and to a copy only when no other installation is left.
 
 A name exists only on the machine that made it, so a `.vfox.toml` that uses it needs the same `vfox install ... --as` on each machine.
 :::

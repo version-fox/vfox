@@ -190,7 +190,7 @@ end
 ### PreUse
 
 当用户使用 `vfox use` 的时候，会调用插件的 `PreUse` 函数。这个函数的作用是返回用户输入的版本信息。
-如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。
+如果 `PreUse` 函数返回了版本信息， `vfox` 将会使用这个新的版本信息。`ctx.installedSdks` 只包含各版本的安装。用 `vfox install --as` 做出的副本不在其中，因为它只能通过自己的名字选中。
 
 **位置**: `hooks/pre_use.lua`
 
@@ -232,6 +232,10 @@ end
 
 ::: tip 策略配置
 在实现此钩子函数时，你可以通过 `ctx.strategy` 获取用户配置的解析策略。详细的策略配置请参考[配置文档](../../guides/configuration.md#兼容版本文件)。
+:::
+
+::: tip 副本
+`getInstalledVersions()` 只包含各版本的安装。用 `vfox install --as` 做出的副本不在其中，因为它只能通过自己的名字选中。
 :::
 
 **位置**: `metadata.lua`

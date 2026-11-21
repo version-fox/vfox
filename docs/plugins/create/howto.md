@@ -198,7 +198,7 @@ For a copy made with `vfox install --as`, `sdkInfo.version` is the name of the c
 
 When the user uses `vfox use`, the plugin's `PreUse` function is called. The purpose of this function is to return the
 version information entered by the user. If the `PreUse` function returns version information, `vfox` will use this new
-version.
+version. `ctx.installedSdks` lists the installations of versions only: a copy made with `vfox install --as` is left out, since it is selected only by its own name.
 
 ```lua
 function PLUGIN:PreUse(ctx)
@@ -241,6 +241,10 @@ This hook must be used with the `legacyFilenames` configuration item to tell `vf
 
 ::: tip Strategy Configuration
 When implementing this hook function, you can access the user-configured parsing strategy through `ctx.strategy`. For detailed strategy configuration, please refer to the [Configuration Documentation](../../guides/configuration.md#legacy-version-file).
+:::
+
+::: tip Copies
+`getInstalledVersions()` lists the installations of versions only: a copy made with `vfox install --as` is left out, since it is selected only by its own name.
 :::
 
 **location**: `metadata.lua`

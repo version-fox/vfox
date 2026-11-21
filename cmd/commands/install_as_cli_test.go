@@ -84,8 +84,8 @@ func TestInstallAsRefusals(t *testing.T) {
 	}{
 		{"with --all", []string{"install", "--all", "--as", "3.12-db"}, "--as cannot be combined with --all"},
 		{"with --reinstall", []string{"install", "--reinstall", "--as", "3.12-db", "gamma@3.12"}, "--as cannot be combined with --reinstall"},
-		{"unusable name", []string{"install", "--as", "a/b", "gamma@3.12"}, `"a/b" is not a usable name for --as`},
-		{"name latest", []string{"install", "--as", "latest", "gamma@3.12"}, `"latest" is not a usable name for --as`},
+		{"unusable name", []string{"install", "--as", "a/b", "gamma@3.12"}, `"a/b" is not a usable name`},
+		{"name latest", []string{"install", "--as", "latest", "gamma@3.12"}, `"latest" is not a usable name`},
 		{"no version", []string{"install", "--as", "3.12-db", "gamma"}, "install --as needs a version for gamma"},
 		{"two installations", []string{"install", "--as", "3.12-db", "gamma@3.12", "gamma@3.12"}, "--as names one installation"},
 	} {
@@ -105,12 +105,72 @@ func TestInstallAsRefusesANameInUse(t *testing.T) {
 	mustContain(t, "error", r.output(), "gamma@3.12-db is already installed", "choose another name")
 }
 
-func TestInstallAsRefusesTheVersionItself(t *testing.T) {
+// A name made of digits and dots would take the lookups of that version.
+func TestInstallAsRefusesAVersionNumberAsItsName(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.writePlugin(t, "gamma", gammaPlugin)
 
-	r := f.run(t, "install", "--as", "3.12.7", "gamma@3.12").mustFail(t, "copy named after its own version")
-	mustContain(t, "error", r.output(), "cannot be named 3.12.7")
+	for _, name := range []string{"3.12.7", "3.12"} {
+		r := f.run(t, "install", "--as", name, "gamma@3.12").mustFail(t, "copy named "+name)
+		mustContain(t, "error", r.output(), `"`+name+`" is only a version number`)
+	}
+}
+
+// An alias of the SDK keeps working: an installed name would win over it without a
+// word, so a copy cannot take the name of an alias.
+func TestInstallAsRefusesAnAliasName(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "gamma", gammaPlugin)
+
+	f.run(t, "install", "gamma@3.12").mustSucceed(t, "install gamma@3.12")
+	f.run(t, "alias", "set", "gamma", "cuda", "3.12.7").mustSucceed(t, "alias set")
+
+	r := f.run(t, "install", "--as", "cuda", "gamma@3.12").mustFail(t, "copy named after an alias")
+	mustContain(t, "error", r.output(), "cuda is an alias of gamma@3.12.7", "vfox alias unset gamma cuda")
+	if exists(filepath.Join(f.shared, "cache", "gamma", "v-cuda")) {
+		t.Error("the refused copy was installed anyway")
+	}
+	mustContain(t, "alias list", f.run(t, "alias", "list", "gamma").mustSucceed(t, "alias list gamma").output(), "cuda")
+}
+
+// When the version in use is uninstalled, the global version moves to another
+// installation, and to a copy only when nothing else is left.
+func TestUninstallSwitchesToAnInstallationNotACopy(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "gamma", gammaPlugin)
+
+	f.run(t, "install", "gamma@3.11.9").mustSucceed(t, "install gamma@3.11.9")
+	f.run(t, "install", "gamma@3.12").mustSucceed(t, "install gamma@3.12")
+	f.run(t, "install", "--as", "3.12-db", "gamma@3.12").mustSucceed(t, "install --as 3.12-db")
+	// The plugin installs no commands, so give each installation one: use reports the missing ones.
+	for _, v := range []string{"3.11.9", "3.12.7", "3.12-db"} {
+		bin := filepath.Join(f.shared, "cache", "gamma", "v-"+v, "gamma-"+v, "bin")
+		must(t, os.MkdirAll(bin, 0755))
+		writeCommand(t, bin, "gamma")
+	}
+	f.run(t, "use", "-g", "gamma@3.12.7").mustSucceed(t, "use -g gamma@3.12.7")
+
+	out := f.run(t, "uninstall", "gamma@3.12.7").mustSucceed(t, "uninstall gamma@3.12.7").output()
+	mustContain(t, "uninstall", out, "Auto switch", "gamma@3.11.9")
+	mustNotContain(t, "uninstall", out, "gamma@3.12-db")
+}
+
+// With no installation of the version left, the copy is what the global version moves to.
+func TestUninstallSwitchesToACopyWhenNothingElseIsLeft(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "gamma", gammaPlugin)
+
+	f.run(t, "install", "gamma@3.12").mustSucceed(t, "install gamma@3.12")
+	f.run(t, "install", "--as", "3.12-db", "gamma@3.12").mustSucceed(t, "install --as 3.12-db")
+	for _, v := range []string{"3.12.7", "3.12-db"} {
+		bin := filepath.Join(f.shared, "cache", "gamma", "v-"+v, "gamma-"+v, "bin")
+		must(t, os.MkdirAll(bin, 0755))
+		writeCommand(t, bin, "gamma")
+	}
+	f.run(t, "use", "-g", "gamma@3.12.7").mustSucceed(t, "use -g gamma@3.12.7")
+
+	out := f.run(t, "uninstall", "gamma@3.12.7").mustSucceed(t, "uninstall gamma@3.12.7").output()
+	mustContain(t, "uninstall", out, "Auto switch", "gamma@3.12-db")
 }
 
 // A copy the SDK changed in place is reinstalled under its own name.

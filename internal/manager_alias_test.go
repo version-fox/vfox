@@ -75,6 +75,27 @@ func TestAliasesFor(t *testing.T) {
 	}
 }
 
+// A copy cannot take the name of an alias of its SDK: the installed name would win
+// over the alias without a word. Aliases belong to one SDK.
+func TestCheckCopyName(t *testing.T) {
+	f := newManagerFixture(t)
+	f.RuntimeEnvContext.UserConfig = &config.Config{Aliases: map[string]map[string]string{
+		"alpha": {"cuda": "2.0.0"},
+	}}
+
+	err := f.CheckCopyName("Alpha", "cuda") // SDK names are not case sensitive
+	if err == nil || !strings.Contains(err.Error(), "cuda is an alias of alpha@2.0.0") ||
+		!strings.Contains(err.Error(), "vfox alias unset alpha cuda") {
+		t.Errorf("CheckCopyName(cuda) = %v, want the alias refused with what to do", err)
+	}
+	if err := f.CheckCopyName("alpha", "db"); err != nil {
+		t.Errorf("CheckCopyName(db) = %v, want a name that no alias has accepted", err)
+	}
+	if err := f.CheckCopyName("beta", "cuda"); err != nil {
+		t.Errorf("CheckCopyName(cuda) for beta = %v, want it accepted: the alias is alpha's", err)
+	}
+}
+
 func TestResolveAlias(t *testing.T) {
 	f, s := aliasFixture(t)
 	f.RuntimeEnvContext.UserConfig = &config.Config{Aliases: map[string]map[string]string{
