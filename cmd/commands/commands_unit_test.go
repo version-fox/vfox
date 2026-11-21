@@ -89,21 +89,25 @@ func TestSdkArgumentsKeepTheVersionAsTyped(t *testing.T) {
 
 func TestFormatVersionLabel(t *testing.T) {
 	tests := []struct {
-		name    string
-		version sdk.Version
-		origin  sdk.Origin
-		target  string
-		aliases []string
-		want    string
+		name     string
+		version  sdk.Version
+		origin   sdk.Origin
+		target   string
+		resolved string
+		aliases  []string
+		want     string
 	}{
-		{"installed", "17.0.9", sdk.OriginInstalled, "", nil, "17.0.9"},
-		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", nil, "17-sys (linked → /usr/lib/jvm/x)"},
-		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", nil, "17-sys (linked)"},
-		{"aliased", "17.0.9", sdk.OriginInstalled, "", []string{"j17", "lts"}, "17.0.9 [alias: j17, lts]"},
-		{"both", "17-sys", sdk.OriginLinked, "/jdk", []string{"sys"}, "17-sys (linked → /jdk) [alias: sys]"},
+		{"installed", "17.0.9", sdk.OriginInstalled, "", "", nil, "17.0.9"},
+		{"linked", "17-sys", sdk.OriginLinked, "/usr/lib/jvm/x", "", nil, "17-sys (linked → /usr/lib/jvm/x)"},
+		{"linked, target unknown", "17-sys", sdk.OriginLinked, "", "", nil, "17-sys (linked)"},
+		{"aliased", "17.0.9", sdk.OriginInstalled, "", "", []string{"j17", "lts"}, "17.0.9 [alias: j17, lts]"},
+		{"both", "17-sys", sdk.OriginLinked, "/jdk", "", []string{"sys"}, "17-sys (linked → /jdk) [alias: sys]"},
+		{"copy under a name", "17-db", sdk.OriginInstalled, "", "17.0.9", nil, "17-db (17.0.9)"},
+		{"copy, aliased", "17-db", sdk.OriginInstalled, "", "17.0.9", []string{"cuda"}, "17-db (17.0.9) [alias: cuda]"},
+		{"resolved to its own name", "17.0.9", sdk.OriginInstalled, "", "17.0.9", nil, "17.0.9"},
 	}
 	for _, tt := range tests {
-		if got := formatVersionLabel(tt.version, tt.origin, tt.target, tt.aliases); got != tt.want {
+		if got := formatVersionLabel(tt.version, tt.origin, tt.target, tt.resolved, tt.aliases); got != tt.want {
 			t.Errorf("%s: label = %q, want %q", tt.name, got, tt.want)
 		}
 	}
@@ -144,6 +148,24 @@ func (f fakeSdk) Installation(v sdk.Version) (*sdk.Installation, error) {
 	return &sdk.Installation{Target: target}, nil
 }
 
+// A detected name that is an alias of the SDK is skipped: linking under it would hide
+// the alias.
+func TestDetectCandidatesSkipsAnAlias(t *testing.T) {
+	s := fakeSdk{installed: map[sdk.Version]string{}}
+	found := []sdk.DetectedRuntime{
+		{Version: "cuda", Path: "/usr/lib/cuda"},
+		{Version: "11", Path: "/usr/lib/jvm/java-11"},
+	}
+	candidates, skipped := detectCandidates(s, found, map[string]string{"cuda": "3.12.7"})
+
+	if want := []sdk.DetectedRuntime{found[1]}; !reflect.DeepEqual(candidates, want) {
+		t.Errorf("candidates = %+v, want %+v", candidates, want)
+	}
+	if len(skipped) != 1 || !strings.Contains(skipped[0], "cuda: an alias of that name already points to 3.12.7") {
+		t.Errorf("skipped = %q", skipped)
+	}
+}
+
 func TestDetectCandidates(t *testing.T) {
 	s := fakeSdk{installed: map[sdk.Version]string{
 		"17":     "",                        // installed by vfox
@@ -155,7 +177,7 @@ func TestDetectCandidates(t *testing.T) {
 		{Version: "11", Path: "/usr/lib/jvm/java-11", Note: "n"}, // new
 		{Version: "8", Path: "/usr/lib/jvm/java-8"},              // new
 	}
-	candidates, skipped := detectCandidates(s, found)
+	candidates, skipped := detectCandidates(s, found, nil)
 
 	if want := []sdk.DetectedRuntime{found[2], found[3]}; !reflect.DeepEqual(candidates, want) {
 		t.Errorf("candidates = %+v, want %+v", candidates, want)

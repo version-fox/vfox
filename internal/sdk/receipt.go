@@ -67,6 +67,7 @@ type Receipt struct {
 	SDK         string            `json:"sdk"`
 	Version     string            `json:"version"`
 	Requested   string            `json:"requested,omitempty"` // what the user asked for, e.g. "21" or "stable"
+	Resolved    string            `json:"resolved,omitempty"`  // a copy made under another name: the version the request resolved to
 	Origin      Origin            `json:"origin"`
 	Target      string            `json:"target,omitempty"` // linked: the directory the version points to
 	InstalledAt time.Time         `json:"installedAt"`

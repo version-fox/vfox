@@ -85,8 +85,19 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	if cv == resolvedVersion {
 		pterm.Println("Auto switch to the other version.")
-		firstVersion := remainVersion[0]
-		return source.Use(firstVersion, env.Global)
+		return source.Use(fallbackVersion(source, remainVersion), env.Global)
 	}
 	return nil
+}
+
+// fallbackVersion is the installed version that takes over when the version in use
+// is uninstalled: an installation of a version, not a copy made with install --as,
+// which was made for one purpose. A copy is taken only when nothing else is left.
+func fallbackVersion(s sdk.Sdk, remaining []sdk.Version) sdk.Version {
+	for _, v := range remaining {
+		if inst, err := s.Installation(v); err != nil || inst.Receipt == nil || inst.Receipt.Resolved == "" {
+			return v
+		}
+	}
+	return remaining[0]
 }
