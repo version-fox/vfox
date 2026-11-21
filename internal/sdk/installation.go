@@ -193,7 +193,7 @@ func (b *impl) ReportedPath(version Version, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if b.plugin == nil || !b.plugin.HasFunction("Paths") {
+	if !b.plugin.HasFunction("Paths") {
 		return "", nil
 	}
 	result, err := b.plugin.Paths(&plugin.PathsHookCtx{
@@ -206,9 +206,6 @@ func (b *impl) ReportedPath(version Version, name string) (string, error) {
 	}
 	if err != nil {
 		return "", fmt.Errorf("plugin [Paths] method error: %w", err)
-	}
-	if result == nil {
-		return "", nil
 	}
 	dir, ok := result.Paths[name]
 	if !ok {

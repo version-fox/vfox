@@ -18,8 +18,10 @@
 package sdk
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/plugin"
@@ -80,6 +82,26 @@ func TestReportedPathRejectsADirectoryThatIsNotThere(t *testing.T) {
 	}
 }
 
+func TestReportedPathRejectsAFileThatIsNotADirectory(t *testing.T) {
+	p := (&testPlugin{paths: func(ctx *plugin.PathsHookCtx) (*plugin.PathsHookResult, error) {
+		return &plugin.PathsHookResult{Paths: map[string]string{"include": filepath.Join(ctx.Path, "include")}}, nil
+	}}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "1.0.0")
+	inst, err := s.Installation("1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The name the plugin reports exists, but it is a file.
+	if err := os.WriteFile(filepath.Join(inst.Runtime.Path, "include"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := s.ReportedPath("1.0.0", "include"); err == nil {
+		t.Errorf("ReportedPath = %q, want an error for a file", got)
+	}
+}
+
 func TestReportedPathWhenThePluginReportsNothing(t *testing.T) {
 	// No Paths hook at all.
 	s := newTestSDK(t, (&testPlugin{}).withCommand(t, "tool"))
@@ -95,6 +117,19 @@ func TestReportedPathWhenThePluginReportsNothing(t *testing.T) {
 	mustInstall(t, s, "1.0.0")
 	if got, err := s.ReportedPath("1.0.0", "include"); err != nil || got != "" {
 		t.Errorf("with nothing to say: %q, %v", got, err)
+	}
+}
+
+func TestReportedPathReportsAHookError(t *testing.T) {
+	p := (&testPlugin{paths: func(*plugin.PathsHookCtx) (*plugin.PathsHookResult, error) {
+		return nil, errors.New("boom")
+	}}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "1.0.0")
+
+	_, err := s.ReportedPath("1.0.0", "include")
+	if err == nil || !strings.Contains(err.Error(), "plugin [Paths] method error") || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("err = %v, want the hook's error", err)
 	}
 }
 

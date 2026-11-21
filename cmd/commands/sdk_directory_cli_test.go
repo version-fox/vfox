@@ -84,3 +84,22 @@ func TestPathCommandsReportWhatIsMissing(t *testing.T) {
 
 	f.run(t, "include-path").mustFail(t, "include-path without an SDK")
 }
+
+func TestPathCommandsRejectMalformedAndUnknownArguments(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+
+	r := f.run(t, "include-path", "alpha@").mustFail(t, "include-path with an empty version")
+	mustContain(t, "stderr", r.stderr, "invalid arguments")
+
+	r = f.run(t, "lib-path", "nosuch").mustFail(t, "lib-path of an SDK without a plugin")
+	mustContain(t, "stderr", r.stderr, "nosuch not supported")
+
+	r = f.run(t, "include-path", "nosuch@1.0.0").mustFail(t, "include-path of an SDK without a plugin")
+	mustContain(t, "stderr", r.stderr, "nosuch not supported")
+
+	// vfox cannot load its settings, so it cannot find any SDK either.
+	f.writeUserConfig(t, "proxy: [\n")
+	r = f.run(t, "include-path", "alpha@1.0.0").mustFail(t, "include-path with a broken config.yaml")
+	mustContain(t, "stderr", r.stderr, "load config failed")
+}
