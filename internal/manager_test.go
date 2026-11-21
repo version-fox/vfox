@@ -17,6 +17,7 @@
 package internal
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -504,5 +505,84 @@ func TestDownloadPluginKeepsBackslashPathsInPluginDir(t *testing.T) {
 		if rel, err := filepath.Rel(plugins, saved); err != nil || rel != filepath.Base(saved) {
 			t.Fatalf("downloadPlugin() saved %q, want a file directly in %q", saved, plugins)
 		}
+	}
+}
+
+func TestAddFromMirroredManifest(t *testing.T) {
+	var (
+		mu              sync.Mutex
+		mirrorPaths     []string
+		thirdPartyPaths []string
+		registryPaths   []string
+	)
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		mirrorPaths = append(mirrorPaths, r.URL.Path)
+		mu.Unlock()
+		if r.URL.Path != "/plugins/demo.lua" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, updateTestPlugin, "1.0.0", "")
+	}))
+	defer mirror.Close()
+
+	thirdParty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		thirdPartyPaths = append(thirdPartyPaths, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/plugins/other.lua":
+			fmt.Fprintf(w, fixturePlugin, "other", "")
+		case "/plugins/explicit.lua":
+			fmt.Fprintf(w, fixturePlugin, "explicit", "")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer thirdParty.Close()
+
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		registryPaths = append(registryPaths, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/demo.json":
+			fmt.Fprint(w, `{"name":"demo","downloadUrl":"https://github.com/plugins/demo.lua"}`)
+		case "/other.json":
+			fmt.Fprintf(w, `{"name":"other","downloadUrl":%q}`, thirdParty.URL+"/plugins/other.lua")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer registry.Close()
+
+	f := newManagerFixture(t)
+	f.RuntimeEnvContext.UserConfig = &config.Config{
+		Proxy:    config.EmptyProxy,
+		Registry: &config.Registry{Address: registry.URL},
+		GitHub:   &config.GitHub{BaseURL: mirror.URL},
+	}
+
+	if err := f.Add("demo", "", ""); err != nil {
+		t.Fatalf("Add(demo) error = %v", err)
+	}
+	if err := f.Add("other", "", ""); err != nil {
+		t.Fatalf("Add(other) error = %v", err)
+	}
+	if err := f.Add("explicit", thirdParty.URL+"/plugins/explicit.lua", ""); err != nil {
+		t.Fatalf("Add(explicit) error = %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if got := strings.Join(registryPaths, ","); got != "/demo.json,/other.json" {
+		t.Fatalf("registry requests = %q, want /demo.json,/other.json", got)
+	}
+	if got := strings.Join(mirrorPaths, ","); got != "/plugins/demo.lua" {
+		t.Fatalf("mirror requests = %q, want /plugins/demo.lua", got)
+	}
+	if got := strings.Join(thirdPartyPaths, ","); got != "/plugins/other.lua,/plugins/explicit.lua" {
+		t.Fatalf("third-party requests = %q, want /plugins/other.lua,/plugins/explicit.lua", got)
 	}
 }

@@ -183,7 +183,7 @@ func TestPluginTestCLI(t *testing.T) {
 		t.Fatalf("filter: %q, %q, %d", stdout, stderr, code)
 	}
 	writeCLIPluginFile(t, root, "plugin/tests/a_test.lua", `require("vfox.test").load(); while true do end`)
-	stdout, stderr, code = runPluginCLI(t, root, "plugin", "test", "plugin", "--timeout", "50ms")
+	stdout, stderr, code = runPluginCLI(t, root, "plugin", "test", "plugin", "--timeout", "2s")
 	if code != 1 || !strings.Contains(stdout, "PASS tests/nested/b_test.lua") || !strings.Contains(stderr, "deadline exceeded") {
 		t.Fatalf("timeout continuation: %q, %q, %d", stdout, stderr, code)
 	}

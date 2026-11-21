@@ -133,6 +133,15 @@ curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/version-fox/vfo
 
 Note: the install script itself is also hosted on GitHub, so curl needs to go through the mirror to fetch it; the `--vfox-installer-github-base-url` flag then controls where vfox binaries and API requests are downloaded from. For gh-proxy style mirrors, the parameter value must include the proxied GitHub host (e.g. `https://gh-proxy.org/https://github.com`).
 
+Set the registry for plugin manifests and the GitHub mirror for upgrades and GitHub archives listed in those manifests.
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+If sudo uses root’s home, set root’s mirror with `sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`.
+
 </TabItem>
 </Tabs>
 

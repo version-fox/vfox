@@ -31,8 +31,14 @@ main() {
       --vfox-installer-github-base-url=*)
         GITHUB_BASE_URL="${1#--vfox-installer-github-base-url=}"
         GITHUB_BASE_URL="${GITHUB_BASE_URL%/}"
-        GITHUB_API_URL="${GITHUB_BASE_URL//github.com/api.github.com}"
-        GITHUB_API_URL="${GITHUB_API_URL%/}"
+        case "$GITHUB_BASE_URL" in
+          https://github.com | http://github.com | */https://github.com | */http://github.com)
+            GITHUB_API_URL="${GITHUB_BASE_URL%github.com}api.github.com"
+            ;;
+          *)
+            GITHUB_API_URL="$GITHUB_BASE_URL"
+            ;;
+        esac
         shift
         ;;
       *)
@@ -91,12 +97,12 @@ main() {
 
   # Get the version: use the user-specified one if provided, otherwise fetch latest
   if [ -n "$VERSION" ]; then
-    if [ -n "${GITHUB_TOKEN}" ]; then
+    if [ -n "${GITHUB_TOKEN}" ] && [ "$GITHUB_API_URL" = "https://api.github.com" ]; then
       API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/tags/v${VERSION}")
     else
       API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/tags/v${VERSION}")
     fi
-  elif [ -n "${GITHUB_TOKEN}" ]; then
+  elif [ -n "${GITHUB_TOKEN}" ] && [ "$GITHUB_API_URL" = "https://api.github.com" ]; then
       API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
   else
       API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")

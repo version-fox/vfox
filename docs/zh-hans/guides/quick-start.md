@@ -133,6 +133,15 @@ curl -sSL https://gh-proxy.org/https://raw.githubusercontent.com/version-fox/vfo
 
 注意：安装脚本本身也托管在 GitHub，因此 curl 需要通过镜像下载脚本；参数 `--vfox-installer-github-base-url` 则控制脚本执行后 vfox 二进制文件和 API 请求的下载地址。对于 gh-proxy 这类镜像，参数值应包含被代理的 GitHub 主机（例如 `https://gh-proxy.org/https://github.com`）。
 
+插件清单由注册表提供。升级和下载清单中的 GitHub 归档时使用 GitHub 镜像。
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+如果 sudo 使用 root 的主目录，请为 root 配置镜像：`sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`。
+
 </TabItem>
 </Tabs>
 

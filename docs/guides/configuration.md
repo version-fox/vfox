@@ -93,8 +93,23 @@ registry:
 ::: tip Available Mirrors
 
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
-- https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
+- https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
   :::
+
+Set the registry for plugin manifests and the GitHub mirror for upgrades and GitHub archives listed in those manifests.
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+Only `https://github.com` and `http://github.com`, and path-proxy bases ending in `/https://github.com` or `/http://github.com`, get the release API rewritten to `api.github.com`; a host-only mirror (such as `https://kkgithub.com`) is used as-is for the release API, so it must serve the GitHub API under its own host.
+
+If sudo uses root’s home, set root’s mirror with `sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`.
+
+::: warning
+`github.baseUrl` decides where `vfox upgrade` downloads the new binary and plugins from. The archive is not verified against a checksum or signature, and both `http://` and `https://` are accepted, so only set it to a mirror you trust. A value in a shared `config.yaml` applies to every user of that `VFOX_HOME`.
+:::
 
 ## Cache Settings
 
