@@ -32,10 +32,13 @@ import (
 )
 
 var Search = &cli.Command{
-	Name:     "search",
-	Usage:    "Search a version of the target SDK",
-	Action:   searchCmd,
-	Category: CategorySDK,
+	Name:  "search",
+	Usage: "Search a version of the target SDK",
+	// The arguments after the SDK name belong to the plugin's Available hook,
+	// also the ones that start with a dash: vfox search clang --no-cache
+	SkipFlagParsing: true,
+	Action:          searchCmd,
+	Category:        CategorySDK,
 }
 
 func RunSearch(sdkName string, availableArgs []string) error {
@@ -150,8 +153,18 @@ func installChosen(installer versionInstaller, prompt printer.Prompt, options []
 
 func searchCmd(ctx context.Context, cmd *cli.Command) error {
 	sdkName := cmd.Args().First()
+	// Flags are not parsed, so a help flag arrives as the first argument.
+	if sdkName == "-h" || sdkName == "--help" {
+		cli.HelpPrinter(cmd.Root().Writer, cli.CommandHelpTemplate, cmd)
+		return nil
+	}
 	if sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	return RunSearch(sdkName, cmd.Args().Tail())
+	args := cmd.Args().Tail()
+	// Keep the old way of passing them working: vfox search clang -- --no-cache
+	if len(args) > 0 && args[0] == "--" {
+		args = args[1:]
+	}
+	return RunSearch(sdkName, args)
 }
