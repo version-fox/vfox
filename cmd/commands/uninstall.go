@@ -85,7 +85,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	if cv == resolvedVersion {
 		pterm.Println("Auto switch to the other version.")
-		return source.Use(fallbackVersion(source, remainVersion), env.Global)
+		return source.UseGlobal(fallbackVersion(source, remainVersion))
 	}
 	return nil
 }
