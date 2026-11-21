@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -84,8 +85,21 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 	if cv == resolvedVersion {
+		fallback := fallbackVersion(source, remainVersion)
 		pterm.Println("Auto switch to the other version.")
-		return source.Use(fallbackVersion(source, remainVersion), env.Global)
+		if env.IsHookEnv() || runtime.GOOS == "windows" {
+			return source.Use(fallback, env.Global)
+		}
+		// Without a shell hook this shell cannot be switched over, but the
+		// global choice can still be recorded, so that the next shell uses
+		// the remaining version and the uninstall itself succeeds (#809).
+		if err := source.UseGlobalWithoutHook(fallback); err != nil {
+			return err
+		}
+		pterm.Printf("%s\n", pterm.LightYellow(fmt.Sprintf(
+			"This shell has no vfox hook, so it was not switched. New shells will use %s@%s; run 'vfox activate' to enable hooks.",
+			name, fallback)))
+		return nil
 	}
 	return nil
 }

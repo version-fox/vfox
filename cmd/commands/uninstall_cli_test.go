@@ -46,3 +46,46 @@ func TestUninstallLeavesTheGlobalVersionOfOtherScopes(t *testing.T) {
 		mustContain(t, "global config", readFile(t, globalConfig), `alpha = "1.0.0"`)
 	})
 }
+
+// Uninstalling the version the global scope uses must succeed even when the
+// shell has no vfox hook (#809): the version is removed, a remaining version
+// takes its place in the global config, and the command exits 0. Only a
+// hook-related warning may remain.
+func TestUninstallCurrentGlobalVersionWithoutShellHook(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.env["__VFOX_SHELL"] = "-" // this shell was never activated
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall the current version without a shell hook").output()
+	mustContain(t, "uninstall output", out, "Uninstalled alpha@2.0.0 successfully!", "Auto switch")
+	if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha", "v-2.0.0")); !os.IsNotExist(err) {
+		t.Errorf("alpha@2.0.0 is still installed: %v", err)
+	}
+	mustContain(t, "global config", readFile(t, globalConfig), `alpha = "1.0.0"`)
+	current := f.run(t, "current", "alpha").mustSucceed(t, "current alpha").output()
+	mustContain(t, "current output", current, "1.0.0")
+}
+
+// Uninstalling the only installed version without a shell hook must also
+// succeed and leave nothing behind (#809).
+func TestUninstallOnlyVersionWithoutShellHook(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.env["__VFOX_SHELL"] = "-" // this shell was never activated
+	f.installOnDisk(t, "alpha", "1.0.0")
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"1.0.0\"\n"), 0644))
+
+	out := f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall the only version without a shell hook").output()
+	mustContain(t, "uninstall output", out, "Uninstalled alpha@1.0.0 successfully!")
+	mustNotContain(t, "uninstall output", out, "Auto switch")
+	if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha")); !os.IsNotExist(err) {
+		t.Errorf("the alpha install directory is still there: %v", err)
+	}
+	mustNotContain(t, "global config", readFile(t, globalConfig), "alpha")
+	current := f.run(t, "current", "alpha").mustFail(t, "current alpha").output()
+	mustContain(t, "current output", current, "no current version")
+}

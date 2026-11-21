@@ -58,10 +58,15 @@ type Sdk interface {
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
 	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
 	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
-	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
-	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
-	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
-	ResolveInstalledVersion(version Version) (Version, error)             // The installed version a typed one stands for, as `vfox use` selects it
+	// UseGlobalWithoutHook records version as the one the global scope uses when
+	// the shell has no vfox hook to hand the choice over to: the global config
+	// and the shims are updated so the next shell picks the version up, and the
+	// current shell is left alone instead of the call failing.
+	UseGlobalWithoutHook(version Version) error                 // Use globally without a shell hook
+	Unuse(scopes ...env.UseScope) error                         // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error) // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                     // Check if a specific runtime version is installed
+	ResolveInstalledVersion(version Version) (Version, error)   // The installed version a typed one stands for, as `vfox use` selects it
 	InstalledList() []Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
@@ -920,6 +925,41 @@ func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookE
 		return shell.Open(os.Getppid())
 	}
 
+	return nil
+}
+
+// UseGlobalWithoutHook records version as the version the global scope uses
+// when the shell has no vfox hook: unlike Use, it neither fails because the
+// hook is missing nor starts a new shell. The global config and the shims are
+// updated, so the next shell picks the version up, while this shell is left
+// as it is. The caller is expected to warn about the missing hook.
+func (b *impl) UseGlobalWithoutHook(version Version) error {
+	logger.Debugf("Use SDK version in the global scope without a hook: %s\n", string(version))
+	if !b.CheckRuntimeExist(version) {
+		logger.Debugf("SDK %s not installed\n", b.Label(version))
+		return &VersionNotExistsError{Label: b.Label(version)}
+	}
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		logger.Debugf("Failed to get runtime package for %s: %v\n", b.Label(version), err)
+		return ErrRuntimeNotFound
+	}
+	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(env.Global)
+	if err != nil {
+		logger.Debugf("Failed to load the global config: %v\n", err)
+		return err
+	}
+	vfoxToml.SetTool(b.Name, string(version))
+	if err := vfoxToml.Save(); err != nil {
+		logger.Debugf("Failed to save tool versions: %v\n", err)
+		return fmt.Errorf("failed to save tool versions, err:%w", err)
+	}
+	if err := b.createSymlinksForScope(runtimePackage, env.Global); err != nil {
+		logger.Debugf("Failed to create symlinks: %v\n", err)
+		return fmt.Errorf("failed to create symlinks, err:%w", err)
+	}
+	pterm.Printf("Now using %s in new shells.\n", pterm.LightGreen(b.Label(version)))
+	logger.Debugf("The global scope now asks for %s; this shell was not switched\n", b.Label(version))
 	return nil
 }
 
