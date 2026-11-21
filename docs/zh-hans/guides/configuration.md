@@ -101,7 +101,7 @@ vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins
 vfox config github.baseUrl https://gh-proxy.org/https://github.com
 ```
 
-只有 `github.com` 以及以 `/https://github.com` 结尾的路径代理地址会将发布 API 重写为 `api.github.com`；仅替换域名的镜像（如 `https://kkgithub.com`）会原样用于发布 API，因此必须在自身域名下提供 GitHub API。
+只有 `https://github.com`、`http://github.com`，以及以 `/https://github.com` 或 `/http://github.com` 结尾的路径代理地址会将发布 API 重写为 `api.github.com`；仅替换域名的镜像（如 `https://kkgithub.com`）会原样用于发布 API，因此必须在自身域名下提供 GitHub API。
 
 如果 sudo 使用 root 的主目录，请为 root 配置镜像：`sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`。
 
