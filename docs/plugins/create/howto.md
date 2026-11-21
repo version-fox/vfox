@@ -48,6 +48,7 @@ The full list of hooks callable from vfox.
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌           | Perform some operations before uninstalling targeted version                    |
 | [hooks/fingerprint.lua](#fingerprint)           | ❌           | Report the facts that identify an installation, so changes made to it show up   |
 | [hooks/detect.lua](#detect)                     | ❌           | Find SDKs on this machine that `vfox` did not install, for `vfox link --detect` |
+| [hooks/paths.lua](#paths)                       | ❌           | Report the directories of an installed SDK, for `vfox include-path` and `vfox lib-path` |
 
 ## Required hook functions
 
@@ -357,6 +358,37 @@ function PLUGIN:Detect(ctx)
         end
     end
     return found
+end
+```
+
+### Paths
+
+Build tools need the headers and libraries of an SDK, and only the plugin knows where they are inside an installed version. This hook says where they are: `vfox include-path <sdk>[@<version>]` prints the `include` directory and `vfox lib-path <sdk>[@<version>]` prints the `lib` directory, so a Makefile or ninja file can use them:
+
+```shell
+CFLAGS += -I$(shell vfox include-path python)
+LDFLAGS += -L$(shell vfox lib-path python)
+```
+
+Return a table of directories keyed by name. `vfox` reads `include` and `lib` today; other names are accepted, but no command prints them yet. Each value must be an absolute path to an existing directory. `vfox` checks only the directory that was asked for, and it cleans that path. Return `nil` when there is nothing to report.
+
+::: tip
+Only `vfox include-path` and `vfox lib-path` call this hook; `vfox use`, `vfox env` and the other commands never do. It must still only read files and must not use the network.
+:::
+
+**Location**: `hooks/paths.lua`
+
+```lua
+function PLUGIN:Paths(ctx)
+    --- main runtime directory of the installed version
+    local path = ctx.path
+
+    return {
+        paths = {
+            include = path .. "/include",
+            lib = path .. "/lib",
+        },
+    }
 end
 ```
 

@@ -47,6 +47,7 @@
 | [hooks/pre_uninstall.lua](#preuninstall)        | ❌       | 删除之前进行额外操作                    |
 | [hooks/fingerprint.lua](#fingerprint)           | ❌       | 报告能标识一次安装的事实，让对它的改动能被发现 |
 | [hooks/detect.lua](#detect)                     | ❌       | 查找本机上 `vfox` 没有安装的 SDK，供 `vfox link --detect` 使用 |
+| [hooks/paths.lua](#paths)                       | ❌       | 报告已安装 SDK 的目录，供 `vfox include-path` 和 `vfox lib-path` 使用 |
 
 ## 必须实现的钩子函数
 
@@ -339,6 +340,37 @@ function PLUGIN:Detect(ctx)
         end
     end
     return found
+end
+```
+
+### Paths
+
+编译工具需要 SDK 的头文件和库，而只有插件知道它们在已安装版本里的位置。这个 hook 告诉 `vfox` 这些位置：`vfox include-path <sdk>[@<version>]` 打印 `include` 目录，`vfox lib-path <sdk>[@<version>]` 打印 `lib` 目录，Makefile 或 ninja 文件可以直接使用：
+
+```shell
+CFLAGS += -I$(shell vfox include-path python)
+LDFLAGS += -L$(shell vfox lib-path python)
+```
+
+返回以名称为键的目录表。`vfox` 目前读取 `include` 和 `lib`；其他名称可以报告，但目前没有命令打印它们。每个值都必须是已存在目录的绝对路径。`vfox` 只检查被请求的那个目录，并会清理它的路径。没有可报告的内容时返回 `nil`。
+
+::: tip
+只有 `vfox include-path` 和 `vfox lib-path` 会调用这个 hook，`vfox use`、`vfox env` 等其他命令都不会。它仍然只能读取文件，不能使用网络。
+:::
+
+**位置**: `hooks/paths.lua`
+
+```lua
+function PLUGIN:Paths(ctx)
+    --- 已安装版本的主运行时目录
+    local path = ctx.path
+
+    return {
+        paths = {
+            include = path .. "/include",
+            lib = path .. "/lib",
+        },
+    }
 end
 ```
 

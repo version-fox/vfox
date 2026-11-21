@@ -303,6 +303,8 @@ func invokeDevelopmentHook(p Plugin, name string, decode func(any) error) (any, 
 		return callDevelopmentHook(decode, p.Fingerprint)
 	case "Detect":
 		return callDevelopmentHook(decode, p.Detect)
+	case "Paths":
+		return callDevelopmentHook(decode, p.Paths)
 	case "ParseLegacyFile":
 		return callDevelopmentHook(decode, func(ctx *developmentLegacyContext) (*ParseLegacyFileResult, error) {
 			return p.ParseLegacyFile(&ParseLegacyFileHookCtx{

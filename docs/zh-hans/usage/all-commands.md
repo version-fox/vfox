@@ -18,6 +18,8 @@ vfox unuse [--global --project --session] <sdk-name>   Unset the SDK version fro
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command in vfox managed environment
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
+vfox include-path <sdk-name>[@<version>]  显示 SDK 版本的 include 目录，由插件报告
+vfox lib-path <sdk-name>[@<version>]      显示 SDK 版本的 lib 目录，由插件报告
 vfox config [<key>] [<value>]       Setup, view config
 vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
 vfox upgrade                    Upgrade vfox to the latest version
