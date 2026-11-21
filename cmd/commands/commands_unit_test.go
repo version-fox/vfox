@@ -148,6 +148,24 @@ func (f fakeSdk) Installation(v sdk.Version) (*sdk.Installation, error) {
 	return &sdk.Installation{Target: target}, nil
 }
 
+// A detected name that is an alias of the SDK is skipped: linking under it would hide
+// the alias.
+func TestDetectCandidatesSkipsAnAlias(t *testing.T) {
+	s := fakeSdk{installed: map[sdk.Version]string{}}
+	found := []sdk.DetectedRuntime{
+		{Version: "cuda", Path: "/usr/lib/cuda"},
+		{Version: "11", Path: "/usr/lib/jvm/java-11"},
+	}
+	candidates, skipped := detectCandidates(s, found, map[string]string{"cuda": "3.12.7"})
+
+	if want := []sdk.DetectedRuntime{found[1]}; !reflect.DeepEqual(candidates, want) {
+		t.Errorf("candidates = %+v, want %+v", candidates, want)
+	}
+	if len(skipped) != 1 || !strings.Contains(skipped[0], "cuda: an alias of that name already points to 3.12.7") {
+		t.Errorf("skipped = %q", skipped)
+	}
+}
+
 func TestDetectCandidates(t *testing.T) {
 	s := fakeSdk{installed: map[sdk.Version]string{
 		"17":     "",                        // installed by vfox
@@ -159,7 +177,7 @@ func TestDetectCandidates(t *testing.T) {
 		{Version: "11", Path: "/usr/lib/jvm/java-11", Note: "n"}, // new
 		{Version: "8", Path: "/usr/lib/jvm/java-8"},              // new
 	}
-	candidates, skipped := detectCandidates(s, found)
+	candidates, skipped := detectCandidates(s, found, nil)
 
 	if want := []sdk.DetectedRuntime{found[2], found[3]}; !reflect.DeepEqual(candidates, want) {
 		t.Errorf("candidates = %+v, want %+v", candidates, want)

@@ -123,7 +123,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	if named {
 		// An alias of the same name would stop working once the copy is installed.
 		sdkName := strings.ToLower(strings.Split(args.First(), "@")[0])
-		if err := manager.CheckCopyName(sdkName, sdk.Version(asName)); err != nil {
+		if err := manager.CheckNotAlias(sdkName, sdk.Version(asName)); err != nil {
 			return cli.Exit(err.Error(), 1)
 		}
 	}

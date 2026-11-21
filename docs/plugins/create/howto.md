@@ -345,7 +345,7 @@ package manager, of an IDE or of a CI runner. `vfox link --detect <sdk>` calls i
 
 Return the SDK directory (the one `EnvKeys` expects as `ctx.path`) and the name to link it under. The name is used as
 written, so make it something a user would type, like `21.0.3-tem`. It may contain letters, digits, `.`, `_`, `+` and
-`-`, and must not be `latest`. Entries that are already linked or installed are skipped by `vfox`.
+`-`, and must not be `latest`. Entries that are already linked or installed, or whose name is an alias of the SDK, are skipped by `vfox`.
 
 **Location**: `hooks/detect.lua`
 

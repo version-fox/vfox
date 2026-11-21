@@ -76,13 +76,13 @@ func (m *Manager) ResolveVersionName(sdkName string, s sdk.Sdk, typed sdk.Versio
 	return m.ResolveAlias(sdkName, s, stripped)
 }
 
-// CheckCopyName refuses a name for a copy made with install --as when the SDK has an
-// alias of that name. An installed name wins over an alias, so the alias would stop
-// working without a word.
-func (m *Manager) CheckCopyName(sdkName string, name sdk.Version) error {
+// CheckNotAlias refuses a name the SDK has an alias for, when an installation is made
+// under a name of its own: a copy from install --as, or a link. An installed name wins
+// over an alias, so the alias would stop working without a word.
+func (m *Manager) CheckNotAlias(sdkName string, name sdk.Version) error {
 	sdkName = strings.ToLower(sdkName)
 	if target, ok := m.AliasesFor(sdkName)[string(name)]; ok {
-		return fmt.Errorf("%s is an alias of %s@%s: choose another name for the copy, or `vfox alias unset %s %s` removes the alias first", name, sdkName, target, sdkName, name)
+		return fmt.Errorf("%s is an alias of %s@%s: choose another name, or `vfox alias unset %s %s` removes the alias first", name, sdkName, target, sdkName, name)
 	}
 	return nil
 }

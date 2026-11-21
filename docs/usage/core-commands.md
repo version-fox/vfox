@@ -206,7 +206,7 @@ vfox link --detect [-y] <sdk-name>
 
 `sdk-name`: SDK name. Its plugin must be added already.
 
-`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed.
+`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed, and neither is the name of an [alias](#alias) of the SDK.
 
 `path`: The directory of the SDK, the one that holds `bin`.
 
@@ -259,7 +259,7 @@ vfox use java@j17
 Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info`, `exec` and `doctor`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
 :::
 
-A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. Uninstalling a version removes the aliases that name it.
+A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. `vfox link` and `vfox install --as` refuse such a name too, so that no installation hides an alias without a word. Uninstalling a version removes the aliases that name it.
 
 A leading `v` in a version you type (`v20.1.0` for `20.1.0`) is dropped only when no installed version and no alias is called what you typed. So an alias, like a [linked](#link) version, may start with a `v`.
 
