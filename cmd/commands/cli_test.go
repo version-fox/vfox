@@ -66,7 +66,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Alias, Config, Current, Doctor, Env, Info, Install, Link, List, Uninstall, Use,
+	Activate, Alias, Config, Current, Doctor, Env, IncludePath, Info, Install, LibPath, Link, List, Uninstall, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -93,7 +93,8 @@ func cloneCommands(commands ...*cli.Command) []*cli.Command {
 
 // alphaPlugin is a minimal SDK plugin. It puts <path>/bin on PATH, finds
 // "installations" in the directory ALPHA_DETECT_DIR, and fingerprints an
-// installation by the contents of its VERSION file.
+// installation by the contents of its VERSION file, and reports its include and
+// lib directories.
 const alphaPlugin = `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 PLUGIN.shadowHints = {{match="pnpm", message="pnpm put its own alphatool first.", url="https://example.com/pnpm"}}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
@@ -110,6 +111,9 @@ function PLUGIN:Fingerprint(ctx)
   local content = f:read("*a")
   f:close()
   return {facts={version=content}}
+end
+function PLUGIN:Paths(ctx)
+  return {paths={include=ctx.path .. "/include", lib=ctx.path .. "/lib"}}
 end
 `
 
@@ -224,7 +228,7 @@ func (r cliResult) output() string { return r.stdout + r.stderr }
 // (activate, env) or may hand over to a shell (use), so each run of them gets a
 // process of its own.
 var inProcess = map[string]bool{
-	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
+	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "include-path": true, "lib-path": true, "list": true, "uninstall": true,
 }
 
 // run executes `vfox <args>` inside the fixture: in this process for the

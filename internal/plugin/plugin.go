@@ -62,6 +62,7 @@ type (
 		EnvKeys(ctx *EnvKeysHookCtx) ([]*EnvKeysHookResultItem, error)
 		Fingerprint(ctx *FingerprintHookCtx) (*FingerprintHookResult, error)
 		Detect(ctx *DetectHookCtx) ([]*DetectHookResultItem, error)
+		Paths(ctx *PathsHookCtx) (*PathsHookResult, error)
 		HasFunction(name string) bool
 		Close()
 	}
@@ -79,6 +80,7 @@ var (
 		"PreUninstall":    {Name: "PreUninstall", Required: false, Filename: "pre_uninstall"},
 		"Fingerprint":     {Name: "Fingerprint", Required: false, Filename: "fingerprint"},
 		"Detect":          {Name: "Detect", Required: false, Filename: "detect"},
+		"Paths":           {Name: "Paths", Required: false, Filename: "paths"},
 	}
 )
 

@@ -71,6 +71,9 @@ type Sdk interface {
 
 	// Installation describes an installed version: who owns it and what vfox recorded about it.
 	Installation(version Version) (*Installation, error)
+	// ReportedPath returns the directory the plugin's Paths hook reports under name for an installed
+	// version, such as "include" or "lib", or "" when it reports none.
+	ReportedPath(version Version, name string) (string, error)
 	// Link registers an existing SDK directory as a version, without copying or downloading anything.
 	Link(version Version, target string, opts LinkOptions) error
 	// Adopt writes a receipt for a version that has none. It reports whether it wrote one.

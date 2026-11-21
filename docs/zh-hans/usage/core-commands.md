@@ -312,6 +312,24 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
+## Include 与 lib 路径
+
+打印已安装 SDK 版本的 `include` 或 `lib` 目录，内容由插件报告。编译工具可以直接使用输出，因为命令只打印这一个路径。
+
+**用法**
+
+```shell
+vfox include-path <sdk-name>[@<version>]
+vfox lib-path <sdk-name>[@<version>]
+```
+
+不带 `@<version>` 时使用 SDK 的当前版本。版本未安装、插件没有报告该目录，或目录不存在时，命令会失败。插件如何报告这些目录，见 [Paths](../plugins/create/howto.md#paths)。
+
+```shell
+CFLAGS="-I$(vfox include-path python)"
+LDFLAGS="-L$(vfox lib-path python)"
+```
+
 ## Cd 
 
 在 `VFOX_HOME` 或 SDK 目录下启动 shell。

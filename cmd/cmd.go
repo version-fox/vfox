@@ -83,6 +83,8 @@ func newCmd() *cmd {
 		commands.Info,
 		commands.Install,
 		commands.Current,
+		commands.IncludePath,
+		commands.LibPath,
 		commands.Use,
 		commands.Unuse,
 		commands.List,
