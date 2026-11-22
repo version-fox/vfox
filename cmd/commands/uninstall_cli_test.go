@@ -20,7 +20,19 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/env"
 )
+
+// keepRegistry keeps the commands the test runs in this process from writing
+// the Windows registry of whoever runs it.
+func keepRegistry(t *testing.T) {
+	t.Helper()
+	oldApply, oldRemove := env.ApplyEnvsToRegistry, env.RemoveEnvsFromRegistry
+	env.ApplyEnvsToRegistry = func(*env.Envs) error { return nil }
+	env.RemoveEnvsFromRegistry = func(*env.Envs) error { return nil }
+	t.Cleanup(func() { env.ApplyEnvsToRegistry, env.RemoveEnvsFromRegistry = oldApply, oldRemove })
+}
 
 // Uninstalling a version switches the global scope away from it only when the
 // global scope asks for it, not when only the project does.
@@ -40,6 +52,7 @@ func TestUninstallLeavesTheGlobalVersionOfOtherScopes(t *testing.T) {
 	})
 
 	t.Run("the global version", func(t *testing.T) {
+		keepRegistry(t)
 		must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
 		out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
 		mustContain(t, "uninstall", out, "Auto switch")
@@ -58,6 +71,7 @@ func TestUninstallSwitchesTheGlobalVersionWithoutAHook(t *testing.T) {
 	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
 	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
 	f.env["__VFOX_SHELL"] = "-"
+	keepRegistry(t)
 
 	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
 	mustContain(t, "uninstall", out, "Auto switch", "alpha@1.0.0")

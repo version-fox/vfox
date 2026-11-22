@@ -791,20 +791,9 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 		}
 	}
 
-	// Resolve version with preUse hook
-	logger.Debugf("Resolving version with preUse hook for %s\n", version)
-	resolvedVersion, err := b.preUse(version, scope)
+	resolvedVersion, err := b.resolveInstalled(version, scope)
 	if err != nil {
-		logger.Debugf("Failed to resolve version: %v\n", err)
 		return err
-	}
-	logger.Debugf("Resolved version: %s\n", resolvedVersion)
-
-	// Verify version exists
-	label := b.Label(resolvedVersion)
-	if !b.CheckRuntimeExist(resolvedVersion) {
-		logger.Debugf("SDK %s not installed\n", label)
-		return &VersionNotExistsError{Label: label}
 	}
 
 	if err := b.useInHook(resolvedVersion, scope, unlink, hookEnv); err != nil {
@@ -813,24 +802,44 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 
 	// In non-hook environment, spawn a new shell so the user can use the new version immediately
 	if !hookEnv {
-		return shell.Open(os.Getppid())
+		return openShell(os.Getppid())
 	}
 	return nil
 }
+
+// openShell starts a new shell in place of the one with the given pid. It is a
+// variable so that a test can see whether it is called.
+var openShell = shell.Open
 
 // UseGlobal makes version the global version of the SDK. It resolves version
 // through the plugin's PreUse hook, checks that it is installed, and writes it to
 // the global config and links. Unlike Use, it does not need the shell hook and
 // never opens a new shell.
 func (b *impl) UseGlobal(version Version) error {
-	resolvedVersion, err := b.preUse(version, env.Global)
+	resolvedVersion, err := b.resolveInstalled(version, env.Global)
 	if err != nil {
 		return err
 	}
-	if !b.CheckRuntimeExist(resolvedVersion) {
-		return &VersionNotExistsError{Label: b.Label(resolvedVersion)}
-	}
 	return b.useInHook(resolvedVersion, env.Global, false, env.IsHookEnv())
+}
+
+// resolveInstalled resolves version through the plugin's PreUse hook and checks
+// that the result is installed.
+func (b *impl) resolveInstalled(version Version, scope env.UseScope) (Version, error) {
+	logger.Debugf("Resolving version with preUse hook for %s\n", version)
+	resolvedVersion, err := b.preUse(version, scope)
+	if err != nil {
+		logger.Debugf("Failed to resolve version: %v\n", err)
+		return "", err
+	}
+	logger.Debugf("Resolved version: %s\n", resolvedVersion)
+
+	label := b.Label(resolvedVersion)
+	if !b.CheckRuntimeExist(resolvedVersion) {
+		logger.Debugf("SDK %s not installed\n", label)
+		return "", &VersionNotExistsError{Label: label}
+	}
+	return resolvedVersion, nil
 }
 
 func (b *impl) useInHook(version Version, scope env.UseScope, unlink bool, hookEnv bool) error {
