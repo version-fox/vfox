@@ -624,6 +624,15 @@ func (b *impl) Uninstall(version Version) (err error) {
 		if err = b.Unuse(env.Global); err != nil {
 			return err
 		}
+		// If the version cannot be removed after all, it is still installed:
+		// make it the global version again rather than leave none.
+		defer func() {
+			if err != nil {
+				if restoreErr := b.useInHook(version, env.Global, false, env.IsHookEnv()); restoreErr != nil {
+					err = errors.Join(err, fmt.Errorf("could not make %s the global version again: %w", label, restoreErr))
+				}
+			}
+		}()
 	}
 
 	if linked {
@@ -807,14 +816,15 @@ func (b *impl) UseWithConfig(version Version, scope env.UseScope, unlink bool) e
 	return nil
 }
 
-// openShell starts a new shell in place of the one with the given pid. It is a
-// variable so that a test can see whether it is called.
+// openShell runs a new shell as a child of vfox and waits for it to exit. It is
+// a variable so that a test can see whether it is called.
 var openShell = shell.Open
 
 // UseGlobal makes version the global version of the SDK. It resolves version
-// through the plugin's PreUse hook, checks that it is installed, and writes it to
-// the global config and links. Unlike Use, it does not need the shell hook and
-// never opens a new shell.
+// through the plugin's PreUse hook, checks that it is installed, writes it to the
+// global config and points the global links at it. On Windows it also removes the
+// registry entries of the previous global version and adds those of this one.
+// Unlike Use, it does not need the shell hook and never opens a new shell.
 func (b *impl) UseGlobal(version Version) error {
 	resolvedVersion, err := b.resolveInstalled(version, env.Global)
 	if err != nil {
@@ -968,7 +978,12 @@ func (b *impl) InstalledList() []Version {
 			}
 		}
 	}
+	// Newest first, by version number: 10.0.0 comes before 9.0.0. Versions
+	// that compare equal (1.0 and 1.0.0) keep a fixed order.
 	sort.Slice(versions, func(i, j int) bool {
+		if c := util.CompareVersion(string(versions[i]), string(versions[j])); c != 0 {
+			return c > 0
+		}
 		return versions[i] > versions[j]
 	})
 	return versions

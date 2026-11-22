@@ -69,6 +69,16 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 			cv = sdk.Version(v)
 		}
 	}
+	// Switch the global version to one that stays before removing anything, so
+	// that a failure in either step leaves an installed version in use.
+	if cv == resolvedVersion {
+		if others := otherVersions(source.InstalledList(), resolvedVersion); len(others) > 0 {
+			pterm.Println("Auto switch to the other version.")
+			if err = source.UseGlobal(fallbackVersion(source, others)); err != nil {
+				return err
+			}
+		}
+	}
 	if err = source.Uninstall(resolvedVersion); err != nil {
 		return err
 	}
@@ -78,16 +88,21 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	} else if len(removed) > 0 {
 		pterm.Printf("Removed the alias(es) %s of %s@%s.\n", strings.Join(removed, ", "), name, resolvedVersion)
 	}
-	remainVersion := source.InstalledList()
-	if len(remainVersion) == 0 {
+	if len(source.InstalledList()) == 0 {
 		_ = os.RemoveAll(source.Metadata().SdkInstalledPath)
-		return nil
-	}
-	if cv == resolvedVersion {
-		pterm.Println("Auto switch to the other version.")
-		return source.UseGlobal(fallbackVersion(source, remainVersion))
 	}
 	return nil
+}
+
+// otherVersions is versions without version.
+func otherVersions(versions []sdk.Version, version sdk.Version) []sdk.Version {
+	var others []sdk.Version
+	for _, v := range versions {
+		if v != version {
+			others = append(others, v)
+		}
+	}
+	return others
 }
 
 // fallbackVersion is the installed version that takes over when the version in use
