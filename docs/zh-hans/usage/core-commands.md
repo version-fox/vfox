@@ -11,11 +11,18 @@ vfox search <sdk-name> [...optionArgs]
 ```
 
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
-`optionArgs`: 搜索命令的附加参数。注意：是否支持取决于插件。
+`optionArgs`: 传给插件 `Available` 钩子的参数，例如 `--no-cache`。是否生效取决于插件。
+
+在 `--` 之前，`-h`、`--help` 和 `--debug` 无论在什么位置都由 vfox 读取。SDK 名称之后的其他参数都会传给插件，包括 `-v` 和 `--version`。`--` 之后的所有参数都会传给插件。SDK 名称不能以 `-` 开头。
+
+```shell
+vfox search clang --no-cache
+vfox search clang -- --help   # --help 传给插件
+```
 
 ::: warning 缓存
 
-`vfox`会缓存`search`的结果, 默认缓存时间为`12h`。
+`vfox`会缓存`search`的结果, 默认缓存时间为`12h`。带插件参数的 `search` 不使用缓存，每次都会调用插件。如果插件通过 `--no-cache` 等参数刷新列表，也应删除插件目录下的 `.available.cache`，这样之后不带参数的 `search` 也能得到新结果。
 
 如果你想禁用，可以通过`vfox config`命令进行配置。
 ```shell

@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -94,6 +95,12 @@ func TestSearchArgs(t *testing.T) {
 		{args: []string{"clang", "--", "--debug", "--help"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--debug", "--help"}}},
 		{args: []string{"clang", "--help"}, want: searchCall{sdkName: "clang", help: true}},
 		{args: []string{"clang", "-v", "--version"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"-v", "--version"}}},
+		{args: []string{"clang", "debug"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"debug"}}},
+		{args: []string{"debug"}, want: searchCall{sdkName: "debug"}},
+		{args: []string{"clang", "a b"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"a b"}}},
+		{args: []string{"--version"}, error: true},
+		{args: []string{"--no-cache", "clang"}, error: true},
+		{args: []string{"--", "--version"}, error: true},
 	} {
 		got, err := searchArgs(tc.args)
 		if tc.error {
@@ -106,8 +113,63 @@ func TestSearchArgs(t *testing.T) {
 			t.Errorf("searchArgs(%q): %v", tc.args, err)
 			continue
 		}
-		if got.sdkName != tc.want.sdkName || got.help != tc.want.help || got.debug != tc.want.debug || strings.Join(got.pluginArgs, " ") != strings.Join(tc.want.pluginArgs, " ") {
+		if got.sdkName != tc.want.sdkName || got.help != tc.want.help || got.debug != tc.want.debug || !slices.Equal(got.pluginArgs, tc.want.pluginArgs) {
 			t.Errorf("searchArgs(%q) = %+v, want %+v", tc.args, got, tc.want)
+		}
+	}
+}
+
+func TestSearchPassesAPlainDebugArgumentToThePlugin(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "echo", echoPlugin)
+
+	out := f.runHere(t, "search", "echo", "x", "debug", "y").mustSucceed(t, "search with debug").output()
+
+	mustContain(t, "search output", out, " - x", " - debug", " - y")
+}
+
+func TestSearchRejectsAnSDKNameThatStartsWithADash(t *testing.T) {
+	f := newCLIFixture(t, false)
+
+	for _, args := range [][]string{{"--version"}, {"--no-cache", "echo"}, {"--", "--version"}} {
+		out := f.runHere(t, append([]string{"search"}, args...)...).mustFail(t, "search with a dash sdk name").output()
+		mustContain(t, "search error", out, "cannot start with a dash", "vfox --version")
+	}
+}
+
+// counterPlugin returns how many times its Available hook ran, and with
+// --no-cache removes the cache vfox keeps for it, as a refresh flag should.
+const counterPlugin = `PLUGIN = {name="counter", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx)
+  local f = io.open("count", "r")
+  local n = 0
+  if f then n = tonumber(f:read("*a")) f:close() end
+  n = n + 1
+  f = io.open("count", "w") f:write(tostring(n)) f:close()
+  if ctx.args[1] == "--no-cache" then os.remove(RUNTIME.pluginDirPath .. "/.available.cache") end
+  return {{version="call-" .. n}}
+end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`
+
+func TestSearchWithPluginArgumentsSkipsTheCache(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "counter", counterPlugin)
+
+	for i, step := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"counter"}, "call-1"},
+		{[]string{"counter"}, "call-1"}, // from the cache
+		{[]string{"counter", "--no-cache"}, "call-2"},
+		{[]string{"counter", "--no-cache"}, "call-3"}, // arguments are never cached
+		{[]string{"counter"}, "call-4"},               // the plugin removed the cache
+	} {
+		out := f.runHere(t, append([]string{"search"}, step.args...)...).mustSucceed(t, "search").output()
+		if !strings.Contains(out, " - "+step.want+"\n") {
+			t.Fatalf("step %d, search %v: want %s in %q", i+1, step.args, step.want, out)
 		}
 	}
 }

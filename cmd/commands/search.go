@@ -167,7 +167,8 @@ type searchCall struct {
 // is the SDK name, and the rest go to the plugin in their order. After a "--",
 // every argument goes to the plugin, except the SDK name if it is not given yet.
 // -v, -V and --version are not vfox options here: after the SDK name they go
-// to the plugin like any other argument.
+// to the plugin like any other argument. An SDK name that starts with a dash is
+// an error.
 func searchArgs(args []string) (searchCall, error) {
 	var opts searchCall
 	own := true
@@ -181,7 +182,7 @@ func searchArgs(args []string) (searchCall, error) {
 				opts.help = true
 				continue
 			}
-			if name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "-"), "="); name == "-debug" || name == "debug" {
+			if name, value, hasValue := strings.Cut(arg, "="); name == "--debug" || name == "-debug" {
 				if !hasValue {
 					opts.debug = true
 					continue
@@ -195,6 +196,9 @@ func searchArgs(args []string) (searchCall, error) {
 			}
 		}
 		if opts.sdkName == "" {
+			if strings.HasPrefix(arg, "-") {
+				return opts, fmt.Errorf("the sdk name cannot start with a dash: %s (vfox --version prints the vfox version)", arg)
+			}
 			opts.sdkName = arg
 			continue
 		}
