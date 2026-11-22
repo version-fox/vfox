@@ -1,8 +1,4 @@
-
-
 local util = {}
-
-
 
 function util:PreInstall(ctx)
     local version = ctx.version
@@ -35,10 +31,9 @@ function util:PreInstall(ctx)
                 sha1 = "xxx",
                 --- sha512 checksum [optional]
                 sha512 = "xx",
-            }
-        }
+            },
+        },
     }
 end
-
 
 return util

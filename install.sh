@@ -74,7 +74,7 @@ main() {
   else
     INSTALL_DIR="/usr/local/bin"
     # Check if sudo is available
-    if command -v sudo &> /dev/null; then
+    if command -v sudo &>/dev/null; then
       SUDO_CMD="sudo"
     else
       SUDO_CMD=""
@@ -82,12 +82,10 @@ main() {
   fi
 
   # Check if curl or wget is installed
-  if command -v curl &> /dev/null
-  then
+  if command -v curl &>/dev/null; then
     DOWNLOAD_CMD="curl -LO"
     API_CMD="curl --silent"
-  elif command -v wget &> /dev/null
-  then
+  elif command -v wget &>/dev/null; then
     DOWNLOAD_CMD="wget"
     API_CMD="wget -qO-"
   else
@@ -103,9 +101,9 @@ main() {
       API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/tags/v${VERSION}")
     fi
   elif [ -n "${GITHUB_TOKEN}" ] && [ "$GITHUB_API_URL" = "https://api.github.com" ]; then
-      API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
+    API_RESPONSE=$($API_CMD --header "Authorization: Bearer ${GITHUB_TOKEN}" "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
   else
-      API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
+    API_RESPONSE=$($API_CMD "${GITHUB_API_URL}/repos/version-fox/vfox/releases/latest")
   fi
 
   # Check if the response contains an error message
@@ -136,9 +134,9 @@ main() {
   ARCH_TYPE=$(uname -m)
 
   if [ "$ARCH_TYPE" = "arm64" ]; then
-      ARCH_TYPE="aarch64"
+    ARCH_TYPE="aarch64"
   elif [ "$ARCH_TYPE" = "loongarch64" ]; then
-      ARCH_TYPE="loong64"
+    ARCH_TYPE="loong64"
   fi
 
   FILENAME="vfox_${VERSION}_${OS_TYPE}_${ARCH_TYPE}"
@@ -146,7 +144,6 @@ main() {
 
   echo "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
   $DOWNLOAD_CMD "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
-
 
   tar -zxvf $TAR_FILE
   if [ $? -ne 0 ]; then

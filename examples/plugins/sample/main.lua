@@ -10,7 +10,9 @@ PLUGIN = {
 
 function PLUGIN:Available(ctx)
     local response, err = http.get({ url = "https://example.com/releases" })
-    if err then error(err) end
+    if err then
+        error(err)
+    end
     assert(response.status_code == 200, "HTTP " .. response.status_code)
 
     local data = assert(json.decode(response.body))

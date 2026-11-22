@@ -11,7 +11,7 @@ PREFIX_DIR="$TMP_ROOT/prefix"
 WORK_DIR="$TMP_ROOT/work"
 mkdir -p "$BIN_DIR" "$HOME_DIR" "$PREFIX_DIR" "$WORK_DIR"
 
-cat > "$BIN_DIR/curl" <<'EOF'
+cat >"$BIN_DIR/curl" <<'EOF'
 #!/bin/bash
 set -eu
 printf '%s\n' "$@" >> "$VFOX_TEST_ARGS_FILE"
@@ -24,15 +24,15 @@ chmod +x "$BIN_DIR/curl" "$BIN_DIR/wget"
 run_installer() {
   local args_file="$1"
   shift
-  : > "$args_file"
+  : >"$args_file"
   (
     cd "$WORK_DIR"
     HOME="$HOME_DIR" \
-    PREFIX="$PREFIX_DIR" \
-    PATH="$BIN_DIR:$PATH" \
-    GITHUB_TOKEN="dummy-token" \
-    VFOX_TEST_ARGS_FILE="$args_file" \
-    bash "$REPO_ROOT/install.sh" --user "$@" >/dev/null 2>&1
+      PREFIX="$PREFIX_DIR" \
+      PATH="$BIN_DIR:$PATH" \
+      GITHUB_TOKEN="dummy-token" \
+      VFOX_TEST_ARGS_FILE="$args_file" \
+      bash "$REPO_ROOT/install.sh" --user "$@" >/dev/null 2>&1
   ) || true
 }
 
