@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -53,7 +54,7 @@ type Sdk interface {
 	Reinstall(version Version) error                                      // Replace an installed runtime with a fresh copy
 	InstallResolved(version Version, reinstall bool) (Version, error)     // Install and report the version that ended up on disk
 	InstallAs(version Version, name Version) (Version, error)             // Install version as a second copy kept under name
-	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
+	Uninstall(version Version, fallbacks ...Version) error                // Uninstall a runtime; the first usable fallback takes over as global
 	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
 	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
 	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
@@ -571,7 +572,11 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 	}
 }
 
-func (b *impl) Uninstall(version Version) (err error) {
+// Uninstall removes version. If it is the global version, the first of
+// fallbacks that can be used becomes the global version before anything is
+// removed; with no fallbacks, the global setting is removed instead. A failure
+// in the checks or the PreUninstall hook leaves the global version alone.
+func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	label := b.Label(version)
 	logger.Debugf("Uninstalling SDK: %s\n", label)
 
@@ -619,7 +624,11 @@ func (b *impl) Uninstall(version Version) (err error) {
 	// If the global scope asks for the version to be uninstalled, unuse it
 	// there first. A version only a project or session asks for leaves the
 	// global setting alone.
-	if b.globalVersion() == version {
+	if b.globalVersion() == version && len(fallbacks) > 0 {
+		if err = b.switchGlobal(fallbacks); err != nil {
+			return err
+		}
+	} else if b.globalVersion() == version {
 		logger.Debugf("SDK %s is currently in use, unusing it first\n", label)
 		if err = b.Unuse(env.Global); err != nil {
 			return err
@@ -653,6 +662,22 @@ func (b *impl) Uninstall(version Version) (err error) {
 	pterm.Printf("Uninstalled %s successfully!\n", label)
 	logger.Debugf("SDK %s uninstalled successfully\n", label)
 	return
+}
+
+// switchGlobal makes the first of candidates that can be used the global
+// version. If none can, it changes nothing and names each one that failed.
+func (b *impl) switchGlobal(candidates []Version) error {
+	var errs []error
+	for _, v := range candidates {
+		err := b.UseGlobal(v)
+		if err == nil {
+			pterm.Printf("Auto switch to the other version: %s.\n", b.Label(v))
+			return nil
+		}
+		logger.Debugf("Could not switch the global version to %s: %v\n", b.Label(v), err)
+		errs = append(errs, fmt.Errorf("%s: %w", b.Label(v), err))
+	}
+	return fmt.Errorf("could not switch the global version to another version, so nothing was removed: %w", errors.Join(errs...))
 }
 
 // EnvKeys Only return the really installed path of this SDK
@@ -978,15 +1003,88 @@ func (b *impl) InstalledList() []Version {
 			}
 		}
 	}
-	// Newest first, by version number: 10.0.0 comes before 9.0.0. Versions
-	// that compare equal (1.0 and 1.0.0) keep a fixed order.
+	// Newest first, by version number: 10.0.0 comes before 9.0.0.
 	sort.Slice(versions, func(i, j int) bool {
-		if c := util.CompareVersion(string(versions[i]), string(versions[j])); c != 0 {
+		if c := compareInstalled(string(versions[i]), string(versions[j])); c != 0 {
 			return c > 0
 		}
 		return versions[i] > versions[j]
 	})
 	return versions
+}
+
+// compareInstalled orders installed version names for InstalledList. A leading
+// "v" is ignored (v20.1.0 is 20.1.0), a pre-release or other suffix comes
+// before its release (2.0.0-rc1 < 2.0.0), and a name that does not start with
+// a number (dev, latest) comes before every numbered one. Missing parts count
+// as 0, so 1.0 and 1.0.0 compare equal.
+func compareInstalled(a, b string) int {
+	na, sa, oka := splitVersionName(a)
+	nb, sb, okb := splitVersionName(b)
+	switch {
+	case oka != okb:
+		if oka {
+			return 1
+		}
+		return -1
+	case !oka:
+		return 0
+	}
+	for i := 0; i < len(na) || i < len(nb); i++ {
+		var x, y int
+		if i < len(na) {
+			x = na[i]
+		}
+		if i < len(nb) {
+			y = nb[i]
+		}
+		if x != y {
+			if x > y {
+				return 1
+			}
+			return -1
+		}
+	}
+	switch {
+	case sa == sb:
+		return 0
+	case sa == "":
+		return 1
+	case sb == "":
+		return -1
+	case sa > sb:
+		return 1
+	}
+	return -1
+}
+
+// splitVersionName splits a name such as v2.0.0-rc1 into its numbers [2 0 0]
+// and the suffix "-rc1". ok is false when the name does not start with a number.
+func splitVersionName(name string) (nums []int, suffix string, ok bool) {
+	if len(name) > 1 && (name[0] == 'v' || name[0] == 'V') && name[1] >= '0' && name[1] <= '9' {
+		name = name[1:]
+	}
+	rest := name
+	for {
+		i := 0
+		for i < len(rest) && rest[i] >= '0' && rest[i] <= '9' {
+			i++
+		}
+		if i == 0 {
+			break
+		}
+		n, err := strconv.Atoi(rest[:i])
+		if err != nil {
+			break
+		}
+		nums = append(nums, n)
+		rest = rest[i:]
+		if len(rest) < 2 || rest[0] != '.' || rest[1] < '0' || rest[1] > '9' {
+			break
+		}
+		rest = rest[1:]
+	}
+	return nums, rest, len(nums) > 0
 }
 
 // globalVersion returns the version the global config asks for, or "".

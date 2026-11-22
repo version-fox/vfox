@@ -157,9 +157,113 @@ func TestUninstallKeepsTheGlobalVersionWhenTheSwitchFails(t *testing.T) {
 	keepRegistry(t)
 
 	out := f.run(t, "uninstall", "beta@2.0.0").mustFail(t, "uninstall beta@2.0.0").output()
-	mustContain(t, "uninstall", out, "EnvKeys exploded")
+	mustContain(t, "uninstall", out, "EnvKeys exploded", "beta@1.0.0")
+	mustNotContain(t, "uninstall", out, "Auto switch")
 	mustContain(t, "global config", readFile(t, globalConfig), `beta = "2.0.0"`)
 	if _, err := os.Stat(filepath.Join(f.shared, "cache", "beta", "v-2.0.0")); err != nil {
 		t.Errorf("beta@2.0.0 was removed: %v", err)
+	}
+}
+
+// A leading "v" is not part of the order: v22.0.0 is newer than v20.1.0, which is
+// newer than 18.0.0. The names stay as they were installed.
+func TestUninstallOrdersVersionsWithALeadingV(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"18.0.0", "v20.1.0", "v22.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"v22.0.0\"\n"), 0644))
+	keepRegistry(t)
+
+	list := f.run(t, "list", "alpha").mustSucceed(t, "list alpha").output()
+	if i22, i20, i18 := strings.Index(list, "v22.0.0"), strings.Index(list, "v20.1.0"), strings.Index(list, "18.0.0"); !(i22 >= 0 && i22 < i20 && i20 < i18) {
+		t.Errorf("list alpha shows the versions out of order, want v22.0.0, v20.1.0, 18.0.0:\n%s", list)
+	}
+	f.run(t, "uninstall", "alpha@v22.0.0").mustSucceed(t, "uninstall alpha@v22.0.0")
+	mustContain(t, "global config", readFile(t, globalConfig), `alpha = "v20.1.0"`)
+}
+
+// A pre-release is older than its release, so the release takes over.
+func TestUninstallPrefersAReleaseToItsPreRelease(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0", "2.0.0-rc1", "3.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"3.0.0\"\n"), 0644))
+	keepRegistry(t)
+
+	f.run(t, "uninstall", "alpha@3.0.0").mustSucceed(t, "uninstall alpha@3.0.0")
+	mustContain(t, "global config", readFile(t, globalConfig), `alpha = "2.0.0"`)
+}
+
+// Uninstalling a global version that is not installed fails without changing
+// the global version.
+func TestUninstallOfAVersionNotInstalledKeepsTheGlobalVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0")
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
+	keepRegistry(t)
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "not installed")
+	mustNotContain(t, "uninstall", out, "Auto switch")
+	mustContain(t, "global config", readFile(t, globalConfig), `alpha = "2.0.0"`)
+}
+
+// deltaPlugin refuses to uninstall anything.
+const deltaPlugin = `PLUGIN = {name="delta", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+function PLUGIN:PreUninstall(ctx) error("PreUninstall refused") end
+`
+
+// When the plugin's PreUninstall hook fails, nothing is removed and the global
+// version stays as it was.
+func TestUninstallKeepsTheGlobalVersionWhenPreUninstallFails(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "delta", deltaPlugin)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "delta", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\ndelta = \"2.0.0\"\n"), 0644))
+	keepRegistry(t)
+
+	out := f.run(t, "uninstall", "delta@2.0.0").mustFail(t, "uninstall delta@2.0.0").output()
+	mustContain(t, "uninstall", out, "PreUninstall refused")
+	mustNotContain(t, "uninstall", out, "Auto switch")
+	mustContain(t, "global config", readFile(t, globalConfig), `delta = "2.0.0"`)
+}
+
+// zetaPlugin fails to give the environment of version 2.0.0.
+const zetaPlugin = `PLUGIN = {name="zeta", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx)
+  if ctx.main.version == "2.0.0" then error("EnvKeys exploded") end
+  return {{key="PATH", value=ctx.path .. "/bin"}}
+end
+`
+
+// When the newest version left cannot be used, the next one takes over.
+func TestUninstallTriesTheNextVersionWhenTheSwitchFails(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "zeta", zetaPlugin)
+	for _, v := range []string{"1.0.0", "2.0.0", "3.0.0"} {
+		f.installOnDisk(t, "zeta", v)
+	}
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nzeta = \"3.0.0\"\n"), 0644))
+	keepRegistry(t)
+
+	out := f.run(t, "uninstall", "zeta@3.0.0").mustSucceed(t, "uninstall zeta@3.0.0").output()
+	mustContain(t, "uninstall", out, "Auto switch", "zeta@1.0.0")
+	mustContain(t, "global config", readFile(t, globalConfig), `zeta = "1.0.0"`)
+	if _, err := os.Stat(filepath.Join(f.shared, "cache", "zeta", "v-3.0.0")); !os.IsNotExist(err) {
+		t.Errorf("zeta@3.0.0 is still there: %v", err)
 	}
 }
