@@ -1,5 +1,7 @@
-# Settings for shfmt (the CI formatting check) and for editors. Each shell
-# script keeps the indentation it already had.
+# Settings for shfmt (the CI formatting check) and for editors. The indent
+# width of each shell script is the one it already had. shfmt re-indented nine
+# lines in two of them: four assignments in install.sh (from 6 to 4 spaces) and
+# five continuation lines in scripts/install-test.sh (from 4 to 6 spaces).
 root = true
 
 [install.sh]
