@@ -19,6 +19,8 @@ package luai
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	lua "github.com/yuin/gopher-lua"
@@ -59,10 +61,42 @@ func (vm *LuaVM) Prepare(options *module.PreloadOptions) error {
 	return nil
 }
 
-// LimitPackagePath limits the package path of the Lua VM.
-func (vm *LuaVM) LimitPackagePath(packagePaths ...string) {
+// LimitPackagePath limits where `require` looks for Lua modules to dirs,
+// searched in order: module `a.b` is `<dir>/a/b.lua`.
+//
+// The search does not go through package.path. Lua reads `;` there as the
+// separator between templates and `?` as the module name, and the plugin
+// directories lie under HOME, so a HOME containing either character split the
+// path or had the module name spliced into it. A loader in place of Lua's own
+// file loader looks in each directory itself; preloaded modules come first as
+// before.
+func (vm *LuaVM) LimitPackagePath(dirs ...string) {
 	packageModule := vm.Instance.GetGlobal("package").(*lua.LTable)
-	packageModule.RawSetString("path", lua.LString(strings.Join(packagePaths, ";")))
+	packageModule.RawSetString("path", lua.LString(""))
+	loaders, ok := packageModule.RawGetString("loaders").(*lua.LTable)
+	if !ok {
+		return
+	}
+	loaders.RawSetInt(2, vm.Instance.NewFunction(func(L *lua.LState) int {
+		name := L.CheckString(1)
+		file := strings.ReplaceAll(name, ".", string(os.PathSeparator)) + ".lua"
+		tried := make([]string, 0, len(dirs))
+		for _, dir := range dirs {
+			path := filepath.Join(dir, file)
+			if _, err := os.Stat(path); err != nil {
+				tried = append(tried, "no file '"+path+"'")
+				continue
+			}
+			fn, err := L.LoadFile(path)
+			if err != nil {
+				L.RaiseError("%s", err.Error())
+			}
+			L.Push(fn)
+			return 1
+		}
+		L.Push(lua.LString("\n\t" + strings.Join(tried, "\n\t")))
+		return 1
+	}))
 }
 
 func (vm *LuaVM) ReturnedValue() *lua.LTable {

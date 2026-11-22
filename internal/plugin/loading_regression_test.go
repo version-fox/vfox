@@ -19,6 +19,7 @@ package plugin
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -60,6 +61,35 @@ func TestLoadingRejectsMalformedPlugin(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// The plugin directory lies under HOME, and a HOME containing ';' or '?' split
+// Lua's package.path or had the module name spliced into it, so a plugin's own
+// require failed (#821).
+func TestPluginRequiresItsModulesFromAnyDirectoryName(t *testing.T) {
+	names := []string{"home;semi"}
+	if runtime.GOOS != "windows" { // '?' is not allowed in a Windows file name
+		names = append(names, "home?question")
+	}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), name, "plugin")
+			writePluginFile(t, dir, "util.lua", `return {version = "1.2.3"}`)
+			writePluginFile(t, dir, "main.lua", `local util = require("util")
+PLUGIN = {name = "example", version = util.version}
+function PLUGIN:Available(ctx) return {{version = "1.0.0"}} end
+function PLUGIN:PreInstall(ctx) return {version = ctx.version, url = "example.zip"} end
+function PLUGIN:EnvKeys(ctx) return {{key = "PATH", value = ctx.path}} end
+`)
+			p, err := CreatePlugin(dir, &env.RuntimeEnvContext{UserConfig: config.DefaultConfig})
+			if p != nil {
+				defer p.Close()
+			}
+			if err != nil {
+				t.Fatalf("loading a plugin under %q: %v", name, err)
 			}
 		})
 	}
