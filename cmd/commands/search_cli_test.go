@@ -93,6 +93,7 @@ func TestSearchArgs(t *testing.T) {
 		{args: []string{"clang", "--debug=maybe"}, error: true},
 		{args: []string{"clang", "--", "--debug", "--help"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--debug", "--help"}}},
 		{args: []string{"clang", "--help"}, want: searchCall{sdkName: "clang", help: true}},
+		{args: []string{"clang", "-v", "--version"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"-v", "--version"}}},
 	} {
 		got, err := searchArgs(tc.args)
 		if tc.error {

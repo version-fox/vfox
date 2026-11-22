@@ -166,6 +166,8 @@ type searchCall struct {
 // options wherever they are: -h, --help and --debug. The first other argument
 // is the SDK name, and the rest go to the plugin in their order. After a "--",
 // every argument goes to the plugin, except the SDK name if it is not given yet.
+// -v, -V and --version are not vfox options here: after the SDK name they go
+// to the plugin like any other argument.
 func searchArgs(args []string) (searchCall, error) {
 	var opts searchCall
 	own := true
