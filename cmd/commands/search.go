@@ -163,7 +163,8 @@ type searchCall struct {
 }
 
 // searchArgs splits the search arguments. Before a "--", vfox reads its own
-// options wherever they are: -h, --help and --debug. The first other argument
+// options wherever they are: -h, -help and -debug, each with one or two dashes
+// and an optional =value, as the flag parser read them. The first other argument
 // is the SDK name, and the rest go to the plugin in their order. After a "--",
 // every argument goes to the plugin, except the SDK name if it is not given yet.
 // -v, -V and --version are not vfox options here: after the SDK name they go
@@ -178,21 +179,23 @@ func searchArgs(args []string) (searchCall, error) {
 				own = false
 				continue
 			}
-			if arg == "-h" || arg == "--help" {
-				opts.help = true
-				continue
-			}
-			if name, value, hasValue := strings.Cut(arg, "="); name == "--debug" || name == "-debug" {
-				if !hasValue {
-					opts.debug = true
+			if strings.HasPrefix(arg, "-") {
+				name, value, hasValue := strings.Cut(strings.TrimPrefix(arg[1:], "-"), "=")
+				if name == "h" || name == "help" || name == "debug" {
+					on := true
+					if hasValue {
+						var err error
+						if on, err = strconv.ParseBool(value); err != nil {
+							return opts, fmt.Errorf("invalid value %q for flag -%s: parse error", value, name)
+						}
+					}
+					if name == "debug" {
+						opts.debug = on
+					} else {
+						opts.help = on
+					}
 					continue
 				}
-				on, err := strconv.ParseBool(value)
-				if err != nil {
-					return opts, fmt.Errorf("invalid value %q for flag -debug: parse error", value)
-				}
-				opts.debug = on
-				continue
 			}
 		}
 		if opts.sdkName == "" {

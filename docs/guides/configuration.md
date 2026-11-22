@@ -114,7 +114,7 @@ If sudo uses root’s home, set root’s mirror with `sudo vfox config github.ba
 ## Cache Settings
 
 `vfox` will cache the results of the `search` command (`available` hook) by default to reduce the number of network requests. The default
-cache time is `12h`.
+cache time is `12h`. A search with plugin arguments is not cached.
 
 ::: warning Special Value
 

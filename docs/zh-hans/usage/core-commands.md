@@ -13,11 +13,12 @@ vfox search <sdk-name> [...optionArgs]
 `sdk-name`: 运行时名称， 如`nodejs`、`custom-node`。
 `optionArgs`: 传给插件 `Available` 钩子的参数，例如 `--no-cache`。是否生效取决于插件。
 
-在 `--` 之前，`-h`、`--help` 和 `--debug` 无论在什么位置都由 vfox 读取。SDK 名称之后的其他参数都会传给插件，包括 `-v` 和 `--version`。`--` 之后的所有参数都会传给插件。SDK 名称不能以 `-` 开头。
+在 `--` 之前，`-h`、`-help` 和 `-debug` 无论在什么位置都由 vfox 读取。它们也可以写成两个 `-`，或者带值，例如 `--debug=false`。第一个其他参数是 SDK 名称。SDK 名称之后的其他参数都会传给插件，包括 `-v` 和 `--version`。`--` 之后的参数都会传给插件，但如果 SDK 名称在 `--` 之后，它仍然是 SDK 名称。SDK 名称不能以 `-` 开头。
 
 ```shell
 vfox search clang --no-cache
 vfox search clang -- --help   # --help 传给插件
+vfox search -- clang --help   # clang 是 SDK 名称，--help 传给插件
 ```
 
 ::: warning 缓存

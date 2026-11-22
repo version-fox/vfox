@@ -134,6 +134,10 @@ end
 `vfox` will cache the results of the `Available` hook to reduce the number of network requests. The default cache time is
 `12h`. For details, see [Cache Settings](../../guides/configuration.md#cache-settings).
 
+A search with plugin arguments, such as `vfox search <sdk-name> --no-cache`, is not cached, so the hook runs every time. If
+your plugin refreshes its list on such a flag, also delete `.available.cache` in the plugin directory, so that the next
+search without arguments is fresh too.
+
 :::
 
 ### EnvKeys

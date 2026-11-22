@@ -64,7 +64,7 @@ func TestSearchStillAcceptsADoubleDashBeforeTheSDKName(t *testing.T) {
 func TestSearchStillShowsItsHelp(t *testing.T) {
 	f := newCLIFixture(t, false)
 
-	for _, args := range [][]string{{"--help"}, {"-h"}, {"echo", "--help"}, {"echo", "-x", "-h"}} {
+	for _, args := range [][]string{{"--help"}, {"-h"}, {"echo", "--help"}, {"echo", "-x", "-h"}, {"-help"}, {"--help=true"}, {"--h"}, {"-h=true"}} {
 		out := f.runHere(t, append([]string{"search"}, args...)...).mustSucceed(t, "search help").output()
 		mustContain(t, "search help", out, "Search a version of the target SDK")
 	}
@@ -94,6 +94,15 @@ func TestSearchArgs(t *testing.T) {
 		{args: []string{"clang", "--debug=maybe"}, error: true},
 		{args: []string{"clang", "--", "--debug", "--help"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"--debug", "--help"}}},
 		{args: []string{"clang", "--help"}, want: searchCall{sdkName: "clang", help: true}},
+		{args: []string{"-h"}, want: searchCall{help: true}},
+		{args: []string{"--h"}, want: searchCall{help: true}},
+		{args: []string{"-help"}, want: searchCall{help: true}},
+		{args: []string{"-h=true"}, want: searchCall{help: true}},
+		{args: []string{"--help=true"}, want: searchCall{help: true}},
+		{args: []string{"--help=false", "clang"}, want: searchCall{sdkName: "clang"}},
+		{args: []string{"clang", "--help=maybe"}, error: true},
+		{args: []string{"---help"}, error: true},
+		{args: []string{"clang", "--debug", "--debug=false"}, want: searchCall{sdkName: "clang"}},
 		{args: []string{"clang", "-v", "--version"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"-v", "--version"}}},
 		{args: []string{"clang", "debug"}, want: searchCall{sdkName: "clang", pluginArgs: []string{"debug"}}},
 		{args: []string{"debug"}, want: searchCall{sdkName: "debug"}},
