@@ -21,6 +21,7 @@ package plugin
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	lua "github.com/yuin/gopher-lua"
 
@@ -33,9 +34,10 @@ import (
 )
 
 type LuaPlugin struct {
-	vm          *luai.LuaVM
-	pluginObj   *lua.LTable
-	development bool
+	vm           *luai.LuaVM
+	pluginObj    *lua.LTable
+	development  bool
+	availableEnv []string
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
@@ -53,6 +55,8 @@ func (l *LuaPlugin) Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem
 	if err != nil {
 		return nil, err
 	}
+	restore := l.traceGetenv()
+	defer restore()
 	table, err := l.CallFunction("Available", ctxTable)
 	if err != nil {
 		return nil, err
@@ -69,6 +73,42 @@ func (l *LuaPlugin) Available(ctx *AvailableHookCtx) ([]*AvailableHookResultItem
 
 	return hookResult, nil
 }
+
+// AvailableEnv returns the environment variables the last Available hook read.
+// The cache key includes their values so one environment cannot reuse a result
+// produced under another. The slice is a copy.
+func (l *LuaPlugin) AvailableEnv() []string {
+	return append([]string(nil), l.availableEnv...)
+}
+
+func (l *LuaPlugin) traceGetenv() func() {
+	L := l.vm.Instance
+	osTable, ok := L.GetGlobal("os").(*lua.LTable)
+	if !ok {
+		l.availableEnv = nil
+		return func() {}
+	}
+	original := osTable.RawGetString("getenv")
+	reads := map[string]struct{}{}
+	osTable.RawSetString("getenv", L.NewFunction(func(state *lua.LState) int {
+		key := state.CheckString(1)
+		reads[key] = struct{}{}
+		state.Push(original)
+		state.Push(lua.LString(key))
+		state.Call(1, 1)
+		return 1
+	}))
+	return func() {
+		osTable.RawSetString("getenv", original)
+		names := make([]string, 0, len(reads))
+		for name := range reads {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		l.availableEnv = names
+	}
+}
+
 func (l *LuaPlugin) PreInstall(ctx *PreInstallHookCtx) (*PreInstallHookResult, error) {
 	L := l.vm.Instance
 	ctxTable, err := codec.Marshal(L, ctx)

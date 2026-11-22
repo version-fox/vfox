@@ -135,15 +135,13 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 		return b.invokeAvailable(args)
 	}
 
-	cacheKey := strings.Join(args, "##")
-	if cacheKey == "" {
-		cacheKey = "empty"
-	}
+	argsKey := availableArgsKey(args)
 
 	fileCache, err := cache.NewFileCache(cachePath)
 	if err == nil {
-		cacheValue, ok := fileCache.Get(cacheKey)
-		logger.Debugf("Available hook cache key: %s, hit: %+v \n", cacheKey, ok)
+		fullKey := argsKey + availableEnvSuffix(cachedEnvNames(fileCache, argsKey))
+		cacheValue, ok := fileCache.Get(fullKey)
+		logger.Debugf("Available hook cache key: %s, hit: %+v \n", fullKey, ok)
 		if ok {
 			var hookResult []*AvailableRuntimePackage
 			if err = cacheValue.Unmarshal(&hookResult); err == nil {
@@ -155,16 +153,75 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 	if err != nil {
 		return result, err
 	}
+	envNames := availableEnvNames(b.plugin.Plugin)
+	fullKey := argsKey + availableEnvSuffix(envNames)
 	if result == nil {
-		fileCache.Set(cacheKey, nil, cache.ExpireTime(cacheDuration))
+		fileCache.Set(fullKey, nil, cache.ExpireTime(cacheDuration))
 	}
 	if value, err := cache.NewValue(result); err == nil {
 		logger.Debugf("Available hook cache set\n")
-		fileCache.Set(cacheKey, value, cache.ExpireTime(cacheDuration))
+		if deps, depErr := cache.NewValue(envNames); depErr == nil {
+			fileCache.Set(envDepsKey(argsKey), deps, cache.ExpireTime(cacheDuration))
+		}
+		fileCache.Set(fullKey, value, cache.ExpireTime(cacheDuration))
 		_ = fileCache.Close()
 	}
 
 	return result, nil
+}
+
+// availableArgsKey is versioned so entries written before environment was part
+// of the key are not reused.
+func availableArgsKey(args []string) string {
+	cacheKey := strings.Join(args, "##")
+	if cacheKey == "" {
+		cacheKey = "empty"
+	}
+	return "v2:" + cacheKey
+}
+
+func envDepsKey(argsKey string) string {
+	return "\x00deps:" + argsKey
+}
+
+func cachedEnvNames(fileCache *cache.FileCache, argsKey string) []string {
+	value, ok := fileCache.Get(envDepsKey(argsKey))
+	if !ok {
+		return nil
+	}
+	var names []string
+	if err := value.Unmarshal(&names); err != nil {
+		return nil
+	}
+	return names
+}
+
+type availableEnvProbe interface {
+	AvailableEnv() []string
+}
+
+func availableEnvNames(p plugin.Plugin) []string {
+	probe, ok := p.(availableEnvProbe)
+	if !ok {
+		return nil
+	}
+	return probe.AvailableEnv()
+}
+
+func availableEnvSuffix(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	var b strings.Builder
+	for _, name := range sorted {
+		b.WriteByte(0)
+		b.WriteString(name)
+		b.WriteByte('=')
+		b.WriteString(os.Getenv(name))
+	}
+	return b.String()
 }
 
 // Install installs a specific version of the SDK.
