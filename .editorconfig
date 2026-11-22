@@ -1,0 +1,16 @@
+# Settings for shfmt (the CI formatting check) and for editors. Each shell
+# script keeps the indentation it already had.
+root = true
+
+[install.sh]
+indent_style = space
+indent_size = 2
+switch_case_indent = true
+
+[scripts/install-test.sh]
+indent_style = space
+indent_size = 2
+
+[scripts/{bump,e2e-test}.sh]
+indent_style = space
+indent_size = 4
