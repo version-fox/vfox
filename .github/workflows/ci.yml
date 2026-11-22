@@ -122,3 +122,54 @@ jobs:
           command -v fish
           fish --version
           go test ./cmd -run '^TestFishCompletion$' -count=1 -v
+
+  format:
+    if: github.repository == 'version-fox/vfox'
+    name: Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Releases and the digests of their binaries, so that this job checks the
+      # code against one formatter and not whatever its newest release prefers.
+      # Bump a version and its digest together (the digest is listed with the
+      # asset on the release page), then run the matching check below and commit
+      # what the new release changes.
+      STYLUA_VERSION: 2.6.0
+      STYLUA_SHA256: a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895
+      SHFMT_VERSION: 3.14.1
+      SHFMT_SHA256: 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Check Go formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "${unformatted}" ]; then
+            echo "These files are not gofmt-formatted; run gofmt -w on them:"
+            echo "${unformatted}"
+            exit 1
+          fi
+      - name: Install StyLua and shfmt
+        run: |
+          mkdir "${RUNNER_TEMP}/bin"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/stylua.zip" \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip"
+          echo "${STYLUA_SHA256}  ${RUNNER_TEMP}/stylua.zip" | sha256sum --check --strict -
+          unzip -q "${RUNNER_TEMP}/stylua.zip" -d "${RUNNER_TEMP}/bin"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/bin/shfmt" \
+            "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  ${RUNNER_TEMP}/bin/shfmt" | sha256sum --check --strict -
+          chmod +x "${RUNNER_TEMP}/bin/stylua" "${RUNNER_TEMP}/bin/shfmt"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      - name: Check Lua formatting
+        run: |
+          stylua --version
+          stylua --check .
+      - name: Check shell formatting
+        run: |
+          shfmt --version
+          shfmt -d install.sh scripts/*.sh
