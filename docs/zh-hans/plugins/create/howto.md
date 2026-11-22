@@ -58,12 +58,18 @@
 
 如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
 
+`ctx.installedSdks` 列出已安装的版本，以版本号为键，结构与 `PreUse` 中相同（用 `vfox install --as` 做出的副本不在其中）。如果返回的版本已经安装，`vfox` 会提示已安装，不再下载。插件更改了版本命名时，可以借此返回已有安装所用的名字，避免同一个版本以两个名字安装两次。
+
 **位置**: `hooks/pre_install.lua`
 
 ```lua
 function PLUGIN:PreInstall(ctx)
     --- 用户输入
     local version = ctx.version
+    --- 已安装的版本（以版本号为键），与 PreUse 相同
+    --- 例如已安装 "OTP-29.1.2"：
+    --- local sdkInfo = ctx.installedSdks['OTP-29.1.2']
+    local installedSdks = ctx.installedSdks
     return {
         --- 版本号
         version = "xxx",

@@ -245,8 +245,12 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		return version, nil
 	}
 
+	// A copy is selected only by its own name, so the plugin is not given it:
+	// returning it would pass the copy off as the version asked for.
+	runtimes, _ := b.getAllRuntimes()
 	ctx := &plugin.PreInstallHookCtx{
-		Version: string(version),
+		Version:       string(version),
+		InstalledSdks: installedPackageItems(b.matchableRuntimes(runtimes)),
 	}
 	logger.Debugf("Calling PreInstall hook for %s\n", label)
 	installInfo, err := b.plugin.PreInstall(ctx)
@@ -683,26 +687,31 @@ func (b *impl) EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error) {
 	return envKeys, nil
 }
 
-func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
-	installedSdks, _ := b.getAllRuntimes()
-	// A copy is selected only by its own name, so the plugin is not given it and the
-	// prefix matching below does not reach it.
-	installedSdks = b.matchableRuntimes(installedSdks)
-	sdks := make(map[string]*plugin.InstalledPackageItem)
-
-	for _, sdk := range installedSdks {
+// installedPackageItems returns runtimes as PreInstall and PreUse are given them,
+// keyed by version.
+func installedPackageItems(runtimes []*RuntimePackage) map[string]*plugin.InstalledPackageItem {
+	sdks := make(map[string]*plugin.InstalledPackageItem, len(runtimes))
+	for _, sdk := range runtimes {
 		sdks[string(sdk.Runtime.Version)] = &plugin.InstalledPackageItem{
 			Name:    sdk.Runtime.Name,
 			Version: string(sdk.Runtime.Version),
 			Path:    sdk.PackagePath,
 		}
 	}
+	return sdks
+}
+
+func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
+	installedSdks, _ := b.getAllRuntimes()
+	// A copy is selected only by its own name, so the plugin is not given it and the
+	// prefix matching below does not reach it.
+	installedSdks = b.matchableRuntimes(installedSdks)
 	preUseCtx := &plugin.PreUseHookCtx{
 		Cwd:             b.envContext.PathMeta.Working.Directory,
 		PreviousVersion: string(b.Current()),
 		Scope:           scope.String(),
 		Version:         string(version),
-		InstalledSdks:   sdks,
+		InstalledSdks:   installedPackageItems(installedSdks),
 	}
 
 	var newVersion string

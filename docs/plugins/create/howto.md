@@ -66,12 +66,18 @@ For example: `https://example.com/1234567890#/filename.zip`.
 
 if the return value of version is empty, it means that the version is not found, and `vfox` will ask the user whether to perform a search operation.
 
+`ctx.installedSdks` lists the installed versions, keyed by version string, in the same shape as in `PreUse` (a copy made with `vfox install --as` is left out). If the version returned is already installed, `vfox` reports it as installed and downloads nothing. A plugin that renamed its versions can use this to return the name an existing installation has, so the same release is not installed twice under two names.
+
 ```lua
 function PLUGIN:PreInstall(ctx)
     --- input parameters
     local version = ctx.version
     --- the current version of vfox running
     local runtimeVersion = ctx.runtimeVersion
+    --- installed versions, keyed by version string, as in PreUse
+    --- For example, if "OTP-29.1.2" is installed:
+    --- local sdkInfo = ctx.installedSdks['OTP-29.1.2']
+    local installedSdks = ctx.installedSdks
     return {
         --- sdk version
         version = "xxx",
