@@ -345,3 +345,112 @@ func TestUninstallRestoresTheOnlyVersionQuietly(t *testing.T) {
 		t.Errorf("the link of alpha was not restored: %v", err)
 	}
 }
+
+// The removal can fail halfway, with the main runtime gone and an addition left.
+// The only version then stays the global version, and its link stays too.
+func TestUninstallKeepsTheOnlyVersionWhenAnAdditionCannotBeRemoved(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory can still be emptied on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can remove a read-only directory")
+	}
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "2.0.0")
+	locked := filepath.Join(f.shared, "cache", "alpha", "v-2.0.0", "extra-2.0.0", "locked")
+	must(t, os.MkdirAll(locked, 0755))
+	must(t, os.WriteFile(filepath.Join(locked, "file"), nil, 0644))
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+	must(t, os.Chmod(locked, 0555))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0755) })
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustNotContain(t, "uninstall", out, "Unset")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
+	for _, name := range []string{"alpha", "extra"} {
+		if !env.IsDirSymlink(filepath.Join(f.userHome, "sdks", name)) {
+			t.Errorf("the global link of %s is gone", name)
+		}
+	}
+}
+
+// Uninstalling the only version unsets it once it is gone.
+func TestUninstallUnsetsTheOnlyVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "2.0.0")
+	keepRegistry(t)
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "Uninstalled", "Unset")
+	mustNotContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), "alpha")
+	if env.IsDirSymlink(filepath.Join(f.userHome, "sdks", "alpha")) {
+		t.Error("the global link of alpha is still there")
+	}
+}
+
+// Uninstalling a version that is not global removes the global links that still
+// point into it, and leaves those of the global version alone.
+func TestUninstallRemovesTheGlobalLinksOfAVersionThatIsNotGlobal(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0", "extra-1.0.0"), 0755))
+	keepRegistry(t)
+	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+
+	f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall alpha@1.0.0")
+	if _, err := os.Lstat(filepath.Join(f.userHome, "sdks", "extra")); !os.IsNotExist(err) {
+		t.Errorf("the link of the addition is still there: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
+		t.Errorf("the link of alpha is broken: %v", err)
+	}
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
+}
+
+// A link that cannot be removed does not fail the uninstall, but it is reported.
+func TestUninstallWarnsWhenALinkCannotBeRemoved(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory can still be written on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can write a read-only directory")
+	}
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0", "extra-1.0.0"), 0755))
+	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+	sdks := filepath.Join(f.userHome, "sdks")
+	must(t, os.Chmod(sdks, 0555))
+	t.Cleanup(func() { _ = os.Chmod(sdks, 0755) })
+
+	out := f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall alpha@1.0.0").output()
+	mustContain(t, "uninstall", out, "Uninstalled", "could not be removed", "extra")
+}
+
+// When the global setting cannot be removed, the command says so and fails, but
+// the version and its aliases are gone.
+func TestUninstallReportsAGlobalVersionThatCannotBeUnset(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only file does not stop the write")
+	}
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "2.0.0")
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+	f.run(t, "alias", "set", "alpha", "mine", "2.0.0").mustSucceed(t, "alias set")
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	must(t, os.Chmod(globalConfig, 0444))
+	t.Cleanup(func() { _ = os.Chmod(globalConfig, 0644) })
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "could not be unset", "Removed the alias(es) mine")
+	if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha", "v-2.0.0")); !os.IsNotExist(err) {
+		t.Errorf("alpha@2.0.0 is still there: %v", err)
+	}
+}

@@ -17,6 +17,7 @@
 package sdk
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -576,8 +578,11 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 // fallbacks that can be used becomes the global version before anything is
 // removed. If none of them can be used, Uninstall fails, removes nothing and
 // leaves the global version alone. With no fallbacks, the global setting is
-// removed instead. A failure in the checks or the PreUninstall hook also leaves
-// the global version alone.
+// removed once the version is gone. A failure in the checks, in the PreUninstall
+// hook or in the removal never leaves the global setting empty.
+//
+// An error that is ErrGlobalNotUnset means that the version was removed, but the
+// global setting still names it.
 func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	label := b.Label(version)
 	logger.Debugf("Uninstalling SDK: %s\n", label)
@@ -601,6 +606,23 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 			return
 		}
 	}
+
+	// If the global scope asks for the version to be uninstalled, it has to stop
+	// doing so. A version only a project or session asks for leaves the global
+	// setting alone. The fallbacks are checked before the hook below runs: it
+	// may only run for a version that is going to be removed.
+	isGlobal := b.globalVersion() == version
+	var usable []Version
+	var registryEnvs *env.Envs
+	if isGlobal && len(fallbacks) > 0 {
+		if usable, err = b.usableFallbacks(version, fallbacks); err != nil {
+			return err
+		}
+	} else if isGlobal && runtime.GOOS == "windows" {
+		// They are built from the files that are about to be removed.
+		registryEnvs, _ = b.EnvKeysForScope(version, env.Global)
+	}
+
 	// vfox does not own the files of a linked version, so the plugin has
 	// nothing of its own to clean up in them.
 	if installed && !linked && b.plugin.HasFunction("PreUninstall") {
@@ -623,33 +645,10 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 		}
 	}
 
-	// If the global scope asks for the version to be uninstalled, unuse it
-	// there first. A version only a project or session asks for leaves the
-	// global setting alone.
-	if b.globalVersion() == version {
-		if len(fallbacks) > 0 {
-			if err = b.switchGlobal(fallbacks); err != nil {
-				return err
-			}
-		} else {
-			logger.Debugf("SDK %s is currently in use, unusing it first\n", label)
-			if err = b.unuse(env.Global); err != nil {
-				return err
-			}
-			// If the version cannot be removed after all, it is still
-			// installed: make it the global version again rather than leave
-			// none, and only say that it was unset once it is gone.
-			defer func() {
-				if err == nil {
-					b.printUnset()
-				} else if _, restoreErr := b.apply(version, env.Global, false); restoreErr != nil {
-					err = errors.Join(err, fmt.Errorf("could not make %s the global version again: %w", label, restoreErr))
-				}
-			}()
+	if len(usable) > 0 {
+		if err = b.switchGlobal(usable); err != nil {
+			return err
 		}
-		// The global links that still point into the version, such as those of
-		// additions the new global version does not have, would dangle.
-		b.removeLinksInto(path, env.Global)
 	}
 
 	if linked {
@@ -659,26 +658,83 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 			return
 		}
 		pterm.Printf("Unlinked %s successfully! %s was left untouched.\n", label, linkedTo)
-		return
+	} else {
+		logger.Debugf("Removing directory: %s\n", path)
+		if err = os.RemoveAll(path); err != nil {
+			logger.Debugf("Failed to remove directory: %v\n", err)
+			return
+		}
+		pterm.Printf("Uninstalled %s successfully!\n", label)
+		logger.Debugf("SDK %s uninstalled successfully\n", label)
 	}
-	logger.Debugf("Removing directory: %s\n", path)
-	err = os.RemoveAll(path)
-	if err != nil {
-		logger.Debugf("Failed to remove directory: %v\n", err)
-		return
+
+	// The global links that pointed into the version now dangle: those of the
+	// version itself, or of additions the global version does not have. This is
+	// best effort, because the version is gone and there is nothing to go back to.
+	if linkErr := b.removeLinksInto(path, env.Global); linkErr != nil {
+		pterm.Warning.Printf("Some links to %s could not be removed: %v\n", label, linkErr)
 	}
-	pterm.Printf("Uninstalled %s successfully!\n", label)
-	logger.Debugf("SDK %s uninstalled successfully\n", label)
-	return
+	if isGlobal && len(usable) == 0 {
+		return b.unsetRemovedGlobal(version, registryEnvs)
+	}
+	return nil
 }
 
-// switchGlobal makes the first of candidates that can be used the global
-// version. If none can, the global version stays as it was, and the error names
-// each candidate that failed.
-func (b *impl) switchGlobal(candidates []Version) error {
+// unsetRemovedGlobal removes the global setting, which still names version after
+// it was uninstalled, and the registry entries version had on Windows.
+func (b *impl) unsetRemovedGlobal(version Version, registryEnvs *env.Envs) error {
+	// Best effort, as in unuse: the entries are only stale, and the config
+	// decides which version is in use.
+	if err := env.RemoveEnvsFromRegistry(registryEnvs); err != nil {
+		pterm.Warning.Printf("Failed to remove the global registry environment of %s: %v\n", b.Label(version), err)
+	}
+	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(env.Global)
+	if err == nil {
+		vfoxToml.RemoveTool(b.Name)
+		err = vfoxToml.Save()
+	}
+	if err != nil {
+		return fmt.Errorf("%s was removed: %w: %w", b.Label(version), ErrGlobalNotUnset, err)
+	}
+	b.printUnset()
+	return nil
+}
+
+// usableFallbacks returns the versions that candidates stand for and that can
+// take over when removed is uninstalled: each resolves to another installed
+// version whose environment the plugin can give. If there is none, the error
+// names each candidate.
+func (b *impl) usableFallbacks(removed Version, candidates []Version) ([]Version, error) {
+	var usable []Version
 	var errs []error
 	for _, v := range candidates {
-		err := b.UseGlobal(v)
+		resolved, err := b.resolveInstalled(v, env.Global)
+		if err == nil && resolved == removed {
+			err = errors.New("it resolves to the version that is being removed")
+		}
+		if err == nil {
+			_, err = b.EnvKeysForScope(resolved, env.Global)
+		}
+		if err != nil {
+			logger.Debugf("Cannot switch the global version to %s: %v\n", b.Label(v), err)
+			errs = append(errs, fmt.Errorf("%s: %w", b.Label(v), err))
+			continue
+		}
+		usable = append(usable, resolved)
+	}
+	if len(usable) == 0 {
+		return nil, noSwitchError(errs)
+	}
+	return usable, nil
+}
+
+// switchGlobal makes the first of versions that can be used the global version.
+// If none can, the global version stays as it was, and the error names each
+// version that failed.
+func (b *impl) switchGlobal(versions []Version) error {
+	var errs []error
+	for _, v := range versions {
+		err := b.useInHook(v, env.Global, false, env.IsHookEnv())
 		if err == nil {
 			pterm.Printf("Auto switch to the other version: %s.\n", b.Label(v))
 			return nil
@@ -686,6 +742,10 @@ func (b *impl) switchGlobal(candidates []Version) error {
 		logger.Debugf("Could not switch the global version to %s: %v\n", b.Label(v), err)
 		errs = append(errs, fmt.Errorf("%s: %w", b.Label(v), err))
 	}
+	return noSwitchError(errs)
+}
+
+func noSwitchError(errs []error) error {
 	return fmt.Errorf("could not switch the global version to another version, so nothing was removed: %w", errors.Join(errs...))
 }
 
@@ -768,20 +828,16 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 		if b.CheckRuntimeExist(version) {
 			return version, nil
 		}
-		installedVersions := make(util.VersionSort, 0, len(installedSdks))
+		installedVersions := make([]Version, 0, len(installedSdks))
 		for _, sdk := range installedSdks {
-			installedVersions = append(installedVersions, string(sdk.Runtime.Version))
+			installedVersions = append(installedVersions, sdk.Runtime.Version)
 		}
-		sort.Sort(installedVersions)
+		sortNewestFirst(installedVersions)
 		version := string(version)
 		prefix := version + "."
 		for _, v := range installedVersions {
-			if version == v {
-				newVersion = v
-				break
-			}
-			if strings.HasPrefix(v, prefix) {
-				newVersion = v
+			if name := string(v); name == version || strings.HasPrefix(name, prefix) {
+				newVersion = name
 				break
 			}
 		}
@@ -966,8 +1022,7 @@ func (b *impl) apply(version Version, scope env.UseScope, unlink bool) (inRegist
 	logger.Debugf("Creating symlinks for scope: %v\n", scope)
 	if err := b.createSymlinksForScope(runtimePackage, scope); err != nil {
 		logger.Debugf("Failed to create symlinks: %v\n", err)
-		b.revertLinks(version, Version(previous), scope)
-		return false, fmt.Errorf("failed to create symlinks, err:%w", err)
+		return false, errors.Join(fmt.Errorf("failed to create symlinks, err:%w", err), b.revertLinks(version, Version(previous), scope))
 	}
 
 	// Determine link flag based on scope and unlink parameter
@@ -984,8 +1039,7 @@ func (b *impl) apply(version Version, scope env.UseScope, unlink bool) (inRegist
 	}
 	if err := vfoxToml.Save(); err != nil {
 		logger.Debugf("Failed to save tool versions: %v\n", err)
-		b.revertLinks(version, Version(previous), scope)
-		return false, fmt.Errorf("failed to save tool versions, err:%w", err)
+		return false, errors.Join(fmt.Errorf("failed to save tool versions, err:%w", err), b.revertLinks(version, Version(previous), scope))
 	}
 
 	// On Windows, always update registry for global scope so GUI apps can pick up the PATH
@@ -1010,16 +1064,19 @@ func (b *impl) apply(version Version, scope env.UseScope, unlink bool) (inRegist
 
 // revertLinks undoes the links apply made for version in scope, and points them
 // at previous again, the version the config still asks for, if there is one.
-func (b *impl) revertLinks(version, previous Version, scope env.UseScope) {
+func (b *impl) revertLinks(version, previous Version, scope env.UseScope) error {
+	var errs []error
 	if version != previous {
-		b.removeLinksInto(b.packagePath(version), scope)
+		if err := b.removeLinksInto(b.packagePath(version), scope); err != nil {
+			errs = append(errs, fmt.Errorf("could not remove the links to %s: %w", b.Label(version), err))
+		}
 	}
-	if previous == "" {
-		return
+	if previous != "" {
+		if err := b.CreateSymlinksForScope(previous, scope); err != nil {
+			errs = append(errs, fmt.Errorf("could not restore the links to %s: %w", b.Label(previous), err))
+		}
 	}
-	if err := b.CreateSymlinksForScope(previous, scope); err != nil {
-		logger.Debugf("Failed to restore the symlinks of %s: %v\n", b.Label(previous), err)
-	}
+	return errors.Join(errs...)
 }
 
 func (b *impl) InstalledList() []Version {
@@ -1039,21 +1096,26 @@ func (b *impl) InstalledList() []Version {
 			}
 		}
 	}
-	// Newest first, by version number: 10.0.0 comes before 9.0.0.
+	sortNewestFirst(versions)
+	return versions
+}
+
+// sortNewestFirst sorts versions by version number: 10.0.0 comes before 9.0.0.
+func sortNewestFirst(versions []Version) {
 	sort.Slice(versions, func(i, j int) bool {
 		if c := compareInstalled(string(versions[i]), string(versions[j])); c != 0 {
 			return c > 0
 		}
 		return versions[i] > versions[j]
 	})
-	return versions
 }
 
-// compareInstalled orders installed version names for InstalledList. A leading
+// compareInstalled orders installed version names for sortNewestFirst. A leading
 // "v" is ignored (v20.1.0 is 20.1.0), a pre-release or other suffix comes
-// before its release (2.0.0-rc1 < 2.0.0), and a name that does not start with
-// a number (dev, latest) comes before every numbered one. Missing parts count
-// as 0, so 1.0 and 1.0.0 compare equal.
+// before its release (2.0.0-rc1 < 2.0.0), the numbers in a suffix compare as
+// numbers (rc9 < rc10), and a name that does not start with a number (dev,
+// latest) comes before every numbered one. Missing parts count as 0, so 1.0 and
+// 1.0.0 compare equal.
 func compareInstalled(a, b string) int {
 	na, sa, oka := splitVersionName(a)
 	nb, sb, okb := splitVersionName(b)
@@ -1088,11 +1150,35 @@ func compareInstalled(a, b string) int {
 		return 1
 	case sb == "":
 		return -1
-	case sa > sb:
-		return 1
 	}
-	return -1
+	return compareSuffix(sa, sb)
 }
+
+// suffixParts matches the runs of digits and the runs of anything else.
+var suffixParts = regexp.MustCompile(`[0-9]+|[^0-9]+`)
+
+// compareSuffix compares the runs of digits in two suffixes as numbers and the
+// rest as text. A number comes before text, and a suffix before a longer one
+// that starts with it.
+func compareSuffix(a, b string) int {
+	pa, pb := suffixParts.FindAllString(a, -1), suffixParts.FindAllString(b, -1)
+	for i := 0; i < len(pa) && i < len(pb); i++ {
+		x, y := pa[i], pb[i]
+		if isDigit(x[0]) && isDigit(y[0]) {
+			// Without leading zeros, the longer number is the larger one.
+			x, y = strings.TrimLeft(x, "0"), strings.TrimLeft(y, "0")
+			if c := cmp.Compare(len(x), len(y)); c != 0 {
+				return c
+			}
+		}
+		if c := strings.Compare(x, y); c != 0 {
+			return c
+		}
+	}
+	return cmp.Compare(len(pa), len(pb))
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 // splitVersionName splits a name such as v2.0.0-rc1 into its numbers [2 0 0]
 // and the suffix "-rc1". ok is false when the name does not start with a number.
@@ -1262,14 +1348,18 @@ func (b *impl) removeSymlinksForScope(version Version, scope env.UseScope) error
 	return nil
 }
 
-// removeLinksInto removes the links of scope that point into dir.
-func (b *impl) removeLinksInto(dir string, scope env.UseScope) {
+// removeLinksInto removes the links of scope that point into dir. It goes on
+// after a link that cannot be removed, and returns the errors of all of them.
+func (b *impl) removeLinksInto(dir string, scope env.UseScope) error {
 	linkDir := b.envContext.GetLinkDirPathByScope(scope)
 	entries, err := os.ReadDir(linkDir)
-	if err != nil {
-		logger.Debugf("Failed to read the link directory %s: %v\n", linkDir, err)
-		return
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
 	}
+	if err != nil {
+		return err
+	}
+	var errs []error
 	for _, entry := range entries {
 		link := filepath.Join(linkDir, entry.Name())
 		target, ok := linkTarget(link)
@@ -1280,9 +1370,10 @@ func (b *impl) removeLinksInto(dir string, scope env.UseScope) {
 			continue
 		}
 		if err := env.RemoveDirSymlink(link); err != nil {
-			logger.Debugf("Failed to remove symlink %s: %v\n", link, err)
+			errs = append(errs, err)
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // createDirSymlinks creates symlinks for runtime in the given paths

@@ -18,6 +18,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -64,8 +65,9 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	// first of these that can be used, after its checks and before it removes
 	// anything. A version only a project or session asks for is left alone.
 	fallbacks := fallbackVersions(source, otherVersions(source.InstalledList(), resolvedVersion))
-	if err = source.Uninstall(resolvedVersion, fallbacks...); err != nil {
-		return err
+	uninstallErr := source.Uninstall(resolvedVersion, fallbacks...)
+	if uninstallErr != nil && !errors.Is(uninstallErr, sdk.ErrGlobalNotUnset) {
+		return uninstallErr
 	}
 	// An alias must not outlive the version it names.
 	if removed, err := manager.RemoveAliasesFor(name, resolvedVersion); err != nil {
@@ -76,7 +78,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	if len(source.InstalledList()) == 0 {
 		_ = os.RemoveAll(source.Metadata().SdkInstalledPath)
 	}
-	return nil
+	return uninstallErr
 }
 
 // otherVersions returns the entries of versions that are not version.

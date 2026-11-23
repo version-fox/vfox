@@ -21,3 +21,7 @@ package sdk
 import "errors"
 
 var ErrRuntimeNotFound = errors.New("runtime not found")
+
+// ErrGlobalNotUnset is returned by Uninstall when the version was removed, but
+// the global setting still names it.
+var ErrGlobalNotUnset = errors.New("the global version could not be unset")

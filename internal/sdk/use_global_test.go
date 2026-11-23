@@ -214,3 +214,49 @@ func TestUseGlobalRevertsTheLinksWhenTheConfigCannotBeWritten(t *testing.T) {
 		t.Errorf("the link points at %s, want 1.0.0", target)
 	}
 }
+
+// The PreUninstall hook runs only for a version that is going to be removed: not
+// when no fallback can take over.
+func TestUninstallChecksTheFallbacksBeforePreUninstall(t *testing.T) {
+	boom := false
+	p := &testPlugin{
+		preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil },
+		envKeys: func(ctx *plugin.EnvKeysHookCtx) ([]*plugin.EnvKeysHookResultItem, error) {
+			if boom && ctx.Main.Version == "1.0.0" {
+				return nil, errors.New("EnvKeys exploded")
+			}
+			return []*plugin.EnvKeysHookResultItem{{Key: "PATH", Value: filepath.Join(ctx.Path, "bin")}}, nil
+		},
+	}
+	s := newTestSDK(t, p)
+	stubShellAndRegistry(t)
+	t.Setenv(env.HookFlag, "")
+	capturePterm(t)
+	mustInstall(t, s, "1.0.0")
+	mustInstall(t, s, "2.0.0")
+	if err := s.UseGlobal("2.0.0"); err != nil {
+		t.Fatalf("UseGlobal(2.0.0): %v", err)
+	}
+
+	boom = true
+	if err := s.Uninstall("2.0.0", "1.0.0"); err == nil || !strings.Contains(err.Error(), "EnvKeys exploded") {
+		t.Fatalf("Uninstall(2.0.0) = %v, want the EnvKeys error", err)
+	}
+	if p.preUninstallCall != 0 {
+		t.Errorf("PreUninstall ran %d times for a version that stays installed", p.preUninstallCall)
+	}
+	if !s.CheckRuntimeExist("2.0.0") || s.globalVersion() != "2.0.0" {
+		t.Errorf("2.0.0 installed = %v, global version = %q, want it untouched", s.CheckRuntimeExist("2.0.0"), s.globalVersion())
+	}
+
+	boom = false
+	if err := s.Uninstall("2.0.0", "1.0.0"); err != nil {
+		t.Fatalf("Uninstall(2.0.0): %v", err)
+	}
+	if p.preUninstallCall != 1 {
+		t.Errorf("PreUninstall ran %d times, want 1", p.preUninstallCall)
+	}
+	if got := s.globalVersion(); got != "1.0.0" {
+		t.Errorf("global version = %q, want 1.0.0", got)
+	}
+}
