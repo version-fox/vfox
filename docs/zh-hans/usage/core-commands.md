@@ -350,14 +350,20 @@ vfox upgrade
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK 名称
 
 `version`[可选]: 指定使用的版本。如不传，则使用当前作用域配置的版本。
 
-可以在 `--` 之前连续指定多个 SDK。它们会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
+只指定单个 SDK 且 `<command>` 及其参数中不包含 `--` 时可以省略 `--`，跟在 `<command>` 之后的标志（如 `--version`、`--help`）会直接透传给 `<command>`。
+
+第一个 `--` 始终作为 SDK 列表与 `<command>` 之间的分隔符，其前方的所有参数都会按 SDK 解析。同时指定多个 SDK 时必须使用 `--` 分隔；如果 `<command>` 自身需要接收 `--`，请将 `--` 放在 `<command>` 之前（例如 `vfox exec nodejs@24.14.0 -- npm run build -- --watch`）。多个 SDK 会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
 
 `command`: 要执行的命令
 

@@ -142,11 +142,106 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("vfox --debug exec exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
 		}
+		if !strings.Contains(stdout, "Looking up SDK: etcd") {
+			t.Fatalf("stdout missing debug log output:\n%s", stdout)
+		}
 		if !strings.Contains(stdout, "args=--version") {
 			t.Fatalf("stdout missing target output %q:\n%s", "args=--version", stdout)
 		}
 		if strings.Contains(stderr, internal.RuntimeVersion) {
 			t.Fatalf("stderr leaked vfox version %q:\n%s", internal.RuntimeVersion, stderr)
+		}
+	})
+
+	t.Run("exec --debug between exec and sdk enables debug and runs command", func(t *testing.T) {
+		stdout, stderr, code := runExecCLI(t, root, "exec", "--debug", "etcd@3.5.12", "etcd", "put")
+		if code != 0 {
+			t.Fatalf("vfox exec --debug exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
+		}
+		if !strings.Contains(stdout, "Looking up SDK: etcd") {
+			t.Fatalf("stdout missing debug log output:\n%s", stdout)
+		}
+		if !strings.Contains(stdout, "args=put") {
+			t.Fatalf("stdout missing target output %q:\n%s", "args=put", stdout)
+		}
+	})
+
+	t.Run("exec --debug before -- still preserves --debug after command", func(t *testing.T) {
+		stdout, stderr, code := runExecCLI(t, root, "exec", "--debug", "etcd@3.5.12", "--", "etcd", "--debug", "--version")
+		if code != 0 {
+			t.Fatalf("vfox exec --debug -- exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
+		}
+		if !strings.Contains(stdout, "Looking up SDK: etcd") {
+			t.Fatalf("stdout missing debug log output:\n%s", stdout)
+		}
+		if !strings.Contains(stdout, "args=--debug --version") {
+			t.Fatalf("stdout missing target output %q:\n%s", "args=--debug --version", stdout)
+		}
+	})
+
+	for _, flag := range []string{"-v", "-V", "--version"} {
+		t.Run("exec "+flag+" between exec and sdk fails naming the flag", func(t *testing.T) {
+			stdout, stderr, code := runExecCLI(t, root, "exec", flag, "etcd@3.5.12", "etcd", "put")
+			if code == 0 {
+				t.Fatalf("expected non-zero exit code for `vfox exec %s`, got 0 (stdout:\n%s)", flag, stdout)
+			}
+			if !strings.Contains(stderr, flag) {
+				t.Fatalf("stderr did not name flag %q:\n%s", flag, stderr)
+			}
+			if strings.Contains(stderr, "multiple SDKs") {
+				t.Fatalf("stderr gave misleading multi-SDK message:\n%s", stderr)
+			}
+			if !strings.Contains(stderr, "usage: vfox exec") {
+				t.Fatalf("stderr missing usage line:\n%s", stderr)
+			}
+			if strings.Contains(stderr, internal.RuntimeVersion) || strings.Contains(stdout, internal.RuntimeVersion) {
+				t.Fatalf("unexpected vfox version %q printed (stdout=%q stderr=%q)", internal.RuntimeVersion, stdout, stderr)
+			}
+		})
+	}
+
+	t.Run("first -- separates sdks and names word parsed as sdk on failure", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			args     []string
+			wantWord string
+			wantErr  string
+		}{
+			{
+				name:     "installed sdk without version before --",
+				args:     []string{"exec", "etcd@3.5.12", "etcd", "--", "--version"},
+				wantWord: "etcd",
+				wantErr:  "no version configured for etcd",
+			},
+			{
+				name:     "uninstalled command word before --",
+				args:     []string{"exec", "etcd@3.5.12", "npm", "run", "build", "--", "--watch"},
+				wantWord: "npm",
+				wantErr:  "npm not supported",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, tc.args...)
+				if code == 0 {
+					t.Fatalf("expected non-zero exit code for %v, got 0 (stdout:\n%s)", tc.args, stdout)
+				}
+				if !strings.Contains(stderr, tc.wantErr) {
+					t.Fatalf("stderr missing %q naming %q:\n%s", tc.wantErr, tc.wantWord, stderr)
+				}
+				if !strings.Contains(stderr, "first '--'") {
+					t.Fatalf("stderr missing first '--' separator explanation:\n%s", stderr)
+				}
+			})
+		}
+	})
+
+	t.Run("command -- passes through when -- separates sdk and command", func(t *testing.T) {
+		stdout, stderr, code := runExecCLI(t, root, "exec", "etcd@3.5.12", "--", "etcd", "put", "--", "key")
+		if code != 0 {
+			t.Fatalf("vfox exec -- etcd put -- key exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
+		}
+		if got := strings.TrimSpace(stdout); got != "args=put -- key" {
+			t.Fatalf("stdout = %q, want %q (stderr:\n%s)", got, "args=put -- key", stderr)
 		}
 	})
 
@@ -163,13 +258,27 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		}
 	})
 
-	t.Run("exec --help prints subcommand help", func(t *testing.T) {
-		stdout, stderr, code := runExecCLI(t, root, "exec", "--help")
-		if code != 0 {
-			t.Fatalf("vfox exec --help exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
-		}
-		if !strings.Contains(stdout, "Execute a command in vfox managed environment") {
-			t.Fatalf("exec --help missing usage output:\n%s", stdout)
+	t.Run("exec --help prints command help including global options", func(t *testing.T) {
+		for _, flag := range []string{"--help", "-h"} {
+			t.Run(flag, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, "exec", flag)
+				if code != 0 {
+					t.Fatalf("vfox exec %s exited %d (stderr:\n%s\nstdout:\n%s)", flag, code, stderr, stdout)
+				}
+				for _, want := range []string{
+					"Execute a command in vfox managed environment",
+					"vfox exec [options]",
+					"OPTIONS:",
+					"GLOBAL OPTIONS:",
+					"--debug",
+					"--version, -v, -V",
+					"first '--'",
+				} {
+					if !strings.Contains(stdout, want) {
+						t.Fatalf("exec %s missing %q in output:\n%s", flag, want, stdout)
+					}
+				}
+			})
 		}
 	})
 

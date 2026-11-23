@@ -348,14 +348,20 @@ Execute a command in a vfox managed environment.
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK name
 
 `version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
 
-You can specify multiple SDKs before `--`. They are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
+For a single SDK, `--` is optional unless `<command>` or its arguments contain `--`: flags after `<command>` (such as `--version` or `--help`) are passed directly to `<command>`.
+
+The first `--` always separates SDK specs from `<command>`, so anything before the first `--` is read as an SDK spec. Multiple SDKs require `--` before `<command>`, and if `<command>` itself takes `--`, place `--` before `<command>` (for example, `vfox exec nodejs@24.14.0 -- npm run build -- --watch`). Multiple SDKs are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
 
 `command`: The command to execute
 

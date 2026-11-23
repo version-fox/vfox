@@ -116,21 +116,108 @@ func TestParseExecInvocationPreservesCommandFlagsWithoutSeparator(t *testing.T) 
 
 	t.Run("rejects missing command or flag before command", func(t *testing.T) {
 		for _, tc := range []struct {
-			name string
-			args []string
+			name            string
+			args            []string
+			wantErrContains string
 		}{
-			{name: "no args", args: nil},
-			{name: "only sdk", args: []string{"etcd@3.5.12"}},
-			{name: "flag instead of command --version", args: []string{"clang", "--version"}},
-			{name: "flag instead of command --help", args: []string{"etcd@3.5.12", "--help"}},
-			{name: "leading --version flag", args: []string{"--version"}},
-			{name: "leading flag before --", args: []string{"--version", "etcd", "--", "echo"}},
-			{name: "separator with no sdk", args: []string{"--", "etcd"}},
-			{name: "separator with no command", args: []string{"etcd@3.5.12", "--"}},
+			{name: "no args", args: nil, wantErrContains: "usage: vfox exec"},
+			{name: "only sdk", args: []string{"etcd@3.5.12"}, wantErrContains: "usage: vfox exec"},
+			{name: "flag instead of command --version", args: []string{"clang", "--version"}, wantErrContains: "--version"},
+			{name: "flag instead of command --help", args: []string{"etcd@3.5.12", "--help"}, wantErrContains: "--help"},
+			{name: "leading --version flag", args: []string{"--version"}, wantErrContains: "usage: vfox exec"},
+			{name: "leading flag before --", args: []string{"--version", "etcd", "--", "echo"}, wantErrContains: "--version"},
+			{name: "flag in sdk list before --", args: []string{"etcd@3.5.12", "-v", "--", "etcd"}, wantErrContains: "-v"},
+			{name: "separator with no sdk", args: []string{"--", "etcd"}, wantErrContains: "usage: vfox exec"},
+			{name: "separator with no command", args: []string{"etcd@3.5.12", "--"}, wantErrContains: "usage: vfox exec"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				if _, _, _, err := parseExecInvocation(tc.args); err == nil {
+				_, _, _, err := parseExecInvocation(tc.args)
+				if err == nil {
 					t.Fatalf("parseExecInvocation(%q) succeeded unexpectedly", tc.args)
+				}
+				if tc.wantErrContains != "" && !strings.Contains(err.Error(), tc.wantErrContains) {
+					t.Fatalf("parseExecInvocation(%q) error = %q, want substring %q", tc.args, err.Error(), tc.wantErrContains)
+				}
+			})
+		}
+	})
+}
+
+func TestParseExecLeadingArgs(t *testing.T) {
+	t.Run("consumes leading --debug and --help flags only before sdk", func(t *testing.T) {
+		for _, tc := range []struct {
+			name          string
+			args          []string
+			wantRemaining []string
+			wantOpts      execOptions
+		}{
+			{
+				name:          "leading --debug before sdk",
+				args:          []string{"--debug", "etcd@3.5.12", "etcd", "put"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "put"},
+				wantOpts:      execOptions{Debug: true, DebugSet: true},
+			},
+			{
+				name:          "leading --debug=false before sdk",
+				args:          []string{"--debug=false", "etcd@3.5.12", "etcd", "--debug"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "--debug"},
+				wantOpts:      execOptions{Debug: false, DebugSet: true},
+			},
+			{
+				name:          "leading --help",
+				args:          []string{"--help"},
+				wantRemaining: nil,
+				wantOpts:      execOptions{ShowHelp: true},
+			},
+			{
+				name:          "leading --debug then -h",
+				args:          []string{"--debug", "-h"},
+				wantRemaining: nil,
+				wantOpts:      execOptions{ShowHelp: true, Debug: true, DebugSet: true},
+			},
+			{
+				name:          "stops at sdk so trailing flags pass to command",
+				args:          []string{"etcd@3.5.12", "etcd", "-v", "--debug", "--help"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "-v", "--debug", "--help"},
+				wantOpts:      execOptions{},
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				remaining, opts, err := parseExecLeadingArgs(tc.args)
+				if err != nil {
+					t.Fatalf("parseExecLeadingArgs(%q) unexpected error: %v", tc.args, err)
+				}
+				if !slices.Equal(remaining, tc.wantRemaining) {
+					t.Fatalf("remaining = %q, want %q", remaining, tc.wantRemaining)
+				}
+				if opts != tc.wantOpts {
+					t.Fatalf("opts = %+v, want %+v", opts, tc.wantOpts)
+				}
+			})
+		}
+	})
+
+	t.Run("rejects unsupported leading flags and names the flag", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			args     []string
+			wantFlag string
+		}{
+			{name: "-v before sdk", args: []string{"-v", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-v"},
+			{name: "-V before sdk", args: []string{"-V", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-V"},
+			{name: "--version before sdk", args: []string{"--version", "etcd@3.5.12", "etcd", "put"}, wantFlag: "--version"},
+			{name: "--unknown after --debug", args: []string{"--debug", "--unknown", "etcd@3.5.12", "etcd"}, wantFlag: "--unknown"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				_, _, err := parseExecLeadingArgs(tc.args)
+				if err == nil {
+					t.Fatalf("parseExecLeadingArgs(%q) succeeded unexpectedly", tc.args)
+				}
+				if !strings.Contains(err.Error(), tc.wantFlag) {
+					t.Fatalf("error = %q, want flag name %q", err.Error(), tc.wantFlag)
+				}
+				if !strings.Contains(err.Error(), "usage: vfox exec") {
+					t.Fatalf("error = %q, want usage line", err.Error())
 				}
 			})
 		}

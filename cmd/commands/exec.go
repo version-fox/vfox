@@ -28,11 +28,18 @@ import (
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 type execSDKSpec struct {
 	Name    string
 	Version sdk.Version
+}
+
+type execOptions struct {
+	ShowHelp bool
+	Debug    bool
+	DebugSet bool
 }
 
 const (
@@ -44,20 +51,63 @@ var Exec = &cli.Command{
 	Name:            execCommandName,
 	Aliases:         []string{execCommandAlias},
 	Usage:           "Execute a command in vfox managed environment",
+	ArgsUsage:       "<sdk>[@<version>]... -- <command> [args...] | <sdk>[@<version>] <command> [args...]",
+	Description:     "The first '--' always separates SDK specs from the command. If <command> itself takes '--', pass '--' before <command>, for example: vfox exec nodejs@24.14.0 -- npm run build -- --watch",
 	SkipFlagParsing: true,
 	Action:          execCmd,
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args().Slice()
-	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
-		return cli.ShowSubcommandHelp(cmd)
+	args, opts, err := parseExecLeadingArgs(cmd.Args().Slice())
+	if err != nil {
+		return err
+	}
+	if opts.DebugSet {
+		if opts.Debug {
+			logger.SetLevel(logger.DebugLevel)
+		} else {
+			logger.SetLevel(logger.InfoLevel)
+		}
+	}
+	if opts.ShowHelp {
+		return showExecHelp(cmd)
 	}
 	sdkSpecs, command, cmdArgs, err := parseExecInvocation(args)
 	if err != nil {
 		return err
 	}
 	return executeInVfoxEnv(sdkSpecs, command, cmdArgs)
+}
+
+func showExecHelp(cmd *cli.Command) error {
+	tmpl := cmd.CustomHelpTemplate
+	if tmpl == "" {
+		tmpl = cli.CommandHelpTemplate
+	}
+	cli.HelpPrinter(cmd.Root().Writer, tmpl, cmd)
+	return nil
+}
+
+func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
+	var opts execOptions
+	for i, arg := range args {
+		if !strings.HasPrefix(arg, "-") || arg == "-" || arg == "--" {
+			return args[i:], opts, nil
+		}
+		switch arg {
+		case "--help", "-h":
+			opts.ShowHelp = true
+		case "--debug", "--debug=true":
+			opts.Debug = true
+			opts.DebugSet = true
+		case "--debug=false":
+			opts.Debug = false
+			opts.DebugSet = true
+		default:
+			return nil, opts, fmt.Errorf("unexpected flag %q before SDK\n%s", arg, execUsageLine())
+		}
+	}
+	return nil, opts, nil
 }
 
 func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error) {
@@ -92,15 +142,18 @@ func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error)
 		return nil, "", nil, err
 	}
 	if strings.HasPrefix(args[1], "-") {
-		return nil, "", nil, execUsageError()
+		return nil, "", nil, fmt.Errorf("unexpected flag %q instead of command\n%s", args[1], execUsageLine())
 	}
 	return []execSDKSpec{spec}, args[1], args[2:], nil
 }
 
 func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 	arg = strings.TrimSpace(arg)
-	if arg == "" || strings.HasPrefix(arg, "-") {
+	if arg == "" {
 		return execSDKSpec{}, execUsageError()
+	}
+	if strings.HasPrefix(arg, "-") {
+		return execSDKSpec{}, fmt.Errorf("unexpected flag %q in SDK spec\n%s", arg, execUsageLine())
 	}
 
 	parts := strings.SplitN(arg, "@", 2)
@@ -116,7 +169,10 @@ func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 }
 
 func execUsageLine() string {
-	return "usage: vfox exec <sdk>[@<version>]... -- <command> [args...]\nExample: vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g pnpm"
+	return "usage: vfox exec <sdk>[@<version>]... -- <command> [args...]\n" +
+		"       vfox exec <sdk>[@<version>] <command> [args...]\n" +
+		"The first '--' always separates SDK specs from the command. If <command> itself takes '--', pass '--' before <command> (for example: vfox exec nodejs@24.14.0 -- npm run build -- --watch).\n" +
+		"Example: vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g pnpm"
 }
 
 func execUsageError() error {
@@ -132,9 +188,12 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 	defer manager.Close()
 
 	sdkEnvs := make([]*env.Envs, 0, len(sdkSpecs))
-	for _, sdkSpec := range sdkSpecs {
+	for i, sdkSpec := range sdkSpecs {
 		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
+			if len(sdkSpecs) > 1 && i > 0 {
+				return fmt.Errorf("%w\nnote: arguments before the first '--' are parsed as SDKs; pass '--' before the command when it also uses '--'", err)
+			}
 			return err
 		}
 		sdkEnvs = append(sdkEnvs, specEnvs)
