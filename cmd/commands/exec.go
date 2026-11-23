@@ -41,29 +41,33 @@ const (
 )
 
 var Exec = &cli.Command{
-	Name:    execCommandName,
-	Aliases: []string{execCommandAlias},
-	Usage:   "Execute a command in vfox managed environment",
-	Action:  execCmd,
+	Name:            execCommandName,
+	Aliases:         []string{execCommandAlias},
+	Usage:           "Execute a command in vfox managed environment",
+	SkipFlagParsing: true,
+	Action:          execCmd,
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	sdkSpecs, command, cmdArgs, err := parseExecInvocation(cmd.Args().Slice(), os.Args)
+	args := cmd.Args().Slice()
+	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
+		return cli.ShowSubcommandHelp(cmd)
+	}
+	sdkSpecs, command, cmdArgs, err := parseExecInvocation(args)
 	if err != nil {
 		return err
 	}
 	return executeInVfoxEnv(sdkSpecs, command, cmdArgs)
 }
 
-func parseExecInvocation(parsedArgs, rawArgs []string) ([]execSDKSpec, string, []string, error) {
-	if len(parsedArgs) < 2 {
+func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error) {
+	if len(args) < 2 {
 		return nil, "", nil, execUsageError()
 	}
 
-	rawExecArgs := rawExecArgs(rawArgs)
-	if separatorIndex := slices.Index(rawExecArgs, "--"); separatorIndex >= 0 {
-		sdkArgs := rawExecArgs[:separatorIndex]
-		commandArgs := rawExecArgs[separatorIndex+1:]
+	if separatorIndex := slices.Index(args, "--"); separatorIndex >= 0 {
+		sdkArgs := args[:separatorIndex]
+		commandArgs := args[separatorIndex+1:]
 		if len(sdkArgs) == 0 || len(commandArgs) == 0 {
 			return nil, "", nil, execUsageError()
 		}
@@ -79,29 +83,23 @@ func parseExecInvocation(parsedArgs, rawArgs []string) ([]execSDKSpec, string, [
 		return sdkSpecs, commandArgs[0], commandArgs[1:], nil
 	}
 
-	if len(parsedArgs) > 2 && strings.Contains(parsedArgs[1], "@") {
+	if len(args) > 2 && strings.Contains(args[1], "@") {
 		return nil, "", nil, fmt.Errorf("multiple SDKs require '--' before the command\n%s", execUsageLine())
 	}
 
-	spec, err := parseExecSDKSpec(parsedArgs[0])
+	spec, err := parseExecSDKSpec(args[0])
 	if err != nil {
 		return nil, "", nil, err
 	}
-	return []execSDKSpec{spec}, parsedArgs[1], parsedArgs[2:], nil
-}
-
-func rawExecArgs(rawArgs []string) []string {
-	for i := 1; i < len(rawArgs); i++ {
-		if rawArgs[i] == execCommandName || rawArgs[i] == execCommandAlias {
-			return rawArgs[i+1:]
-		}
+	if strings.HasPrefix(args[1], "-") {
+		return nil, "", nil, execUsageError()
 	}
-	return nil
+	return []execSDKSpec{spec}, args[1], args[2:], nil
 }
 
 func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 	arg = strings.TrimSpace(arg)
-	if arg == "" {
+	if arg == "" || strings.HasPrefix(arg, "-") {
 		return execSDKSpec{}, execUsageError()
 	}
 

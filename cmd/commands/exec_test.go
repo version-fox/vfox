@@ -50,3 +50,89 @@ func TestBuildExecPathUsesNativeSeparator(t *testing.T) {
 		})
 	}
 }
+
+func TestParseExecInvocationPreservesCommandFlagsWithoutSeparator(t *testing.T) {
+	t.Run("accepts command flags without --", func(t *testing.T) {
+		for _, tc := range []struct {
+			name        string
+			args        []string
+			wantSpecs   []execSDKSpec
+			wantCommand string
+			wantArgs    []string
+		}{
+			{
+				name:        "single sdk without -- and --version",
+				args:        []string{"etcd@3.5.12", "etcd", "--version"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "etcd",
+				wantArgs:    []string{"--version"},
+			},
+			{
+				name:        "single sdk without -- and --help",
+				args:        []string{"etcd@3.5.12", "etcd", "--help"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "etcd",
+				wantArgs:    []string{"--help"},
+			},
+			{
+				name:        "single sdk without -- and multiple vfox-like flags",
+				args:        []string{"etcd@3.5.12", "etcd", "-v", "-V", "-h", "--debug"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "etcd",
+				wantArgs:    []string{"-v", "-V", "-h", "--debug"},
+			},
+			{
+				name:        "single sdk with -- and --version",
+				args:        []string{"etcd@3.5.12", "--", "etcd", "--version"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "etcd",
+				wantArgs:    []string{"--version"},
+			},
+			{
+				name:        "multiple sdks with -- and flags",
+				args:        []string{"nodejs@20", "python@3.12", "--", "python", "--help", "--version"},
+				wantSpecs:   []execSDKSpec{{Name: "nodejs", Version: "20"}, {Name: "python", Version: "3.12"}},
+				wantCommand: "python",
+				wantArgs:    []string{"--help", "--version"},
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				specs, cmdName, cmdArgs, err := parseExecInvocation(tc.args)
+				if err != nil {
+					t.Fatalf("parseExecInvocation(%q) unexpected error: %v", tc.args, err)
+				}
+				if !slices.Equal(specs, tc.wantSpecs) {
+					t.Fatalf("specs = %#v, want %#v", specs, tc.wantSpecs)
+				}
+				if cmdName != tc.wantCommand {
+					t.Fatalf("command = %q, want %q", cmdName, tc.wantCommand)
+				}
+				if !slices.Equal(cmdArgs, tc.wantArgs) {
+					t.Fatalf("cmdArgs = %q, want %q", cmdArgs, tc.wantArgs)
+				}
+			})
+		}
+	})
+
+	t.Run("rejects missing command or flag before command", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			args []string
+		}{
+			{name: "no args", args: nil},
+			{name: "only sdk", args: []string{"etcd@3.5.12"}},
+			{name: "flag instead of command --version", args: []string{"clang", "--version"}},
+			{name: "flag instead of command --help", args: []string{"etcd@3.5.12", "--help"}},
+			{name: "leading --version flag", args: []string{"--version"}},
+			{name: "leading flag before --", args: []string{"--version", "etcd", "--", "echo"}},
+			{name: "separator with no sdk", args: []string{"--", "etcd"}},
+			{name: "separator with no command", args: []string{"etcd@3.5.12", "--"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, _, _, err := parseExecInvocation(tc.args); err == nil {
+					t.Fatalf("parseExecInvocation(%q) succeeded unexpectedly", tc.args)
+				}
+			})
+		}
+	})
+}
