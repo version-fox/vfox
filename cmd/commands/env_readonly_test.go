@@ -40,7 +40,7 @@ func sortSemicolonStatements(s string) []string {
 
 func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 	t.Run("activate comparison helper normalizes map-ordered exports", func(t *testing.T) {
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		first := f.runProcess(t, "activate", "bash").mustSucceed(t, "first activate bash")
 		second := f.runProcess(t, "activate", "bash").mustSucceed(t, "second activate bash")
 		if !slices.Equal(sortSemicolonStatements(first.stdout), sortSemicolonStatements(second.stdout)) {
@@ -49,7 +49,7 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 	})
 
 	t.Run("env does not create missing nested VFOX_HOME directories", func(t *testing.T) {
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		typoRoot := filepath.Join(f.root, "typo")
 		f.env["VFOX_HOME"] = filepath.Join(typoRoot, "a", "b")
 
@@ -60,10 +60,10 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 	})
 
 	t.Run("env stdout stays clean shell code when GlobalSdkDir cannot be created", func(t *testing.T) {
-		fClean := newIsolatedCLIFixture(t, false)
+		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
 
-		fBlocked := newIsolatedCLIFixture(t, false)
+		fBlocked := newCLIFixtureWithoutRegistryGuard(t, false)
 		must(t, os.WriteFile(filepath.Join(fBlocked.userHome, "sdks"), []byte("file"), 0644))
 		blockedEnv := fBlocked.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with blocked GlobalSdkDir")
 
@@ -75,10 +75,10 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 	})
 
 	t.Run("env stdout stays clean shell code when session temp dir cannot be created", func(t *testing.T) {
-		fClean := newIsolatedCLIFixture(t, false)
+		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
 
-		fBlocked := newIsolatedCLIFixture(t, false)
+		fBlocked := newCLIFixtureWithoutRegistryGuard(t, false)
 		fBlocked.env["__VFOX_CURTMPPATH"] = "-"
 		must(t, os.WriteFile(filepath.Join(fBlocked.userHome, "tmp"), []byte("file"), 0644))
 		blockedEnv := fBlocked.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with blocked session temp dir")
@@ -94,14 +94,14 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
 		}
-		fBase := newIsolatedCLIFixture(t, false)
+		fBase := newCLIFixtureWithoutRegistryGuard(t, false)
 		roEmpty := filepath.Join(fBase.root, "ro-vfox-empty")
 		must(t, os.MkdirAll(roEmpty, 0755))
 		fBase.env["VFOX_HOME"] = roEmpty
 		wantEnv := fBase.runProcess(t, "env", "-s", "bash").mustSucceed(t, "writable empty env")
 		wantAct := fBase.runProcess(t, "activate", "bash").mustSucceed(t, "writable empty activate")
 
-		fRO := newIsolatedCLIFixture(t, false)
+		fRO := newCLIFixtureWithoutRegistryGuard(t, false)
 		roHome := filepath.Join(fRO.root, "ro-vfox")
 		must(t, os.MkdirAll(roHome, 0555))
 		t.Cleanup(func() { _ = os.Chmod(roHome, 0755) })
@@ -128,7 +128,7 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
 		}
-		f := newIsolatedCLIFixture(t, true)
+		f := newCLIFixtureWithoutRegistryGuard(t, true)
 		overrideDir := filepath.Join(f.root, "custom-sdks")
 		sdkBin := filepath.Join(overrideDir, "alpha", "v-1.0.0", "alpha-1.0.0", "bin")
 		must(t, os.MkdirAll(sdkBin, 0755))

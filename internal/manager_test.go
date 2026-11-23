@@ -17,12 +17,15 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -584,5 +587,74 @@ func TestAddFromMirroredManifest(t *testing.T) {
 	}
 	if got := strings.Join(thirdPartyPaths, ","); got != "/plugins/other.lua,/plugins/explicit.lua" {
 		t.Fatalf("third-party requests = %q, want /plugins/other.lua,/plugins/explicit.lua", got)
+	}
+}
+
+func TestEnsureWritableDir(t *testing.T) {
+	t.Run("creates missing parents and removes probe file", func(t *testing.T) {
+		target := filepath.Join(t.TempDir(), "missing", "plugin")
+		if err := ensureWritableDir(target); err != nil {
+			t.Fatalf("ensureWritableDir(%q) error = %v", target, err)
+		}
+		entries, err := os.ReadDir(target)
+		if err != nil {
+			t.Fatalf("ReadDir(%q) error = %v", target, err)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("expected %q to be empty after probe cleanup, got %d entries", target, len(entries))
+		}
+	})
+
+	t.Run("fails when a regular file blocks directory creation", func(t *testing.T) {
+		blocker := filepath.Join(t.TempDir(), "not-a-dir")
+		if err := os.WriteFile(blocker, []byte("file"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := ensureWritableDir(filepath.Join(blocker, "plugin")); err == nil {
+			t.Fatal("expected error when parent is a regular file")
+		}
+	})
+
+	t.Run("fails when existing directory is read-only", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
+		}
+		dir := filepath.Join(t.TempDir(), "plugin")
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dir, 0555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
+
+		if err := ensureWritableDir(dir); err == nil {
+			t.Fatal("expected error when directory is 0555")
+		}
+	})
+}
+
+func TestPreparePluginDirErrorWithoutVfoxHome(t *testing.T) {
+	t.Setenv(env.HomeFromEnv, "")
+	pluginsDir := filepath.Join(t.TempDir(), "plugin")
+	probeErr := &fs.PathError{
+		Op:   "open",
+		Path: filepath.Join(pluginsDir, ".vfox-write-check-123"),
+		Err:  fs.ErrPermission,
+	}
+
+	err := preparePluginDirError(pluginsDir, probeErr)
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("expected errors.Is(err, fs.ErrPermission), got %v", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "prepare plugin directory "+pluginsDir+" is not writable") {
+		t.Fatalf("unexpected error format: %q", msg)
+	}
+	if strings.Contains(msg, env.HomeFromEnv) {
+		t.Fatalf("expected %s to be omitted when unset, got %q", env.HomeFromEnv, msg)
+	}
+	if strings.Contains(msg, ".vfox-write-check-") {
+		t.Fatalf("expected probe filename to be unwrapped, got %q", msg)
 	}
 }

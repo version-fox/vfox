@@ -19,7 +19,9 @@
 package pathmeta
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,8 +142,8 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 	}
 
 	// Initialize user directories and immediate shared subdirectories
-	// best-effort: keep base read-path semantics (Shared subdirs are created only
-	// when Shared.Root already exists; write commands ensure missing parents).
+	// best-effort (Shared subdirs are created only when Shared.Root already
+	// exists; write commands ensure missing parents).
 	if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
 		logger.Debugf("create temp dir failed: %v\n", err)
 	}
@@ -149,8 +151,8 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		logger.Debugf("create global sdk dir failed: %v\n", err)
 	}
 	for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
-		if err := os.Mkdir(dir, ReadWriteAuth); err != nil {
-			logger.Debugf("create shared directory %q failed: %v\n", dir, err)
+		if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
+			logger.Debugf("create shared directory %s failed: %v\n", dir, err)
 		}
 	}
 

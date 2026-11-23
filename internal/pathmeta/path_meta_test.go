@@ -25,7 +25,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 func TestIsVfoxRelatedPath(t *testing.T) {
@@ -215,6 +218,45 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 			if statErr != nil || !info.IsDir() {
 				t.Fatalf("expected directory %q to exist under existing root (stat err=%v)", dir, statErr)
 			}
+		}
+	})
+
+	t.Run("does not log failures at debug level when shared subdirectories already exist", func(t *testing.T) {
+		root := t.TempDir()
+		home := filepath.Join(root, "home")
+		existingRoot := filepath.Join(root, "existing")
+		for _, dir := range []string{
+			filepath.Join(existingRoot, installedDirPrefix),
+			filepath.Join(existingRoot, pluginDirPrefix),
+		} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv(HookCurTmpPath, t.TempDir())
+
+		logger.SetLevel(logger.DebugLevel)
+		t.Cleanup(func() { logger.SetLevel(logger.InfoLevel) })
+
+		origStdout := os.Stdout
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		os.Stdout = w
+		_, metaErr := NewPathMeta(home, existingRoot, root, 4242)
+		_ = w.Close()
+		os.Stdout = origStdout
+
+		var out bytes.Buffer
+		_, _ = io.Copy(&out, r)
+		_ = r.Close()
+
+		if metaErr != nil {
+			t.Fatalf("NewPathMeta returned error: %v", metaErr)
+		}
+		if strings.Contains(out.String(), "failed") {
+			t.Fatalf("unexpected failure log at debug level when shared subdirs exist: %q", out.String())
 		}
 	})
 

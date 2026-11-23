@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -514,7 +515,7 @@ func ensureWritableDir(dir string) error {
 	probePath := probe.Name()
 	if err := probe.Close(); err != nil {
 		if removeErr := os.Remove(probePath); removeErr != nil && !os.IsNotExist(removeErr) {
-			logger.Debugf("remove plugin directory probe %q failed: %v\n", probePath, removeErr)
+			logger.Debugf("remove plugin directory probe %s failed: %v\n", probePath, removeErr)
 		}
 		return err
 	}
@@ -524,11 +525,20 @@ func ensureWritableDir(dir string) error {
 	return nil
 }
 
-func preparePluginDirError(pluginsDir string, err error) error {
-	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
-		return fmt.Errorf("prepare plugin directory %q (%s=%q): %w", pluginsDir, env.HomeFromEnv, vfoxHome, err)
+func unwrapPathError(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
 	}
-	return fmt.Errorf("prepare plugin directory %q: %w", pluginsDir, err)
+	return err
+}
+
+func preparePluginDirError(pluginsDir string, err error) error {
+	reason := unwrapPathError(err)
+	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
+		return fmt.Errorf("prepare plugin directory %s (%s=%s) is not writable: %w", pluginsDir, env.HomeFromEnv, vfoxHome, reason)
+	}
+	return fmt.Errorf("prepare plugin directory %s is not writable: %w", pluginsDir, reason)
 }
 
 // Add a plugin to plugin home directory

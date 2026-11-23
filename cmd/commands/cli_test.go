@@ -137,12 +137,14 @@ func newCLIFixture(t *testing.T, splitShared bool) *cliFixture {
 	if runtime.GOOS == "windows" && os.Getenv("VFOX_TEST_WINDOWS_REGISTRY") != "1" {
 		t.Skip("these tests change the user PATH in the Windows registry: set VFOX_TEST_WINDOWS_REGISTRY=1 on a runner or VM that is thrown away (CI does)")
 	}
-	return newIsolatedCLIFixture(t, splitShared)
+	return newCLIFixtureWithoutRegistryGuard(t, splitShared)
 }
 
-// newIsolatedCLIFixture sets up a vfox home inside t.TempDir() for commands
-// that never touch global machine state such as the Windows registry.
-func newIsolatedCLIFixture(t *testing.T, splitShared bool) *cliFixture {
+// newCLIFixtureWithoutRegistryGuard sets up a vfox home inside t.TempDir() for
+// commands (such as add, env, and activate) that never touch global machine
+// state such as the Windows registry; callers that change global SDK state must
+// use newCLIFixture so Windows runs guard the registry.
+func newCLIFixtureWithoutRegistryGuard(t *testing.T, splitShared bool) *cliFixture {
 	t.Helper()
 	root := t.TempDir()
 	if runtime.GOOS == "windows" {
