@@ -165,7 +165,7 @@ func generateSessionShimPath(userTemp string, pid int) string {
 	if !util.FileExists(curTmpPath) {
 		err := os.MkdirAll(curTmpPath, ReadWriteAuth)
 		if err != nil {
-			logger.Errorf("create temp dir failed: %v", err)
+			logger.Debugf("create temp dir failed: %v\n", err)
 		}
 	}
 	return curTmpPath

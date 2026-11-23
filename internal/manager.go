@@ -503,6 +503,20 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+func ensureWritableDir(dir string) error {
+	if err := os.MkdirAll(dir, pathmeta.ReadWriteAuth); err != nil {
+		return err
+	}
+	probe, err := os.CreateTemp(dir, ".vfox-write-check-*")
+	if err != nil {
+		return err
+	}
+	probePath := probe.Name()
+	_ = probe.Close()
+	_ = os.Remove(probePath)
+	return nil
+}
+
 // Add a plugin to plugin home directory
 // 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
 // 2. If the plugin is a custom plugin, install the plugin from the specified URL.
@@ -529,7 +543,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	}
 	var installPath string
 	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
-	if err := os.MkdirAll(pluginsDir, pathmeta.ReadWriteAuth); err != nil {
+	if err := ensureWritableDir(pluginsDir); err != nil {
 		if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
 			return fmt.Errorf("prepare plugin directory %q (%s=%q): %w", pluginsDir, env.HomeFromEnv, vfoxHome, err)
 		}

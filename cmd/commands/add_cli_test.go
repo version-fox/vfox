@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -89,9 +91,53 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 			t.Fatalf("expected add to stop before downloading plugin, got %d requests", hits.Load())
 		}
 	})
+
+	t.Run("non-writable VFOX_HOME plugin dir fails before download and names VFOX_HOME", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
+		}
+		f := newIsolatedCLIFixture(t, false)
+		pluginsDir := filepath.Join(f.shared, "plugin")
+		must(t, os.Chmod(pluginsDir, 0555))
+		t.Cleanup(func() { _ = os.Chmod(pluginsDir, 0755) })
+
+		var hits atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			http.Error(w, "unexpected download", http.StatusInternalServerError)
+		}))
+		defer srv.Close()
+
+		res := f.runHere(t, "add", "--source", srv.URL+"/demo.zip").mustFail(t, "add --source with non-writable VFOX_HOME/plugin")
+		mustContain(t, "add non-writable plugin dir error", res.output(), "VFOX_HOME")
+		mustContain(t, "Manager.Add error path", res.output(), "prepare plugin directory")
+		if hits.Load() != 0 {
+			t.Fatalf("expected add to stop before downloading plugin, got %d requests", hits.Load())
+		}
+	})
+}
+
+func sortSemicolonStatements(s string) []string {
+	raw := strings.Split(s, ";")
+	parts := make([]string, 0, len(raw))
+	for _, part := range raw {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	sort.Strings(parts)
+	return parts
 }
 
 func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
+	t.Run("activate comparison helper normalizes map-ordered exports", func(t *testing.T) {
+		f := newIsolatedCLIFixture(t, false)
+		first := f.runProcess(t, "activate", "bash").mustSucceed(t, "first activate bash")
+		second := f.runProcess(t, "activate", "bash").mustSucceed(t, "second activate bash")
+		if !slices.Equal(sortSemicolonStatements(first.stdout), sortSemicolonStatements(second.stdout)) {
+			t.Fatalf("normalized activate output differed across runs:\nfirst:\n%s\nsecond:\n%s", first.stdout, second.stdout)
+		}
+	})
 	t.Run("env stdout stays clean shell code when GlobalSdkDir cannot be created", func(t *testing.T) {
 		fClean := newIsolatedCLIFixture(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
@@ -104,6 +150,22 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		want = strings.ReplaceAll(want, fClean.root, fBlocked.root)
 		if blockedEnv.stdout != want {
 			t.Fatalf("env stdout changed when GlobalSdkDir could not be created:\ngot:\n%s\nwant:\n%s", blockedEnv.stdout, want)
+		}
+	})
+
+	t.Run("env stdout stays clean shell code when session temp dir cannot be created", func(t *testing.T) {
+		fClean := newIsolatedCLIFixture(t, false)
+		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
+
+		fBlocked := newIsolatedCLIFixture(t, false)
+		fBlocked.env["__VFOX_CURTMPPATH"] = "-"
+		must(t, os.WriteFile(filepath.Join(fBlocked.userHome, "tmp"), []byte("file"), 0644))
+		blockedEnv := fBlocked.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with blocked session temp dir")
+
+		want := strings.ReplaceAll(cleanEnv.stdout, shellPath(fClean.root), shellPath(fBlocked.root))
+		want = strings.ReplaceAll(want, fClean.root, fBlocked.root)
+		if blockedEnv.stdout != want {
+			t.Fatalf("env stdout changed when session temp dir could not be created:\ngot:\n%s\nwant:\n%s", blockedEnv.stdout, want)
 		}
 	})
 
@@ -136,7 +198,7 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if expectedEnv := norm(wantEnv.stdout); gotEnv.stdout != expectedEnv {
 			t.Fatalf("env output mismatch on read-only VFOX_HOME:\ngot:\n%s\nwant:\n%s", gotEnv.stdout, expectedEnv)
 		}
-		if expectedAct := norm(wantAct.stdout); gotAct.stdout != expectedAct {
+		if expectedAct := norm(wantAct.stdout); !slices.Equal(sortSemicolonStatements(gotAct.stdout), sortSemicolonStatements(expectedAct)) {
 			t.Fatalf("activate output mismatch on read-only VFOX_HOME:\ngot:\n%s\nwant:\n%s", gotAct.stdout, expectedAct)
 		}
 	})
