@@ -834,9 +834,6 @@ func NewSdkManager() (*Manager, error) {
 	currentDir := getWorkingDirectory()
 	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 	if err != nil {
-		if vfoxHomeDir != "" {
-			return nil, fmt.Errorf("init path meta failed (%s=%q): %w", env.HomeFromEnv, vfoxHomeDir, err)
-		}
 		return nil, fmt.Errorf("init path meta failed: %w", err)
 	}
 

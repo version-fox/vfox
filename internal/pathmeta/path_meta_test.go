@@ -19,6 +19,8 @@
 package pathmeta
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -223,16 +225,46 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		}
 	})
 
-	t.Run("returns error when shared root cannot be created", func(t *testing.T) {
+	t.Run("stays best-effort and silent on stdout when directories cannot be created", func(t *testing.T) {
 		root := t.TempDir()
+		home := filepath.Join(root, "home")
+		userVfox := filepath.Join(home, ".vfox")
+		if err := os.MkdirAll(userVfox, 0755); err != nil {
+			t.Fatal(err)
+		}
+		// Block GlobalSdkDir and SharedRoot with regular files so directory creation fails.
+		if err := os.WriteFile(filepath.Join(userVfox, "sdks"), []byte("file"), 0644); err != nil {
+			t.Fatal(err)
+		}
 		blocker := filepath.Join(root, "not-a-dir")
 		if err := os.WriteFile(blocker, []byte("file"), 0644); err != nil {
 			t.Fatal(err)
 		}
 		shared := filepath.Join(blocker, "vfox-home")
+		t.Setenv(HookCurTmpPath, t.TempDir())
 
-		if _, err := NewPathMeta(filepath.Join(root, "home"), shared, root, 4242); err == nil {
-			t.Fatalf("expected error creating shared directories under file %q, got nil", blocker)
+		origStdout := os.Stdout
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		os.Stdout = w
+		meta, metaErr := NewPathMeta(home, shared, root, 4242)
+		_ = w.Close()
+		os.Stdout = origStdout
+
+		var out bytes.Buffer
+		_, _ = io.Copy(&out, r)
+		_ = r.Close()
+
+		if metaErr != nil {
+			t.Fatalf("NewPathMeta returned unexpected error: %v", metaErr)
+		}
+		if meta == nil || meta.Shared.Root != shared {
+			t.Fatalf("unexpected PathMeta: %+v", meta)
+		}
+		if out.Len() != 0 {
+			t.Fatalf("NewPathMeta wrote to stdout when directory creation failed: %q", out.String())
 		}
 	})
 }
