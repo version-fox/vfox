@@ -39,3 +39,8 @@ func acquireInstallLock(path string) (*os.File, error) {
 	}
 	return file, nil
 }
+
+// sdkInstallLockName is the lock in an SDK's installation root that lets one
+// installation of the SDK run at a time. Like the lock of each version, it stays
+// in place after the installation.
+const sdkInstallLockName = ".install.lock"

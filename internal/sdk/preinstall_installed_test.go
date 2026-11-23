@@ -19,7 +19,9 @@ package sdk
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/plugin"
@@ -164,5 +166,188 @@ func TestLuaPreInstallReadsTheInstalledVersions(t *testing.T) {
 	}
 	if installed := s.InstalledList(); !slices.Equal(installed, []Version{"OTP-29.1.2"}) {
 		t.Errorf("installed versions = %v, want OTP-29.1.2 only", installed)
+	}
+}
+
+// unreadable makes the version directory of version unlistable, as an installation
+// owned by another user can be, and restores it when the test ends.
+func unreadable(t *testing.T, s *impl, version Version) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions do not stop listing on Windows")
+	}
+	dir := s.packagePath(version)
+	if err := os.Chmod(dir, 0311); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
+	if _, err := os.ReadDir(dir); err == nil {
+		t.Skip("permissions are not enforced for this user")
+	}
+}
+
+// An installation whose directory cannot be listed is still installed, so it is
+// still given to PreInstall. Reading it used to fail the whole list, which left the
+// table empty and installed the release a second time.
+func TestPreInstallIsGivenAnInstallationItCannotList(t *testing.T) {
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "28.0")
+	mustInstall(t, s, "OTP-29.1.2")
+	unreadable(t, s, "OTP-29.1.2")
+
+	var seen map[string]*plugin.InstalledPackageItem
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		seen = ctx.InstalledSdks
+		return renamedRelease(ctx)
+	}
+	got, err := s.InstallResolved("29.1.2", false)
+	if err != nil {
+		t.Fatalf("InstallResolved(29.1.2): %v", err)
+	}
+	if got != "OTP-29.1.2" {
+		t.Errorf("InstallResolved(29.1.2) = %q, want the installation OTP-29.1.2", got)
+	}
+	if exists(s.packagePath("29.1.2")) {
+		t.Error("29.1.2 was installed a second time")
+	}
+	var names []string
+	for name := range seen {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"28.0", "OTP-29.1.2"}) {
+		t.Errorf("PreInstall was given %v, want 28.0 and OTP-29.1.2", names)
+	}
+}
+
+// PreUse and the matching after it see the same list, so one installation that
+// cannot be listed does not hide the others, or itself.
+func TestUseMatchesAnInstallationItCannotList(t *testing.T) {
+	s := newTestSDK(t, (&testPlugin{}).withCommand(t, "tool"))
+	mustInstall(t, s, "1.2.3")
+	unreadable(t, s, "1.2.3")
+	got, err := s.ResolveInstalledVersion("1.2")
+	if err != nil || got != "1.2.3" {
+		t.Errorf("ResolveInstalledVersion(1.2) = %q, %v; want 1.2.3", got, err)
+	}
+}
+
+// An installation of the release under its other name that is still running is
+// seen: one installation of an SDK runs at a time, from the list PreInstall is given
+// until the version is on disk. Another one is refused, as an installation of the
+// same version is, and once the first is done the request maps to it.
+func TestInstallIsRefusedWhileTheSDKIsBeingInstalled(t *testing.T) {
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	p.preInstall = renamedRelease
+
+	var concurrent error
+	postInstall := p.postInstall
+	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+		if ctx.SdkInfo["test-sdk"].Version == "OTP-29.1.2" {
+			// OTP-29.1.2 is being installed: its marker is there and it is not done.
+			// The lock is taken through a file of its own, as another vfox would take it.
+			_, concurrent = s.InstallResolved("29.1.2", false)
+		}
+		return postInstall(ctx)
+	}
+	mustInstall(t, s, "OTP-29.1.2")
+
+	if concurrent == nil || !strings.Contains(concurrent.Error(), "while another installation of test-sdk runs") {
+		t.Errorf("InstallResolved(29.1.2) during the installation of OTP-29.1.2 = %v, want it refused", concurrent)
+	}
+	if exists(s.packagePath("29.1.2")) {
+		t.Error("29.1.2 was installed beside the installation that was running")
+	}
+	got, err := s.InstallResolved("29.1.2", false)
+	if err != nil || got != "OTP-29.1.2" {
+		t.Errorf("InstallResolved(29.1.2) afterwards = %q, %v; want the installation OTP-29.1.2", got, err)
+	}
+}
+
+// A reinstall replaces the version as typed, so the plugin resolves it as it would
+// without the list: with both 29.1.2 and OTP-29.1.2 installed, 29.1.2 is reinstalled.
+func TestReinstallIsNotGivenTheInstalledVersions(t *testing.T) {
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "29.1.2")
+	mustInstall(t, s, "OTP-29.1.2")
+	main := s.mainRuntimePath("29.1.2")
+	if err := os.WriteFile(filepath.Join(main, "changed-in-place"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var seen map[string]*plugin.InstalledPackageItem
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		seen = ctx.InstalledSdks
+		return renamedRelease(ctx)
+	}
+	if err := s.Reinstall("29.1.2"); err != nil {
+		t.Fatalf("Reinstall(29.1.2): %v", err)
+	}
+	if seen == nil || len(seen) != 0 {
+		t.Errorf("PreInstall was given %v, want an empty table on a reinstall", seen)
+	}
+	if exists(filepath.Join(main, "changed-in-place")) || !s.CheckRuntimeExist("29.1.2") {
+		t.Error("29.1.2 was not reinstalled")
+	}
+	if !s.CheckRuntimeExist("OTP-29.1.2") {
+		t.Error("the reinstall of 29.1.2 removed OTP-29.1.2")
+	}
+}
+
+// A plugin can return any name, including the name of a copy. A copy is selected
+// only by its own name, so it cannot be reported as the version asked for.
+func TestPreInstallCannotResolveToACopy(t *testing.T) {
+	s, p := newCopyTestSDK(t)
+	mustInstall(t, s, "3.12")
+	if _, err := s.InstallAs("3.12", "3.12-db"); err != nil {
+		t.Fatalf("InstallAs: %v", err)
+	}
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		return &plugin.PreInstallHookResult{PreInstallPackageItem: &plugin.PreInstallPackageItem{Version: "3.12-db"}}, nil
+	}
+	got, err := s.InstallResolved("3.13", false)
+	if err == nil || !strings.Contains(err.Error(), "test-sdk@3.12-db is a copy") {
+		t.Fatalf("InstallResolved(3.13) = %q, %v; want a refusal that names the copy", got, err)
+	}
+	if exists(s.packagePath("3.13")) {
+		t.Error("3.13 was installed")
+	}
+	if !s.isCopy("3.12-db") || !exists(binCommand(s.mainRuntimePath("3.12-db"), "tool")) {
+		t.Error("the refused installation changed the copy")
+	}
+}
+
+// A copy of a mapped version is still made: --as keeps a second copy on purpose, so
+// the installation the request maps to is recorded as what the copy resolved to.
+func TestInstallAsOfAMappedVersionMakesTheCopy(t *testing.T) {
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	mustInstall(t, s, "OTP-29.1.2")
+	p.preInstall = renamedRelease
+	postInstall := p.postInstall
+	postInstalls := 0
+	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+		postInstalls++
+		return postInstall(ctx)
+	}
+
+	got, err := s.InstallAs("29.1.2", "erl-db")
+	if err != nil {
+		t.Fatalf("InstallAs(29.1.2, erl-db): %v", err)
+	}
+	if got != "erl-db" || !s.CheckRuntimeExist("erl-db") {
+		t.Errorf("InstallAs returned %q, want the copy erl-db on disk", got)
+	}
+	if postInstalls != 1 {
+		t.Errorf("PostInstall ran %d times, want once for the copy", postInstalls)
+	}
+	if receipt := s.copyReceipt("erl-db"); receipt == nil || receipt.Resolved != "OTP-29.1.2" || receipt.Requested != "29.1.2" {
+		t.Errorf("receipt of the copy = %+v, want requested 29.1.2 resolved to OTP-29.1.2", receipt)
+	}
+	if exists(s.packagePath("29.1.2")) {
+		t.Error("29.1.2 was installed as well as the copy")
 	}
 }

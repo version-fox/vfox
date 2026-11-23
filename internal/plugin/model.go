@@ -88,7 +88,8 @@ type PreInstallHookCtx struct {
 	Version string `json:"version"`
 	// InstalledSdks holds the installed versions, keyed by version as in PreUse,
 	// so that a plugin can return one of them for a version it knows by another
-	// name. Copies made with `vfox install --as` are left out.
+	// name. Copies made with `vfox install --as` are left out, and on a reinstall
+	// it is empty, so that the version is resolved as it was typed.
 	InstalledSdks map[string]*InstalledPackageItem `json:"installedSdks"`
 }
 

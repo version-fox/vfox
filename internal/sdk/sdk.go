@@ -245,12 +245,29 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		return version, nil
 	}
 
-	// A copy is selected only by its own name, so the plugin is not given it:
-	// returning it would pass the copy off as the version asked for.
-	runtimes, _ := b.getAllRuntimes()
+	// One installation of this SDK runs at a time, from the list PreInstall is given
+	// until the version is on disk. The plugin can map the request to an installed
+	// version under another name, and the lock below is per name, so without this an
+	// installation of that other name still running would not be seen.
+	sdkLock, err := acquireInstallLock(filepath.Join(b.InstallPath, sdkInstallLockName))
+	if err != nil {
+		return "", fmt.Errorf("cannot install %s while another installation of %s runs: %w", label, b.Name, err)
+	}
+	defer func() {
+		if err := sdkLock.Close(); err != nil {
+			installErr = errors.Join(installErr, fmt.Errorf("close installation lock: %w", err))
+		}
+	}()
+
+	// A reinstall replaces the version as it was typed, so the plugin resolves it
+	// as it would without the list.
+	installedSdks := map[string]*plugin.InstalledPackageItem{}
+	if !reinstall {
+		installedSdks = b.matchableInstalledItems()
+	}
 	ctx := &plugin.PreInstallHookCtx{
 		Version:       string(version),
-		InstalledSdks: installedPackageItems(b.matchableRuntimes(runtimes)),
+		InstalledSdks: installedSdks,
 	}
 	logger.Debugf("Calling PreInstall hook for %s\n", label)
 	installInfo, err := b.plugin.PreInstall(ctx)
@@ -288,6 +305,12 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 			return "", fmt.Errorf("%s is a copy of %s, which now resolves to %s, not the %s it was installed as; uninstall it and install it again with --as to get %s", label, version, sdkVersion, exact, sdkVersion)
 		}
 		return "", fmt.Errorf("%s resolves to %s; give the exact installed version to reinstall it", b.Label(version), label)
+	}
+	// The list given to PreInstall leaves copies out, but a plugin can return any
+	// name. A copy is selected only by its own name, so it cannot stand for the
+	// version asked for.
+	if !named && b.isCopy(sdkVersion) {
+		return "", fmt.Errorf("plugin [PreInstall] method error: %s was resolved to %s, but %s is a copy made with `vfox install --as` and is selected only by its own name", b.Label(version), label, label)
 	}
 	if named && sdkVersion == name {
 		return "", fmt.Errorf("%s resolves to %s, so a copy of it cannot be named %s: name the copy differently", b.Label(version), sdkVersion, name)
@@ -417,20 +440,8 @@ func (b *impl) isCopy(version Version) bool {
 	return b.copyReceipt(version) != nil
 }
 
-// matchableRuntimes returns the installed runtimes a typed version can stand for. A
-// copy is selected only by its own name, so it is not among them.
-func (b *impl) matchableRuntimes(runtimes []*RuntimePackage) []*RuntimePackage {
-	kept := make([]*RuntimePackage, 0, len(runtimes))
-	for _, pkg := range runtimes {
-		if !b.isCopy(pkg.Runtime.Version) {
-			kept = append(kept, pkg)
-		}
-	}
-	return kept
-}
-
-// matchableVersions is InstalledList without the copies, for the same purpose as
-// matchableRuntimes.
+// matchableVersions is InstalledList without the copies: the installed versions a
+// typed version can stand for. A copy is selected only by its own name.
 func (b *impl) matchableVersions() []Version {
 	var versions []Version
 	for _, version := range b.InstalledList() {
@@ -687,31 +698,34 @@ func (b *impl) EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error) {
 	return envKeys, nil
 }
 
-// installedPackageItems returns runtimes as PreInstall and PreUse are given them,
-// keyed by version.
-func installedPackageItems(runtimes []*RuntimePackage) map[string]*plugin.InstalledPackageItem {
-	sdks := make(map[string]*plugin.InstalledPackageItem, len(runtimes))
-	for _, sdk := range runtimes {
-		sdks[string(sdk.Runtime.Version)] = &plugin.InstalledPackageItem{
-			Name:    sdk.Runtime.Name,
-			Version: string(sdk.Runtime.Version),
-			Path:    sdk.PackagePath,
+// matchableInstalledItems returns the installed versions a typed version can stand
+// for, as PreInstall and PreUse are given them, keyed by version. They are built from
+// what InstalledList already checked, without listing each version directory, so
+// that one installation that cannot be read is neither left out nor able to empty
+// the list.
+func (b *impl) matchableInstalledItems() map[string]*plugin.InstalledPackageItem {
+	versions := b.matchableVersions()
+	sdks := make(map[string]*plugin.InstalledPackageItem, len(versions))
+	for _, version := range versions {
+		sdks[string(version)] = &plugin.InstalledPackageItem{
+			Name:    b.sdkName(),
+			Version: string(version),
+			Path:    b.packagePath(version),
 		}
 	}
 	return sdks
 }
 
 func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
-	installedSdks, _ := b.getAllRuntimes()
 	// A copy is selected only by its own name, so the plugin is not given it and the
 	// prefix matching below does not reach it.
-	installedSdks = b.matchableRuntimes(installedSdks)
+	installedSdks := b.matchableInstalledItems()
 	preUseCtx := &plugin.PreUseHookCtx{
 		Cwd:             b.envContext.PathMeta.Working.Directory,
 		PreviousVersion: string(b.Current()),
 		Scope:           scope.String(),
 		Version:         string(version),
-		InstalledSdks:   installedPackageItems(installedSdks),
+		InstalledSdks:   installedSdks,
 	}
 
 	var newVersion string
@@ -734,8 +748,8 @@ func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
 			return version, nil
 		}
 		installedVersions := make(util.VersionSort, 0, len(installedSdks))
-		for _, sdk := range installedSdks {
-			installedVersions = append(installedVersions, string(sdk.Runtime.Version))
+		for v := range installedSdks {
+			installedVersions = append(installedVersions, v)
 		}
 		sort.Sort(installedVersions)
 		version := string(version)
@@ -1340,19 +1354,6 @@ func (b *impl) Unuse(scopes ...env.UseScope) error {
 	}
 	pterm.Printf("Unset %s successfully.\n", pterm.LightGreen(b.Name))
 	return nil
-}
-
-func (b *impl) getAllRuntimes() ([]*RuntimePackage, error) {
-	versions := b.InstalledList()
-	var runtimes []*RuntimePackage
-	for _, v := range versions {
-		runtime, err := b.GetRuntimePackage(v)
-		if err != nil {
-			return nil, err
-		}
-		runtimes = append(runtimes, runtime)
-	}
-	return runtimes, nil
 }
 
 // NewSdk creates a new SDK instance based on the provided plugin path and runtime environment context.
