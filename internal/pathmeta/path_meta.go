@@ -139,8 +139,9 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		Executable: getExecutablePath(),
 	}
 
-	// Initialize necessary directories best-effort; commands that write create
-	// target directories after config (such as storage.sdkPath) is loaded.
+	// Initialize user directories and immediate shared subdirectories
+	// best-effort: keep base read-path semantics (Shared subdirs are created only
+	// when Shared.Root already exists; write commands ensure missing parents).
 	if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
 		logger.Debugf("create temp dir failed: %v\n", err)
 	}
@@ -148,7 +149,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		logger.Debugf("create global sdk dir failed: %v\n", err)
 	}
 	for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
-		if err := os.MkdirAll(dir, ReadWriteAuth); err != nil {
+		if err := os.Mkdir(dir, ReadWriteAuth); err != nil {
 			logger.Debugf("create shared directory %q failed: %v\n", dir, err)
 		}
 	}
@@ -171,10 +172,12 @@ func generateSessionShimPath(userTemp string, pid int) string {
 	return curTmpPath
 }
 
+var executable = os.Executable
+
 func getExecutablePath() string {
-	exePath, err := os.Executable()
+	exePath, err := executable()
 	if err != nil {
-		logger.Errorf("get executable path failed: %v", err)
+		logger.Debugf("get executable path failed: %v\n", err)
 		return ""
 	}
 	return exePath

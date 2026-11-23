@@ -20,6 +20,7 @@ package pathmeta
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -199,13 +200,32 @@ func TestApplyStoragePath(t *testing.T) {
 }
 
 func TestNewPathMetaSharedDirectories(t *testing.T) {
-	t.Run("creates missing shared root and nested parents", func(t *testing.T) {
+	t.Run("creates immediate shared subdirs only when shared root already exists", func(t *testing.T) {
+		root := t.TempDir()
+		existingRoot := filepath.Join(root, "existing")
+		if err := os.MkdirAll(existingRoot, 0755); err != nil {
+			t.Fatal(err)
+		}
+		meta, err := NewPathMeta(filepath.Join(root, "home"), existingRoot, root, 4242)
+		if err != nil {
+			t.Fatalf("NewPathMeta returned error: %v", err)
+		}
+		for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
+			info, statErr := os.Stat(dir)
+			if statErr != nil || !info.IsDir() {
+				t.Fatalf("expected directory %q to exist under existing root (stat err=%v)", dir, statErr)
+			}
+		}
+	})
+
+	t.Run("does not create missing shared root or parent trees on read paths", func(t *testing.T) {
 		for _, tc := range []struct {
-			name string
-			rel  []string
+			name      string
+			rel       []string
+			checkPath string
 		}{
-			{name: "single missing directory", rel: []string{"vfox-home"}},
-			{name: "missing parent directories", rel: []string{"no-such-dir", "vfox-home"}},
+			{name: "missing directory", rel: []string{"vfox-home"}, checkPath: "vfox-home"},
+			{name: "missing parent directories", rel: []string{"no-such-dir", "vfox-home"}, checkPath: "no-such-dir"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -215,23 +235,25 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				if err != nil {
 					t.Fatalf("NewPathMeta returned error: %v", err)
 				}
-				for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
-					info, statErr := os.Stat(dir)
-					if statErr != nil || !info.IsDir() {
-						t.Fatalf("expected directory %q to exist (stat err=%v)", dir, statErr)
-					}
+				if meta == nil || meta.Shared.Root != shared {
+					t.Fatalf("unexpected PathMeta: %+v", meta)
+				}
+				if _, statErr := os.Stat(filepath.Join(root, tc.checkPath)); !os.IsNotExist(statErr) {
+					t.Fatalf("expected %q not to be created on read path, stat err = %v", tc.checkPath, statErr)
 				}
 			})
 		}
 	})
 
-	t.Run("stays best-effort and silent on stdout when directories cannot be created", func(t *testing.T) {
+	t.Run("stays best-effort and silent on stdout when directories or executable lookup fail", func(t *testing.T) {
 		for _, tc := range []struct {
 			name      string
 			blockTemp bool
+			failExe   bool
 		}{
 			{name: "blocked GlobalSdkDir and SharedRoot"},
 			{name: "blocked session temp directory", blockTemp: true},
+			{name: "executable lookup failure", failExe: true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -239,6 +261,13 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				userVfox := filepath.Join(home, ".vfox")
 				if err := os.MkdirAll(userVfox, 0755); err != nil {
 					t.Fatal(err)
+				}
+				if tc.failExe {
+					origExe := executable
+					executable = func() (string, error) {
+						return "", errors.New("readlink /proc/self/exe: no such file or directory")
+					}
+					t.Cleanup(func() { executable = origExe })
 				}
 				// Block GlobalSdkDir and SharedRoot with regular files so directory creation fails.
 				if err := os.WriteFile(filepath.Join(userVfox, "sdks"), []byte("file"), 0644); err != nil {
@@ -278,8 +307,11 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				if meta == nil || meta.Shared.Root != shared {
 					t.Fatalf("unexpected PathMeta: %+v", meta)
 				}
+				if tc.failExe && meta.Executable != "" {
+					t.Fatalf("expected empty Executable on error, got %q", meta.Executable)
+				}
 				if out.Len() != 0 {
-					t.Fatalf("NewPathMeta wrote to stdout when directory creation failed: %q", out.String())
+					t.Fatalf("NewPathMeta wrote to stdout on failure: %q", out.String())
 				}
 			})
 		}

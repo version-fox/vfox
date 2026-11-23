@@ -512,9 +512,23 @@ func ensureWritableDir(dir string) error {
 		return err
 	}
 	probePath := probe.Name()
-	_ = probe.Close()
-	_ = os.Remove(probePath)
+	if err := probe.Close(); err != nil {
+		if removeErr := os.Remove(probePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			logger.Debugf("remove plugin directory probe %q failed: %v\n", probePath, removeErr)
+		}
+		return err
+	}
+	if err := os.Remove(probePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	return nil
+}
+
+func preparePluginDirError(pluginsDir string, err error) error {
+	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
+		return fmt.Errorf("prepare plugin directory %q (%s=%q): %w", pluginsDir, env.HomeFromEnv, vfoxHome, err)
+	}
+	return fmt.Errorf("prepare plugin directory %q: %w", pluginsDir, err)
 }
 
 // Add a plugin to plugin home directory
@@ -543,19 +557,22 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	}
 	var installPath string
 	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
-	if err := ensureWritableDir(pluginsDir); err != nil {
-		if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
-			return fmt.Errorf("prepare plugin directory %q (%s=%q): %w", pluginsDir, env.HomeFromEnv, vfoxHome, err)
-		}
-		return fmt.Errorf("prepare plugin directory %q: %w", pluginsDir, err)
-	}
-	// first quick check.
+	// first quick check before probing directory writability, so an already-installed
+	// plugin still gets "already exists" even when plugin/ is read-only.
 	if pname != "" {
 		installPath = filepath.Join(pluginsDir, pname)
 		if util.FileExists(installPath) {
 			logger.Debugf("Plugin %s already exists at: %s\n", pname, installPath)
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
+	}
+	isRemoteSource := len(url) == 0 || strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+	dirChecked := false
+	if pname != "" || isRemoteSource {
+		if err := ensureWritableDir(pluginsDir); err != nil {
+			return preparePluginDirError(pluginsDir, err)
+		}
+		dirChecked = true
 	}
 	// official plugin
 	if len(url) == 0 {
@@ -585,6 +602,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		logger.Debugf("No plugin name provided, use %s as plugin name, installPath: %s\n", pname, installPath)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
+		}
+	}
+	if !dirChecked {
+		if err := ensureWritableDir(pluginsDir); err != nil {
+			return preparePluginDirError(pluginsDir, err)
 		}
 	}
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
