@@ -91,15 +91,16 @@ func otherVersions(versions []sdk.Version, version sdk.Version) []sdk.Version {
 }
 
 // fallbackVersions orders the installed versions that may take over when the
-// version in use is uninstalled: installations of a version first, newest first,
-// then copies made with install --as, which were made for one purpose.
+// version in use is uninstalled: installations of a version first, then copies
+// made with install --as, which were made for one purpose. Within each, the
+// order of remaining is kept.
 func fallbackVersions(s sdk.Sdk, remaining []sdk.Version) []sdk.Version {
 	var versions, copies []sdk.Version
 	for _, v := range remaining {
-		if inst, err := s.Installation(v); err != nil || inst.Receipt == nil || inst.Receipt.Resolved == "" {
-			versions = append(versions, v)
-		} else {
+		if inst, err := s.Installation(v); err == nil && inst.Receipt.IsCopy() {
 			copies = append(copies, v)
+		} else {
+			versions = append(versions, v)
 		}
 	}
 	return append(versions, copies...)

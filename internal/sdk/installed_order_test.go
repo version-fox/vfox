@@ -17,24 +17,23 @@
 package sdk
 
 import (
-	"sort"
+	"slices"
 	"testing"
 )
 
-func TestCompareInstalledOrdersNewestFirst(t *testing.T) {
-	names := []string{"dev", "18.0.0", "v20.1.0", "2.0.0-rc1", "9.0.0", "v22.0.0", "2.0.0", "10.0.0", "latest", "2.0.0-rc2"}
-	sort.Slice(names, func(i, j int) bool {
-		if c := compareInstalled(names[i], names[j]); c != 0 {
-			return c > 0
-		}
-		return names[i] > names[j]
-	})
-	want := []string{"v22.0.0", "v20.1.0", "18.0.0", "10.0.0", "9.0.0", "2.0.0", "2.0.0-rc2", "2.0.0-rc1", "latest", "dev"}
-	for i := range want {
-		if names[i] != want[i] {
-			t.Fatalf("order = %v, want %v", names, want)
-		}
+func TestInstalledListIsNewestFirst(t *testing.T) {
+	s := newTestSDK(t, &testPlugin{})
+	capturePterm(t)
+	for _, v := range []Version{"dev", "18.0.0", "v20.1.0", "2.0.0-rc1", "9.0.0", "v22.0.0", "2.0.0", "10.0.0", "latest", "2.0.0-rc2"} {
+		mustInstall(t, s, v)
 	}
+	want := []Version{"v22.0.0", "v20.1.0", "18.0.0", "10.0.0", "9.0.0", "2.0.0", "2.0.0-rc2", "2.0.0-rc1", "latest", "dev"}
+	if got := s.InstalledList(); !slices.Equal(got, want) {
+		t.Errorf("InstalledList() = %v, want %v", got, want)
+	}
+}
+
+func TestCompareInstalledTreatsMissingPartsAsZero(t *testing.T) {
 	if c := compareInstalled("1.0", "1.0.0"); c != 0 {
 		t.Errorf("compareInstalled(1.0, 1.0.0) = %d, want 0", c)
 	}

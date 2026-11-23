@@ -267,3 +267,81 @@ func TestUninstallTriesTheNextVersionWhenTheSwitchFails(t *testing.T) {
 		t.Errorf("zeta@3.0.0 is still there: %v", err)
 	}
 }
+
+// The global links of additions that only the removed version had are removed
+// with it. The link of the main runtime stays: it points at the version that
+// took over.
+func TestUninstallRemovesTheLinksOfAdditionsTheNextVersionLacks(t *testing.T) {
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0", "extra-1.0.0"), 0755))
+	keepRegistry(t)
+	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+	extra := filepath.Join(f.userHome, "sdks", "extra")
+	if _, err := os.Stat(extra); err != nil {
+		t.Fatalf("use -g did not link the addition: %v", err)
+	}
+
+	f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall alpha@1.0.0")
+	if _, err := os.Lstat(extra); !os.IsNotExist(err) {
+		t.Errorf("the link of the addition is still there: %v", err)
+	}
+	if got := env.IsDirSymlink(filepath.Join(f.userHome, "sdks", "alpha")); !got {
+		t.Error("the link of alpha is gone")
+	}
+	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
+		t.Errorf("the link of alpha is broken: %v", err)
+	}
+}
+
+// When the links cannot be moved to the version that would take over, the config
+// keeps the version the links still point at.
+func TestUninstallKeepsTheConfigWhenTheLinksCannotBeMoved(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory can still be written on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can write a read-only directory")
+	}
+	f := newCLIFixture(t, false)
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		f.installOnDisk(t, "alpha", v)
+	}
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+	sdks := filepath.Join(f.userHome, "sdks")
+	must(t, os.Chmod(sdks, 0555))
+	t.Cleanup(func() { _ = os.Chmod(sdks, 0755) })
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "nothing was removed")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
+	target, err := os.Readlink(filepath.Join(sdks, "alpha"))
+	must(t, err)
+	mustContain(t, "link of alpha", target, "v-2.0.0")
+}
+
+// A failed uninstall of the only version puts it back as the global version
+// without saying that it was unset and then used again.
+func TestUninstallRestoresTheOnlyVersionQuietly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory can still be emptied on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can remove a read-only directory")
+	}
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "2.0.0")
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+	locked := filepath.Join(f.shared, "cache", "alpha", "v-2.0.0")
+	must(t, os.Chmod(locked, 0555))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0755) })
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustNotContain(t, "uninstall", out, "Unset", "Now using")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
+	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
+		t.Errorf("the link of alpha was not restored: %v", err)
+	}
+}

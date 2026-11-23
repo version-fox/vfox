@@ -177,3 +177,40 @@ func TestUseGlobalReturnsThePreUseError(t *testing.T) {
 		t.Errorf("global version = %q, want none", got)
 	}
 }
+
+// When the config cannot be written, the links go back to the version it asks for.
+func TestUseGlobalRevertsTheLinksWhenTheConfigCannotBeWritten(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only file does not stop the write")
+	}
+	s := installedSDK(t)
+	stubShellAndRegistry(t)
+	t.Setenv(env.HookFlag, "")
+	capturePterm(t)
+	mustInstall(t, s, "2.0.0")
+	if err := s.UseGlobal("1.0.0"); err != nil {
+		t.Fatalf("UseGlobal(1.0.0): %v", err)
+	}
+	home := s.envContext.PathMeta.User.Home
+	config := filepath.Join(home, ".vfox.toml")
+	for _, path := range []string{config, home} {
+		if err := os.Chmod(path, 0555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(path, 0755) })
+	}
+
+	if err := s.UseGlobal("2.0.0"); err == nil {
+		t.Fatal("UseGlobal(2.0.0) succeeded, want an error from the config")
+	}
+	if got := s.globalVersion(); got != "1.0.0" {
+		t.Errorf("global version = %q, want 1.0.0 unchanged", got)
+	}
+	target, err := os.Readlink(filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "test-sdk"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(target, "1.0.0") {
+		t.Errorf("the link points at %s, want 1.0.0", target)
+	}
+}
