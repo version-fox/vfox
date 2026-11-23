@@ -19,6 +19,7 @@
 package pathmeta
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -191,6 +192,47 @@ func TestApplyStoragePath(t *testing.T) {
 		expectedPath := customPath
 		if meta.Shared.Installs != expectedPath {
 			t.Errorf("Installs path not updated correctly: got %q, want %q", meta.Shared.Installs, expectedPath)
+		}
+	})
+}
+
+func TestNewPathMetaSharedDirectories(t *testing.T) {
+	t.Run("creates missing shared root and nested parents", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			rel  []string
+		}{
+			{name: "single missing directory", rel: []string{"vfox-home"}},
+			{name: "missing parent directories", rel: []string{"no-such-dir", "vfox-home"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				root := t.TempDir()
+				shared := filepath.Join(append([]string{root}, tc.rel...)...)
+
+				meta, err := NewPathMeta(filepath.Join(root, "home"), shared, root, 4242)
+				if err != nil {
+					t.Fatalf("NewPathMeta returned error: %v", err)
+				}
+				for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
+					info, statErr := os.Stat(dir)
+					if statErr != nil || !info.IsDir() {
+						t.Fatalf("expected directory %q to exist (stat err=%v)", dir, statErr)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("returns error when shared root cannot be created", func(t *testing.T) {
+		root := t.TempDir()
+		blocker := filepath.Join(root, "not-a-dir")
+		if err := os.WriteFile(blocker, []byte("file"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		shared := filepath.Join(blocker, "vfox-home")
+
+		if _, err := NewPathMeta(filepath.Join(root, "home"), shared, root, 4242); err == nil {
+			t.Fatalf("expected error creating shared directories under file %q, got nil", blocker)
 		}
 	})
 }

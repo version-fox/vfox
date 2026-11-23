@@ -140,10 +140,17 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 	}
 
 	// Initialize necessary directories
-	_ = os.MkdirAll(meta.User.Temp, ReadWriteAuth)
-	_ = os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth)
-	_ = os.Mkdir(meta.Shared.Installs, ReadWriteAuth)
-	_ = os.Mkdir(meta.Shared.Plugins, ReadWriteAuth)
+	if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
+		logger.Errorf("create temp dir failed: %v", err)
+	}
+	if err := os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth); err != nil {
+		logger.Errorf("create global sdk dir failed: %v", err)
+	}
+	for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
+		if err := os.MkdirAll(dir, ReadWriteAuth); err != nil {
+			return nil, fmt.Errorf("create shared directory %q: %w", dir, err)
+		}
+	}
 
 	return meta, nil
 }

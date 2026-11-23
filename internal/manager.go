@@ -528,9 +528,16 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 		logger.Debugf("Using alias: %s\n", alias)
 	}
 	var installPath string
+	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
+	if err := os.MkdirAll(pluginsDir, pathmeta.ReadWriteAuth); err != nil {
+		if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
+			return fmt.Errorf("prepare plugin directory %q (%s=%q): %w", pluginsDir, env.HomeFromEnv, vfoxHome, err)
+		}
+		return fmt.Errorf("prepare plugin directory %q: %w", pluginsDir, err)
+	}
 	// first quick check.
 	if pname != "" {
-		installPath = filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, pname)
+		installPath = filepath.Join(pluginsDir, pname)
 		if util.FileExists(installPath) {
 			logger.Debugf("Plugin %s already exists at: %s\n", pname, installPath)
 			return fmt.Errorf("plugin named %s already exists", pname)
@@ -560,7 +567,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
 	if pname == "" {
 		pname = tempPlugin.Name
-		installPath = filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, pname)
+		installPath = filepath.Join(pluginsDir, pname)
 		logger.Debugf("No plugin name provided, use %s as plugin name, installPath: %s\n", pname, installPath)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
@@ -827,6 +834,9 @@ func NewSdkManager() (*Manager, error) {
 	currentDir := getWorkingDirectory()
 	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 	if err != nil {
+		if vfoxHomeDir != "" {
+			return nil, fmt.Errorf("init path meta failed (%s=%q): %w", env.HomeFromEnv, vfoxHomeDir, err)
+		}
 		return nil, fmt.Errorf("init path meta failed: %w", err)
 	}
 
