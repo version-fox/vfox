@@ -17,15 +17,29 @@
 package sdk
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // acquireInstallLock serializes attempts across SDK instances and processes.
 // The file is kept after Close: unlinking it could let another process lock a
 // different inode. Closing the descriptor (including process exit) releases it.
 func acquireInstallLock(path string) (*os.File, error) {
+	file, err := openInstallLock(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := lockInstallFile(file); err != nil {
+		_ = file.Close() // No lock was acquired; preserve the locking error.
+		return nil, fmt.Errorf("installation is in progress or cannot be locked: %w", err)
+	}
+	return file, nil
+}
+
+func openInstallLock(path string) (*os.File, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, fmt.Errorf("create installation root: %w", err)
 	}
@@ -33,11 +47,49 @@ func acquireInstallLock(path string) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open installation lock: %w", err)
 	}
-	if err := lockInstallFile(file); err != nil {
-		_ = file.Close() // No lock was acquired; preserve the locking error.
-		return nil, fmt.Errorf("installation is in progress or cannot be locked: %w", err)
-	}
 	return file, nil
+}
+
+// errInstallLockStillHeld is returned by waitForInstallLock when the lock is still
+// held by another installation after installLockWait.
+var errInstallLockStillHeld = errors.New("another installation still holds the lock")
+
+// How long waitForInstallLock waits for another installation, and how often it
+// tries the lock meanwhile. Variables so that tests can shorten them.
+var (
+	installLockWait = 10 * time.Minute
+	installLockPoll = 100 * time.Millisecond
+)
+
+// waitForInstallLock is acquireInstallLock for a lock that another installation
+// holds while it runs: it waits up to installLockWait for that installation, and
+// calls waiting once when it starts to wait. Only a lock held by someone else is
+// waited for; any other error is returned at once.
+func waitForInstallLock(path string, waiting func()) (*os.File, error) {
+	file, err := openInstallLock(path)
+	if err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(installLockWait)
+	for {
+		err := lockInstallFile(file)
+		if err == nil {
+			return file, nil
+		}
+		if !installLockHeld(err) {
+			_ = file.Close() // No lock was acquired; preserve the locking error.
+			return nil, fmt.Errorf("lock installation: %w", err)
+		}
+		if time.Now().After(deadline) {
+			_ = file.Close()
+			return nil, errInstallLockStillHeld
+		}
+		if waiting != nil {
+			waiting()
+			waiting = nil
+		}
+		time.Sleep(installLockPoll)
+	}
 }
 
 // sdkInstallLockName is the lock in an SDK's installation root that lets one

@@ -66,7 +66,7 @@ For example: `https://example.com/1234567890#/filename.zip`.
 
 if the return value of version is empty, it means that the version is not found, and `vfox` will ask the user whether to perform a search operation.
 
-`ctx.installedSdks` lists the installed versions, keyed by version string, in the same shape as in `PreUse` (a copy made with `vfox install --as` is left out). In a plain `vfox install`, if the version returned is already installed, `vfox` reports it as installed and downloads nothing. A plugin that renamed its versions can use this to return the name an existing installation has, so the same release is not installed twice under two names. `vfox install --as` still makes the copy from the version returned, and for `vfox install --reinstall` the table is empty, so the version is resolved as it was typed. The name of a copy cannot be returned: `vfox` refuses it.
+`ctx.installedSdks` lists the installed versions, keyed by version string, in the same shape as in `PreUse` (a copy made with `vfox install --as` is left out). In a plain `vfox install`, if the version returned is already installed, `vfox` reports it as installed and downloads nothing. A plugin that renamed its versions can use this to return the name an existing installation has, so the same release is not installed twice under two names. For `vfox install --as` and `vfox install --reinstall` the table is empty, so the version is resolved as it was typed and the copy or the reinstalled version gets its payload from what `PreInstall` returns for it, as without this table. The name of a copy cannot be returned: `vfox` refuses it.
 
 ```lua
 function PLUGIN:PreInstall(ctx)

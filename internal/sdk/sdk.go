@@ -245,13 +245,35 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		return version, nil
 	}
 
+	// An installation of this very version that is running is reported at once, as
+	// before the SDK had a lock, rather than waited for.
+	typed := version
+	if named {
+		typed = name
+	}
+	if b.hasPendingInstall(typed) {
+		lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(typed)+".lock"))
+		if err != nil {
+			return "", fmt.Errorf("cannot install %s: %w", label, err)
+		}
+		if err := lock.Close(); err != nil {
+			return "", fmt.Errorf("close installation lock: %w", err)
+		}
+	}
+
 	// One installation of this SDK runs at a time, from the list PreInstall is given
 	// until the version is on disk. The plugin can map the request to an installed
 	// version under another name, and the lock below is per name, so without this an
-	// installation of that other name still running would not be seen.
-	sdkLock, err := acquireInstallLock(filepath.Join(b.InstallPath, sdkInstallLockName))
+	// installation of that other name still running would not be seen. Another
+	// installation waits for this one rather than fail.
+	sdkLock, err := waitForInstallLock(filepath.Join(b.InstallPath, sdkInstallLockName), func() {
+		pterm.Printf("Waiting for another installation of %s to finish...\n", b.Name)
+	})
+	if errors.Is(err, errInstallLockStillHeld) {
+		return "", fmt.Errorf("cannot install %s: another installation of %s is still running after %s; try again when it is done", label, b.Name, installLockWait)
+	}
 	if err != nil {
-		return "", fmt.Errorf("cannot install %s while another installation of %s runs: %w", label, b.Name, err)
+		return "", fmt.Errorf("cannot install %s: %w", label, err)
 	}
 	defer func() {
 		if err := sdkLock.Close(); err != nil {
@@ -259,11 +281,17 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		}
 	}()
 
-	// A reinstall replaces the version as it was typed, so the plugin resolves it
-	// as it would without the list.
+	// Only a plain install is given the installed versions. A reinstall replaces the
+	// version as it was typed, and --as makes a second copy on purpose, so for both
+	// the plugin resolves the version as it would without the list.
 	installedSdks := map[string]*plugin.InstalledPackageItem{}
-	if !reinstall {
+	if !reinstall && !named {
 		installedSdks = b.matchableInstalledItems()
+		// A version directory that cannot be entered may hold an installation, so
+		// the plugin is given it too, and a request resolved to it is refused below.
+		for _, version := range b.uninspectableVersions() {
+			installedSdks[string(version)] = b.installedItem(version)
+		}
 	}
 	ctx := &plugin.PreInstallHookCtx{
 		Version:       string(version),
@@ -314,6 +342,9 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 	}
 	if named && sdkVersion == name {
 		return "", fmt.Errorf("%s resolves to %s, so a copy of it cannot be named %s: name the copy differently", b.Label(version), sdkVersion, name)
+	}
+	if err := b.inspectError(key); err != nil {
+		return "", fmt.Errorf("cannot tell whether %s is installed: %w; fix the permissions of %s or remove it", label, err, b.packagePath(key))
 	}
 	newDirPath := b.packagePath(key)
 	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(key)+".lock"))
@@ -707,13 +738,48 @@ func (b *impl) matchableInstalledItems() map[string]*plugin.InstalledPackageItem
 	versions := b.matchableVersions()
 	sdks := make(map[string]*plugin.InstalledPackageItem, len(versions))
 	for _, version := range versions {
-		sdks[string(version)] = &plugin.InstalledPackageItem{
-			Name:    b.sdkName(),
-			Version: string(version),
-			Path:    b.packagePath(version),
-		}
+		sdks[string(version)] = b.installedItem(version)
 	}
 	return sdks
+}
+
+func (b *impl) installedItem(version Version) *plugin.InstalledPackageItem {
+	return &plugin.InstalledPackageItem{
+		Name:    b.sdkName(),
+		Version: string(version),
+		Path:    b.packagePath(version),
+	}
+}
+
+// inspectError returns why vfox cannot tell whether version is installed: its
+// directory is there but cannot be entered, as one owned by another user can be.
+// CheckRuntimeExist takes such a version as absent. It is nil otherwise.
+func (b *impl) inspectError(version Version) error {
+	if b.hasPendingInstall(version) {
+		return nil
+	}
+	if _, err := os.Stat(b.mainRuntimePath(version)); errors.Is(err, fs.ErrPermission) {
+		return err
+	}
+	return nil
+}
+
+// uninspectableVersions returns the versions whose directory cannot be entered (see
+// inspectError). InstalledList leaves them out.
+func (b *impl) uninspectableVersions() []Version {
+	entries, err := os.ReadDir(b.InstallPath)
+	if err != nil {
+		return nil
+	}
+	var versions []Version
+	for _, d := range entries {
+		if d.IsDir() && strings.HasPrefix(d.Name(), "v-") {
+			if version := Version(strings.TrimPrefix(d.Name(), "v-")); b.inspectError(version) != nil {
+				versions = append(versions, version)
+			}
+		}
+	}
+	return versions
 }
 
 func (b *impl) preUse(version Version, scope env.UseScope) (Version, error) {
