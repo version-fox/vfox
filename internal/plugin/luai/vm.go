@@ -62,28 +62,49 @@ func (vm *LuaVM) Prepare(options *module.PreloadOptions) error {
 }
 
 // LimitPackagePath limits where `require` looks for Lua modules to dirs,
-// searched in order: module `a.b` is `<dir>/a/b.lua`.
+// searched in order: module `a.b` is `<dir>/a/b.lua`. After dirs it searches
+// the templates the plugin itself added to package.path, with Lua's `?` rule.
 //
-// The search does not go through package.path. Lua reads `;` there as the
-// separator between templates and `?` as the module name, and the plugin
+// The search for dirs does not go through package.path. Lua reads `;` there as
+// the separator between templates and `?` as the module name, and the plugin
 // directories lie under HOME, so a HOME containing either character split the
-// path or had the module name spliced into it. A loader in place of Lua's own
-// file loader looks in each directory itself; preloaded modules come first as
-// before.
+// path or had the module name spliced into it. package.path starts empty, so
+// only the entries a plugin adds (for example a vendored directory) are read
+// from it. A loader in place of Lua's own file loader does the search;
+// preloaded modules come first as before.
 func (vm *LuaVM) LimitPackagePath(dirs ...string) {
 	packageModule := vm.Instance.GetGlobal("package").(*lua.LTable)
 	packageModule.RawSetString("path", lua.LString(""))
-	loaders, ok := packageModule.RawGetString("loaders").(*lua.LTable)
-	if !ok {
-		return
-	}
+	// gopher-lua's OpenPackage always creates package.loaders. Without it,
+	// require could not load any module that is not preloaded, so stop here.
+	loaders := packageModule.RawGetString("loaders").(*lua.LTable)
 	loaders.RawSetInt(2, vm.Instance.NewFunction(func(L *lua.LState) int {
 		name := L.CheckString(1)
-		file := strings.ReplaceAll(name, ".", string(os.PathSeparator)) + ".lua"
-		tried := make([]string, 0, len(dirs))
+		modulePath := strings.ReplaceAll(name, ".", string(os.PathSeparator))
+		candidates := make([]string, 0, len(dirs))
 		for _, dir := range dirs {
-			path := filepath.Join(dir, file)
-			if _, err := os.Stat(path); err != nil {
+			candidates = append(candidates, filepath.Join(dir, modulePath+".lua"))
+		}
+		for _, template := range strings.Split(lua.LVAsString(packageModule.RawGetString("path")), ";") {
+			if template != "" {
+				candidates = append(candidates, strings.ReplaceAll(template, "?", modulePath))
+			}
+		}
+		tried := make([]string, 0, len(candidates))
+		for _, path := range candidates {
+			info, err := os.Stat(path)
+			if err != nil {
+				if os.IsNotExist(err) {
+					tried = append(tried, "no file '"+path+"'")
+				} else {
+					// Keep the reason, for example "permission denied": the
+					// file may be there, and "no file" would send the reader
+					// looking for a file that is not missing.
+					tried = append(tried, err.Error())
+				}
+				continue
+			}
+			if info.IsDir() {
 				tried = append(tried, "no file '"+path+"'")
 				continue
 			}
@@ -94,7 +115,8 @@ func (vm *LuaVM) LimitPackagePath(dirs ...string) {
 			L.Push(fn)
 			return 1
 		}
-		L.Push(lua.LString("\n\t" + strings.Join(tried, "\n\t")))
+		// gopher-lua puts "\n\t" in front of each loader's message itself.
+		L.Push(lua.LString(strings.Join(tried, "\n\t")))
 		return 1
 	}))
 }
