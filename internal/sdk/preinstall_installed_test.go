@@ -491,3 +491,191 @@ func TestReinstallOfACopyOfAMappedVersion(t *testing.T) {
 		t.Error("the reinstall of erl-db changed the other installations")
 	}
 }
+
+// blockPostInstall makes PostInstall of version wait until the returned finish is
+// closed, and closes the returned installing when it starts waiting.
+func blockPostInstall(p *testPlugin, version string) (installing, finish chan struct{}) {
+	installing = make(chan struct{})
+	finish = make(chan struct{})
+	postInstall := p.postInstall
+	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+		if ctx.SdkInfo["test-sdk"].Version == version {
+			close(installing)
+			<-finish
+		}
+		return postInstall(ctx)
+	}
+	return installing, finish
+}
+
+// shortLockWait makes waiting for another installation give up quickly.
+func shortLockWait(t *testing.T) {
+	wait := installLockWait
+	installLockWait = 10 * installLockPoll
+	t.Cleanup(func() { installLockWait = wait })
+}
+
+// The SDK lock covers deciding and claiming a name, not the download and
+// PostInstall, so two versions of one SDK install side by side, as on main.
+func TestInstallsOfTwoVersionsRunSideBySide(t *testing.T) {
+	shortLockWait(t)
+	p := (&testPlugin{}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	installing, finish := blockPostInstall(p, "1.0")
+	first := make(chan error, 1)
+	go func() { first <- s.Install("1.0") }()
+	<-installing
+
+	// 1.0 is still in PostInstall, and stays there until 2.0 is done.
+	err := s.Install("2.0")
+	close(finish)
+	if err != nil {
+		t.Errorf("Install(2.0) while 1.0 is being installed: %v", err)
+	}
+	if err := <-first; err != nil {
+		t.Fatalf("Install(1.0): %v", err)
+	}
+	for _, version := range []Version{"1.0", "2.0"} {
+		if !s.CheckRuntimeExist(version) {
+			t.Errorf("%s is not installed", version)
+		}
+	}
+}
+
+// A PostInstall can install another version of its SDK, as a plugin does through
+// os.execute. The nested install takes the locks through files of its own, as the
+// child vfox would, so it must not wait on the installation that started it.
+func TestPostInstallCanInstallAnotherVersionOfItsSDK(t *testing.T) {
+	shortLockWait(t)
+	p := (&testPlugin{}).withCommand(t, "tool")
+	s := newTestSDK(t, p)
+	postInstall := p.postInstall
+	var nested error
+	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+		if ctx.SdkInfo["test-sdk"].Version == "1.0" {
+			nested = s.Install("2.0")
+		}
+		return postInstall(ctx)
+	}
+	mustInstall(t, s, "1.0")
+	if nested != nil {
+		t.Errorf("Install(2.0) from PostInstall of 1.0: %v", nested)
+	}
+	for _, version := range []Version{"1.0", "2.0"} {
+		if !s.CheckRuntimeExist(version) {
+			t.Errorf("%s is not installed", version)
+		}
+	}
+}
+
+// A request mapped to a version still being installed waits for that installation,
+// with a limit. After it, the install fails, says why, and leaves nothing.
+func TestInstallGivesUpWaitingForTheVersionItWasMappedTo(t *testing.T) {
+	shortLockWait(t)
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	p.preInstall = renamedRelease
+	installing, finish := blockPostInstall(p, "OTP-29.1.2")
+	first := make(chan error, 1)
+	go func() { first <- s.Install("OTP-29.1.2") }()
+	<-installing
+
+	got, err := s.InstallResolved("29.1.2", false)
+	close(finish)
+	if err == nil || !strings.Contains(err.Error(), "test-sdk@OTP-29.1.2 is still being installed") {
+		t.Errorf("InstallResolved(29.1.2) while OTP-29.1.2 is being installed = %q, %v; want it to give up waiting", got, err)
+	}
+	if err := <-first; err != nil {
+		t.Fatalf("Install(OTP-29.1.2): %v", err)
+	}
+	if exists(s.packagePath("29.1.2")) {
+		t.Error("29.1.2 was installed beside the installation that was running")
+	}
+}
+
+// A copy is left out of the list even when its directory cannot be entered, and
+// so its receipt cannot be read.
+func TestPreInstallIsNotGivenACopyItCannotEnter(t *testing.T) {
+	s, p := newCopyTestSDK(t)
+	mustInstall(t, s, "3.12")
+	if _, err := s.InstallAs("3.12", "3.12-db"); err != nil {
+		t.Fatalf("InstallAs: %v", err)
+	}
+	unreadable(t, s, "3.12-db", 0000)
+
+	var seen map[string]*plugin.InstalledPackageItem
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		seen = ctx.InstalledSdks
+		return resolves312(ctx)
+	}
+	mustInstall(t, s, "3.13")
+	if _, ok := seen["3.12-db"]; ok {
+		t.Errorf("PreInstall was given %v, want the copy 3.12-db left out", seen)
+	}
+
+	// A plugin that returns it anyway is told it is a copy.
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		return &plugin.PreInstallHookResult{PreInstallPackageItem: &plugin.PreInstallPackageItem{Version: "3.12-db"}}, nil
+	}
+	got, err := s.InstallResolved("3.14", false)
+	if err == nil || !strings.Contains(err.Error(), "test-sdk@3.12-db is a copy") {
+		t.Errorf("InstallResolved(3.14) = %q, %v; want a refusal that names the copy", got, err)
+	}
+}
+
+// A copy still being installed is left out of the list too.
+func TestPreInstallIsNotGivenACopyBeingInstalled(t *testing.T) {
+	shortLockWait(t)
+	s, p := newCopyTestSDK(t)
+	installing, finish := blockPostInstall(p, "3.12-db")
+	first := make(chan error, 1)
+	go func() {
+		_, err := s.InstallAs("3.12", "3.12-db")
+		first <- err
+	}()
+	<-installing
+
+	var seen map[string]*plugin.InstalledPackageItem
+	p.preInstall = func(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		seen = ctx.InstalledSdks
+		return resolves312(ctx)
+	}
+	err := s.Install("3.13")
+	close(finish)
+	if err != nil {
+		t.Errorf("Install(3.13): %v", err)
+	}
+	if err := <-first; err != nil {
+		t.Fatalf("InstallAs: %v", err)
+	}
+	if _, ok := seen["3.12-db"]; ok {
+		t.Errorf("PreInstall was given %v, want the copy being installed left out", seen)
+	}
+}
+
+// The mark of a copy goes with it, and a version installed under a name whose copy
+// is gone is not taken for a copy because of a mark left behind.
+func TestTheMarkOfACopyGoesWithIt(t *testing.T) {
+	s, _ := newCopyTestSDK(t)
+	if _, err := s.InstallAs("3.12", "3.12-db"); err != nil {
+		t.Fatalf("InstallAs: %v", err)
+	}
+	if !exists(s.copyMarkerPath("3.12-db")) {
+		t.Fatal("InstallAs left no mark beside the copy")
+	}
+	if err := s.Uninstall("3.12-db"); err != nil {
+		t.Fatalf("Uninstall(3.12-db): %v", err)
+	}
+	if exists(s.copyMarkerPath("3.12-db")) {
+		t.Error("Uninstall left the mark of the copy")
+	}
+
+	// A mark left behind, as by a removal that failed half way.
+	if err := os.WriteFile(s.copyMarkerPath("3.13"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	mustInstall(t, s, "3.13")
+	if s.isCopy("3.13") || exists(s.copyMarkerPath("3.13")) {
+		t.Error("3.13 was installed as a version but is taken for a copy")
+	}
+}
