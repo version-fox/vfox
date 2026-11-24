@@ -62,8 +62,8 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	typedVersion := manager.ResolveVersion(name, version)
 	resolvedVersion := manager.ResolveVersionName(name, source, typedVersion)
-	// Files left of a version that is gone are found under the name as typed, but
-	// only when nothing is installed under that name or without its "v".
+	// Files and links left of a version that is gone are found under the name as
+	// typed, but only when nothing is installed under that name or without its "v".
 	if !source.HasVersion(resolvedVersion) && source.HasLeftovers(typedVersion) {
 		resolvedVersion = typedVersion
 	}
@@ -72,7 +72,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	// for is left alone.
 	fallbacks := fallbackVersions(source, otherVersions(source.InstalledList(), resolvedVersion))
 	uninstallErr := source.Uninstall(resolvedVersion, fallbacks...)
-	if uninstallErr != nil && !errors.Is(uninstallErr, sdk.ErrFilesLeft) {
+	if uninstallErr != nil && !errors.Is(uninstallErr, sdk.ErrFilesLeft) && !errors.Is(uninstallErr, sdk.ErrLinksLeft) {
 		return uninstallErr
 	}
 	// An alias must not outlive the version it names.

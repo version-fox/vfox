@@ -249,7 +249,7 @@ func TestLeftoverFilesDoNotChangeALeadingV(t *testing.T) {
 	must(t, os.MkdirAll(left, 0755)) // the empty SDK directory went with the last version
 
 	out = f.run(t, "uninstall", "alpha@v1.0.0").mustSucceed(t, "uninstall alpha@v1.0.0 again").output()
-	mustContain(t, "uninstall again", out, "Deleted the files that were left of alpha@v1.0.0")
+	mustContain(t, "uninstall again", out, "Removed what was left of alpha@v1.0.0")
 	if _, err := os.Lstat(left); !os.IsNotExist(err) {
 		t.Errorf("%s is still there: %v", left, err)
 	}
@@ -320,7 +320,7 @@ func TestUninstallReportsTheFilesOfAnEarlierOne(t *testing.T) {
 
 	must(t, os.Chmod(left, 0755))
 	out = f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0 again").output()
-	mustContain(t, "uninstall again", out, "Deleted the files that were left of alpha@2.0.0")
+	mustContain(t, "uninstall again", out, "Removed what was left of alpha@2.0.0")
 	if _, err := os.Lstat(left); !os.IsNotExist(err) {
 		t.Errorf("%s is still there: %v", left, err)
 	}
@@ -551,22 +551,96 @@ func TestUninstallRemovesTheGlobalLinksOfAVersionThatIsNotGlobal(t *testing.T) {
 	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
 }
 
-// A link that cannot be removed does not fail the uninstall, but it is reported.
-func TestUninstallWarnsWhenALinkCannotBeRemoved(t *testing.T) {
+// A link that cannot be removed fails the command, which names it. The version is
+// gone, and running the command again removes the link.
+func TestUninstallThatLeavesLinksIsFinishedByARetry(t *testing.T) {
 	skipUnlessPermissionsHold(t)
+	for _, tc := range []struct {
+		name  string
+		other bool
+		left  []string
+	}{
+		{"the only version", false, []string{"alpha", "extra"}},
+		{"a version that is not global", true, []string{"extra"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			f.installOnDisk(t, "alpha", "v1.0.0")
+			must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "alpha", "v-v1.0.0", "extra-v1.0.0"), 0755))
+			f.run(t, "use", "-g", "alpha@v1.0.0").mustSucceed(t, "use -g alpha@v1.0.0")
+			if tc.other {
+				f.installOnDisk(t, "alpha", "2.0.0")
+				f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+			}
+			f.run(t, "alias", "set", "alpha", "mine", "v1.0.0").mustSucceed(t, "alias set")
+			globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+			sdks := filepath.Join(f.userHome, "sdks")
+			unlock := lock(t, sdks)
+
+			out := f.run(t, "uninstall", "alpha@v1.0.0").mustFail(t, "uninstall alpha@v1.0.0").output()
+			mustContain(t, "uninstall", out, "no longer installed", "could not remove all links to alpha@v1.0.0", "uninstall alpha@v1.0.0 again", "Removed the alias(es) mine")
+			mustNotContain(t, "uninstall", out, "successfully! ", "Uninstalled")
+			for _, name := range tc.left {
+				mustContain(t, "uninstall", out, filepath.Join(sdks, name))
+			}
+			mustNotContain(t, "global config", readFile(t, globalConfig), "v1.0.0")
+
+			out = f.run(t, "uninstall", "alpha@v1.0.0").mustFail(t, "uninstall alpha@v1.0.0 while the links are locked").output()
+			mustContain(t, "uninstall while locked", out, "could not remove all links to alpha@v1.0.0")
+
+			unlock()
+			out = f.run(t, "uninstall", "alpha@v1.0.0").mustSucceed(t, "uninstall alpha@v1.0.0 again").output()
+			mustContain(t, "uninstall again", out, "Removed what was left of alpha@v1.0.0")
+			for _, name := range tc.left {
+				if _, err := os.Lstat(filepath.Join(sdks, name)); !os.IsNotExist(err) {
+					t.Errorf("the link %s is still there: %v", name, err)
+				}
+			}
+			if _, err := os.Stat(filepath.Join(sdks, "alpha")); tc.other && err != nil {
+				t.Errorf("the link of alpha is broken: %v", err)
+			}
+			out = f.run(t, "uninstall", "alpha@v1.0.0").mustFail(t, "uninstall alpha@v1.0.0 a fourth time").output()
+			mustContain(t, "uninstall with nothing left", out, "is not installed")
+		})
+	}
+}
+
+// A global config that cannot be read may name the version, so nothing is removed.
+func TestUninstallChangesNothingWhenTheGlobalConfigCannotBeRead(t *testing.T) {
 	f := newCLIFixture(t, false)
 	for _, v := range []string{"1.0.0", "2.0.0"} {
 		f.installOnDisk(t, "alpha", v)
 	}
-	must(t, os.MkdirAll(filepath.Join(f.shared, "cache", "alpha", "v-1.0.0", "extra-1.0.0"), 0755))
-	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
-	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
-	sdks := filepath.Join(f.userHome, "sdks")
-	must(t, os.Chmod(sdks, 0555))
-	t.Cleanup(func() { _ = os.Chmod(sdks, 0755) })
+	keepRegistry(t)
+	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
+	broken := "[tools\nalpha = \"2.0.0\"\n"
+	must(t, os.WriteFile(globalConfig, []byte(broken), 0644))
 
-	out := f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall alpha@1.0.0").output()
-	mustContain(t, "uninstall", out, "Uninstalled", "could not be removed", "extra")
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "could not read the global version", "nothing was removed")
+	mustNotContain(t, "uninstall", out, "Uninstalled")
+	if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha", "v-2.0.0", "alpha-2.0.0")); err != nil {
+		t.Errorf("alpha@2.0.0 is gone: %v", err)
+	}
+	if got := readFile(t, globalConfig); got != broken {
+		t.Errorf("global config = %q, want it untouched", got)
+	}
+}
+
+// A version linked into the directory that is being removed cannot take over.
+func TestUninstallDoesNotSwitchToAVersionLinkedIntoTheRemovedOne(t *testing.T) {
+	f := newCLIFixture(t, false)
+	main := f.installOnDisk(t, "alpha", "2.0.0", "alpha")
+	keepRegistry(t)
+	f.run(t, "link", "alpha@x", main).mustSucceed(t, "link alpha@x")
+	f.run(t, "use", "-g", "alpha@2.0.0").mustSucceed(t, "use -g alpha@2.0.0")
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "nothing was removed", "alpha@x", "linked into the directory of alpha@2.0.0")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "2.0.0"`)
+	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
+		t.Errorf("the link of alpha is broken: %v", err)
+	}
 }
 
 // When the global setting cannot be changed, nothing is removed, and a retry

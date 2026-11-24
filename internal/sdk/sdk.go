@@ -71,8 +71,8 @@ type Sdk interface {
 	// installation, a link whose target is gone, an interrupted installation. CheckRuntimeExist is
 	// the stricter question, whether the version can be used.
 	HasVersion(version Version) bool
-	// HasLeftovers reports whether files of a version that is not installed any more are left,
-	// because an uninstall could not delete them. Uninstall deletes them.
+	// HasLeftovers reports whether files of a version that is not installed any more, or global
+	// links into it, are left, because an uninstall could not remove them. Uninstall removes them.
 	HasLeftovers(version Version) bool
 
 	// Installation describes an installed version: who owns it and what vfox recorded about it.
@@ -585,20 +585,35 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 // version. If anything fails up to and including that step, the version stays
 // installed, and the global entry and links are set back to what they were. If
 // that fails too, the error says what the global version is. After the rename,
-// the version is gone, and all that can fail is deleting its files: that error
-// is ErrFilesLeft, and the next Uninstall of the same version deletes the files
-// that are left, whether it was installed again or not.
+// the version is gone, and what can still fail is removing the global links into
+// it (ErrLinksLeft) and deleting its files (ErrFilesLeft). The next Uninstall of
+// the same version does what is left, whether it was installed again or not.
 func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	label := b.Label(version)
 	logger.Debugf("Uninstalling SDK: %s\n", label)
+
+	// Without the global config there is no telling whether it names the version.
+	globalEntry, err := b.globalEntry()
+	if err != nil {
+		return fmt.Errorf("could not read the global version, so nothing was removed: %w", err)
+	}
 
 	installed := b.CheckRuntimeExist(version)
 	// A link whose target has gone away no longer counts as installed, but it
 	// is still there to be removed.
 	if !installed && !b.brokenLink(version) {
-		if left := b.leftovers(version); len(left) > 0 {
-			if err = b.deleteLeftovers(version, left); err == nil {
-				pterm.Printf("Deleted the files that were left of %s.\n", label)
+		linksLeft, err := b.linksLeft(version, globalEntry)
+		if err != nil {
+			return fmt.Errorf("could not read the global links: %w", err)
+		}
+		files := b.leftovers(version)
+		if linksLeft || len(files) > 0 {
+			if linksLeft {
+				err = b.removeLinksTo(version)
+			}
+			err = errors.Join(err, b.deleteLeftovers(version, files))
+			if err == nil {
+				pterm.Printf("Removed what was left of %s.\n", label)
 			}
 			return err
 		}
@@ -626,12 +641,13 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	// If the global scope asks for the version to be uninstalled, it has to stop
 	// doing so. A version only a project or session asks for leaves the global
 	// setting alone.
-	isGlobal := b.globalVersion() == version
-	var before *globalState
+	isGlobal := globalEntry != nil && Version(globalEntry.Version) == version
+	var before globalState
 	var takesOver Version
 	if isGlobal {
-		if before, err = b.globalState(); err != nil {
-			return err
+		before.entry = globalEntry
+		if before.links, err = b.linksOfScope(env.Global); err != nil {
+			return fmt.Errorf("could not read the global links, so nothing was removed: %w", err)
 		}
 		if takesOver, err = b.releaseGlobal(version, fallbacks); err != nil {
 			return err
@@ -683,11 +699,10 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	}
 
 	// The global links that pointed into the version now dangle: those of the
-	// version itself, or of additions the global version does not have. This is
-	// best effort, because the version is gone and there is nothing to go back to.
-	if linkErr := b.removeLinksInto(path, env.Global); linkErr != nil {
-		pterm.Warning.Printf("Some links to %s could not be removed: %v\n", label, linkErr)
-	}
+	// version itself, or of additions the global version does not have. The version
+	// is gone, so if one cannot be removed there is nothing to go back to: the rest
+	// is done all the same, and the next uninstall tries that link again.
+	linkErr := b.removeLinksTo(version)
 
 	// Files that an earlier uninstall of the version left go as well.
 	paths := []string{removing}
@@ -696,9 +711,9 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 			paths = append(paths, left)
 		}
 	}
-	deleteErr := b.deleteLeftovers(version, paths)
+	leftErr := errors.Join(linkErr, b.deleteLeftovers(version, paths))
 	switch {
-	case deleteErr != nil:
+	case leftErr != nil:
 		pterm.Printf("%s is no longer installed.\n", label)
 	case linked:
 		pterm.Printf("Unlinked %s successfully! %s was left untouched.\n", label, linkedTo)
@@ -711,7 +726,7 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	} else if isGlobal {
 		b.printUnset()
 	}
-	return deleteErr
+	return leftErr
 }
 
 // globalState is what the global scope holds for the SDK: its config entry and
@@ -721,22 +736,17 @@ type globalState struct {
 	links map[string]string
 }
 
-// globalState returns the global entry of the SDK as it is, attributes included,
-// and the global links.
-func (b *impl) globalState() (*globalState, error) {
+// globalEntry returns the global entry of the SDK as it is, attributes included,
+// or nil if it has none.
+func (b *impl) globalEntry() (*pathmeta.ToolConfig, error) {
 	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(env.Global)
 	if err != nil {
-		return nil, fmt.Errorf("could not read the global version: %w", err)
+		return nil, err
 	}
-	entry, ok := vfoxToml.GetToolConfig(b.Name)
-	if !ok {
-		return nil, fmt.Errorf("could not read the global version: %s has none", b.Name)
+	if entry, ok := vfoxToml.GetToolConfig(b.Name); ok {
+		return entry, nil
 	}
-	links, err := b.linksOfScope(env.Global)
-	if err != nil {
-		return nil, fmt.Errorf("could not read the global links: %w", err)
-	}
-	return &globalState{entry: entry, links: links}, nil
+	return nil, nil
 }
 
 // releaseGlobal makes the global setting, which names version, stop doing so: the
@@ -776,7 +786,7 @@ func (b *impl) releaseGlobal(version Version, fallbacks []Version) (Version, err
 // links and the entry become what they were before. As in apply, the order is
 // links, config, registry, and if the links or the config fail, the links go to
 // what the config still asks for.
-func (b *impl) restoreGlobal(version, tookOver Version, before *globalState) error {
+func (b *impl) restoreGlobal(version, tookOver Version, before globalState) error {
 	after, err := b.linksOfScope(env.Global)
 	if err != nil {
 		return err
@@ -874,6 +884,28 @@ func (b *impl) deleteLeftovers(version Version, paths []string) error {
 	return errors.Join(errs...)
 }
 
+// linksLeft reports whether an uninstall of version left global links that point
+// into it. A version the global config, whose entry is entry, still names was not
+// uninstalled: its directory went some other way.
+func (b *impl) linksLeft(version Version, entry *pathmeta.ToolConfig) (bool, error) {
+	path := b.packagePath(version)
+	if _, err := os.Lstat(path); !os.IsNotExist(err) || entry != nil && Version(entry.Version) == version {
+		return false, nil
+	}
+	links, err := b.linksInto(path, env.Global)
+	return len(links) > 0, err
+}
+
+// removeLinksTo removes the global links that point into the directory of version,
+// which is gone.
+func (b *impl) removeLinksTo(version Version) error {
+	if err := b.removeLinksInto(b.packagePath(version), env.Global); err != nil {
+		label := b.Label(version)
+		return fmt.Errorf("%w %s: %w (uninstall %s again to remove them)", ErrLinksLeft, label, err, label)
+	}
+	return nil
+}
+
 func filesLeftError(label, path string, err error) error {
 	return fmt.Errorf("%w %s: %w (they are in %s, uninstall %s again to delete them)", ErrFilesLeft, label, err, path, label)
 }
@@ -911,6 +943,9 @@ func (b *impl) switchGlobal(removed Version, candidates []Version) (Version, err
 		if err == nil && v == removed {
 			err = errors.New("it resolves to the version that is being removed")
 		}
+		if err == nil && b.dependsOn(v, removed) {
+			err = fmt.Errorf("it is linked into the directory of %s, which is being removed", b.Label(removed))
+		}
 		if err == nil {
 			_, err = b.apply(v, env.Global, false)
 		}
@@ -924,6 +959,69 @@ func (b *impl) switchGlobal(removed Version, candidates []Version) (Version, err
 		return v, nil
 	}
 	return "", noSwitchError(errs)
+}
+
+// dependsOn reports whether the main runtime or an addition of version is reached
+// through the directory of other, so that it breaks when that directory is moved.
+func (b *impl) dependsOn(version, other Version) bool {
+	runtimePackage, err := b.GetRuntimePackage(version)
+	if err != nil {
+		return false // apply returns the error
+	}
+	dir := b.packagePath(other)
+	for _, r := range append([]*Runtime{runtimePackage.Runtime}, runtimePackage.Additions...) {
+		if leadsThrough(r.Path, dir) {
+			return true
+		}
+	}
+	return false
+}
+
+// leadsThrough reports whether path passes dir, by its own directories or by those
+// of the links on it. The end of the links is not enough to tell: a link in dir may
+// lead out of it again, and is gone with dir all the same.
+func leadsThrough(path, dir string) bool {
+	moved, err := os.Lstat(dir)
+	if err != nil {
+		return false
+	}
+	for links := 0; links < 255; links++ {
+		link, rest, through := firstLink(path, moved)
+		if through || link == "" {
+			return through
+		}
+		target, ok := linkTarget(link)
+		if !ok {
+			return false
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(link), target)
+		}
+		path = filepath.Join(target, rest)
+	}
+	return false
+}
+
+// firstLink goes down path until it finds a link, and returns the link and the part
+// of path after it, or until it comes to the directory moved.
+func firstLink(path string, moved os.FileInfo) (link, rest string, through bool) {
+	root := filepath.VolumeName(path) + string(filepath.Separator)
+	names := strings.Split(strings.TrimPrefix(filepath.Clean(path), root), string(filepath.Separator))
+	current := root
+	for i, name := range names {
+		current = filepath.Join(current, name)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return "", "", false
+		}
+		if os.SameFile(info, moved) {
+			return "", "", true
+		}
+		if env.IsDirSymlink(current) {
+			return current, filepath.Join(names[i+1:]...), false
+		}
+	}
+	return "", "", false
 }
 
 func noSwitchError(errs []error) error {
@@ -1342,8 +1440,8 @@ func sortNewestFirst(versions []Version) {
 // "v" is ignored (v20.1.0 is 20.1.0), a pre-release or other suffix comes
 // before its release (2.0.0-rc1 < 2.0.0), the numbers in a suffix compare as
 // numbers (rc9 < rc10), and a name that does not start with a number (dev,
-// latest) comes before every numbered one. Missing parts count as 0, so 1.0 and
-// 1.0.0 compare equal.
+// latest) is lower than every numbered one, so sortNewestFirst puts it last.
+// Missing parts count as 0, so 1.0 and 1.0.0 compare equal.
 func compareInstalled(a, b string) int {
 	na, sa, oka := splitVersionName(a)
 	nb, sb, okb := splitVersionName(b)
@@ -1576,27 +1674,32 @@ func (b *impl) removeSymlinksForScope(version Version, scope env.UseScope) error
 	return nil
 }
 
+// linksInto returns the links of scope that point into dir.
+func (b *impl) linksInto(dir string, scope env.UseScope) ([]string, error) {
+	targets, err := b.linksOfScope(scope)
+	if err != nil {
+		return nil, err
+	}
+	linkDir := b.envContext.GetLinkDirPathByScope(scope)
+	var links []string
+	for name, target := range targets {
+		if isInside(dir, target) {
+			links = append(links, filepath.Join(linkDir, name))
+		}
+	}
+	sort.Strings(links)
+	return links, nil
+}
+
 // removeLinksInto removes the links of scope that point into dir. It goes on
 // after a link that cannot be removed, and returns the errors of all of them.
 func (b *impl) removeLinksInto(dir string, scope env.UseScope) error {
-	linkDir := b.envContext.GetLinkDirPathByScope(scope)
-	entries, err := os.ReadDir(linkDir)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+	links, err := b.linksInto(dir, scope)
 	if err != nil {
 		return err
 	}
 	var errs []error
-	for _, entry := range entries {
-		link := filepath.Join(linkDir, entry.Name())
-		target, ok := linkTarget(link)
-		if !ok {
-			continue
-		}
-		if !isInside(dir, target) {
-			continue
-		}
+	for _, link := range links {
 		if err := env.RemoveDirSymlink(link); err != nil {
 			errs = append(errs, err)
 		}
@@ -1713,9 +1816,21 @@ func (b *impl) HasVersion(version Version) bool {
 	return false
 }
 
-// HasLeftovers reports whether files of version are left that an uninstall could not delete.
+// HasLeftovers reports whether an uninstall of version left files or links of it.
 func (b *impl) HasLeftovers(version Version) bool {
-	return version != "" && len(b.leftovers(version)) > 0
+	if version == "" {
+		return false
+	}
+	if len(b.leftovers(version)) > 0 {
+		return true
+	}
+	// Uninstall returns the errors.
+	entry, err := b.globalEntry()
+	if err != nil {
+		return false
+	}
+	left, err := b.linksLeft(version, entry)
+	return err == nil && left
 }
 
 func (b *impl) installMarkerPath(version Version) string {
