@@ -486,9 +486,9 @@ func TestDownloadPluginKeepsBackslashPathsInDownloadTempDir(t *testing.T) {
 		},
 	}}
 
-	// A backslash in the URL path, literal or as %5C, must not let the
-	// download escape the private download directory on Windows, where filepath.Join
-	// splits at it.
+	// A backslash in the URL path, literal or as %5C, must resolve to the
+	// trailing path segment so the download stays inside the private directory
+	// with a plain filename across Windows and POSIX.
 	for _, p := range []string{"/..\\evil.zip", "/..%5Cevil.zip", "/sub/..%5C..%5Cevil.zip"} {
 		saved, err := m.downloadPlugin(srv.URL + p)
 		if err != nil {

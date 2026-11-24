@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	stdpath "path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -432,12 +433,13 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 // element of the URL path is used only when it ends with the extension the
 // whole URL was accepted by; otherwise the name falls back to "plugin" plus
 // that extension, so NewDecompressor always sees the extension it needs.
-// filepath.Base splits at the OS separator, so a backslash in the URL path
-// cannot move the download out of the plugin directory on Windows.
+// Backslashes are normalized before stdpath.Base so URL paths with \ or %5C
+// always yield a single clean filename element across POSIX and Windows.
 func pluginFileName(downloadUrl string) string {
 	ext := filepath.Ext(downloadUrl)
 	if u, err := url.Parse(downloadUrl); err == nil {
-		if name := filepath.Base(u.Path); name != "." && name != "/" && strings.HasSuffix(name, ext) {
+		normalized := strings.ReplaceAll(u.Path, "\\", "/")
+		if name := stdpath.Base(normalized); name != "." && name != ".." && name != "/" && filepath.VolumeName(name) == "" && strings.HasSuffix(name, ext) {
 			return name
 		}
 	}
