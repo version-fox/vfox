@@ -19,6 +19,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -269,13 +270,14 @@ func TestParseExecLeadingArgs(t *testing.T) {
 
 	t.Run("rejects unsupported leading flags and names the flag", func(t *testing.T) {
 		for _, tc := range []struct {
-			name     string
-			args     []string
-			wantFlag string
+			name        string
+			args        []string
+			wantFlag    string
+			wantContain string
 		}{
-			{name: "-v before sdk", args: []string{"-v", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-v"},
-			{name: "-V before sdk", args: []string{"-V", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-V"},
-			{name: "--version before sdk", args: []string{"--version", "etcd@3.5.12", "etcd", "put"}, wantFlag: "--version"},
+			{name: "-v before sdk", args: []string{"-v", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-v", wantContain: "vfox --version"},
+			{name: "-V before sdk", args: []string{"-V", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-V", wantContain: "vfox --version"},
+			{name: "--version before sdk", args: []string{"--version", "etcd@3.5.12", "etcd", "put"}, wantFlag: "--version", wantContain: "vfox --version"},
 			{name: "--debug=invalid before sdk", args: []string{"--debug=invalid", "etcd@3.5.12", "etcd"}, wantFlag: "--debug=invalid"},
 			{name: "--unknown after --debug", args: []string{"--debug", "--unknown", "etcd@3.5.12", "etcd"}, wantFlag: "--unknown"},
 		} {
@@ -287,10 +289,105 @@ func TestParseExecLeadingArgs(t *testing.T) {
 				if !strings.Contains(err.Error(), tc.wantFlag) {
 					t.Fatalf("error = %q, want flag name %q", err.Error(), tc.wantFlag)
 				}
+				if tc.wantContain != "" && !strings.Contains(err.Error(), tc.wantContain) {
+					t.Fatalf("error = %q, want substring %q", err.Error(), tc.wantContain)
+				}
 				if !strings.Contains(err.Error(), "usage: vfox exec") {
 					t.Fatalf("error = %q, want usage line", err.Error())
 				}
 			})
 		}
 	})
+}
+
+func TestParseExecArgsBetweenSDKAndCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		args        []string
+		wantSpecs   []execSDKSpec
+		wantCommand string
+		wantArgs    []string
+		wantOpts    execOptions
+		wantSep     bool
+	}{
+		{
+			name:        "single sdk then --debug then command",
+			args:        []string{"etcd@3.5.12", "--debug", "etcd", "put"},
+			wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+			wantCommand: "etcd",
+			wantArgs:    []string{"put"},
+			wantOpts:    execOptions{Debug: true, DebugSet: true},
+		},
+		{
+			name:        "single sdk then -debug then command with trailing --debug",
+			args:        []string{"etcd@3.5.12", "-debug", "etcd", "--debug"},
+			wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+			wantCommand: "etcd",
+			wantArgs:    []string{"--debug"},
+			wantOpts:    execOptions{Debug: true, DebugSet: true},
+		},
+		{
+			name:        "single sdk then --debug=false overrides leading --debug",
+			args:        []string{"--debug", "etcd@3.5.12", "--debug=false", "etcd", "put"},
+			wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+			wantCommand: "etcd",
+			wantArgs:    []string{"put"},
+			wantOpts:    execOptions{Debug: false, DebugSet: true},
+		},
+		{
+			name:        "multiple sdks then --debug before --",
+			args:        []string{"etcd@3.5.12", "golang@1.25.6", "--debug", "--", "etcd", "--debug"},
+			wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}, {Name: "golang", Version: "1.25.6"}},
+			wantCommand: "etcd",
+			wantArgs:    []string{"--debug"},
+			wantOpts:    execOptions{Debug: true, DebugSet: true},
+			wantSep:     true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			specs, cmdName, cmdArgs, opts, hasSep, err := parseExecArgs(tc.args)
+			if err != nil {
+				t.Fatalf("parseExecArgs(%q) unexpected error: %v", tc.args, err)
+			}
+			if !slices.Equal(specs, tc.wantSpecs) {
+				t.Fatalf("specs = %#v, want %#v", specs, tc.wantSpecs)
+			}
+			if cmdName != tc.wantCommand {
+				t.Fatalf("command = %q, want %q", cmdName, tc.wantCommand)
+			}
+			if !slices.Equal(cmdArgs, tc.wantArgs) {
+				t.Fatalf("cmdArgs = %q, want %q", cmdArgs, tc.wantArgs)
+			}
+			if opts != tc.wantOpts {
+				t.Fatalf("opts = %+v, want %+v", opts, tc.wantOpts)
+			}
+			if hasSep != tc.wantSep {
+				t.Fatalf("hasSep = %v, want %v", hasSep, tc.wantSep)
+			}
+		})
+	}
+}
+
+func TestLookPathInEnvWithDotEntry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix '.' PATH entry lookup test")
+	}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "etcd")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	got, err := lookPathInEnvWithExt("etcd", "."+string(os.PathListSeparator)+"/nonexistent", "")
+	if err != nil {
+		t.Fatalf("lookPathInEnvWithExt returned error: %v", err)
+	}
+	want := "." + string(os.PathSeparator) + "etcd"
+	if got != want {
+		t.Fatalf("lookPathInEnvWithExt = %q, want %q", got, want)
+	}
+	if err := executeCommand("etcd", []string{"hi"}, map[string]string{"PATH": "."}); err != nil {
+		t.Fatalf("executeCommand with PATH=. failed: %v", err)
+	}
 }

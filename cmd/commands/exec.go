@@ -66,10 +66,7 @@ func execCmd(ctx context.Context, cmd *cli.Command) error {
 	if hasTrailingCompletionFlag(cmd) {
 		return nil
 	}
-	args, opts, err := parseExecLeadingArgs(cmd.Args().Slice())
-	if err != nil {
-		return err
-	}
+	sdkSpecs, command, cmdArgs, opts, hasSeparator, err := parseExecArgs(cmd.Args().Slice())
 	if opts.DebugSet {
 		if opts.Debug {
 			logger.SetLevel(logger.DebugLevel)
@@ -77,14 +74,12 @@ func execCmd(ctx context.Context, cmd *cli.Command) error {
 			logger.SetLevel(logger.InfoLevel)
 		}
 	}
-	if opts.ShowHelp {
-		return showExecHelp(cmd)
-	}
-	sdkSpecs, command, cmdArgs, err := parseExecInvocation(args)
 	if err != nil {
 		return err
 	}
-	hasSeparator := slices.Index(args, "--") >= 0
+	if opts.ShowHelp {
+		return showExecHelp(cmd)
+	}
 	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, hasSeparator)
 }
 
@@ -142,6 +137,8 @@ func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
 		switch arg {
 		case "--help", "-help", "-h":
 			opts.ShowHelp = true
+		case "-v", "-V", "--version":
+			return nil, opts, fmt.Errorf("unexpected flag %q before SDK (use 'vfox --version' to print the vfox version)\n%s", arg, execUsageLine())
 		default:
 			if debug, ok := parseExecDebugFlag(arg); ok {
 				opts.Debug = debug
@@ -152,6 +149,47 @@ func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
 		}
 	}
 	return nil, opts, nil
+}
+
+func parseExecArgs(raw []string) ([]execSDKSpec, string, []string, execOptions, bool, error) {
+	args, opts, err := parseExecLeadingArgs(raw)
+	if err != nil || opts.ShowHelp {
+		return nil, "", nil, opts, false, err
+	}
+
+	sepIdx := slices.Index(args, "--")
+	hasSeparator := sepIdx >= 0
+	if hasSeparator {
+		filtered := make([]string, 0, len(args))
+		for _, tok := range args[:sepIdx] {
+			if debug, ok := parseExecDebugFlag(tok); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				continue
+			}
+			filtered = append(filtered, tok)
+		}
+		filtered = append(filtered, args[sepIdx:]...)
+		args = filtered
+	} else if len(args) > 1 {
+		restIdx := 1
+		for restIdx < len(args) {
+			if debug, ok := parseExecDebugFlag(args[restIdx]); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				restIdx++
+				continue
+			}
+			break
+		}
+		filtered := make([]string, 0, len(args)-(restIdx-1))
+		filtered = append(filtered, args[0])
+		filtered = append(filtered, args[restIdx:]...)
+		args = filtered
+	}
+
+	sdkSpecs, command, cmdArgs, err := parseExecInvocation(args)
+	return sdkSpecs, command, cmdArgs, opts, hasSeparator, err
 }
 
 func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error) {
@@ -429,6 +467,9 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	if err != nil {
 		return &execCommandNotFoundError{command: command, err: err}
 	}
+	if err := validateWindowsBatchArgs(execPath, args); err != nil {
+		return err
+	}
 
 	// Execute command
 	execCmd := exec.Command(execPath, args...)
@@ -441,38 +482,60 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	return execCmd.Run()
 }
 
+func isWindowsBatchFile(path string) bool {
+	ext := filepath.Ext(path)
+	return strings.EqualFold(ext, ".cmd") || strings.EqualFold(ext, ".bat")
+}
+
+func validateWindowsBatchArgs(execPath string, args []string) error {
+	if runtime.GOOS != "windows" || !isWindowsBatchFile(execPath) {
+		return nil
+	}
+	const unsafeBatchChars = "&|<>()^%!\"\r\n\x00"
+	for _, arg := range args {
+		if strings.ContainsAny(arg, unsafeBatchChars) {
+			return fmt.Errorf("refusing to pass cmd.exe metacharacters in argument %q to Windows batch file %q", arg, execPath)
+		}
+	}
+	return nil
+}
+
 func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
 	if pathEnv == "" {
 		return exec.LookPath(command)
 	}
 
-	// If command contains path separator, check directly
-	if strings.Contains(command, "/") || strings.Contains(command, "\\") {
-		if runtime.GOOS == "windows" {
-			command = filepath.FromSlash(command)
+	if runtime.GOOS != "windows" {
+		// Keep main's exact Unix lookup (including '.' entries formatted as './<command>').
+		if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+			return exec.LookPath(command)
+		}
+		for _, dir := range strings.Split(pathEnv, string(os.PathListSeparator)) {
+			if dir == "" {
+				continue
+			}
+			fullPath := dir + string(os.PathSeparator) + command
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+				return fullPath, nil
+			}
 		}
 		return exec.LookPath(command)
 	}
 
-	// Search in PATH
-	paths := filepath.SplitList(pathEnv)
-	var exts []string
-	if runtime.GOOS == "windows" {
-		exts = windowsPathExts(pathExtEnv)
+	// If command contains path separator, check directly.
+	if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+		return exec.LookPath(filepath.FromSlash(command))
 	}
+
+	// Search in PATH with PATHEXT on Windows.
+	paths := filepath.SplitList(pathEnv)
+	exts := windowsPathExts(pathExtEnv)
 	for _, dir := range paths {
 		if dir == "" {
 			continue
 		}
-		if runtime.GOOS == "windows" {
-			if found, ok := findWindowsExecutable(dir, command, exts); ok {
-				return found, nil
-			}
-			continue
-		}
-		fullPath := filepath.Join(dir, command)
-		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-			return fullPath, nil
+		if found, ok := findWindowsExecutable(dir, command, exts); ok {
+			return found, nil
 		}
 	}
 

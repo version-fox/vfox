@@ -259,6 +259,9 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		{name: "x -debug alias", cmdArgs: []string{"x", "-debug", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
 		{name: "exec --debug=0", cmdArgs: []string{"exec", "--debug=0", "etcd@3.5.12", "etcd", "put"}, wantDebug: false},
 		{name: "exec --debug=false", cmdArgs: []string{"exec", "--debug=false", "etcd@3.5.12", "etcd", "put"}, wantDebug: false},
+		{name: "exec between sdk and command --debug", cmdArgs: []string{"exec", "etcd@3.5.12", "--debug", "etcd", "put"}, wantDebug: true},
+		{name: "exec between sdk and command -debug", cmdArgs: []string{"exec", "etcd@3.5.12", "-debug", "etcd", "put"}, wantDebug: true},
+		{name: "exec between sdk and command --debug=false", cmdArgs: []string{"exec", "etcd@3.5.12", "--debug=false", "etcd", "put"}, wantDebug: false},
 	} {
 		t.Run(tc.name+" between exec and sdk matches debug parsing", func(t *testing.T) {
 			stdout, stderr, code := runExecCLI(t, root, tc.cmdArgs...)
@@ -295,6 +298,9 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 			}
 			if !strings.Contains(stderr, flag) {
 				t.Fatalf("stderr did not name flag %q:\n%s", flag, stderr)
+			}
+			if !strings.Contains(stderr, "vfox --version") {
+				t.Fatalf("stderr did not mention 'vfox --version':\n%s", stderr)
 			}
 			if strings.Contains(stderr, "multiple SDKs") {
 				t.Fatalf("stderr gave misleading multi-SDK message:\n%s", stderr)
@@ -561,4 +567,29 @@ function PLUGIN:EnvKeys(ctx) return {} end
 			t.Fatalf("vfox --version output missing version %q: stdout=%q stderr=%q", internal.RuntimeVersion, stdout, stderr)
 		}
 	})
+
+	if runtime.GOOS != "windows" {
+		t.Run("unix PATH entry '.' finds executable in working directory", func(t *testing.T) {
+			dotBin := filepath.Join(root, "dot-etcd")
+			if err := os.WriteFile(dotBin, []byte("#!/bin/sh\nprintf 'dot-etcd:args=%s\\n' \"$*\"\n"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Remove(dotBin) })
+			t.Setenv("PATH", "."+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			for _, cliArgs := range [][]string{
+				{"exec", "etcd@3.5.12", "dot-etcd", "hi"},
+				{"exec", "etcd@3.5.12", "--", "dot-etcd", "hi"},
+				{"x", "etcd@3.5.12", "dot-etcd", "hi"},
+			} {
+				stdout, stderr, code := runExecCLI(t, root, cliArgs...)
+				if code != 0 {
+					t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", cliArgs, code, stderr, stdout)
+				}
+				if got := strings.TrimSpace(stdout); got != "dot-etcd:args=hi" {
+					t.Fatalf("vfox %v stdout = %q, want %q", cliArgs, got, "dot-etcd:args=hi")
+				}
+			}
+		})
+	}
 }

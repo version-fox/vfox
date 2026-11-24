@@ -77,3 +77,45 @@ func TestLookPathInEnvResolvesPATHEXT(t *testing.T) {
 		t.Fatalf("found %q, want SDK entry %q", got, sdkCmd)
 	}
 }
+
+func TestExecuteCommandRefusesUnsafeBatchArgs(t *testing.T) {
+	binDir := t.TempDir()
+	markerDir := t.TempDir()
+	ranMarker := filepath.Join(markerDir, "ran.txt")
+	injectMarker := filepath.Join(markerDir, "injected.txt")
+
+	batchPath := filepath.Join(binDir, "etcd.cmd")
+	batchBody := "@echo off\r\necho ran > \"" + ranMarker + "\"\r\n"
+	if err := os.WriteFile(batchPath, []byte(batchBody), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	envMap := map[string]string{
+		"PATH":    binDir,
+		"PATHEXT": ".COM;.EXE;.BAT;.CMD",
+	}
+
+	for _, ch := range []string{"&", "|", "^", "<", ">", "(", ")", "%", "!", `"`, "\r", "\n", "\x00"} {
+		arg := "safe" + ch + "echo pwned > \"" + injectMarker + "\""
+		err := executeCommand("etcd", []string{arg}, envMap)
+		if err == nil {
+			t.Fatalf("char %q: expected error refusing batch metacharacters, got nil", ch)
+		}
+		if !strings.Contains(err.Error(), "refusing to pass cmd.exe metacharacters") {
+			t.Fatalf("char %q: error = %q, want refusal message", ch, err.Error())
+		}
+		if _, statErr := os.Stat(ranMarker); !os.IsNotExist(statErr) {
+			t.Fatalf("char %q: batch file ran despite refusal (stat err=%v)", ch, statErr)
+		}
+		if _, statErr := os.Stat(injectMarker); !os.IsNotExist(statErr) {
+			t.Fatalf("char %q: second injected command ran (stat err=%v)", ch, statErr)
+		}
+	}
+
+	if err := executeCommand("etcd", []string{"--version"}, envMap); err != nil {
+		t.Fatalf("safe argument to batch file failed: %v", err)
+	}
+	if _, err := os.Stat(ranMarker); err != nil {
+		t.Fatalf("expected safe batch invocation to create marker: %v", err)
+	}
+}
