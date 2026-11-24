@@ -21,3 +21,11 @@ package sdk
 import "errors"
 
 var ErrRuntimeNotFound = errors.New("runtime not found")
+
+// ErrFilesLeft is returned by Uninstall when the version is no longer installed,
+// but some of its files could not be deleted.
+var ErrFilesLeft = errors.New("could not delete all files of")
+
+// ErrLinksLeft is returned by Uninstall when the version is no longer installed,
+// but some of the global links into it could not be removed.
+var ErrLinksLeft = errors.New("could not remove all links to")
