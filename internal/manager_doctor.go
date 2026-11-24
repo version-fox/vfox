@@ -99,7 +99,6 @@ func (m *Manager) ignores(id, sdkName, version string) bool {
 	return m.RuntimeEnvContext.UserConfig.Diagnostics.Ignores(id, sdkName, version)
 }
 
-// activationFindings checks that this shell went through `vfox activate`.
 // PathFindings returns unusable directory and path initialization diagnostics
 // recorded during Manager / PathMeta setup, marked with ignore rules applied.
 func (m *Manager) PathFindings() []sdk.Finding {
@@ -148,6 +147,7 @@ func (m *Manager) pathFindings() []sdk.Finding {
 	return findings
 }
 
+// activationFindings checks that this shell went through `vfox activate`.
 func (m *Manager) activationFindings() []sdk.Finding {
 	if env.IsHookEnv() {
 		return nil

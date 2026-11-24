@@ -284,6 +284,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | :------------------------ | :------ | :----------------------------------------------------------------------------------------------------------------------- |
 | `path.shadowed`           | warn    | A command of the SDK is not the one that runs, because another executable sits earlier in `PATH` (a pnpm-installed `node`, a system JDK …) |
 | `path.not-activated`      | error   | `vfox activate` is not set up in this shell                                                                              |
+| `path.unusable`           | error   | A directory `vfox` needs (`~/.vfox/tmp`, `~/.vfox/sdks`, or the working directory) cannot be used or created             |
 | `sdk.drift`               | warn    | The SDK was modified in place since it was installed (for example `flutter upgrade`). Fix: `vfox install --reinstall <sdk>@<version>` |
 | `sdk.link-dangling`       | error   | The directory a linked version points to is gone                                                                         |
 | `sdk.payload-empty`       | error   | The directories the plugin puts on `PATH` do not exist or hold no command                                                |

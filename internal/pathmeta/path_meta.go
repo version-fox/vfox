@@ -174,11 +174,6 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) *PathMeta {
 		for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
 			if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
 				logger.Debugf("create shared directory %s failed: %v\n", dir, err)
-				meta.InitErrors = append(meta.InitErrors, InitError{
-					Target: "shared directory",
-					Path:   dir,
-					Err:    err,
-				})
 			}
 		}
 	}

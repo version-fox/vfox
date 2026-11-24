@@ -202,6 +202,57 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		}
 	})
 
+	t.Run("doctor and use in activated shell succeed without path.unusable on read-only VFOX_HOME", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
+		}
+
+		// Case 1: read-only shared root with cache/ existing and plugin/ missing.
+		fNoPlugin := newCLIFixtureWithoutRegistryGuard(t, false)
+		roNoPlugin := filepath.Join(fNoPlugin.root, "ro-no-plugin")
+		must(t, os.MkdirAll(filepath.Join(roNoPlugin, "cache"), 0755))
+		must(t, os.Chmod(roNoPlugin, 0555))
+		t.Cleanup(func() { _ = os.Chmod(roNoPlugin, 0755) })
+		fNoPlugin.env["VFOX_HOME"] = roNoPlugin
+		fNoPlugin.env["__VFOX_SHELL"] = "bash"
+
+		doc := fNoPlugin.runProcess(t, "doctor").mustSucceed(t, "doctor on read-only VFOX_HOME without plugin/")
+		mustContain(t, "doctor output", doc.output(), "No problems found.")
+		mustNotContain(t, "doctor output", doc.output(), sdk.FindingPathUnusable, "Cannot use shared directory")
+
+		docJSON := fNoPlugin.runProcess(t, "doctor", "--json").mustSucceed(t, "doctor --json on read-only VFOX_HOME without plugin/")
+		mustNotContain(t, "doctor --json output", docJSON.stdout, sdk.FindingPathUnusable, "shared directory")
+
+		useMissing := fNoPlugin.runProcess(t, "use", "-s", "alpha@1.0.0")
+		mustNotContain(t, "use output without plugin/", useMissing.output(), sdk.FindingPathUnusable, "Cannot use shared directory")
+
+		// Case 2: read-only shared root with plugin/ existing, cache/ missing, and custom storage.sdkPath.
+		fNoCache := newCLIFixtureWithoutRegistryGuard(t, false)
+		fNoCache.runProcess(t, "install", "alpha@1.0.0").mustSucceed(t, "install alpha@1.0.0")
+		roNoCache := filepath.Join(fNoCache.root, "ro-no-cache")
+		must(t, os.MkdirAll(filepath.Join(roNoCache, "plugin", "alpha"), 0755))
+		pluginSrc, err := os.ReadFile(filepath.Join(fNoCache.shared, "plugin", "alpha", "main.lua"))
+		must(t, err)
+		must(t, os.WriteFile(filepath.Join(roNoCache, "plugin", "alpha", "main.lua"), pluginSrc, 0644))
+		sdkStore := filepath.Join(fNoCache.shared, "cache")
+		cfgYAML := "storage:\n  sdkPath: '" + strings.ReplaceAll(sdkStore, "'", "''") + "'\n"
+		must(t, os.WriteFile(filepath.Join(fNoCache.userHome, "config.yaml"), []byte(cfgYAML), 0644))
+		must(t, os.Chmod(roNoCache, 0555))
+		t.Cleanup(func() { _ = os.Chmod(roNoCache, 0755) })
+		fNoCache.env["VFOX_HOME"] = roNoCache
+		fNoCache.env["__VFOX_SHELL"] = "bash"
+
+		docWithPlugin := fNoCache.runProcess(t, "doctor").mustSucceed(t, "doctor on read-only VFOX_HOME without cache/")
+		mustContain(t, "doctor output with plugin/", docWithPlugin.output(), "No problems found.")
+		mustNotContain(t, "doctor output with plugin/", docWithPlugin.output(), sdk.FindingPathUnusable, "Cannot use shared directory")
+
+		docWithPluginJSON := fNoCache.runProcess(t, "doctor", "--json").mustSucceed(t, "doctor --json on read-only VFOX_HOME without cache/")
+		mustNotContain(t, "doctor --json output with plugin/", docWithPluginJSON.stdout, sdk.FindingPathUnusable, "shared directory")
+
+		useOK := fNoCache.runProcess(t, "use", "-s", "alpha@1.0.0").mustSucceed(t, "use -s on read-only VFOX_HOME without cache/")
+		mustNotContain(t, "use output without cache/", useOK.output(), sdk.FindingPathUnusable, "Cannot use shared directory")
+	})
+
 	t.Run("env keeps stdout and stderr clean when cwd was deleted", func(t *testing.T) {
 		if runtime.GOOS != "linux" {
 			t.Skip("Linux reliably fails getcwd on an unlinked cwd; darwin caches F_GETPATH and Windows locks open cwd handles")

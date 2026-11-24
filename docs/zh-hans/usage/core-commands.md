@@ -285,6 +285,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | :------------------------ | :---- | :---------------------------------------------------------------------------------------------------------------- |
 | `path.shadowed`           | warn  | SDK 的某个命令没有被运行，因为 `PATH` 中更靠前的位置有同名的可执行文件（pnpm 装的 `node`、系统 JDK……）                |
 | `path.not-activated`      | error | 当前 shell 没有设置 `vfox activate`                                                                               |
+| `path.unusable`           | error | `vfox` 需要的目录（`~/.vfox/tmp`、`~/.vfox/sdks` 或当前工作目录）无法使用或创建                                   |
 | `sdk.drift`               | warn  | SDK 在安装之后被就地改动过（例如 `flutter upgrade`）。处理：`vfox install --reinstall <sdk>@<version>`               |
 | `sdk.link-dangling`       | error | 链接版本指向的目录不见了                                                                                          |
 | `sdk.payload-empty`       | error | 插件放进 `PATH` 的目录不存在，或里面没有命令                                                                      |

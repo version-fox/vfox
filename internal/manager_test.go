@@ -28,6 +28,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -832,9 +833,9 @@ func TestCleanTmpSweepsStaleDownloadDirs(t *testing.T) {
 }
 
 func TestAddRejectsInvalidAliasBeforeDownload(t *testing.T) {
-	var hits int
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits++
+		hits.Add(1)
 		http.NotFound(w, r)
 	}))
 	defer srv.Close()
@@ -850,7 +851,7 @@ func TestAddRejectsInvalidAliasBeforeDownload(t *testing.T) {
 			t.Fatalf("alias %q created path outside VFOX_HOME: %v", alias, statErr)
 		}
 	}
-	if hits != 0 {
-		t.Fatalf("expected invalid alias to fail before downloading, got %d HTTP requests", hits)
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("expected invalid alias to fail before downloading, got %d HTTP requests", n)
 	}
 }

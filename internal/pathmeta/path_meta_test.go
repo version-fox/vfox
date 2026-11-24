@@ -429,4 +429,33 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("does not record InitErrors when shared root is read-only and plugin dir is missing", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
+		}
+		root := t.TempDir()
+		home := filepath.Join(root, "home")
+		userVfox := filepath.Join(home, ".vfox")
+		if err := os.MkdirAll(userVfox, 0755); err != nil {
+			t.Fatal(err)
+		}
+		shared := filepath.Join(root, "shared")
+		if err := os.MkdirAll(filepath.Join(shared, installedDirPrefix), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(shared, 0555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(shared, 0755) })
+		t.Setenv(HookCurTmpPath, t.TempDir())
+
+		meta := NewPathMeta(home, shared, root, 4242)
+		if len(meta.InitErrors) != 0 {
+			t.Fatalf("expected no InitErrors on read-only shared root without plugin/, got %+v", meta.InitErrors)
+		}
+		if _, err := os.Stat(meta.Shared.Plugins); !os.IsNotExist(err) {
+			t.Fatalf("expected missing %q not to be created on read-only root, stat err = %v", meta.Shared.Plugins, err)
+		}
+	})
 }
