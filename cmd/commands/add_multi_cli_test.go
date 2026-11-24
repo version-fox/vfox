@@ -1,5 +1,4 @@
 /*
- *
  *    Copyright 2026 Han Li and contributors
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +12,18 @@
  *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
- *
  */
 
 package commands
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,4 +84,59 @@ function PLUGIN:EnvKeys(ctx) return {} end
 			}
 		}
 	})
+
+	t.Run("rejects --source and --alias with multiple plugins", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			args []string
+		}{
+			{name: "source", args: []string{"add", "--source", "./no-such.lua", "one", "two"}},
+			{name: "short_source", args: []string{"add", "-s", "./no-such.lua", "one", "two"}},
+			{name: "alias", args: []string{"add", "--alias", "uno", "one", "two"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := newRegistryFixture(t)
+				res := f.runHere(t, tc.args...).mustFail(t, tc.name)
+				mustContain(t, tc.name+" stderr", res.stderr, "apply to one plugin")
+				for _, name := range []string{"one", "two", "uno"} {
+					if _, err := os.Stat(filepath.Join(f.shared, "plugin", name)); !os.IsNotExist(err) {
+						t.Fatalf("expected plugin %s not to be installed, stat err = %v", name, err)
+					}
+				}
+			})
+		}
+	})
+}
+
+func TestAddRejectsSourceAndAliasWithMultiplePlugins(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "source", args: []string{"vfox", "add", "--source", "./no-such.lua", "one", "two"}},
+		{name: "short_source", args: []string{"vfox", "add", "-s", "./no-such.lua", "one", "two"}},
+		{name: "alias", args: []string{"vfox", "add", "--alias", "uno", "one", "two"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			vfoxHome := filepath.Join(home, "vfox")
+			t.Setenv("HOME", home)
+			t.Setenv("VFOX_HOME", vfoxHome)
+
+			app := newTestApp()
+			var outBuf, errBuf bytes.Buffer
+			useStreams(app, &outBuf, &errBuf)
+
+			err := app.Run(t.Context(), tc.args)
+			if err == nil {
+				t.Fatalf("expected error for %v, got nil", tc.args)
+			}
+			if !strings.Contains(err.Error(), "apply to one plugin") {
+				t.Fatalf("error = %q, want substring %q", err.Error(), "apply to one plugin")
+			}
+			if _, statErr := os.Stat(filepath.Join(vfoxHome, "plugin")); !os.IsNotExist(statErr) {
+				t.Fatalf("expected plugin dir not to be created, stat err = %v", statErr)
+			}
+		})
+	}
 }

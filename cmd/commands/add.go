@@ -47,6 +47,9 @@ var Add = &cli.Command{
 // addCmd is the command to add a plugin of sdk
 func addCmd(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
+	if args.Len() > 1 && (cmd.IsSet("source") || cmd.IsSet("alias")) {
+		return fmt.Errorf("--source and --alias apply to one plugin, run add once per plugin")
+	}
 
 	manager, err := internal.NewSdkManager()
 	if err != nil {

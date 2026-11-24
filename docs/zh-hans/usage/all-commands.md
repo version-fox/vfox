@@ -3,7 +3,7 @@
 ```shell
 vfox - vfox is a tool for runtime version management.
 vfox available      List all available plugins
-vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from official repository or custom source, `--alias` and `--source` are not supported when adding multiple plugins.
+vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from official repository or custom source; `--alias` and `--source` are not supported when adding multiple plugins; any plugin failure returns a non-zero exit status.
 vfox remove <sdk-name>          Remove a plugin
 vfox update [<sdk-name> | --all] Update a specified or all plugin(s)
 vfox info <sdk-name>[@<version>] [options]  显示插件信息或 SDK 路径，支持格式化选项
