@@ -17,6 +17,8 @@
 package internal
 
 import (
+	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -792,6 +794,8 @@ func TestPluginFileNameRejectsWindowsReservedNames(t *testing.T) {
 		{url: "https://example.com/console.zip", want: "console.zip"},
 		{url: "https://example.com/my-nul.zip", want: "my-nul.zip"},
 		{url: "https://example.com/demo.zip", want: "demo.zip"},
+		{url: "https://example.com/demo.zip?raw=true", want: "demo.zip"},
+		{url: "https://example.com/nul.zip?raw=true", want: "plugin.zip"},
 	}
 	for _, tc := range tests {
 		if got := pluginFileName(tc.url); got != tc.want {
@@ -853,5 +857,83 @@ func TestAddRejectsInvalidAliasBeforeDownload(t *testing.T) {
 	}
 	if n := hits.Load(); n != 0 {
 		t.Fatalf("expected invalid alias to fail before downloading, got %d HTTP requests", n)
+	}
+}
+
+func TestAddFromSourceURLWithQueryString(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("main.lua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fmt.Fprintf(w, fixturePlugin, "demozip", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zipBytes := buf.Bytes()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/demo.lua":
+			fmt.Fprintf(w, fixturePlugin, "demolua", "")
+		case "/demo.zip":
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	f := newManagerFixture(t)
+	f.RuntimeEnvContext.UserConfig = &config.Config{Proxy: config.EmptyProxy}
+	if err := f.Add("demolua", srv.URL+"/demo.lua?raw=true&token=abc123", ""); err != nil {
+		t.Fatalf("Add(.lua?raw=true) error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.meta.Shared.Plugins, "demolua", "main.lua")); err != nil {
+		t.Fatalf("expected demolua plugin to be installed: %v", err)
+	}
+
+	if err := f.Add("", srv.URL+"/demo.zip?raw=true", ""); err != nil {
+		t.Fatalf("Add(.zip?raw=true) error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.meta.Shared.Plugins, "demozip", "main.lua")); err != nil {
+		t.Fatalf("expected demozip plugin to be installed: %v", err)
+	}
+}
+
+func TestAddMultiSlashLegacyNameKeepsMiddleSegment(t *testing.T) {
+	var requested []string
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.Path)
+		switch r.URL.Path {
+		case "/b.json":
+			fmt.Fprintf(w, `{"name":"b","downloadUrl":%q}`, srv.URL+"/plugins/b.lua")
+		case "/plugins/b.lua":
+			fmt.Fprintf(w, fixturePlugin, "b", "")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	f := newManagerFixture(t)
+	f.RuntimeEnvContext.UserConfig = &config.Config{
+		Proxy:    config.EmptyProxy,
+		Registry: &config.Registry{Address: srv.URL},
+	}
+
+	if err := f.Add("a/b/c", "", ""); err != nil {
+		t.Fatalf("Add(a/b/c) error = %v", err)
+	}
+	if got := strings.Join(requested, ","); got != "/b.json,/plugins/b.lua" {
+		t.Fatalf("requests = %q, want /b.json,/plugins/b.lua", got)
+	}
+	if _, err := os.Stat(filepath.Join(f.meta.Shared.Plugins, "b", "main.lua")); err != nil {
+		t.Fatalf("expected plugin b to be installed: %v", err)
 	}
 }

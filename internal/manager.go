@@ -429,18 +429,37 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 	return &plugin, nil
 }
 
+// pluginSourceExt returns the .lua or .zip extension from an HTTP(S) URL's
+// parsed path when present (so query parameters like ?raw=true do not break
+// installs), and otherwise falls back to filepath.Ext to preserve existing
+// query-encoded filename handling.
+func pluginSourceExt(source string) string {
+	if strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "http://") {
+		if u, err := url.Parse(source); err == nil {
+			normalized := strings.ReplaceAll(u.Path, "\\", "/")
+			if ext := stdpath.Ext(normalized); ext == ".lua" || ext == ".zip" {
+				return ext
+			}
+		}
+	}
+	return filepath.Ext(source)
+}
+
 // pluginFileName derives the local file name of a downloaded plugin from the
 // path of its URL, so a query is never printed or written to disk. The last
-// element of the URL path is used only when it ends with the extension the
-// whole URL was accepted by and contains no characters unsafe for filenames;
-// otherwise the name falls back to "plugin" plus that extension.
+// element of the URL path is used only when it ends with the resolved source
+// extension and contains no characters unsafe for filenames; otherwise the name
+// falls back to "plugin" plus a safe extension.
 func pluginFileName(downloadUrl string) string {
-	ext := filepath.Ext(downloadUrl)
+	ext := pluginSourceExt(downloadUrl)
 	if u, err := url.Parse(downloadUrl); err == nil {
 		normalized := strings.ReplaceAll(u.Path, "\\", "/")
 		if name := stdpath.Base(normalized); isSafePluginFileName(name) && strings.HasSuffix(name, ext) {
 			return name
 		}
+	}
+	if !isSafePluginFileName("plugin" + ext) {
+		return "plugin"
 	}
 	return "plugin" + ext
 }
@@ -613,11 +632,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
 	if strings.Contains(pluginName, "/") {
-		parts := strings.SplitN(pluginName, "/", 2)
-		if parts[1] == "" {
+		normalized := strings.Split(pluginName, "/")[1]
+		if normalized == "" {
 			return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pluginName)
 		}
-		pluginName = parts[1]
+		pluginName = normalized
 		logger.Debugf("Normalized plugin name to: %s\n", pluginName)
 	}
 	pluginPath := url
@@ -728,11 +747,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 	logger.Debugf("Installing plugin to temp from: %s\n", util.RedactSourceURL(path))
 
-	ext := filepath.Ext(path)
+	ext := pluginSourceExt(path)
 	if ext != ".lua" && ext != ".zip" {
 		// Print the extension of the redacted path: a source URL can carry
 		// credentials or a query token that the message must not echo.
-		shown := filepath.Ext(util.RedactSourceURL(path))
+		shown := pluginSourceExt(util.RedactSourceURL(path))
 		logger.Debugf("Unsupported plugin type: %s\n", shown)
 		return nil, fmt.Errorf("unsupported %s type wrapper to install, only support .lua or .zip", shown)
 	}

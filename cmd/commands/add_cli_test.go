@@ -100,6 +100,27 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		}
 	})
 
+	t.Run("remote --source with query string installs cleanly", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		zipBytes, err := os.ReadFile(writeDemoPluginZip(t, f.work))
+		must(t, err)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/demo.zip" || r.URL.RawQuery != "raw=true" {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
+		}))
+		defer srv.Close()
+
+		f.runProcess(t, "add", "--source", srv.URL+"/demo.zip?raw=true").mustSucceed(t, "add remote --source with query string")
+		if !exists(filepath.Join(f.shared, "plugin", "demo", "main.lua")) {
+			t.Fatalf("expected remote plugin with query string to be installed")
+		}
+	})
+
 	t.Run("blocked VFOX_HOME fails cleanly and names VFOX_HOME", func(t *testing.T) {
 		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		blocker := filepath.Join(f.root, "not-a-dir")
