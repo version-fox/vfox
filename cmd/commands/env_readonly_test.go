@@ -26,7 +26,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/version-fox/vfox/internal/pathmeta"
 )
@@ -173,22 +172,8 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		fDeleted := newCLIFixtureWithoutRegistryGuard(t, false)
 		goneDir := filepath.Join(fDeleted.root, "deleted-work")
 		must(t, os.MkdirAll(goneDir, 0755))
-
-		exe, err := os.Executable()
-		must(t, err)
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-		cmd := fDeleted.command(
-			ctx,
-			"/bin/sh",
-			"-c",
-			`cd "$1" && rmdir "$1" && exec "$2" -test.run=^TestCLIProcess$ -- env -s bash`,
-			"sh",
-			goneDir,
-			exe,
-		)
-		cmd.Env = append(cmd.Env, "VFOX_TEST_CLI=1")
-		deletedEnv := runCommand(t, cmd).mustSucceed(t, "env -s bash with deleted cwd")
+		fDeleted.env["VFOX_TEST_DELETED_CWD"] = goneDir
+		deletedEnv := fDeleted.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with deleted cwd")
 
 		want := strings.ReplaceAll(cleanEnv.stdout, shellPath(fClean.root), shellPath(fDeleted.root))
 		want = strings.ReplaceAll(want, fClean.root, fDeleted.root)

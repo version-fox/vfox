@@ -45,6 +45,17 @@ func TestCLIProcess(t *testing.T) {
 	if os.Getenv("VFOX_TEST_CLI") != "1" {
 		return
 	}
+	if goneDir := os.Getenv("VFOX_TEST_DELETED_CWD"); goneDir != "" {
+		_ = os.Unsetenv("PWD")
+		if err := os.Chdir(goneDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := os.Remove(goneDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	separator := slices.Index(os.Args, "--")
 	if separator < 0 {
 		os.Exit(2)
