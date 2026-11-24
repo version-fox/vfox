@@ -261,13 +261,14 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		}
 	}
 
-	// The SDK lock is held from the list PreInstall is given until the name the
-	// request resolves to is claimed, that is, until its installation marker is
-	// written. The plugin can map the request to an installed version under another
-	// name, and the lock of each version is per name, so without it a name another
-	// installation is about to claim would not be seen. It is released before the
-	// download and PostInstall, so other versions of the SDK, including one that a
-	// PostInstall installs, install side by side as before.
+	// PreInstall runs without a lock, so plugin code can take as long as it needs
+	// and can install other versions of the SDK, as on main. The SDK lock is taken
+	// after it, only to decide on the name the request resolved to and claim it, that
+	// is, until its installation marker is written. If the list the plugin was given
+	// changed meanwhile, another installation installed or claimed a version, which the
+	// plugin may have mapped the request to, so it is asked again with the new list.
+	// The lock is released before the download and PostInstall, so other versions of
+	// the SDK, including one that a PostInstall installs, install side by side.
 	var (
 		sdkLock     *os.File
 		installInfo *plugin.PreInstallHookResult
@@ -292,44 +293,24 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 			installErr = errors.Join(installErr, err)
 		}
 	}()
+	// Only a plain install is given the installed versions. A reinstall replaces the
+	// version as it was typed, and --as makes a second copy on purpose, so for both
+	// the plugin resolves the version as it would without the list.
+	listed := !reinstall && !named
 	requestLabel := label
 	for {
 		label = requestLabel
-		var err error
-		sdkLock, err = waitForInstallLock(filepath.Join(b.InstallPath, sdkInstallLockName), func() {
-			pterm.Printf("Waiting for another installation of %s to finish...\n", b.Name)
-		})
-		if errors.Is(err, errInstallLockStillHeld) {
-			return "", fmt.Errorf("cannot install %s: another installation of %s is still running after %s; try again when it is done", label, b.Name, installLockWait)
-		}
-		if err != nil {
-			return "", fmt.Errorf("cannot install %s: %w", label, err)
-		}
-
-		// Only a plain install is given the installed versions. A reinstall replaces the
-		// version as it was typed, and --as makes a second copy on purpose, so for both
-		// the plugin resolves the version as it would without the list.
 		installedSdks := map[string]*plugin.InstalledPackageItem{}
 		var installing map[Version]bool
-		if !reinstall && !named {
-			installedSdks = b.matchableInstalledItems()
-			// A version directory that cannot be entered may hold an installation, so
-			// the plugin is given it too, and a request resolved to it is refused below.
-			for _, version := range b.uninspectableVersions() {
-				installedSdks[string(version)] = b.installedItem(version)
-			}
-			// So is a version another installation is still installing. If the request
-			// is mapped to it, the install waits for it below.
-			installing = b.installingVersions()
-			for version := range installing {
-				installedSdks[string(version)] = b.installedItem(version)
-			}
+		if listed {
+			installedSdks, installing = b.preInstallList()
 		}
 		ctx := &plugin.PreInstallHookCtx{
 			Version:       string(version),
 			InstalledSdks: installedSdks,
 		}
 		logger.Debugf("Calling PreInstall hook for %s\n", label)
+		var err error
 		installInfo, err = b.plugin.PreInstall(ctx)
 		if b.plugin.IsNoResultProvided(err) {
 			return "", fmt.Errorf("no installable runtime provided")
@@ -366,14 +347,33 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 			}
 			return "", fmt.Errorf("%s resolves to %s; give the exact installed version to reinstall it", b.Label(version), label)
 		}
+		if named && sdkVersion == name {
+			return "", fmt.Errorf("%s resolves to %s, so a copy of it cannot be named %s: name the copy differently", b.Label(version), sdkVersion, name)
+		}
+
+		sdkLock, err = waitForInstallLock(filepath.Join(b.InstallPath, sdkInstallLockName), func() {
+			pterm.Printf("Waiting for another installation of %s to finish...\n", b.Name)
+		})
+		if errors.Is(err, errInstallLockStillHeld) {
+			return "", fmt.Errorf("cannot install %s: another installation of %s is still running after %s; try again when it is done", label, b.Name, installLockWait)
+		}
+		if err != nil {
+			return "", fmt.Errorf("cannot install %s: %w", label, err)
+		}
+		if listed {
+			if now, _ := b.preInstallList(); !sameVersions(installedSdks, now) {
+				logger.Debugf("Installed versions changed during PreInstall of %s; asking again\n", requestLabel)
+				if err := releaseSDKLock(); err != nil {
+					return "", err
+				}
+				continue
+			}
+		}
 		// The list given to PreInstall leaves copies out, but a plugin can return any
 		// name. A copy is selected only by its own name, so it cannot stand for the
 		// version asked for.
 		if !named && b.isCopy(sdkVersion) {
 			return "", fmt.Errorf("plugin [PreInstall] method error: %s was resolved to %s, but %s is a copy made with `vfox install --as` and is selected only by its own name", b.Label(version), label, label)
-		}
-		if named && sdkVersion == name {
-			return "", fmt.Errorf("%s resolves to %s, so a copy of it cannot be named %s: name the copy differently", b.Label(version), sdkVersion, name)
 		}
 		if err := b.inspectError(key); err != nil {
 			return "", fmt.Errorf("cannot tell whether %s is installed: %w; fix the permissions of %s or remove it", label, err, b.packagePath(key))
@@ -387,11 +387,6 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 			}
 			if err := b.waitForInstallation(requestLabel, key); err != nil {
 				return "", err
-			}
-			if b.CheckRuntimeExist(key) {
-				fmt.Printf("%s is already installed\n", label)
-				logger.Debugf("SDK %s was installed while waiting for it\n", label)
-				return key, nil
 			}
 			continue
 		}
@@ -537,12 +532,46 @@ func (b *impl) copyReceipt(name Version) *Receipt {
 // Its mark beside the directory is read first, so that a copy whose directory
 // cannot be entered is still known as one.
 func (b *impl) isCopy(version Version) bool {
+	// What an interrupted or running `install --as` left is not a copy yet: a
+	// plain install of the name replaces it, or waits for it, as on main.
+	if b.hasPendingInstall(version) {
+		return false
+	}
 	if _, err := os.Lstat(b.copyMarkerPath(version)); err == nil {
 		if _, err := os.Lstat(b.packagePath(version)); err == nil {
 			return true
 		}
 	}
 	return b.copyReceipt(version) != nil
+}
+
+// preInstallList is what a plain install gives PreInstall: the installed versions
+// without the copies, those whose directory cannot be entered (a request resolved to
+// one is refused), and the versions another installation is installing now, which
+// it returns too (a request mapped to one waits for it).
+func (b *impl) preInstallList() (map[string]*plugin.InstalledPackageItem, map[Version]bool) {
+	installedSdks := b.matchableInstalledItems()
+	for _, version := range b.uninspectableVersions() {
+		installedSdks[string(version)] = b.installedItem(version)
+	}
+	installing := b.installingVersions()
+	for version := range installing {
+		installedSdks[string(version)] = b.installedItem(version)
+	}
+	return installedSdks, installing
+}
+
+// sameVersions reports whether two lists from preInstallList name the same versions.
+func sameVersions(a, b map[string]*plugin.InstalledPackageItem) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for version := range a {
+		if _, ok := b[version]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // copyMarkerPath is the mark InstallAs leaves beside the directory of a copy.

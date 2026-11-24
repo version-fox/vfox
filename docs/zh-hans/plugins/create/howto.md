@@ -58,7 +58,7 @@
 
 如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
 
-`ctx.installedSdks` 列出已安装的版本，以版本号为键，结构与 `PreUse` 中相同（用 `vfox install --as` 做出的副本不在其中）。另一个 `vfox` 此时正在安装的版本也在其中；如果返回的是这样的版本，`vfox` 会等那次安装结束后再继续。在普通的 `vfox install` 中，如果返回的版本已经安装，`vfox` 会提示已安装，不再下载。插件更改了版本命名时，可以借此返回已有安装所用的名字，避免同一个版本以两个名字安装两次。`vfox install --as` 和 `vfox install --reinstall` 时该表为空，版本按输入的写法解析，副本或重新安装的版本的内容来自 `PreInstall` 为它返回的结果，与没有这个表时相同。插件不能返回副本的名字，`vfox` 会拒绝。
+`ctx.installedSdks` 列出已安装的版本，以版本号为键，结构与 `PreUse` 中相同（用 `vfox install --as` 做出的副本不在其中）。另一个 `vfox` 此时正在安装的版本也在其中；如果返回的是这样的版本，`vfox` 会等那次安装结束后再次调用 `PreInstall`。如果 `PreInstall` 运行期间另一次安装改变了这个列表，`vfox` 也会再次调用它，所以一次安装中 `PreInstall` 可能被调用不止一次。在普通的 `vfox install` 中，如果返回的版本已经安装，`vfox` 会提示已安装，不再下载。插件更改了版本命名时，可以借此返回已有安装所用的名字，避免同一个版本以两个名字安装两次。`vfox install --as` 和 `vfox install --reinstall` 时该表为空，版本按输入的写法解析，副本或重新安装的版本的内容来自 `PreInstall` 为它返回的结果，与没有这个表时相同。插件不能返回副本的名字，`vfox` 会拒绝。
 
 **位置**: `hooks/pre_install.lua`
 
