@@ -55,7 +55,17 @@ type PathMeta struct {
 	User       UserPaths
 	Shared     SharedPaths
 	Working    WorkingPaths
-	Executable string // Executable path
+	Executable string      // Executable path
+	InitErrors []InitError // Best-effort directory/path initialization failures
+}
+
+// InitError records a non-fatal directory or path resolution failure encountered
+// while constructing PathMeta so diagnostic commands (`doctor`, `use`) can report it
+// without polluting read paths (`env`, `activate`).
+type InitError struct {
+	Target string
+	Path   string
+	Err    error
 }
 
 const (
@@ -120,6 +130,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) *PathMeta {
 	if len(sharedRoot) == 0 {
 		sharedRoot = vfoxUserHome
 	}
+	exePath, exeErr := getExecutablePath()
 	meta := &PathMeta{
 		User: UserPaths{
 			Home:   vfoxUserHome,
@@ -138,29 +149,80 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) *PathMeta {
 			SessionSdkDir: generateSessionShimPath(filepath.Join(vfoxUserHome, tmpDirPrefix), pid),
 			GlobalSdkDir:  filepath.Join(vfoxUserHome, symlinkSdkDirPrefix),
 		},
-		Executable: getExecutablePath(),
+		Executable: exePath,
+	}
+	if exeErr != nil {
+		meta.InitErrors = append(meta.InitErrors, InitError{
+			Target: "executable path",
+			Err:    exeErr,
+		})
 	}
 
 	// Initialize user directories and immediate shared subdirectories
 	// best-effort (Shared subdirs are created only when Shared.Root already
 	// exists; write commands ensure missing parents).
-	if os.Getenv(HookCurTmpPath) != "" {
-		if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
-			logger.Debugf("create temp dir failed: %v\n", err)
-		}
-	}
+	ensureUserTempDirs(meta)
 	if err := os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth); err != nil {
 		logger.Debugf("create global sdk dir failed: %v\n", err)
+		meta.InitErrors = append(meta.InitErrors, InitError{
+			Target: "global sdk directory",
+			Path:   meta.Working.GlobalSdkDir,
+			Err:    err,
+		})
 	}
 	if util.FileExists(meta.Shared.Root) {
 		for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
 			if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
 				logger.Debugf("create shared directory %s failed: %v\n", dir, err)
+				meta.InitErrors = append(meta.InitErrors, InitError{
+					Target: "shared directory",
+					Path:   dir,
+					Err:    err,
+				})
 			}
 		}
 	}
 
 	return meta
+}
+
+func isWithinDir(parent, target string) bool {
+	rel, err := filepath.Rel(parent, target)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+}
+
+func ensureUserTempDirs(meta *PathMeta) {
+	// Ensure User.Temp in one place: when HookCurTmpPath is unset, SessionSdkDir
+	// lives directly under User.Temp so a single MkdirAll prepares both; when set,
+	// fail at most once if SessionSdkDir shares the same blocked User.Temp root.
+	tempReady := true
+	if os.Getenv(HookCurTmpPath) != "" {
+		if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
+			logger.Debugf("create temp dir failed: %v\n", err)
+			meta.InitErrors = append(meta.InitErrors, InitError{
+				Target: "user temp directory",
+				Path:   meta.User.Temp,
+				Err:    err,
+			})
+			tempReady = false
+		}
+	}
+	if !util.FileExists(meta.Working.SessionSdkDir) {
+		if !tempReady && isWithinDir(meta.User.Temp, meta.Working.SessionSdkDir) {
+			return
+		}
+		if err := os.MkdirAll(meta.Working.SessionSdkDir, ReadWriteAuth); err != nil {
+			logger.Debugf("create temp dir failed: %v\n", err)
+			meta.InitErrors = append(meta.InitErrors, InitError{
+				Target: "temp directory",
+				Path:   meta.Working.SessionSdkDir,
+				Err:    err,
+			})
+		}
+	}
 }
 
 func generateSessionShimPath(userTemp string, pid int) string {
@@ -169,25 +231,19 @@ func generateSessionShimPath(userTemp string, pid int) string {
 		name := newTempPath(pid)
 		curTmpPath = filepath.Join(userTemp, name)
 	}
-	if !util.FileExists(curTmpPath) {
-		err := os.MkdirAll(curTmpPath, ReadWriteAuth)
-		if err != nil {
-			logger.Debugf("create temp dir failed: %v\n", err)
-		}
-	}
 	return curTmpPath
 }
 
 // Executable resolves the running binary path; tests override it to simulate lookup failures.
 var Executable = os.Executable
 
-func getExecutablePath() string {
+func getExecutablePath() (string, error) {
 	exePath, err := Executable()
 	if err != nil {
 		logger.Debugf("get executable path failed: %v\n", err)
-		return ""
+		return "", err
 	}
-	return exePath
+	return exePath, nil
 }
 
 // ApplyStoragePath applies the storage path from config to update the Installs path

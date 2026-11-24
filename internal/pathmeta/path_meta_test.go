@@ -321,14 +321,17 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 
 	t.Run("keeps stdout and stderr clean on normal runs and logs diagnostics only at debug level", func(t *testing.T) {
 		for _, tc := range []struct {
-			name      string
-			blockTemp bool
-			failExe   bool
-			wantDebug string
+			name        string
+			blockTemp   bool
+			activated   bool
+			failExe     bool
+			wantDebug   string
+			wantInitErr bool
 		}{
-			{name: "blocked GlobalSdkDir and missing SharedRoot", wantDebug: "create global sdk dir failed:"},
-			{name: "blocked session temp directory", blockTemp: true, wantDebug: "create temp dir failed:"},
-			{name: "executable lookup failure", failExe: true, wantDebug: "get executable path failed:"},
+			{name: "blocked GlobalSdkDir and missing SharedRoot", wantDebug: "create global sdk dir failed:", wantInitErr: true},
+			{name: "blocked session temp directory", blockTemp: true, wantDebug: "create temp dir failed:", wantInitErr: true},
+			{name: "blocked session temp directory in activated shell", blockTemp: true, activated: true, wantDebug: "create temp dir failed:", wantInitErr: true},
+			{name: "executable lookup failure", failExe: true, wantDebug: "get executable path failed:", wantInitErr: true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -352,7 +355,11 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(userVfox, "tmp"), []byte("file"), 0644); err != nil {
 						t.Fatal(err)
 					}
-					t.Setenv(HookCurTmpPath, "")
+					if tc.activated {
+						t.Setenv(HookCurTmpPath, filepath.Join(userVfox, "tmp", "20261124-4242"))
+					} else {
+						t.Setenv(HookCurTmpPath, "")
+					}
 				} else {
 					t.Setenv(HookCurTmpPath, t.TempDir())
 				}
@@ -395,6 +402,9 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				}
 				if tc.failExe && meta.Executable != "" {
 					t.Fatalf("expected empty Executable on error, got %q", meta.Executable)
+				}
+				if tc.wantInitErr && len(meta.InitErrors) == 0 {
+					t.Fatalf("expected InitErrors to record %s", tc.name)
 				}
 				if outNormal != "" {
 					t.Fatalf("NewPathMeta wrote to stdout at InfoLevel: %q", outNormal)

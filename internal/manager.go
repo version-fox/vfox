@@ -72,6 +72,7 @@ type Manager struct {
 	RuntimeEnvContext *env.RuntimeEnvContext // runtime environment context
 	openSdks          map[string]sdk.Sdk
 	mu                sync.RWMutex // protects openSdks map
+	workingDirErr     error
 }
 
 // LookupSdk lookup sdk by name
@@ -461,7 +462,9 @@ func isWindowsReservedDeviceName(base string) bool {
 	switch strings.ToUpper(base) {
 	case "CON", "PRN", "AUX", "NUL",
 		"COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-		"LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		"COM\u00b9", "COM\u00b2", "COM\u00b3",
+		"LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+		"LPT\u00b9", "LPT\u00b2", "LPT\u00b3":
 		return true
 	default:
 		return false
@@ -610,14 +613,23 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
 	if strings.Contains(pluginName, "/") {
-		pluginName = strings.Split(pluginName, "/")[1]
+		parts := strings.SplitN(pluginName, "/", 2)
+		if parts[1] == "" {
+			return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pluginName)
+		}
+		pluginName = parts[1]
 		logger.Debugf("Normalized plugin name to: %s\n", pluginName)
 	}
 	pluginPath := url
 	pname := pluginName
 	if len(alias) > 0 {
+		if !plugin.IsValidName(alias) {
+			return fmt.Errorf("invalid plugin alias %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", alias)
+		}
 		pname = alias
 		logger.Debugf("Using alias: %s\n", alias)
+	} else if pname != "" && !plugin.IsValidName(pname) {
+		return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pname)
 	}
 	var installPath string
 	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
@@ -669,6 +681,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	if !dirChecked {
 		if err := ensureWritableDir(pluginsDir); err != nil {
 			return preparePluginDirError(pluginsDir, err)
+		}
+	}
+	if info, statErr := os.Stat(pluginsDir); statErr == nil {
+		if chmodErr := os.Chmod(tempPlugin.InstalledPath, info.Mode().Perm()); chmodErr != nil {
+			logger.Debugf("Failed to set directory permissions %v on %s: %v\n", info.Mode().Perm(), tempPlugin.InstalledPath, chmodErr)
 		}
 	}
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
@@ -919,7 +936,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName, _ := range legacyFileRecord.Record {
+		for sdkName := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,
@@ -942,7 +959,7 @@ func NewSdkManager() (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
-	currentDir := getWorkingDirectory()
+	currentDir, wdErr := getWorkingDirectory()
 	meta := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 
 	// Load config with hierarchy: SharedRoot (VFOX_HOME) > User Home
@@ -969,7 +986,8 @@ func NewSdkManager() (*Manager, error) {
 			PathMeta:          meta,
 			RuntimeVersion:    RuntimeVersion,
 		},
-		openSdks: make(map[string]sdk.Sdk),
+		openSdks:      make(map[string]sdk.Sdk),
+		workingDirErr: wdErr,
 		// mu is intentionally zero-initialized (Go's zero-value mutex is ready to use)
 	}, nil
 }
@@ -977,11 +995,11 @@ func NewSdkManager() (*Manager, error) {
 // Getwd resolves the working directory; tests override it to simulate lookup failures.
 var Getwd = os.Getwd
 
-func getWorkingDirectory() string {
+func getWorkingDirectory() (string, error) {
 	wd, err := Getwd()
 	if err != nil {
 		logger.Debugf("get current working directory failed: %v\n", err)
-		return ""
+		return "", err
 	}
-	return wd
+	return wd, nil
 }

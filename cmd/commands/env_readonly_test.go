@@ -27,6 +27,7 @@ import (
 
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
@@ -117,6 +118,33 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 			t.Fatalf("activate debug run wrote unexpected stderr: %q", debugActErr)
 		}
 		mustContain(t, "activate debug output", debugActOut, "create temp dir failed:")
+
+		// Activated shell case: __VFOX_CURTMPPATH points inside the blocked tmp dir.
+		fActivatedBlocked := newCLIFixtureWithoutRegistryGuard(t, false)
+		must(t, os.WriteFile(filepath.Join(fActivatedBlocked.userHome, "tmp"), []byte("file"), 0644))
+		fActivatedBlocked.env["__VFOX_CURTMPPATH"] = filepath.Join(fActivatedBlocked.userHome, "tmp", "activated-session")
+		actDebugEnvOut, actDebugEnvErr := runInProcessCaptured(t, fActivatedBlocked, logger.DebugLevel, "env", "-s", "bash")
+		if actDebugEnvErr != "" {
+			t.Fatalf("activated env debug run wrote unexpected stderr: %q", actDebugEnvErr)
+		}
+		if count := strings.Count(actDebugEnvOut, "create temp dir failed:"); count != 1 {
+			t.Fatalf("expected create temp dir failed once in activated debug env, got %d:\n%s", count, actDebugEnvOut)
+		}
+	})
+
+	t.Run("doctor and use report blocked temp directory while env stays clean", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, true)
+		f.runProcess(t, "install", "alpha@1.0.0").mustSucceed(t, "install alpha@1.0.0")
+		tmpPath := filepath.Join(f.userHome, "tmp")
+		must(t, os.RemoveAll(tmpPath))
+		must(t, os.WriteFile(tmpPath, []byte("file"), 0644))
+		f.env["__VFOX_CURTMPPATH"] = filepath.Join(tmpPath, "session-1")
+
+		docRes := f.runProcess(t, "doctor", "--json").mustFail(t, "doctor --json with blocked tmp")
+		mustContain(t, "doctor --json output", docRes.stdout, sdk.FindingPathUnusable, "user temp directory")
+
+		useRes := f.runProcess(t, "use", "-s", "alpha@1.0.0").mustFail(t, "use -s with blocked tmp")
+		mustContain(t, "use output", useRes.output(), "Cannot use user temp directory")
 	})
 
 	t.Run("activate keeps stdout and stderr clean on normal runs and logs executable diagnostic at debug level", func(t *testing.T) {

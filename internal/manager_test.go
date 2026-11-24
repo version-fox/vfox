@@ -779,8 +779,14 @@ func TestPluginFileNameRejectsWindowsReservedNames(t *testing.T) {
 		{url: "https://example.com/com0.zip", want: "plugin.zip"},
 		{url: "https://example.com/com1.zip", want: "plugin.zip"},
 		{url: "https://example.com/COM9.tar.xz", want: "plugin.xz"},
+		{url: "https://example.com/com\u00b9.zip", want: "plugin.zip"},
+		{url: "https://example.com/COM\u00b2.zip", want: "plugin.zip"},
+		{url: "https://example.com/COM\u00b3.tar.xz", want: "plugin.xz"},
 		{url: "https://example.com/lpt0.zip", want: "plugin.zip"},
 		{url: "https://example.com/lpt9.tar.gz", want: "plugin.gz"},
+		{url: "https://example.com/lpt\u00b9.lua", want: "plugin.lua"},
+		{url: "https://example.com/lpt\u00b2.zip", want: "plugin.zip"},
+		{url: "https://example.com/lpt\u00b3.zip", want: "plugin.zip"},
 		{url: "https://example.com/nul", want: "plugin"},
 		{url: "https://example.com/console.zip", want: "console.zip"},
 		{url: "https://example.com/my-nul.zip", want: "my-nul.zip"},
@@ -822,5 +828,29 @@ func TestCleanTmpSweepsStaleDownloadDirs(t *testing.T) {
 	}
 	if info, err := os.Stat(freshDir); err != nil || !info.IsDir() {
 		t.Fatalf("expected fresh download dir %q to be kept (info=%v, err=%v)", freshDir, info, err)
+	}
+}
+
+func TestAddRejectsInvalidAliasBeforeDownload(t *testing.T) {
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	f := newManagerFixture(t)
+	outside := filepath.Join(filepath.Dir(f.meta.Shared.Root), "outside")
+	for _, alias := range []string{"../../../outside", "..\\outside", "sub/dir", ".hidden", "1leadingdigit"} {
+		err := f.Add("demo", srv.URL+"/demo.zip", alias)
+		if err == nil {
+			t.Fatalf("Add(..., alias=%q) = nil, want error", alias)
+		}
+		if _, statErr := os.Stat(outside); !os.IsNotExist(statErr) {
+			t.Fatalf("alias %q created path outside VFOX_HOME: %v", alias, statErr)
+		}
+	}
+	if hits != 0 {
+		t.Fatalf("expected invalid alias to fail before downloading, got %d HTTP requests", hits)
 	}
 }

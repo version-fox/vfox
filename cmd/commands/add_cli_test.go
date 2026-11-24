@@ -263,4 +263,36 @@ function PLUGIN:EnvKeys(ctx) return {} end
 			t.Fatalf("expected demo plugin to install cleanly under %q", f.shared)
 		}
 	})
+
+	t.Run("alias traversal fails without writing outside VFOX_HOME", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		zipPath := writeDemoPluginZip(t, f.work)
+		outside := filepath.Join(filepath.Dir(f.shared), "outside")
+
+		res := f.runHere(t, "add", "--source", zipPath, "--alias", "../../../outside").mustFail(t, "add with traversal alias")
+		mustContain(t, "invalid alias error", res.output(), "invalid plugin alias")
+		if exists(outside) {
+			t.Fatalf("expected nothing written outside VFOX_HOME at %q", outside)
+		}
+		if exists(filepath.Join(f.shared, "plugin", "outside")) || exists(filepath.Join(f.shared, "plugin", "demo")) {
+			t.Fatal("expected failed alias add not to install plugin")
+		}
+	})
+
+	t.Run("installed plugin directory matches plugin root mode for shared VFOX_HOME", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("POSIX directory permission bits do not enforce shared mode semantics on Windows")
+		}
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		pluginsDir := filepath.Join(f.shared, "plugin")
+		must(t, os.Chmod(pluginsDir, 0755))
+		zipPath := writeDemoPluginZip(t, f.work)
+
+		f.runProcess(t, "add", "--source", zipPath).mustSucceed(t, "add --source demo.zip")
+		info, err := os.Stat(filepath.Join(pluginsDir, "demo"))
+		must(t, err)
+		if got := info.Mode().Perm(); got != 0755 {
+			t.Fatalf("installed plugin mode = %#o, want 0755 matching plugin/", got)
+		}
+	})
 }

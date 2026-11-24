@@ -42,6 +42,7 @@ type VersionInEffect func(s sdk.Sdk) sdk.Version
 func (m *Manager) Diagnose(name string, version sdk.Version, inEffect VersionInEffect) ([]sdk.Finding, error) {
 	var findings []sdk.Finding
 	findings = append(findings, m.activationFindings()...)
+	findings = append(findings, m.pathFindings()...)
 
 	var sdks []sdk.Sdk
 	if name != "" {
@@ -99,6 +100,54 @@ func (m *Manager) ignores(id, sdkName, version string) bool {
 }
 
 // activationFindings checks that this shell went through `vfox activate`.
+// PathFindings returns unusable directory and path initialization diagnostics
+// recorded during Manager / PathMeta setup, marked with ignore rules applied.
+func (m *Manager) PathFindings() []sdk.Finding {
+	findings := m.pathFindings()
+	sdk.ApplyIgnore(findings, m.ignores)
+	sdk.SortFindings(findings)
+	return findings
+}
+
+// DiagnosticsOnUse reports whether `vfox use` should print non-fatal diagnostics.
+func (m *Manager) DiagnosticsOnUse() bool {
+	if m.RuntimeEnvContext == nil || m.RuntimeEnvContext.UserConfig == nil || m.RuntimeEnvContext.UserConfig.Diagnostics == nil {
+		return true
+	}
+	return m.RuntimeEnvContext.UserConfig.Diagnostics.OnUse
+}
+
+func (m *Manager) pathFindings() []sdk.Finding {
+	var findings []sdk.Finding
+	if m.RuntimeEnvContext != nil && m.RuntimeEnvContext.PathMeta != nil {
+		for _, issue := range m.RuntimeEnvContext.PathMeta.InitErrors {
+			severity := sdk.SeverityError
+			msg := fmt.Sprintf("Cannot use %s (%s): %v.", issue.Target, issue.Path, issue.Err)
+			var detail map[string]string
+			if issue.Path != "" {
+				detail = map[string]string{"path": issue.Path}
+			} else {
+				severity = sdk.SeverityWarn
+				msg = fmt.Sprintf("Cannot determine %s: %v.", issue.Target, issue.Err)
+			}
+			findings = append(findings, sdk.Finding{
+				ID:       sdk.FindingPathUnusable,
+				Severity: severity,
+				Message:  msg,
+				Detail:   detail,
+			})
+		}
+	}
+	if m.workingDirErr != nil {
+		findings = append(findings, sdk.Finding{
+			ID:       sdk.FindingPathUnusable,
+			Severity: sdk.SeverityError,
+			Message:  fmt.Sprintf("Cannot determine current working directory: %v.", m.workingDirErr),
+		})
+	}
+	return findings
+}
+
 func (m *Manager) activationFindings() []sdk.Finding {
 	if env.IsHookEnv() {
 		return nil
