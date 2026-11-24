@@ -51,21 +51,28 @@ const (
 	additionRuntimePrefix  = "add-" // Prefix of path for additional runtime packages
 )
 
+// InstallOptions controls optional behavior for InstallResolvedWithOptions.
+type InstallOptions struct {
+	Reinstall   bool
+	NoClipboard bool
+}
+
 // Sdk interface defines the methods for managing software development kits (SDKs).
 type Sdk interface {
-	Install(version Version) error                                        // Install a specific runtime of the SDK
-	Reinstall(version Version) error                                      // Replace an installed runtime with a fresh copy
-	InstallResolved(version Version, reinstall bool) (Version, error)     // Install and report the version that ended up on disk
-	InstallAs(version Version, name Version) (Version, error)             // Install version as a second copy kept under name
-	Uninstall(version Version, fallbacks ...Version) error                // Uninstall a runtime; the first usable fallback takes over as global
-	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
-	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
-	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
-	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
-	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
-	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
-	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
-	ResolveInstalledVersion(version Version) (Version, error)             // The installed version a typed one stands for, as `vfox use` selects it
+	Install(version Version) error                                                    // Install a specific runtime of the SDK
+	Reinstall(version Version) error                                                  // Replace an installed runtime with a fresh copy
+	InstallResolved(version Version, reinstall bool) (Version, error)                 // Install and report the version that ended up on disk
+	InstallResolvedWithOptions(version Version, opts InstallOptions) (Version, error) // InstallResolved with explicit behavior options
+	InstallAs(version Version, name Version) (Version, error)                         // Install version as a second copy kept under name
+	Uninstall(version Version, fallbacks ...Version) error                            // Uninstall a runtime; the first usable fallback takes over as global
+	Available(args []string) ([]*AvailableRuntimePackage, error)                      // List available runtime of the SDK
+	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)                        // Get environment variables for a specific runtime of the SDK
+	Use(version Version, scope env.UseScope) error                                    // Use a specific runtime in a given scope
+	UseWithConfig(version Version, scope env.UseScope, unlink bool) error             // Use with link configuration
+	Unuse(scopes ...env.UseScope) error                                               // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error)                       // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                                           // Check if a specific runtime version is installed
+	ResolveInstalledVersion(version Version) (Version, error)                         // The installed version a typed one stands for, as `vfox use` selects it
 	InstalledList() []Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
@@ -202,7 +209,13 @@ func (b *impl) Reinstall(version Version) error {
 // not called. The version is only meaningful when err is nil. Install and Reinstall
 // wrap this for callers that do not need it.
 func (b *impl) InstallResolved(version Version, reinstall bool) (Version, error) {
-	return b.install(version, "", reinstall)
+	return b.install(version, "", InstallOptions{Reinstall: reinstall})
+}
+
+// InstallResolvedWithOptions installs version according to opts and returns the
+// resolved version on disk.
+func (b *impl) InstallResolvedWithOptions(version Version, opts InstallOptions) (Version, error) {
+	return b.install(version, "", opts)
 }
 
 // InstallAs installs version as a second copy of it, kept under name, which is what
@@ -216,13 +229,14 @@ func (b *impl) InstallAs(version Version, name Version) (Version, error) {
 	if name == "" {
 		return "", fmt.Errorf("a copy of %s needs a name", version)
 	}
-	return b.install(version, name, false)
+	return b.install(version, name, InstallOptions{})
 }
 
 // install is InstallResolved and InstallAs. Without a name the installation is kept
 // under the version PreInstall resolves the request to; with one, under name, and the
 // version it resolves to is recorded in the receipt.
-func (b *impl) install(version, name Version, reinstall bool) (installed Version, installErr error) {
+func (b *impl) install(version, name Version, opts InstallOptions) (installed Version, installErr error) {
+	reinstall := opts.Reinstall
 	// PreInstall does not know the name of a copy, so a copy is reinstalled from the
 	// version it was asked for, and the reinstall has to resolve to the version it has.
 	exact := version
@@ -393,8 +407,8 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 	useCommand := fmt.Sprintf("vfox use %s", label)
 	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
 
-	// Copy command to clipboard in TTY mode
-	if util.IsTTY() {
+	// Copy command to clipboard in interactive TTY mode unless suppressed (e.g. non-interactive exec).
+	if !opts.NoClipboard && util.IsTTY() {
 		if err := util.CopyToClipboard(useCommand); err == nil {
 			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
 		}

@@ -211,8 +211,11 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("vfox --debug exec exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
 		}
-		if !strings.Contains(stdout, "Looking up SDK: etcd") {
-			t.Fatalf("stdout missing debug log output:\n%s", stdout)
+		if strings.Contains(stdout, "Looking up SDK: etcd") {
+			t.Fatalf("stdout unexpectedly leaked debug log output:\n%s", stdout)
+		}
+		if !strings.Contains(stderr, "Looking up SDK: etcd") {
+			t.Fatalf("stderr missing debug log output:\n%s", stderr)
 		}
 		if !strings.Contains(stdout, execExpectedLine("--version")) {
 			t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("--version"), stdout)
@@ -227,8 +230,8 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("vfox --debug=false exec exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
 		}
-		if strings.Contains(stdout, "Looking up SDK: etcd") {
-			t.Fatalf("stdout unexpectedly contained debug log output:\n%s", stdout)
+		if strings.Contains(stdout, "Looking up SDK: etcd") || strings.Contains(stderr, "Looking up SDK: etcd") {
+			t.Fatalf("unexpected debug log output (stdout:\n%s\nstderr:\n%s)", stdout, stderr)
 		}
 		if got := strings.TrimSpace(stdout); got != execExpectedLine("put") {
 			t.Fatalf("stdout = %q, want %q (stderr:\n%s)", got, execExpectedLine("put"), stderr)
@@ -280,8 +283,11 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.cmdArgs, code, stderr, stdout)
 			}
-			if got := strings.Contains(stdout, "Looking up SDK: etcd"); got != tc.wantDebug {
-				t.Fatalf("debug log present = %v, want %v (stdout:\n%s)", got, tc.wantDebug, stdout)
+			if strings.Contains(stdout, "Looking up SDK: etcd") {
+				t.Fatalf("stdout unexpectedly leaked debug log output:\n%s", stdout)
+			}
+			if got := strings.Contains(stderr, "Looking up SDK: etcd"); got != tc.wantDebug {
+				t.Fatalf("debug log present on stderr = %v, want %v (stderr:\n%s)", got, tc.wantDebug, stderr)
 			}
 			if !strings.Contains(stdout, execExpectedLine("put")) {
 				t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("put"), stdout)
@@ -294,8 +300,11 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("vfox exec --debug -- exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
 		}
-		if !strings.Contains(stdout, "Looking up SDK: etcd") {
-			t.Fatalf("stdout missing debug log output:\n%s", stdout)
+		if strings.Contains(stdout, "Looking up SDK: etcd") {
+			t.Fatalf("stdout unexpectedly leaked debug log output:\n%s", stdout)
+		}
+		if !strings.Contains(stderr, "Looking up SDK: etcd") {
+			t.Fatalf("stderr missing debug log output:\n%s", stderr)
 		}
 		if !strings.Contains(stdout, execExpectedLine("--debug --version")) {
 			t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("--debug --version"), stdout)
