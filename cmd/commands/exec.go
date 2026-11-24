@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"slices"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/sdk"
 )
 
@@ -133,7 +135,9 @@ func redirectStdoutToStderr() func() {
 	origStdout := os.Stdout
 	os.Stdout = os.Stderr
 	pterm.SetDefaultOutput(os.Stderr)
+	restorePlugin := plugin.RedirectStdIO(func() io.Writer { return os.Stderr })
 	return func() {
+		restorePlugin()
 		os.Stdout = origStdout
 		pterm.SetDefaultOutput(origStdout)
 	}

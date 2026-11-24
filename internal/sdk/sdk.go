@@ -49,16 +49,9 @@ const (
 
 // InstallOptions controls optional behavior for InstallResolvedWithOptions.
 type InstallOptions struct {
-	Reinstall      bool
-	NoClipboard    bool
-	ProgressWriter io.Writer
-	OutputWriter   io.Writer
+	Reinstall   bool
+	NoClipboard bool
 }
-
-var (
-	isTTY           = func() bool { return util.IsTTY() }
-	copyToClipboard = util.CopyToClipboard
-)
 
 // Sdk interface defines the methods for managing software development kits (SDKs).
 type Sdk interface {
@@ -266,21 +259,6 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		return version, nil
 	}
 
-	if opts.ProgressWriter != nil {
-		if setter, ok := b.plugin.Plugin.(interface {
-			SetProgressWriter(io.Writer) func()
-		}); ok {
-			defer setter.SetProgressWriter(opts.ProgressWriter)()
-		}
-	}
-	if opts.OutputWriter != nil {
-		if setter, ok := b.plugin.Plugin.(interface {
-			SetOutputWriter(io.Writer) func()
-		}); ok {
-			defer setter.SetOutputWriter(opts.OutputWriter)()
-		}
-	}
-
 	ctx := &plugin.PreInstallHookCtx{
 		Version: string(version),
 	}
@@ -370,7 +348,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 
 	// The main runtime is where mainRuntimePath looks for it, so it is named after the
 	// installation, which for a copy is not the version the plugin resolved to.
-	path, err := b.preInstallSdk(mainSdk, b.mainRuntimePath(key), opts.ProgressWriter)
+	path, err := b.preInstallSdk(mainSdk, b.mainRuntimePath(key))
 
 	if err != nil {
 		return "", err
@@ -384,7 +362,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 	if len(installInfo.Addition) > 0 {
 		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Addition))
 		for _, oSdk := range installInfo.Addition {
-			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, additionDirName(oSdk)), opts.ProgressWriter)
+			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, additionDirName(oSdk)))
 			if err != nil {
 				return "", err
 			}
@@ -420,8 +398,8 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
 
 	// Copy command to clipboard in interactive TTY mode unless suppressed (e.g. non-interactive exec).
-	if !opts.NoClipboard && isTTY() {
-		if err := copyToClipboard(useCommand); err == nil {
+	if !opts.NoClipboard && util.IsTTY() {
+		if err := util.CopyToClipboard(useCommand); err == nil {
 			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
 		}
 		// Silently ignore clipboard errors (not supported, utility not found, etc.)
@@ -533,13 +511,13 @@ func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath stri
 	return nil
 }
 
-func (b *impl) moveRemoteFileWithProgressWriter(info *plugin.PreInstallPackageItem, targetPath string, progressWriter io.Writer) error {
+func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath string) error {
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
 		return util.RedactError(err)
 	}
-	filePath, err := b.downloadWithProgressWriter(u, info.Headers, progressWriter)
+	filePath, err := b.Download(u, info.Headers)
 	if err != nil {
 		return fmt.Errorf("failed to download %s file, err:%w", label, err)
 	}
@@ -581,7 +559,7 @@ func additionDirName(info *plugin.PreInstallPackageItem) string {
 	return additionRuntimePrefix + info.Name + "-" + info.Version
 }
 
-func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string, progressWriter io.Writer) (string, error) {
+func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string) (string, error) {
 	pterm.Printf("Preinstalling %s...\n", info.Name+"@"+info.Version)
 
 	path := sdkDestPath
@@ -594,7 +572,7 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 		return path, nil
 	}
 	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
-		if err := b.moveRemoteFileWithProgressWriter(info, path, progressWriter); err != nil {
+		if err := b.moveRemoteFile(info, path); err != nil {
 			return "", err
 		}
 		return path, nil
@@ -1244,13 +1222,6 @@ func (b *impl) packagePath(version Version) string {
 }
 
 func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
-	return b.downloadWithProgressWriter(u, headers, os.Stderr)
-}
-
-func (b *impl) downloadWithProgressWriter(u *url.URL, headers map[string]string, progressWriter io.Writer) (string, error) {
-	if progressWriter == nil {
-		progressWriter = os.Stderr
-	}
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", util.RedactError(err)
@@ -1315,12 +1286,12 @@ func (b *impl) downloadWithProgressWriter(u *url.URL, headers map[string]string,
 
 	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		progressbar.OptionSetWriter(progressWriter),
+		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
 		progressbar.OptionFullWidth(),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Fprintf(progressWriter, "\n")
+			fmt.Fprintf(os.Stderr, "\n")
 		}),
 		progressbar.OptionSetDescription("Downloading..."),
 		progressbar.OptionSetTheme(progressbar.Theme{

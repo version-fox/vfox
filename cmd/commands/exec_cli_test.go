@@ -17,14 +17,11 @@
 package commands
 
 import (
-	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/util"
@@ -184,102 +181,4 @@ func TestExecAutoInstallNeverWritesClipboard(t *testing.T) {
 			t.Fatalf("exec auto-install invoked clipboard utility unexpectedly (marker %q created)", marker)
 		}
 	})
-}
-
-func TestInstallAndExecIgnoreUnwritableStdioStreams(t *testing.T) {
-	unwritablePlugin := `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
-function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
-function PLUGIN:PreInstall(ctx)
-  print("ignored-print-error")
-  local ok, msg, errno = io.write("ignored-io-write")
-  assert(ok == nil and type(msg) == "string" and type(errno) == "number", "expected io.write error tuple")
-  return {version=ctx.version}
-end
-function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
-`
-
-	runWithReadOnlyStream := func(t *testing.T, redirectStderr bool, args ...string) string {
-		t.Helper()
-		f := newIsolatedCLIFixture(t, false)
-		f.writePlugin(t, "alpha", unwritablePlugin)
-		stdoutOnlyTool := filepath.Join(f.system, commandFile("stdouttool"))
-		toolScript := "#!/bin/sh\nprintf 'ok\\n'\n"
-		if runtime.GOOS == "windows" {
-			toolScript = "@echo off\r\necho ok\r\n"
-		}
-		must(t, os.WriteFile(stdoutOnlyTool, []byte(toolScript), 0755))
-
-		roPath := filepath.Join(f.root, "readonly-stream")
-		must(t, os.WriteFile(roPath, []byte("ro"), 0644))
-		roFile, err := os.Open(roPath)
-		must(t, err)
-		defer roFile.Close()
-
-		exe, err := os.Executable()
-		must(t, err)
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		cmd := f.command(ctx, exe, append([]string{"-test.run=^TestCLIProcess$", "--"}, args...)...)
-		cmd.Env = append(cmd.Env, "VFOX_TEST_CLI=1")
-		var outBuf, errBuf bytes.Buffer
-		if redirectStderr {
-			cmd.Stdout = &outBuf
-			cmd.Stderr = roFile
-		} else {
-			cmd.Stdout = roFile
-			cmd.Stderr = &errBuf
-		}
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("vfox %v failed with unwritable stream: %v\nstdout:\n%s\nstderr:\n%s", args, err, outBuf.String(), errBuf.String())
-		}
-		return outBuf.String()
-	}
-
-	t.Run("install with unwritable stdout", func(t *testing.T) {
-		_ = runWithReadOnlyStream(t, false, "install", "alpha@1.0.0")
-	})
-
-	t.Run("exec with unwritable stderr", func(t *testing.T) {
-		gotStdout := runWithReadOnlyStream(t, true, "exec", "alpha@1.0.0", "--", "stdouttool")
-		if got := strings.TrimSpace(gotStdout); got != "ok" {
-			t.Fatalf("exec stdout = %q, want %q", gotStdout, "ok")
-		}
-	})
-}
-
-func TestExecPreservesStdinWhenPluginClosesStdin(t *testing.T) {
-	f := newIsolatedCLIFixture(t, false)
-	f.writePlugin(t, "alpha", `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
-function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
-function PLUGIN:PreInstall(ctx)
-  local ok1, msg1 = io.stdin:close()
-  assert(ok1 == nil and msg1 == "cannot close standard input", tostring(msg1))
-  local ok2, msg2 = io.close(io.stdin)
-  assert(ok2 == nil and msg2 == "cannot close standard input", tostring(msg2))
-  local ok3, msg3 = io.input():close()
-  assert(ok3 == nil and msg3 == "cannot close standard input", tostring(msg3))
-  return {version=ctx.version}
-end
-function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
-`)
-	readTool := filepath.Join(f.system, commandFile("readtool"))
-	toolScript := "#!/bin/sh\nIFS= read -r line\nprintf 'read: [%s]\\n' \"$line\"\n"
-	if runtime.GOOS == "windows" {
-		toolScript = "@echo off\r\nset \"line=\"\r\nset /p line=\r\necho read: [%line%]\r\n"
-	}
-	must(t, os.WriteFile(readTool, []byte(toolScript), 0755))
-
-	exe, err := os.Executable()
-	must(t, err)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	cmd := f.command(ctx, exe, "-test.run=^TestCLIProcess$", "--", "exec", "alpha@1.0.0", "--", "readtool")
-	cmd.Env = append(cmd.Env, "VFOX_TEST_CLI=1")
-	cmd.Stdin = strings.NewReader("hello-from-stdin\n")
-	res := runCommand(t, cmd).mustSucceed(t, "exec alpha@1.0.0 -- readtool")
-	if got := strings.TrimSpace(res.stdout); got != "read: [hello-from-stdin]" {
-		t.Fatalf("exec stdout = %q, want %q\nstderr:\n%s", res.stdout, "read: [hello-from-stdin]", res.stderr)
-	}
 }

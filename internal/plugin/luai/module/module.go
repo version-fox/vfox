@@ -32,10 +32,9 @@ import (
 )
 
 type PreloadOptions struct {
-	Config         *config.Config
-	HTTPTransport  func(nethttp.RoundTripper) nethttp.RoundTripper
-	Output         io.Writer
-	ProgressOutput func() io.Writer
+	Config        *config.Config
+	HTTPTransport func(nethttp.RoundTripper) nethttp.RoundTripper
+	Output        io.Writer
 }
 
 func Preload(L *lua.LState, options *PreloadOptions) {
@@ -46,7 +45,6 @@ func Preload(L *lua.LState, options *PreloadOptions) {
 	http.PreloadWithOptions(L, cfg.Proxy, cfg.Plugin.HTTP, http.Options{
 		WrapTransport: options.HTTPTransport,
 		Output:        options.Output,
-		OutputFunc:    options.ProgressOutput,
 	})
 	json.Preload(L)
 	html.Preload(L)

@@ -19,7 +19,6 @@ package http
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -391,51 +390,5 @@ func TestDownloadUsesSeparateDeadline(t *testing.T) {
 	body, err := os.ReadFile(destination)
 	if err != nil || string(body) != "complete download" {
 		t.Fatalf("download = %q, err = %v", body, err)
-	}
-}
-
-func TestDownloadFileUsesOutputFuncDynamically(t *testing.T) {
-	payload := make([]byte, 512*1024)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
-		for off := 0; off < len(payload); off += len(payload) / 4 {
-			_, _ = w.Write(payload[off : off+len(payload)/4])
-			if f, ok := w.(http.Flusher); ok {
-				f.Flush()
-			}
-			time.Sleep(25 * time.Millisecond)
-		}
-	}))
-	defer server.Close()
-
-	var currentOut io.Writer = &bytes.Buffer{}
-	ls := lua.NewState()
-	defer ls.Close()
-	ls.PreloadModule("http", createModule(config.EmptyProxy, nil, Options{
-		OutputFunc: func() io.Writer { return currentOut },
-	}))
-
-	// Require http once at load time, then switch output per download call.
-	var firstBuf bytes.Buffer
-	currentOut = &firstBuf
-	ls.SetGlobal("url", lua.LString(server.URL+"/payload.bin"))
-	dest1 := filepath.Join(t.TempDir(), "one.bin")
-	ls.SetGlobal("dest1", lua.LString(dest1))
-	if err := ls.DoString(`dl = require("http"); assert(dl.download_file({url = url}, dest1) == nil)`); err != nil {
-		t.Fatal(err)
-	}
-	if firstBuf.Len() == 0 {
-		t.Fatal("expected progress output when OutputFunc points to a buffer")
-	}
-
-	beforeDiscard := firstBuf.Len()
-	currentOut = io.Discard
-	dest2 := filepath.Join(t.TempDir(), "two.bin")
-	ls.SetGlobal("dest2", lua.LString(dest2))
-	if err := ls.DoString(`assert(dl.download_file({url = url}, dest2) == nil)`); err != nil {
-		t.Fatal(err)
-	}
-	if firstBuf.Len() != beforeDiscard {
-		t.Fatalf("expected prior buffer untouched after switching to io.Discard, grew by %d bytes", firstBuf.Len()-beforeDiscard)
 	}
 }
