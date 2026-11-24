@@ -156,6 +156,20 @@ func TestAddMultiplePluginsExitStatus(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("multiple invalid trailing-slash names all reported", func(t *testing.T) {
+		f := newRegistryFixture(t)
+		res := f.runProcess(t, "add", "x/", "y/").mustFail(t, "add x/ y/")
+		mustContain(t, "add x/ stderr failure", res.stderr, "Add plugin(x/) failed:")
+		mustContain(t, "add y/ stderr failure", res.stderr, "Add plugin(y/) failed:")
+		if strings.Contains(res.stderr, "\x1b[") {
+			t.Fatalf("expected plain text on stderr without ANSI escapes, got %q", res.stderr)
+		}
+		if strings.Contains(res.stdout, "Add plugin(") {
+			t.Fatalf("expected failure details on stderr, not stdout: %q", res.stdout)
+		}
+		mustContain(t, "stderr summary", res.stderr, "failed to add plugins: x/, y/")
+	})
 }
 
 func TestAddMultiplePluginsStderrAndDedup(t *testing.T) {
@@ -210,6 +224,25 @@ func TestAddMultiplePluginsStderrAndDedup(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(vfoxHome, "plugin", "two", "main.lua")); err != nil {
 			t.Fatalf("expected plugin two to be installed: %v", err)
+		}
+	})
+
+	t.Run("multiple invalid trailing-slash args both attempted and reported", func(t *testing.T) {
+		setupHome(t)
+		app := newTestApp()
+		var outBuf, errBuf bytes.Buffer
+		useStreams(app, &outBuf, &errBuf)
+
+		err := app.Run(t.Context(), []string{"vfox", "add", "x/", "y/"})
+		if err == nil {
+			t.Fatal("expected error for invalid plugin names x/ y/, got nil")
+		}
+		stderr := errBuf.String()
+		if !strings.Contains(stderr, "Add plugin(x/) failed:") || !strings.Contains(stderr, "Add plugin(y/) failed:") {
+			t.Fatalf("stderr missing one or both invalid plugin failures: %q", stderr)
+		}
+		if !strings.Contains(err.Error(), "failed to add plugins: x/, y/") {
+			t.Fatalf("error = %q, want substring %q", err.Error(), "failed to add plugins: x/, y/")
 		}
 	})
 }

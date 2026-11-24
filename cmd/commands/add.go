@@ -64,6 +64,9 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 		uniqueArgs := make([]string, 0, args.Len())
 		for _, sdkName := range args.Slice() {
 			key := internal.NormalizePluginName(sdkName)
+			if key == "" {
+				key = sdkName
+			}
 			if _, ok := seen[key]; ok {
 				continue
 			}
