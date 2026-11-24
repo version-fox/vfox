@@ -431,19 +431,29 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 // pluginFileName derives the local file name of a downloaded plugin from the
 // path of its URL, so a query is never printed or written to disk. The last
 // element of the URL path is used only when it ends with the extension the
-// whole URL was accepted by; otherwise the name falls back to "plugin" plus
-// that extension, so NewDecompressor always sees the extension it needs.
-// Backslashes are normalized before stdpath.Base so URL paths with \ or %5C
-// always yield a single clean filename element across POSIX and Windows.
+// whole URL was accepted by and contains no characters unsafe for filenames;
+// otherwise the name falls back to "plugin" plus that extension.
 func pluginFileName(downloadUrl string) string {
 	ext := filepath.Ext(downloadUrl)
 	if u, err := url.Parse(downloadUrl); err == nil {
 		normalized := strings.ReplaceAll(u.Path, "\\", "/")
-		if name := stdpath.Base(normalized); name != "." && name != ".." && name != "/" && filepath.VolumeName(name) == "" && strings.HasSuffix(name, ext) {
+		if name := stdpath.Base(normalized); isSafePluginFileName(name) && strings.HasSuffix(name, ext) {
 			return name
 		}
 	}
 	return "plugin" + ext
+}
+
+func isSafePluginFileName(name string) bool {
+	if name == "" || name == "." || name == ".." || name == "/" || filepath.VolumeName(name) != "" {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f || strings.ContainsRune(`<>:"|?*`, r) {
+			return false
+		}
+	}
+	return true
 }
 
 // downloadPlugin download plugin from downloadUrl to plugin home directory.
@@ -512,12 +522,16 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		logger.Debugf("Failed to create file: %v\n", err)
 		return "", err
 	}
-	defer f.Close()
 	fmt.Printf("Downloading %s... \n", fileName)
 	_, err = io.Copy(f, resp.Body)
+	closeErr := f.Close()
 	if err != nil {
 		logger.Debugf("Failed to write plugin file: %v\n", err)
 		return "", err
+	}
+	if closeErr != nil {
+		logger.Debugf("Failed to close plugin file: %v\n", closeErr)
+		return "", closeErr
 	}
 	keepFile = true
 	logger.Debugf("Plugin downloaded successfully: %s\n", path)
@@ -876,7 +890,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName, _ := range legacyFileRecord.Record {
+		for sdkName := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,
@@ -934,7 +948,7 @@ func NewSdkManager() (*Manager, error) {
 func getWorkingDirectory() string {
 	wd, err := os.Getwd()
 	if err != nil {
-		logger.Errorf("get current working directory failed: %v", err)
+		fmt.Fprintf(os.Stderr, "get current working directory failed: %v\n", err)
 		return ""
 	}
 	return wd

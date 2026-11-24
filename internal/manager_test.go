@@ -283,22 +283,28 @@ func TestDownloadPluginRejectsUnexpectedStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	userTemp := t.TempDir()
 	pluginsDir := t.TempDir()
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: pluginsDir}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: userTemp},
+			Shared: pathmeta.SharedPaths{Plugins: pluginsDir},
+		},
 	}}
 
 	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 403 Forbidden") {
 		t.Fatalf("downloadPlugin() error = %v, want unexpected HTTP status 403 Forbidden", err)
 	}
 
-	entries, readErr := os.ReadDir(pluginsDir)
-	if readErr != nil && !os.IsNotExist(readErr) {
-		t.Fatalf("read plugins dir: %v", readErr)
-	}
-	if len(entries) != 0 {
-		t.Fatalf("downloadPlugin() saved %d file(s) for an HTTP 403 response, want none", len(entries))
+	for name, dir := range map[string]string{"plugins": pluginsDir, "temp": userTemp} {
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil && !os.IsNotExist(readErr) {
+			t.Fatalf("read %s dir: %v", name, readErr)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("downloadPlugin() left %d file(s) in %s dir for an HTTP 403 response, want none", len(entries), name)
+		}
 	}
 }
 
@@ -310,7 +316,10 @@ func TestDownloadPluginKeepsNotFoundMessage(t *testing.T) {
 
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: t.TempDir()},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
 	}}
 
 	if _, err := m.downloadPlugin(srv.URL + "/plugin.zip"); err == nil || !strings.Contains(err.Error(), "plugin not found") {
@@ -326,7 +335,10 @@ func TestDownloadPluginNotFoundRedactsPassword(t *testing.T) {
 
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: t.TempDir()},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
 	}}
 
 	u, err := url.Parse(srv.URL + "/plugin.zip")
@@ -368,7 +380,10 @@ func TestFetchPluginManifestRedactsConnectionError(t *testing.T) {
 func TestDownloadPluginRedactsRequestError(t *testing.T) {
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: t.TempDir()},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
 	}}
 
 	_, err := m.downloadPlugin("http://user:Zq9%ss@127.0.0.1/plugin.zip")
@@ -383,7 +398,10 @@ func TestDownloadPluginRedactsRequestError(t *testing.T) {
 func TestDownloadPluginRedactsConnectionError(t *testing.T) {
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: t.TempDir()},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
 	}}
 
 	_, err := m.downloadPlugin("http://user:s3cret@127.0.0.1:1/plugin.zip?token=abc123")
@@ -441,7 +459,10 @@ func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
 
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: t.TempDir()}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: t.TempDir()},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
 	}}
 
 	// The saved name has to end with the extension the whole URL was accepted
@@ -496,6 +517,44 @@ func TestDownloadPluginKeepsBackslashPathsInDownloadTempDir(t *testing.T) {
 		}
 		if filepath.Dir(filepath.Dir(saved)) != userTemp || filepath.Base(saved) != "evil.zip" {
 			t.Fatalf("downloadPlugin() saved %q, want a file inside a direct subdir of %q", saved, userTemp)
+		}
+		_ = os.RemoveAll(filepath.Dir(saved))
+	}
+}
+
+func TestDownloadPluginSanitizesInvalidFilenameCharacters(t *testing.T) {
+	const body = "plugin bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	userTemp := t.TempDir()
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: userTemp},
+			Shared: pathmeta.SharedPaths{Plugins: t.TempDir()},
+		},
+	}}
+
+	for _, p := range []string{
+		"/a%3Fb.zip",
+		"/a%22b.zip",
+		"/a%3Ab.zip",
+		"/a%3Cb.zip",
+		"/a%3Eb.zip",
+		"/a%7Cb.zip",
+		"/a%2Ab.zip",
+		"/a%0Ab.zip",
+		"/a%7Fb.zip",
+	} {
+		saved, err := m.downloadPlugin(srv.URL + p)
+		if err != nil {
+			t.Fatalf("downloadPlugin(%q) error = %v", p, err)
+		}
+		if filepath.Dir(filepath.Dir(saved)) != userTemp || filepath.Base(saved) != "plugin.zip" {
+			t.Fatalf("downloadPlugin(%q) saved %q, want plugin.zip inside %q", p, saved, userTemp)
 		}
 		_ = os.RemoveAll(filepath.Dir(saved))
 	}

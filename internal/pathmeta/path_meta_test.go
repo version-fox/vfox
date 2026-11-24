@@ -278,14 +278,14 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		}
 	})
 
-	t.Run("writes diagnostics to stderr and keeps stdout clean when directories or executable lookup fail", func(t *testing.T) {
+	t.Run("writes session and executable diagnostics to stderr and keeps stdout clean", func(t *testing.T) {
 		for _, tc := range []struct {
 			name       string
 			blockTemp  bool
 			failExe    bool
 			wantStderr string
 		}{
-			{name: "blocked GlobalSdkDir and SharedRoot", wantStderr: "create global sdk dir failed:"},
+			{name: "blocked GlobalSdkDir and SharedRoot", wantStderr: ""},
 			{name: "blocked session temp directory", blockTemp: true, wantStderr: "create temp dir failed:"},
 			{name: "executable lookup failure", failExe: true, wantStderr: "get executable path failed:"},
 		} {
@@ -351,8 +351,14 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				if out.Len() != 0 {
 					t.Fatalf("NewPathMeta wrote to stdout on failure: %q", out.String())
 				}
-				if !strings.Contains(errBuf.String(), tc.wantStderr) {
+				if tc.wantStderr == "" {
+					if errBuf.Len() != 0 {
+						t.Fatalf("NewPathMeta wrote unexpected stderr on failure: %q", errBuf.String())
+					}
+				} else if !strings.Contains(errBuf.String(), tc.wantStderr) {
 					t.Fatalf("NewPathMeta stderr = %q, want substring %q", errBuf.String(), tc.wantStderr)
+				} else if tc.blockTemp && strings.Count(errBuf.String(), tc.wantStderr) != 1 {
+					t.Fatalf("NewPathMeta logged duplicate temp dir failure to stderr: %q", errBuf.String())
 				}
 			})
 		}

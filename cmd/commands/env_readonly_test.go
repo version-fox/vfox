@@ -24,33 +24,20 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
-	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/version-fox/vfox/internal/pathmeta"
 )
 
-func sortSemicolonStatements(s string) []string {
-	raw := strings.Split(s, ";")
-	parts := make([]string, 0, len(raw))
-	for _, part := range raw {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			parts = append(parts, trimmed)
-		}
-	}
-	sort.Strings(parts)
-	return parts
-}
-
 func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
-	t.Run("activate comparison helper normalizes map-ordered exports", func(t *testing.T) {
+	t.Run("activate produces identical output across runs", func(t *testing.T) {
 		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		first := f.runProcess(t, "activate", "bash").mustSucceed(t, "first activate bash")
 		second := f.runProcess(t, "activate", "bash").mustSucceed(t, "second activate bash")
-		if !slices.Equal(sortSemicolonStatements(first.stdout), sortSemicolonStatements(second.stdout)) {
-			t.Fatalf("normalized activate output differed across runs:\nfirst:\n%s\nsecond:\n%s", first.stdout, second.stdout)
+		if first.stdout != second.stdout {
+			t.Fatalf("activate output differed across runs:\nfirst:\n%s\nsecond:\n%s", first.stdout, second.stdout)
 		}
 	})
 
@@ -171,9 +158,45 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if expectedEnv := norm(wantEnv.stdout); gotEnv.stdout != expectedEnv {
 			t.Fatalf("env output mismatch on read-only VFOX_HOME:\ngot:\n%s\nwant:\n%s", gotEnv.stdout, expectedEnv)
 		}
-		if expectedAct := norm(wantAct.stdout); !slices.Equal(sortSemicolonStatements(gotAct.stdout), sortSemicolonStatements(expectedAct)) {
+		if expectedAct := norm(wantAct.stdout); gotAct.stdout != expectedAct {
 			t.Fatalf("activate output mismatch on read-only VFOX_HOME:\ngot:\n%s\nwant:\n%s", gotAct.stdout, expectedAct)
 		}
+	})
+
+	t.Run("env writes deleted cwd diagnostic to stderr while keeping stdout clean shell code", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows holds an open handle on a process working directory")
+		}
+		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
+		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
+
+		fDeleted := newCLIFixtureWithoutRegistryGuard(t, false)
+		goneDir := filepath.Join(fDeleted.root, "deleted-work")
+		must(t, os.MkdirAll(goneDir, 0755))
+
+		exe, err := os.Executable()
+		must(t, err)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		cmd := fDeleted.command(
+			ctx,
+			"/bin/sh",
+			"-c",
+			`cd "$1" && rmdir "$1" && exec "$2" -test.run=^TestCLIProcess$ -- env -s bash`,
+			"sh",
+			goneDir,
+			exe,
+		)
+		cmd.Env = append(cmd.Env, "VFOX_TEST_CLI=1")
+		deletedEnv := runCommand(t, cmd).mustSucceed(t, "env -s bash with deleted cwd")
+
+		want := strings.ReplaceAll(cleanEnv.stdout, shellPath(fClean.root), shellPath(fDeleted.root))
+		want = strings.ReplaceAll(want, fClean.root, fDeleted.root)
+		if deletedEnv.stdout != want {
+			t.Fatalf("env stdout changed when cwd was deleted:\ngot:\n%s\nwant:\n%s", deletedEnv.stdout, want)
+		}
+		mustContain(t, "env stderr", deletedEnv.stderr, "get current working directory failed:")
+		mustNotContain(t, "env stdout", deletedEnv.stdout, "get current working directory failed:")
 	})
 
 	t.Run("read-only VFOX_HOME honors storage.sdkPath override", func(t *testing.T) {
