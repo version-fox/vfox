@@ -19,6 +19,8 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
@@ -46,6 +48,9 @@ var Add = &cli.Command{
 // addCmd is the command to add a plugin of sdk
 func addCmd(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
+	if args.Len() > 1 && (cmd.IsSet("source") || cmd.IsSet("alias")) {
+		return fmt.Errorf("--source and --alias apply to one plugin, run add once per plugin")
+	}
 
 	manager, err := internal.NewSdkManager()
 	if err != nil {
@@ -55,11 +60,38 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 
 	// multiple plugins
 	if args.Len() > 1 {
-		for index, sdkName := range args.Slice() {
-			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), args.Len(), pterm.Green(sdkName))
-			if err := manager.Add(sdkName, "", ""); err != nil {
-				pterm.Println(fmt.Sprintf("Add plugin(%s) failed: %s", pterm.Red(sdkName), err.Error()))
+		seen := make(map[string]struct{}, args.Len())
+		uniqueArgs := make([]string, 0, args.Len())
+		for _, sdkName := range args.Slice() {
+			key := internal.NormalizePluginName(sdkName)
+			if key == "" {
+				key = sdkName
 			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			uniqueArgs = append(uniqueArgs, sdkName)
+		}
+
+		errOut := cmd.ErrWriter
+		if errOut == nil {
+			errOut = os.Stderr
+		}
+
+		var failed []string
+		for index, sdkName := range uniqueArgs {
+			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), len(uniqueArgs), pterm.Green(sdkName))
+			if err := manager.Add(sdkName, "", ""); err != nil {
+				fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", sdkName, err.Error())
+				failed = append(failed, sdkName)
+			}
+		}
+		if len(failed) == 1 {
+			return fmt.Errorf("failed to add plugin: %s", failed[0])
+		}
+		if len(failed) > 1 {
+			return fmt.Errorf("failed to add plugins: %s", strings.Join(failed, ", "))
 		}
 		return nil
 	} else {

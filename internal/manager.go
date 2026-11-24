@@ -576,6 +576,15 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+// NormalizePluginName returns the installed plugin name for an add argument,
+// stripping any legacy "<category>/" prefix.
+func NormalizePluginName(name string) string {
+	if strings.Contains(name, "/") {
+		return strings.Split(name, "/")[1]
+	}
+	return name
+}
+
 func ensureWritableDir(dir string) error {
 	if err := os.MkdirAll(dir, pathmeta.ReadWriteAuth); err != nil {
 		return err
@@ -631,8 +640,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	logger.Debugf("Adding plugin: name=%s, url=%s, alias=%s\n", pluginName, util.RedactSourceURL(url), alias)
 
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
-	if strings.Contains(pluginName, "/") {
-		normalized := strings.Split(pluginName, "/")[1]
+	if normalized := NormalizePluginName(pluginName); normalized != pluginName {
 		if normalized == "" {
 			return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pluginName)
 		}
