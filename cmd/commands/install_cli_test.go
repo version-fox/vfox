@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
@@ -474,8 +475,46 @@ function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nremote = \"1.0.0\"\n"), 0644))
 
 		res := f.runProcess(t, "install", "--all", "-y").mustFail(t, "install --all -y when plugin add fails")
-		mustNotContain(t, "install --all stdout on add failure", res.stdout, "Installation completed.")
-		mustContain(t, "install --all stdout on add failure", res.stdout, "Installation finished with failures.")
+		mustNotContain(t, "install --all stdout on add failure", res.stdout, "Installation completed.", "SDK: remote@1.0.0 installing...")
+		mustContain(t, "install --all stdout on add failure", res.stdout, "SDK: remote@1.0.0 skipped", "Installation finished with failures.")
+	})
+
+	t.Run("category-prefixed and mixed-case keys install plugin and sdk", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			tomlKey string
+		}{
+			{name: "category prefix", tomlKey: `"cat/remote"`},
+			{name: "mixed case", tomlKey: "Remote"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := newIsolatedCLIFixture(t, false)
+				var registry *httptest.Server
+				registry = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/remote.json":
+						fmt.Fprintf(w, `{"name":"remote","downloadUrl":%q}`, registry.URL+"/plugins/remote.lua")
+					case "/plugins/remote.lua":
+						fmt.Fprint(w, `PLUGIN = {name="remote", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+`)
+					default:
+						http.NotFound(w, r)
+					}
+				}))
+				defer registry.Close()
+
+				f.writeUserConfig(t, "registry:\n  address: "+registry.URL+"\n")
+				must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte(fmt.Sprintf("[tools]\n%s = \"1.0.0\"\n", tc.tomlKey)), 0644))
+
+				res := f.runProcess(t, "install", "--all", "-y").mustSucceed(t, "install --all -y for "+tc.name)
+				if _, err := os.Stat(filepath.Join(f.shared, "cache", "remote", "v-1.0.0")); err != nil {
+					t.Fatalf("remote@1.0.0 was not installed for %s: %v\noutput:\n%s", tc.name, err, res.output())
+				}
+			})
+		}
 	})
 
 	t.Run("PreInstall os.execute output from PATH tool", func(t *testing.T) {
@@ -503,5 +542,104 @@ function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 		res := f.runProcess(t, "install", "--all", "-y").mustSucceed(t, "install --all -y with PreInstall os.execute")
 		mustNotContain(t, "install --all stdout", res.stdout, "preinstall-exec-marker")
 		mustContain(t, "install --all stderr", res.stderr, "preinstall-exec-marker")
+	})
+}
+
+func TestInstallAllNormalizesKeysAndPreservesErrorChain(t *testing.T) {
+	t.Run("category-prefixed and mixed-case keys install without registry skip", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			tomlKey string
+		}{
+			{name: "category prefix", tomlKey: `"cat/remote"`},
+			{name: "mixed case", tomlKey: "Remote"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				home := t.TempDir()
+				vfoxHome := filepath.Join(home, "vfox")
+				work := filepath.Join(home, "work")
+				must(t, os.MkdirAll(vfoxHome, 0o755))
+				must(t, os.MkdirAll(work, 0o755))
+
+				var registry *httptest.Server
+				registry = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/remote.json":
+						fmt.Fprintf(w, `{"name":"remote","downloadUrl":%q}`, registry.URL+"/plugins/remote.lua")
+					case "/plugins/remote.lua":
+						fmt.Fprint(w, `PLUGIN = {name="remote", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+`)
+					default:
+						http.NotFound(w, r)
+					}
+				}))
+				defer registry.Close()
+
+				userHome := filepath.Join(home, ".version-fox")
+				must(t, os.MkdirAll(userHome, 0o755))
+				must(t, os.WriteFile(filepath.Join(userHome, "config.yaml"), []byte("registry:\n  address: "+registry.URL+"\n"), 0o644))
+				must(t, os.WriteFile(filepath.Join(work, ".vfox.toml"), []byte(fmt.Sprintf("[tools]\n%s = \"1.0.0\"\n", tc.tomlKey)), 0o644))
+
+				t.Setenv("HOME", home)
+				t.Setenv("USERPROFILE", home)
+				t.Setenv("VFOX_HOME", vfoxHome)
+				t.Chdir(work)
+
+				if err := installAll(true); err != nil {
+					t.Fatalf("installAll failed for %s: %v", tc.name, err)
+				}
+				if _, err := os.Stat(filepath.Join(vfoxHome, "cache", "remote", "v-1.0.0")); err != nil {
+					t.Fatalf("cache/remote/v-1.0.0 missing for %s: %v", tc.name, err)
+				}
+			})
+		}
+	})
+
+	t.Run("preserves errors.Is chain and skips missing plugin sdk without installing message", func(t *testing.T) {
+		home := t.TempDir()
+		vfoxHome := filepath.Join(home, "vfox")
+		work := filepath.Join(home, "work")
+		userHome := filepath.Join(home, ".version-fox")
+		must(t, os.MkdirAll(vfoxHome, 0o755))
+		must(t, os.MkdirAll(work, 0o755))
+		must(t, os.MkdirAll(userHome, 0o755))
+
+		registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.NotFound(w, r)
+		}))
+		defer registry.Close()
+
+		must(t, os.WriteFile(filepath.Join(userHome, "config.yaml"), []byte("registry:\n  address: "+registry.URL+"\n"), 0o644))
+		must(t, os.WriteFile(filepath.Join(work, ".vfox.toml"), []byte("[tools]\nmissing = \"1.0.0\"\n"), 0o644))
+
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		t.Setenv("VFOX_HOME", vfoxHome)
+		t.Chdir(work)
+
+		outFile, fErr := os.CreateTemp(t.TempDir(), "stdout-*")
+		must(t, fErr)
+		oldStdout := os.Stdout
+		os.Stdout = outFile
+		t.Cleanup(func() {
+			os.Stdout = oldStdout
+			_ = outFile.Close()
+		})
+
+		err := installAll(true)
+		os.Stdout = oldStdout
+		_ = outFile.Close()
+		outBytes, rErr := os.ReadFile(outFile.Name())
+		must(t, rErr)
+		outStr := string(outBytes)
+
+		if !errors.Is(err, internal.ManifestNotFound) {
+			t.Fatalf("expected error chain containing internal.ManifestNotFound, got %v", err)
+		}
+		mustNotContain(t, "installAll stdout", outStr, "SDK: missing@1.0.0 installing...")
+		mustContain(t, "installAll stdout", outStr, "SDK: missing@1.0.0 skipped", "Installation finished with failures.")
 	})
 }

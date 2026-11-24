@@ -275,7 +275,7 @@ func installAll(autoConfirm bool) error {
 	var (
 		count         = len(plugins) + len(sdks)
 		index         = 0
-		errorStr      string
+		errs          []error
 		stdout        = os.Stdout
 		pluginsResult = make(map[string]bool)
 		sdksResult    = make(map[string]bool)
@@ -301,9 +301,9 @@ func installAll(autoConfirm bool) error {
 		pluginsResult[plugin] = false
 		if err := manager.Add(plugin, "", ""); err != nil {
 			if errors.Is(err, internal.ManifestNotFound) {
-				errorStr = fmt.Sprintf("%s\n[%s] not found in remote registry, please check the name", errorStr, plugin)
+				errs = append(errs, fmt.Errorf("[%s] not found in remote registry, please check the name: %w", plugin, err))
 			} else {
-				errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
+				errs = append(errs, err)
 			}
 			continue
 		}
@@ -312,15 +312,16 @@ func installAll(autoConfirm bool) error {
 	for _, sdkName := range slices.Sorted(maps.Keys(sdks)) {
 		version := sdks[sdkName]
 		index++
-		fmt.Fprintf(stdout, "[%v/%v] %s: %s@%s installing...\n", index, count, "SDK", sdkName, version)
 		sdkVersion := fmt.Sprintf("%s@%s", sdkName, version)
 		sdksResult[sdkVersion] = false
 		if ok, planned := pluginsResult[sdkName]; planned && !ok {
+			fmt.Fprintf(stdout, "[%v/%v] %s: %s skipped (plugin failed to install).\n", index, count, "SDK", sdkVersion)
 			continue
 		}
+		fmt.Fprintf(stdout, "[%v/%v] %s: %s installing...\n", index, count, "SDK", sdkVersion)
 		lookupSdk, err := manager.LookupSdk(sdkName)
 		if err != nil {
-			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
+			errs = append(errs, err)
 			continue
 		}
 		_, err = lookupSdk.InstallResolvedWithOptions(sdk.Version(version), sdk.InstallOptions{
@@ -329,12 +330,12 @@ func installAll(autoConfirm bool) error {
 			OutputWriter:   os.Stderr,
 		})
 		if err != nil {
-			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
+			errs = append(errs, err)
 			continue
 		}
 		sdksResult[sdkVersion] = true
 	}
-	if len(errorStr) > 0 {
+	if len(errs) > 0 {
 		fmt.Fprintf(stdout, "[%v/%v] Installation finished with failures.\n", count, count)
 	} else {
 		fmt.Fprintf(stdout, "[%v/%v] Installation completed.\n", count, count)
@@ -346,10 +347,15 @@ func installAll(autoConfirm bool) error {
 	printPlugin(plugins, pluginsResult)
 	printSdk(sdks, sdksResult)
 
-	if len(errorStr) > 0 {
-		return errors.New(strings.TrimPrefix(errorStr, "\n"))
+	return errors.Join(errs...)
+}
+
+func normalizeToolName(name string) string {
+	name = strings.ToLower(name)
+	if _, rest, ok := strings.Cut(name, "/"); ok {
+		return rest
 	}
-	return nil
+	return name
 }
 
 func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]string, err error) {
@@ -364,12 +370,17 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 	// Get all tools from the chain
 	allTools := chain.GetAllTools()
 	sdks = make(map[string]string)
+	seenPlugins := make(map[string]struct{})
 
-	for name, version := range allTools {
+	for rawName, version := range allTools {
+		name := normalizeToolName(rawName)
 		lookupSdk, err := manager.LookupSdk(name)
 		if err != nil {
 			// Plugin not installed yet: install the plugin first and the recorded SDK version afterwards.
-			plugins = append(plugins, name)
+			if _, exists := seenPlugins[name]; !exists {
+				seenPlugins[name] = struct{}{}
+				plugins = append(plugins, name)
+			}
 			sdks[name] = version
 		} else if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
 			// SDK not installed
