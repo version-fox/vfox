@@ -44,6 +44,18 @@ func TestExecCLIProcess(t *testing.T) {
 	os.Exit(0)
 }
 
+func TestExecCLIBatchArgHelper(t *testing.T) {
+	if os.Getenv("EXEC_TEST_BATCH_HELPER") != "1" {
+		return
+	}
+	separator := slices.Index(os.Args, "--")
+	if separator < 0 {
+		os.Exit(2)
+	}
+	os.Stdout.WriteString("batch:[" + strings.Join(os.Args[separator+1:], " ") + "]\n")
+	os.Exit(0)
+}
+
 func runExecCLI(t *testing.T, root string, args ...string) (string, string, int) {
 	t.Helper()
 	executable, err := os.Executable()
@@ -568,7 +580,44 @@ function PLUGIN:EnvKeys(ctx) return {} end
 		}
 	})
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "windows" {
+		t.Run("windows batch shim forwards caret and ampersand args and refuses percent/bang", func(t *testing.T) {
+			testExe, err := os.Executable()
+			if err != nil {
+				t.Fatal(err)
+			}
+			pluginDir := filepath.Join(root, "shared", "plugin", "nodewin")
+			writeCLIPluginFile(t, pluginDir, "main.lua", `PLUGIN = {name="nodewin", version="0.1.0", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {{version="20.0.0"}} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/R&D/bin"}} end
+`)
+			ampBinDir := filepath.Join(root, "shared", "cache", "nodewin", "v-20.0.0", "nodewin-20.0.0", "R&D", "bin")
+			if err := os.MkdirAll(ampBinDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			// Route npm.CMD into TestExecCLIProcess in print-args mode so we verify argv intact.
+			npmCmd := filepath.Join(ampBinDir, "npm.CMD")
+			script := "@echo off\r\n\"" + testExe + "\" -test.run=^TestExecCLIBatchArgHelper$ -- %*\r\n"
+			if err := os.WriteFile(npmCmd, []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+
+			t.Setenv("EXEC_TEST_BATCH_HELPER", "1")
+			stdout, stderr, code := runExecCLI(t, root, "exec", "nodewin@20.0.0", "npm", "install", "express@^4.18.0", "a&echo pwned")
+			if code != 0 {
+				t.Fatalf("vfox exec npm install express@^4.18.0 exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
+			}
+			if got := strings.TrimSpace(stdout); got != "batch:[install express@^4.18.0 a&echo pwned]" {
+				t.Fatalf("stdout = %q, want %q", got, "batch:[install express@^4.18.0 a&echo pwned]")
+			}
+
+			_, errStderr, errCode := runExecCLI(t, root, "exec", "nodewin@20.0.0", "npm", "install", "%PATH%")
+			if errCode == 0 || !strings.Contains(errStderr, "refusing to pass unsafe cmd.exe character") {
+				t.Fatalf("expected refusal for %% in batch arg, code=%d stderr=%q", errCode, errStderr)
+			}
+		})
+	} else {
 		t.Run("unix PATH entry '.' finds executable in working directory", func(t *testing.T) {
 			dotBin := filepath.Join(root, "dot-etcd")
 			if err := os.WriteFile(dotBin, []byte("#!/bin/sh\nprintf 'dot-etcd:args=%s\\n' \"$*\"\n"), 0755); err != nil {

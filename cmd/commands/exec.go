@@ -515,12 +515,10 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	if err != nil {
 		return &execCommandNotFoundError{command: command, err: err}
 	}
-	if err := validateWindowsBatchArgs(execPath, args); err != nil {
+	execCmd, err := prepareExecCommand(execPath, args)
+	if err != nil {
 		return err
 	}
-
-	// Execute command
-	execCmd := exec.Command(execPath, args...)
 	execCmd.Env = cleanedEnvVars
 	execCmd.Stdin = os.Stdin
 	execCmd.Stdout = os.Stdout
@@ -528,24 +526,6 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 
 	// Start process and wait
 	return execCmd.Run()
-}
-
-func isWindowsBatchFile(path string) bool {
-	ext := filepath.Ext(path)
-	return strings.EqualFold(ext, ".cmd") || strings.EqualFold(ext, ".bat")
-}
-
-func validateWindowsBatchArgs(execPath string, args []string) error {
-	if runtime.GOOS != "windows" || !isWindowsBatchFile(execPath) {
-		return nil
-	}
-	const unsafeBatchChars = "&|<>()^%!\"\r\n\x00"
-	for _, arg := range args {
-		if strings.ContainsAny(arg, unsafeBatchChars) {
-			return fmt.Errorf("refusing to pass cmd.exe metacharacters in argument %q to Windows batch file %q", arg, execPath)
-		}
-	}
-	return nil
 }
 
 func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {

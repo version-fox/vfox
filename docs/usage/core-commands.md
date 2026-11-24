@@ -388,6 +388,12 @@ vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 
 :::
 
+::: warning Windows Batch Shims (`.cmd` / `.bat`)
+
+On Windows, when the resolved target is a batch file (`.cmd` or `.bat`, such as `npm.cmd`), `vfox exec` quotes paths and arguments for `cmd.exe` so characters like `&`, `|`, `<`, `>`, `(`, `)`, `^`, and spaces pass through safely. Paths or arguments containing characters that `cmd.exe` quoting cannot protect (`%`, `!`, `"`, `CR`, `LF`, `NUL`) are refused before launching. To pass those characters, invoke the underlying `.exe` directly (for example `node`), run the script through `powershell` or `sh`, or call the underlying CLI entry script directly.
+
+:::
+
 **Examples**
 
 ```shell
