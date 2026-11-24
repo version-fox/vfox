@@ -29,6 +29,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shell"
@@ -389,19 +390,21 @@ func installsStamp(ctx *env.RuntimeEnvContext, chain env.VfoxTomlChain) string {
 	shared := ctx.PathMeta.Shared
 	var b strings.Builder
 	for _, name := range stampNames(chain) {
-		plugin := "-"
-		if _, err := os.Stat(filepath.Join(shared.Plugins, name)); err == nil {
-			plugin = "+"
-		}
+		pluginMark := "-"
 		installed := "-"
-		// The same fallback as sdk.NewSdk.
-		for _, dir := range []string{filepath.Join(shared.Installs, name), filepath.Join(shared.Installs, "cache", name)} {
-			if info, err := os.Stat(dir); err == nil {
-				installed = fmt.Sprint(info.ModTime().UnixNano())
-				break
+		if plugin.IsValidName(name) {
+			if _, err := os.Stat(filepath.Join(shared.Plugins, name)); err == nil {
+				pluginMark = "+"
+			}
+			// The same fallback as sdk.NewSdk.
+			for _, dir := range []string{filepath.Join(shared.Installs, name), filepath.Join(shared.Installs, "cache", name)} {
+				if info, err := os.Stat(dir); err == nil {
+					installed = fmt.Sprint(info.ModTime().UnixNano())
+					break
+				}
 			}
 		}
-		fmt.Fprintf(&b, "%s %s %s\n", name, plugin, installed)
+		fmt.Fprintf(&b, "%s %s %s\n", name, pluginMark, installed)
 	}
 	return b.String()
 }
@@ -414,10 +417,13 @@ func linksStamp(ctx *env.RuntimeEnvContext, chain env.VfoxTomlChain) string {
 	var b strings.Builder
 	for _, name := range stampNames(chain) {
 		b.WriteString(name)
+		validName := plugin.IsValidName(name)
 		for _, scope := range scopes {
 			mark := " -"
-			if _, err := os.Lstat(filepath.Join(ctx.GetLinkDirPathByScope(scope), name)); err == nil {
-				mark = " +"
+			if validName {
+				if _, err := os.Lstat(filepath.Join(ctx.GetLinkDirPathByScope(scope), name)); err == nil {
+					mark = " +"
+				}
 			}
 			b.WriteString(mark)
 		}

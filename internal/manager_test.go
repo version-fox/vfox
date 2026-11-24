@@ -937,3 +937,71 @@ func TestAddMultiSlashLegacyNameKeepsMiddleSegment(t *testing.T) {
 		t.Fatalf("expected plugin b to be installed: %v", err)
 	}
 }
+
+func TestLookupSdkRejectsTraversalAndInvalidNames(t *testing.T) {
+	f := newManagerFixture(t)
+	outsideDir := filepath.Join(filepath.Dir(f.meta.Shared.Root), "outside")
+	if err := os.MkdirAll(outsideDir, 0755); err != nil {
+		t.Fatalf("mkdir outside dir: %v", err)
+	}
+	markerPath := filepath.Join(outsideDir, "loaded.marker")
+	luaSource := fmt.Sprintf(`PLUGIN = {name="outside", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+local fh = io.open(%q, "w")
+if fh ~= nil then fh:write("loaded"); fh:close() end
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`, filepath.ToSlash(markerPath))
+	if err := os.WriteFile(filepath.Join(outsideDir, "main.lua"), []byte(luaSource), 0644); err != nil {
+		t.Fatalf("write outside plugin: %v", err)
+	}
+
+	var srvRequests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srvRequests++
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	f.RuntimeEnvContext.UserConfig = &config.Config{
+		Proxy:    config.EmptyProxy,
+		Registry: &config.Registry{Address: srv.URL},
+	}
+
+	for _, badName := range []string{
+		"../../outside",
+		"../outside",
+		`..\..\outside`,
+		"cat/outside",
+		"..",
+		".",
+		"",
+		"1invalid",
+	} {
+		t.Run(fmt.Sprintf("%q", badName), func(t *testing.T) {
+			if _, err := f.LookupSdk(badName); err == nil {
+				t.Fatalf("LookupSdk(%q) succeeded, want error", badName)
+			} else if errors.As(err, &NotFoundError{}) {
+				t.Fatalf("LookupSdk(%q) returned NotFoundError %v, want invalid name error", badName, err)
+			}
+			if _, err := f.LookupSdkWithInstall(badName, true); err == nil {
+				t.Fatalf("LookupSdkWithInstall(%q) succeeded, want error", badName)
+			}
+			if err := f.Remove(badName); err == nil {
+				t.Fatalf("Remove(%q) succeeded, want error", badName)
+			}
+			if err := f.Update(badName); err == nil {
+				t.Fatalf("Update(%q) succeeded, want error", badName)
+			}
+		})
+	}
+
+	if srvRequests != 0 {
+		t.Fatalf("registry received %d request(s) for invalid SDK names, want 0", srvRequests)
+	}
+	if _, err := os.Stat(markerPath); !os.IsNotExist(err) {
+		t.Fatalf("outside plugin was executed on LookupSdk traversal, marker stat err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outsideDir, "main.lua")); err != nil {
+		t.Fatalf("Remove deleted or damaged outside directory: %v", err)
+	}
+}

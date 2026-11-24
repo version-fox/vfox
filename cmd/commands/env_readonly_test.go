@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/version-fox/vfox/internal"
+	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/pathmeta"
 	"github.com/version-fox/vfox/internal/sdk"
 	"github.com/version-fox/vfox/internal/shared/logger"
@@ -372,4 +374,40 @@ func runInProcessCaptured(t *testing.T, f *cliFixture, level logger.LoggerLevel,
 		t.Fatalf("vfox %v (level=%v) returned unexpected error: %v", args, level, runErr)
 	}
 	return string(outBytes), string(errBytes)
+}
+
+func TestEnvAndStampRejectTraversalToolNames(t *testing.T) {
+	f := newCLIFixtureWithoutRegistryGuard(t, false)
+	outsideDir := filepath.Join(f.root, "outside")
+	must(t, os.MkdirAll(outsideDir, 0755))
+	markerPath := filepath.Join(outsideDir, "executed.marker")
+	luaSource := fmt.Sprintf(`PLUGIN = {name="outside", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+local fh = io.open(%q, "w")
+if fh ~= nil then fh:write("loaded"); fh:close() end
+function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`, filepath.ToSlash(markerPath))
+	must(t, os.WriteFile(filepath.Join(outsideDir, "main.lua"), []byte(luaSource), 0644))
+	must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\n\"../../outside\" = \"1.0.0\"\n"), 0644))
+
+	f.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with traversal key in .vfox.toml")
+	f.runProcess(t, "env", "--json").mustSucceed(t, "env --json with traversal key in .vfox.toml")
+
+	if _, err := os.Stat(markerPath); !os.IsNotExist(err) {
+		t.Fatalf("vfox env loaded and executed plugin outside shared plugin dir, stat err = %v", err)
+	}
+
+	ctx := &env.RuntimeEnvContext{
+		PathMeta:          pathmeta.NewPathMeta(f.userHome, f.shared, f.work, 12345),
+		CurrentWorkingDir: f.work,
+	}
+	chain, err := ctx.LoadVfoxTomlChainByScopes(env.Project)
+	must(t, err)
+	if got := installsStamp(ctx, chain); got != "../../outside - -\n" {
+		t.Fatalf("installsStamp() = %q, want %q", got, "../../outside - -\n")
+	}
+	if got := linksStamp(ctx, chain); got != "../../outside - - -\n" {
+		t.Fatalf("linksStamp() = %q, want %q", got, "../../outside - - -\n")
+	}
 }
