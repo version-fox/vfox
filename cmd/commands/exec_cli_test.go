@@ -119,7 +119,7 @@ func assertExecStreamsSeparated(t *testing.T, res cliResult) {
 
 func TestExecAutoInstallSeparatesStdoutAndStderr(t *testing.T) {
 	t.Run("process", func(t *testing.T) {
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		f.writePlugin(t, "alpha", execOutputPlugin)
 		writeExecTestTool(t, f.system, "alphatool")
 
@@ -128,7 +128,7 @@ func TestExecAutoInstallSeparatesStdoutAndStderr(t *testing.T) {
 	})
 
 	t.Run("in-process restores streams", func(t *testing.T) {
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		f.writePlugin(t, "alpha", execOutputPlugin)
 		writeExecTestTool(t, f.system, "alphatool")
 
@@ -141,7 +141,7 @@ func TestExecAutoInstallSeparatesStdoutAndStderr(t *testing.T) {
 	})
 
 	t.Run("error restores streams", func(t *testing.T) {
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		f.writePlugin(t, "alpha", execOutputPlugin)
 		writeExecTestTool(t, f.system, "alphatool")
 
@@ -172,7 +172,7 @@ func TestExecAutoInstallNeverWritesClipboard(t *testing.T) {
 		util.IsTTY = func() bool { return true }
 		t.Cleanup(func() { util.IsTTY = origIsTTY })
 
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		f.writePlugin(t, "alpha", execOutputPlugin)
 		writeExecTestTool(t, f.system, "alphatool")
 		marker := filepath.Join(f.root, "clipboard.called")
@@ -239,7 +239,7 @@ func TestExecAutoInstallStdioCloseRefusalAndFileErrors(t *testing.T) {
 		{name: "io_output_close", closeStmt: `local ok, err = io.output():close(); assert(ok == nil and err == "cannot close standard output")`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := newIsolatedCLIFixture(t, false)
+			f := newCLIFixtureWithoutRegistryGuard(t, false)
 			pluginSrc := `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
 function PLUGIN:PreInstall(ctx)
@@ -271,12 +271,12 @@ function PLUGIN:PreInstall(ctx)
 end
 function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 `
-		fExec := newIsolatedCLIFixture(t, false)
+		fExec := newCLIFixtureWithoutRegistryGuard(t, false)
 		fExec.writePlugin(t, "alpha", pluginSrc)
 		writeExecTestTool(t, fExec.system, "alphatool")
 		execRes := fExec.runProcess(t, "exec", "alpha@1.0.0", "--", "alphatool").mustFail(t, "exec failing PreInstall")
 
-		fInst := newIsolatedCLIFixture(t, false)
+		fInst := newCLIFixtureWithoutRegistryGuard(t, false)
 		fInst.writePlugin(t, "alpha", pluginSrc)
 		instRes := fInst.runProcess(t, "install", "alpha@1.0.0").mustFail(t, "install failing PreInstall")
 
@@ -301,7 +301,7 @@ function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 		}
 		defer errSink.Close()
 
-		f := newIsolatedCLIFixture(t, false)
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		pluginSrc := `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
 function PLUGIN:Available(ctx) return {{version="1.0.0"}} end
 function PLUGIN:PreInstall(ctx)

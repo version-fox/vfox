@@ -62,7 +62,8 @@ func (b bash) Activate(config ActivateConfig) (string, error) {
 }
 
 func (b bash) Export(envs env.Vars) (out string) {
-	for key, value := range envs {
+	for _, key := range sortedEnvKeys(envs) {
+		value := envs[key]
 		if value == nil {
 			out += b.unset(key)
 		} else {

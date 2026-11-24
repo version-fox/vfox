@@ -58,7 +58,7 @@ func openLinuxPTY(t *testing.T) (master, slave *os.File) {
 // Reproduces `x=$(vfox exec alpha@1.0.0 -- cmd)` where stdout is piped and
 // stderr is attached to an interactive terminal.
 func TestExecAutoInstallWithStderrPTYNeverWritesClipboard(t *testing.T) {
-	f := newIsolatedCLIFixture(t, false)
+	f := newCLIFixtureWithoutRegistryGuard(t, false)
 	f.writePlugin(t, "alpha", execOutputPlugin)
 	writeExecTestTool(t, f.system, "alphatool")
 	marker := filepath.Join(f.root, "clipboard.called")
