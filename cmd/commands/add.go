@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
@@ -55,11 +56,19 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 
 	// multiple plugins
 	if args.Len() > 1 {
+		var failed []string
 		for index, sdkName := range args.Slice() {
 			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), args.Len(), pterm.Green(sdkName))
 			if err := manager.Add(sdkName, "", ""); err != nil {
 				pterm.Println(fmt.Sprintf("Add plugin(%s) failed: %s", pterm.Red(sdkName), err.Error()))
+				failed = append(failed, sdkName)
 			}
+		}
+		if len(failed) == 1 {
+			return fmt.Errorf("failed to add plugin: %s", failed[0])
+		}
+		if len(failed) > 1 {
+			return fmt.Errorf("failed to add plugins: %s", strings.Join(failed, ", "))
 		}
 		return nil
 	} else {
