@@ -150,7 +150,8 @@ func (n nushell) Export(envs env.Vars) string {
 		EnvsToUnset: make([]string, 0),
 	}
 
-	for key, value := range envs {
+	for _, key := range sortedEnvKeys(envs) {
+		value := envs[key]
 		if strings.ToLower(key) == "path" {
 			n.addPathToExportData(&exportData, value)
 		} else {

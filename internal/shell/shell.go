@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/process"
@@ -43,6 +44,15 @@ type Shell interface {
 	// Export generates a string that can be used by the shell to set or unset the given environment variables. (The
 	// input specifies environment variables to be unset by giving them a nil value.)
 	Export(envs env.Vars) string
+}
+
+func sortedEnvKeys(envs env.Vars) []string {
+	keys := make([]string, 0, len(envs))
+	for key := range envs {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func NewShell(name string) Shell {
