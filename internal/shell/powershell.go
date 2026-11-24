@@ -64,7 +64,8 @@ func (sh pwsh) Activate(config ActivateConfig) (string, error) {
 }
 
 func (sh pwsh) Export(e env.Vars) (out string) {
-	for key, value := range e {
+	for _, key := range sortedEnvKeys(e) {
+		value := e[key]
 		if value == nil {
 			out += sh.unset(key)
 		} else {

@@ -74,7 +74,8 @@ func (sh fish) Activate(config ActivateConfig) (string, error) {
 }
 
 func (sh fish) Export(e env.Vars) (out string) {
-	for key, value := range e {
+	for _, key := range sortedEnvKeys(e) {
+		value := e[key]
 		if value == nil {
 			out += sh.unset(key)
 		} else {

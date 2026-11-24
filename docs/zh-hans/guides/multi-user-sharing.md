@@ -197,7 +197,7 @@ sudo chmod 644 /opt/vfox/config.yaml
 │   └── nodejs/
 │       └── v-20.9.0/
 │           └── nodejs-20.9.0/      # Node.js 实际文件
-└── plugins/                        # 插件定义
+└── plugin/                         # 插件定义
     ├── java/
     └── nodejs/
 
@@ -243,9 +243,9 @@ sudo chgrp vfox /opt/vfox
 sudo chmod 2775 /opt/vfox
 
 # 2. 移动现有的 SDK 安装和插件
-mkdir -p /opt/vfox/cache /opt/vfox/plugins
+mkdir -p /opt/vfox/cache /opt/vfox/plugin
 mv ~/.vfox/cache/* /opt/vfox/cache/
-mv ~/.vfox/plugins/* /opt/vfox/plugins/
+mv ~/.vfox/plugin/* /opt/vfox/plugin/
 
 # 3. 设置 VFOX_HOME
 export VFOX_HOME=/opt/vfox
@@ -274,9 +274,9 @@ Set-Acl $vfoxPath $acl
 
 # 2. 移动现有的 SDK 安装和插件
 New-Item -ItemType Directory -Path "$vfoxPath\cache\" -Force
-New-Item -ItemType Directory -Path "$vfoxPath\plugins\" -Force
+New-Item -ItemType Directory -Path "$vfoxPath\plugin\" -Force
 Move-Item -Path "$env:USERPROFILE\.vfox\cache\*" -Destination "$vfoxPath\cache\" -Force
-Move-Item -Path "$env:USERPROFILE\.vfox\plugins\*" -Destination "$vfoxPath\plugins\" -Force
+Move-Item -Path "$env:USERPROFILE\.vfox\plugin\*" -Destination "$vfoxPath\plugin\" -Force
 
 # 3. 设置 VFOX_HOME 环境变量
 [System.Environment]::SetEnvironmentVariable('VFOX_HOME', $vfoxPath, 'User')
