@@ -16,6 +16,7 @@ vfox doctor [<sdk-name>[@<version>]] 检查 vfox 和已安装的 SDK 有没有�
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox unuse [--global --project --session] <sdk-name>   Unset the SDK version from the specified scope
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command in vfox managed environment
+vfox exec <sdk-name>[@<version>] <command> [args...]         Execute a command in vfox managed environment for a single SDK
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox config [<key>] [<value>]       Setup, view config

@@ -350,14 +350,20 @@ vfox upgrade
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK 名称
 
 `version`[可选]: 指定使用的版本。如不传，则使用当前作用域配置的版本。
 
-可以在 `--` 之前连续指定多个 SDK。它们会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
+只指定单个 SDK 且 `<command>` 及其参数中不包含 `--` 时可以省略 `--`，跟在 `<command>` 之后的标志（如 `--version`、`--help`）会直接透传给 `<command>`。`exec` 自身的前置标志（`--help`/`-h`/`-help` 与 `--debug`/`-debug`）必须放在 `<sdk-name>` 之前（`--debug`/`-debug` 也可放在 SDK 与 `<command>` 或 `--` 之间）；`-v`、`-V` 和 `--version` 属于根命令选项，如需查看 `vfox` 版本请运行 `vfox --version`。但无论是带 `--` 还是不带 `--` 的调用，末尾用于 Shell 补全探测的 `--generate-shell-completion` 都会由 `vfox` 拦截并返回空输出，不会运行 `<command>`；使用 `--` 的形式也不再将该探测参数交给目标命令响应。如果目标工具自身需要接收 `--generate-shell-completion` 参数，可通过 Shell 包装调用，例如：`vfox exec <sdk> sh -c '<tool> --generate-shell-completion'`。
+
+第一个 `--` 始终作为 SDK 列表与 `<command>` 之间的分隔符，其前方的所有参数都会按 SDK 解析。同时指定多个 SDK 时必须使用 `--` 分隔；如果 `<command>` 自身需要接收 `--`，请将 `--` 放在 `<command>` 之前（例如 `vfox exec nodejs@24.14.0 -- npm run build -- --watch`）。多个 SDK 会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
 
 `command`: 要执行的命令
 
@@ -381,6 +387,12 @@ vfox x <sdk-name>[@<version>]... -- <command> [args...]
 vfox exec nodejs@24.14.0 -- npm install -g pnpm
 vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 ```
+
+:::
+
+::: warning Windows 批处理脚本（`.cmd` / `.bat`）
+
+在 Windows 上，当解析到的目标是批处理脚本（`.cmd` 或 `.bat`，例如 `npm.cmd`）时，`vfox exec` 会按 `cmd.exe` 规则为可执行文件路径及参数加引号，从而安全透传 `&`、`|`、`<`、`>`、`(`、`)`、`^` 和空格。但对于引号也无法阻止 `cmd.exe` 解析的字符（`%`、`!`、`"`、回车 `CR`、换行 `LF`、`NUL`），若出现在批处理路径或参数中会被拒绝执行。如需传递这些字符，可直接调用对应的 `.exe` 主程序（如 `node`）、直接执行入口脚本，或通过 `powershell` / `sh` 包装运行。
 
 :::
 
