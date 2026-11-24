@@ -486,9 +486,26 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	}
 
 	fileName := pluginFileName(downloadUrl)
-	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, fileName)
+	tempRoot := m.RuntimeEnvContext.PathMeta.User.Temp
+	if tempRoot == "" {
+		tempRoot = os.TempDir()
+	}
+	if err := os.MkdirAll(tempRoot, pathmeta.ReadWriteAuth); err != nil {
+		return "", err
+	}
+	dlDir, err := os.MkdirTemp(tempRoot, "vfox-dl-")
+	if err != nil {
+		return "", err
+	}
+	keepFile := false
+	defer func() {
+		if !keepFile {
+			_ = os.RemoveAll(dlDir)
+		}
+	}()
+	path := filepath.Join(dlDir, fileName)
 	logger.Debugf("Saving plugin to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		logger.Debugf("Failed to create file: %v\n", err)
 		return "", err
@@ -500,6 +517,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 		logger.Debugf("Failed to write plugin file: %v\n", err)
 		return "", err
 	}
+	keepFile = true
 	logger.Debugf("Plugin downloaded successfully: %s\n", path)
 	return path, nil
 }
@@ -535,10 +553,14 @@ func unwrapPathError(err error) error {
 
 func preparePluginDirError(pluginsDir string, err error) error {
 	reason := unwrapPathError(err)
-	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
-		return fmt.Errorf("prepare plugin directory %s (%s=%s) is not writable: %w", pluginsDir, env.HomeFromEnv, vfoxHome, reason)
+	verb := "failed"
+	if errors.Is(err, fs.ErrPermission) {
+		verb = "is not writable"
 	}
-	return fmt.Errorf("prepare plugin directory %s is not writable: %w", pluginsDir, reason)
+	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
+		return fmt.Errorf("prepare plugin directory %s (%s=%s) %s: %w", pluginsDir, env.HomeFromEnv, vfoxHome, verb, reason)
+	}
+	return fmt.Errorf("prepare plugin directory %s %s: %w", pluginsDir, verb, reason)
 }
 
 // Add a plugin to plugin home directory
@@ -567,18 +589,16 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	}
 	var installPath string
 	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
-	// first quick check before probing directory writability, so an already-installed
-	// plugin still gets "already exists" even when plugin/ is read-only.
+	// When the target plugin name is known up front, check existence and plugin/
+	// writability before downloading. Unnamed sources download into User.Temp first
+	// so existing-plugin errors take precedence over read-only plugin/ probes.
+	dirChecked := false
 	if pname != "" {
 		installPath = filepath.Join(pluginsDir, pname)
 		if util.FileExists(installPath) {
 			logger.Debugf("Plugin %s already exists at: %s\n", pname, installPath)
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
-	}
-	isRemoteSource := len(url) == 0 || strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
-	dirChecked := false
-	if pname != "" || isRemoteSource {
 		if err := ensureWritableDir(pluginsDir); err != nil {
 			return preparePluginDirError(pluginsDir, err)
 		}
@@ -677,7 +697,7 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 		}
 		localPath = pluginPath
 		defer func() {
-			_ = os.Remove(localPath)
+			_ = os.RemoveAll(filepath.Dir(localPath))
 		}()
 	}
 	success := false
@@ -692,11 +712,11 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 			_ = os.RemoveAll(tempInstallPath)
 		}
 	}()
-	// make a directory to store the wrapper and rename the wrapper file to main.lua
+	// make a directory to store the wrapper and copy the wrapper file to main.lua
 	if ext == ".lua" {
-		logger.Debugf("Moving wrapper %s to %s \n", localPath, tempInstallPath)
-		if err = os.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
-			logger.Debugf("Failed to move lua plugin: %v\n", err)
+		logger.Debugf("Copying wrapper %s to %s \n", localPath, tempInstallPath)
+		if err = util.CopyFile(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
+			logger.Debugf("Failed to copy lua plugin: %v\n", err)
 			return nil, fmt.Errorf("install wrapper error: %w", err)
 		}
 	} else {
@@ -878,10 +898,7 @@ func NewSdkManager() (*Manager, error) {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
 	currentDir := getWorkingDirectory()
-	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
-	if err != nil {
-		return nil, fmt.Errorf("init path meta failed: %w", err)
-	}
+	meta := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 
 	// Load config with hierarchy: SharedRoot (VFOX_HOME) > User Home
 	// Shared config has higher priority and overrides user config

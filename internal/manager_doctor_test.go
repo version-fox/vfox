@@ -54,10 +54,7 @@ func newManagerFixture(t *testing.T) *managerFixture {
 			t.Fatal(err)
 		}
 	}
-	meta, err := pathmeta.NewPathMeta(filepath.Join(root, "home"), shared, work, 4242)
-	if err != nil {
-		t.Fatal(err)
-	}
+	meta := pathmeta.NewPathMeta(filepath.Join(root, "home"), shared, work, 4242)
 	m := &Manager{
 		RuntimeEnvContext: &env.RuntimeEnvContext{
 			UserConfig:        &config.Config{},

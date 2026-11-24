@@ -209,10 +209,7 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		if err := os.MkdirAll(existingRoot, 0755); err != nil {
 			t.Fatal(err)
 		}
-		meta, err := NewPathMeta(filepath.Join(root, "home"), existingRoot, root, 4242)
-		if err != nil {
-			t.Fatalf("NewPathMeta returned error: %v", err)
-		}
+		meta := NewPathMeta(filepath.Join(root, "home"), existingRoot, root, 4242)
 		for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
 			info, statErr := os.Stat(dir)
 			if statErr != nil || !info.IsDir() {
@@ -244,7 +241,7 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		os.Stdout = w
-		_, metaErr := NewPathMeta(home, existingRoot, root, 4242)
+		NewPathMeta(home, existingRoot, root, 4242)
 		_ = w.Close()
 		os.Stdout = origStdout
 
@@ -252,9 +249,6 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		_, _ = io.Copy(&out, r)
 		_ = r.Close()
 
-		if metaErr != nil {
-			t.Fatalf("NewPathMeta returned error: %v", metaErr)
-		}
 		if strings.Contains(out.String(), "failed") {
 			t.Fatalf("unexpected failure log at debug level when shared subdirs exist: %q", out.String())
 		}
@@ -273,10 +267,7 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				root := t.TempDir()
 				shared := filepath.Join(append([]string{root}, tc.rel...)...)
 
-				meta, err := NewPathMeta(filepath.Join(root, "home"), shared, root, 4242)
-				if err != nil {
-					t.Fatalf("NewPathMeta returned error: %v", err)
-				}
+				meta := NewPathMeta(filepath.Join(root, "home"), shared, root, 4242)
 				if meta == nil || meta.Shared.Root != shared {
 					t.Fatalf("unexpected PathMeta: %+v", meta)
 				}
@@ -287,15 +278,16 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		}
 	})
 
-	t.Run("stays best-effort and silent on stdout when directories or executable lookup fail", func(t *testing.T) {
+	t.Run("writes diagnostics to stderr and keeps stdout clean when directories or executable lookup fail", func(t *testing.T) {
 		for _, tc := range []struct {
-			name      string
-			blockTemp bool
-			failExe   bool
+			name       string
+			blockTemp  bool
+			failExe    bool
+			wantStderr string
 		}{
-			{name: "blocked GlobalSdkDir and SharedRoot"},
-			{name: "blocked session temp directory", blockTemp: true},
-			{name: "executable lookup failure", failExe: true},
+			{name: "blocked GlobalSdkDir and SharedRoot", wantStderr: "create global sdk dir failed:"},
+			{name: "blocked session temp directory", blockTemp: true, wantStderr: "create temp dir failed:"},
+			{name: "executable lookup failure", failExe: true, wantStderr: "get executable path failed:"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -305,11 +297,11 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 					t.Fatal(err)
 				}
 				if tc.failExe {
-					origExe := executable
-					executable = func() (string, error) {
+					origExe := Executable
+					Executable = func() (string, error) {
 						return "", errors.New("readlink /proc/self/exe: no such file or directory")
 					}
-					t.Cleanup(func() { executable = origExe })
+					t.Cleanup(func() { Executable = origExe })
 				}
 				// Block GlobalSdkDir and SharedRoot with regular files so directory creation fails.
 				if err := os.WriteFile(filepath.Join(userVfox, "sdks"), []byte("file"), 0644); err != nil {
@@ -329,23 +321,27 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				}
 				shared := filepath.Join(blocker, "vfox-home")
 
-				origStdout := os.Stdout
-				r, w, err := os.Pipe()
+				origStdout, origStderr := os.Stdout, os.Stderr
+				rOut, wOut, err := os.Pipe()
 				if err != nil {
 					t.Fatal(err)
 				}
-				os.Stdout = w
-				meta, metaErr := NewPathMeta(home, shared, root, 4242)
-				_ = w.Close()
-				os.Stdout = origStdout
-
-				var out bytes.Buffer
-				_, _ = io.Copy(&out, r)
-				_ = r.Close()
-
-				if metaErr != nil {
-					t.Fatalf("NewPathMeta returned unexpected error: %v", metaErr)
+				rErr, wErr, err := os.Pipe()
+				if err != nil {
+					t.Fatal(err)
 				}
+				os.Stdout, os.Stderr = wOut, wErr
+				meta := NewPathMeta(home, shared, root, 4242)
+				_ = wOut.Close()
+				_ = wErr.Close()
+				os.Stdout, os.Stderr = origStdout, origStderr
+
+				var out, errBuf bytes.Buffer
+				_, _ = io.Copy(&out, rOut)
+				_, _ = io.Copy(&errBuf, rErr)
+				_ = rOut.Close()
+				_ = rErr.Close()
+
 				if meta == nil || meta.Shared.Root != shared {
 					t.Fatalf("unexpected PathMeta: %+v", meta)
 				}
@@ -354,6 +350,9 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				}
 				if out.Len() != 0 {
 					t.Fatalf("NewPathMeta wrote to stdout on failure: %q", out.String())
+				}
+				if !strings.Contains(errBuf.String(), tc.wantStderr) {
+					t.Fatalf("NewPathMeta stderr = %q, want substring %q", errBuf.String(), tc.wantStderr)
 				}
 			})
 		}

@@ -110,7 +110,7 @@ func newTempPath(pid int) string {
 
 // NewPathMeta creates a new PathMeta instance based on the provided parameters and environment variables.
 // If not provide sharedRoot, it will use userHome as sharedRoot.
-func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, error) {
+func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) *PathMeta {
 	vfoxUserHome := filepath.Join(userHome, oldVfoxDirPrefix)
 	// Compatibility check for old directory
 	if !util.FileExists(vfoxUserHome) {
@@ -145,10 +145,10 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 	// best-effort (Shared subdirs are created only when Shared.Root already
 	// exists; write commands ensure missing parents).
 	if err := os.MkdirAll(meta.User.Temp, ReadWriteAuth); err != nil {
-		logger.Debugf("create temp dir failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "create temp dir failed: %v\n", err)
 	}
 	if err := os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth); err != nil {
-		logger.Debugf("create global sdk dir failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "create global sdk dir failed: %v\n", err)
 	}
 	for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
 		if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
@@ -156,7 +156,7 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) (*PathMeta, e
 		}
 	}
 
-	return meta, nil
+	return meta
 }
 
 func generateSessionShimPath(userTemp string, pid int) string {
@@ -168,18 +168,19 @@ func generateSessionShimPath(userTemp string, pid int) string {
 	if !util.FileExists(curTmpPath) {
 		err := os.MkdirAll(curTmpPath, ReadWriteAuth)
 		if err != nil {
-			logger.Debugf("create temp dir failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "create temp dir failed: %v\n", err)
 		}
 	}
 	return curTmpPath
 }
 
-var executable = os.Executable
+// Executable resolves the running binary path; tests override it to simulate lookup failures.
+var Executable = os.Executable
 
 func getExecutablePath() string {
-	exePath, err := executable()
+	exePath, err := Executable()
 	if err != nil {
-		logger.Debugf("get executable path failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "get executable path failed: %v\n", err)
 		return ""
 	}
 	return exePath

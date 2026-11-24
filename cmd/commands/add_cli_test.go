@@ -100,28 +100,38 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		}
 	})
 
-	t.Run("blocked VFOX_HOME fails before download and names VFOX_HOME", func(t *testing.T) {
+	t.Run("blocked VFOX_HOME fails cleanly and names VFOX_HOME", func(t *testing.T) {
 		f := newCLIFixtureWithoutRegistryGuard(t, false)
 		blocker := filepath.Join(f.root, "not-a-dir")
 		must(t, os.WriteFile(blocker, []byte("file"), 0644))
 		f.env["VFOX_HOME"] = filepath.Join(blocker, "vfox-home")
 
+		zipBytes, err := os.ReadFile(writeDemoPluginZip(t, f.work))
+		must(t, err)
+
 		var hits atomic.Int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			http.Error(w, "unexpected download", http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
 		}))
 		defer srv.Close()
+
+		namedRes := f.runHere(t, "add", "--source", srv.URL+"/demo.zip", "--alias", "mydemo").mustFail(t, "add --alias --source with blocked VFOX_HOME")
+		mustContain(t, "add blocked VFOX_HOME error", namedRes.output(), "VFOX_HOME")
+		mustContain(t, "Manager.Add error path", namedRes.output(), "prepare plugin directory")
+		mustNotContain(t, "non-permission blocked VFOX_HOME error", namedRes.output(), "is not writable")
+		if hits.Load() != 0 {
+			t.Fatalf("expected named add to stop before downloading plugin, got %d requests", hits.Load())
+		}
 
 		res := f.runHere(t, "add", "--source", srv.URL+"/demo.zip").mustFail(t, "add --source with blocked VFOX_HOME")
 		mustContain(t, "add blocked VFOX_HOME error", res.output(), "VFOX_HOME")
 		mustContain(t, "Manager.Add error path", res.output(), "prepare plugin directory")
-		if hits.Load() != 0 {
-			t.Fatalf("expected add to stop before downloading plugin, got %d requests", hits.Load())
-		}
+		mustNotContain(t, "non-permission blocked VFOX_HOME error", res.output(), "is not writable")
 	})
 
-	t.Run("non-writable VFOX_HOME plugin dir fails before download and names VFOX_HOME", func(t *testing.T) {
+	t.Run("unnamed remote source on non-writable VFOX_HOME plugin dir makes one request, writes nothing, and names VFOX_HOME", func(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 			t.Skip("POSIX chmod 0555 does not block owner writes on Windows or root")
 		}
@@ -130,10 +140,14 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		must(t, os.Chmod(pluginsDir, 0555))
 		t.Cleanup(func() { _ = os.Chmod(pluginsDir, 0755) })
 
+		zipBytes, err := os.ReadFile(writeDemoPluginZip(t, f.work))
+		must(t, err)
+
 		var hits atomic.Int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			http.Error(w, "unexpected download", http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
 		}))
 		defer srv.Close()
 
@@ -142,8 +156,11 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		mustContain(t, "Manager.Add error path", res.output(), "prepare plugin directory")
 		mustContain(t, "add non-writable plugin dir error", res.output(), "is not writable")
 		mustNotContain(t, "add non-writable plugin dir error", res.output(), ".vfox-write-check-")
-		if hits.Load() != 0 {
-			t.Fatalf("expected add to stop before downloading plugin, got %d requests", hits.Load())
+		if hits.Load() != 1 {
+			t.Fatalf("expected 1 download to discover plugin name before probing plugin/, got %d requests", hits.Load())
+		}
+		if exists(filepath.Join(pluginsDir, "demo")) || exists(filepath.Join(pluginsDir, "demo.zip")) {
+			t.Fatal("expected nothing written under non-writable plugin/")
 		}
 	})
 
@@ -174,6 +191,16 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		zipPath := writeDemoPluginZip(t, f.work)
 		f.runProcess(t, "add", "--source", zipPath).mustSucceed(t, "seed demo plugin")
 
+		zipBytes, err := os.ReadFile(zipPath)
+		must(t, err)
+		var hits atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
+		}))
+		defer srv.Close()
+
 		pluginsDir := filepath.Join(f.shared, "plugin")
 		must(t, os.Chmod(pluginsDir, 0555))
 		t.Cleanup(func() { _ = os.Chmod(pluginsDir, 0755) })
@@ -185,5 +212,55 @@ func TestAddSourceMissingVfoxHome(t *testing.T) {
 		bySource := f.runHere(t, "add", "--source", zipPath).mustFail(t, "add --source demo.zip when already installed")
 		mustContain(t, "add --source existing plugin error", bySource.output(), "plugin named demo already exists")
 		mustNotContain(t, "add --source existing plugin error", bySource.output(), "prepare plugin directory")
+
+		byRemoteSource := f.runHere(t, "add", "--source", srv.URL+"/demo.zip").mustFail(t, "add --source remote demo.zip when already installed")
+		mustContain(t, "add --source remote existing plugin error", byRemoteSource.output(), "plugin named demo already exists")
+		mustNotContain(t, "add --source remote existing plugin error", byRemoteSource.output(), "prepare plugin directory")
+		if hits.Load() != 1 {
+			t.Fatalf("expected 1 remote download request to discover name, got %d", hits.Load())
+		}
+	})
+
+	t.Run("local lua source is preserved after both successful and failed add", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		luaPath := filepath.Join(f.work, "mine.lua")
+		must(t, os.WriteFile(luaPath, []byte(`PLUGIN = {name="mine", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`), 0644))
+
+		f.runProcess(t, "add", "--source", luaPath).mustSucceed(t, "add --source mine.lua")
+		if !exists(luaPath) {
+			t.Fatalf("expected source lua file %q to still exist after add", luaPath)
+		}
+		if !exists(filepath.Join(f.shared, "plugin", "mine", "main.lua")) {
+			t.Fatalf("expected installed mine/main.lua under %q", f.shared)
+		}
+
+		// Adding the same file again fails cleanly without deleting mine.lua.
+		f.runHere(t, "add", "--source", luaPath).mustFail(t, "duplicate add --source mine.lua")
+		if !exists(luaPath) {
+			t.Fatalf("expected source lua file %q to still exist after failed add", luaPath)
+		}
+	})
+
+	t.Run("leftover archive in plugin dir does not break subsequent remote add", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		zipBytes, err := os.ReadFile(writeDemoPluginZip(t, f.work))
+		must(t, err)
+		leftover := filepath.Join(f.shared, "plugin", "demo.zip")
+		must(t, os.WriteFile(leftover, make([]byte, len(zipBytes)*4), 0644))
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBytes)
+		}))
+		defer srv.Close()
+
+		f.runProcess(t, "add", "--source", srv.URL+"/demo.zip").mustSucceed(t, "add --source with leftover plugin/demo.zip")
+		if !exists(filepath.Join(f.shared, "plugin", "demo", "main.lua")) {
+			t.Fatalf("expected demo plugin to install cleanly under %q", f.shared)
+		}
 	})
 }

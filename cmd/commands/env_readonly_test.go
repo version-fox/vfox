@@ -17,6 +17,10 @@
 package commands
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,6 +28,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/pathmeta"
 )
 
 func sortSemicolonStatements(s string) []string {
@@ -74,7 +80,7 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("env stdout stays clean shell code when session temp dir cannot be created", func(t *testing.T) {
+	t.Run("env and activate write temp-dir diagnostic to stderr while keeping stdout clean", func(t *testing.T) {
 		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
 
@@ -88,6 +94,52 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if blockedEnv.stdout != want {
 			t.Fatalf("env stdout changed when session temp dir could not be created:\ngot:\n%s\nwant:\n%s", blockedEnv.stdout, want)
 		}
+		mustContain(t, "env stderr", blockedEnv.stderr, "create temp dir failed:")
+		mustNotContain(t, "env stdout", blockedEnv.stdout, "create temp dir failed:")
+
+		blockedAct := fBlocked.runProcess(t, "activate", "bash").mustSucceed(t, "activate bash with blocked session temp dir")
+		mustContain(t, "activate stderr", blockedAct.stderr, "create temp dir failed:")
+		mustNotContain(t, "activate stdout", blockedAct.stdout, "create temp dir failed:")
+	})
+
+	t.Run("activate writes executable lookup diagnostic to stderr and not stdout", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		for k, v := range f.environ() {
+			if v == "-" {
+				t.Setenv(k, "")
+			} else {
+				t.Setenv(k, v)
+			}
+		}
+		origExe := pathmeta.Executable
+		pathmeta.Executable = func() (string, error) {
+			return "", errors.New("readlink /proc/self/exe: no such file or directory")
+		}
+		t.Cleanup(func() { pathmeta.Executable = origExe })
+
+		origStdout, origStderr := os.Stdout, os.Stderr
+		rOut, wOut, err := os.Pipe()
+		must(t, err)
+		rErr, wErr, err := os.Pipe()
+		must(t, err)
+		os.Stdout, os.Stderr = wOut, wErr
+
+		runErr := newTestApp().Run(context.Background(), []string{"vfox", "activate", "bash"})
+		_ = wOut.Close()
+		_ = wErr.Close()
+		os.Stdout, os.Stderr = origStdout, origStderr
+
+		var out, errBuf bytes.Buffer
+		_, _ = io.Copy(&out, rOut)
+		_, _ = io.Copy(&errBuf, rErr)
+		_ = rOut.Close()
+		_ = rErr.Close()
+
+		if runErr != nil {
+			t.Fatalf("activate bash returned unexpected error: %v", runErr)
+		}
+		mustContain(t, "activate stderr", errBuf.String(), "get executable path failed:")
+		mustNotContain(t, "activate stdout", out.String(), "get executable path failed:")
 	})
 
 	t.Run("read-only VFOX_HOME without cache or plugin keeps env and activate identical", func(t *testing.T) {

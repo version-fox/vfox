@@ -54,10 +54,7 @@ func TestLookupSdk_ConcurrentAccess(t *testing.T) {
 	os.MkdirAll(vfoxHome, 0755)
 
 	// Create PathMeta
-	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
-	if err != nil {
-		t.Fatalf("Failed to create PathMeta: %v", err)
-	}
+	meta := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
 
 	// Create plugins directory
 	pluginsDir := meta.Shared.Plugins
@@ -109,10 +106,7 @@ func TestLookupSdk_ConcurrentCacheHits(t *testing.T) {
 	os.MkdirAll(vfoxHome, 0755)
 
 	// Create PathMeta
-	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
-	if err != nil {
-		t.Fatalf("Failed to create PathMeta: %v", err)
-	}
+	meta := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
 
 	// Create Manager
 	manager := &Manager{
@@ -166,10 +160,7 @@ func TestLoadAllSdk_NoRaceCondition(t *testing.T) {
 	os.MkdirAll(vfoxHome, 0755)
 
 	// Create PathMeta
-	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
-	if err != nil {
-		t.Fatalf("Failed to create PathMeta: %v", err)
-	}
+	meta := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
 
 	// Create plugins directory
 	pluginsDir := meta.Shared.Plugins
@@ -212,10 +203,7 @@ func TestClose_NoRaceCondition(t *testing.T) {
 	os.MkdirAll(vfoxHome, 0755)
 
 	// Create PathMeta
-	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
-	if err != nil {
-		t.Fatalf("Failed to create PathMeta: %v", err)
-	}
+	meta := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
 
 	// Create Manager
 	manager := &Manager{
@@ -246,10 +234,7 @@ func TestLookupSdk_SimulateActivateScenario(t *testing.T) {
 	os.MkdirAll(vfoxHome, 0755)
 
 	// Create PathMeta
-	meta, err := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
-	if err != nil {
-		t.Fatalf("Failed to create PathMeta: %v", err)
-	}
+	meta := pathmeta.NewPathMeta(userHome, vfoxHome, currentDir, 12345)
 
 	// Create plugins directory
 	pluginsDir := meta.Shared.Plugins
@@ -484,30 +469,35 @@ func TestDownloadPluginNamesFileFromURLPath(t *testing.T) {
 	}
 }
 
-func TestDownloadPluginKeepsBackslashPathsInPluginDir(t *testing.T) {
+func TestDownloadPluginKeepsBackslashPathsInDownloadTempDir(t *testing.T) {
 	const body = "plugin bytes"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(body))
 	}))
 	defer srv.Close()
 
+	userTemp := t.TempDir()
 	plugins := t.TempDir()
 	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
 		UserConfig: &config.Config{Proxy: config.EmptyProxy},
-		PathMeta:   &pathmeta.PathMeta{Shared: pathmeta.SharedPaths{Plugins: plugins}},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: userTemp},
+			Shared: pathmeta.SharedPaths{Plugins: plugins},
+		},
 	}}
 
 	// A backslash in the URL path, literal or as %5C, must not let the
-	// download escape the plugin directory on Windows, where filepath.Join
+	// download escape the private download directory on Windows, where filepath.Join
 	// splits at it.
 	for _, p := range []string{"/..\\evil.zip", "/..%5Cevil.zip", "/sub/..%5C..%5Cevil.zip"} {
 		saved, err := m.downloadPlugin(srv.URL + p)
 		if err != nil {
 			t.Fatalf("downloadPlugin(%q) error = %v", p, err)
 		}
-		if rel, err := filepath.Rel(plugins, saved); err != nil || rel != filepath.Base(saved) {
-			t.Fatalf("downloadPlugin() saved %q, want a file directly in %q", saved, plugins)
+		if filepath.Dir(filepath.Dir(saved)) != userTemp || filepath.Base(saved) != "evil.zip" {
+			t.Fatalf("downloadPlugin() saved %q, want a file inside a direct subdir of %q", saved, userTemp)
 		}
+		_ = os.RemoveAll(filepath.Dir(saved))
 	}
 }
 
@@ -656,5 +646,63 @@ func TestPreparePluginDirErrorWithoutVfoxHome(t *testing.T) {
 	}
 	if strings.Contains(msg, ".vfox-write-check-") {
 		t.Fatalf("expected probe filename to be unwrapped, got %q", msg)
+	}
+
+	blocker := filepath.Join(t.TempDir(), "file-blocker")
+	dirErr := preparePluginDirError(filepath.Join(blocker, "plugin"), &fs.PathError{
+		Op:   "mkdir",
+		Path: filepath.Join(blocker, "plugin"),
+		Err:  errors.New("not a directory"),
+	})
+	if strings.Contains(dirErr.Error(), "is not writable") || !strings.Contains(dirErr.Error(), "failed: not a directory") {
+		t.Fatalf("unexpected non-permission error wording: %q", dirErr.Error())
+	}
+}
+
+func TestDownloadPluginSavesToPrivateTempAndTruncates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("small-payload"))
+	}))
+	defer srv.Close()
+
+	root := t.TempDir()
+	userTemp := filepath.Join(root, "tmp")
+	pluginsDir := filepath.Join(root, "plugin")
+	if err := os.MkdirAll(pluginsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	leftover := filepath.Join(pluginsDir, "demo.zip")
+	if err := os.WriteFile(leftover, []byte(strings.Repeat("LATE", 1024)), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		UserConfig: &config.Config{Proxy: config.EmptyProxy},
+		PathMeta: &pathmeta.PathMeta{
+			User:   pathmeta.UserPaths{Temp: userTemp},
+			Shared: pathmeta.SharedPaths{Plugins: pluginsDir},
+		},
+	}}
+
+	gotPath, err := m.downloadPlugin(srv.URL + "/demo.zip")
+	if err != nil {
+		t.Fatalf("downloadPlugin() error = %v", err)
+	}
+	defer os.RemoveAll(filepath.Dir(gotPath))
+
+	if !strings.HasPrefix(gotPath, userTemp+string(filepath.Separator)) {
+		t.Fatalf("downloaded archive %q should live under User.Temp %q", gotPath, userTemp)
+	}
+	content, err := os.ReadFile(gotPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "small-payload" {
+		t.Fatalf("downloaded content = %q, want small-payload", string(content))
+	}
+	// Shared plugins/ must not be written by downloadPlugin and leftover in plugin/ stays untouched.
+	leftoverBytes, err := os.ReadFile(leftover)
+	if err != nil || len(leftoverBytes) != 4096 {
+		t.Fatalf("expected leftover file in pluginsDir to stay untouched (err=%v, len=%d)", err, len(leftoverBytes))
 	}
 }
