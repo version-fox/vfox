@@ -352,6 +352,7 @@ func (m *Manager) Update(pluginName string) error {
 			_ = os.Rename(backupPath, sdkMetadata.PluginInstalledPath)
 		}
 	}()
+	m.matchPluginsDirMode(tempPlugin.InstalledPath)
 	logger.Debugf("Moving updated plugin from %s to %s\n", tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath)
 	if err = util.MovePath(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
@@ -617,6 +618,19 @@ func preparePluginDirError(pluginsDir string, err error) error {
 	return fmt.Errorf("prepare plugin directory %s %s: %w", pluginsDir, verb, reason)
 }
 
+// matchPluginsDirMode gives a staged plugin directory the plugin home's
+// permission bits. The staging directory comes from os.MkdirTemp, whose mode
+// is 0700: moved into place as is, it locks out every other user sharing the
+// VFOX_HOME.
+func (m *Manager) matchPluginsDirMode(path string) {
+	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
+	if info, err := os.Stat(pluginsDir); err == nil {
+		if chmodErr := os.Chmod(path, info.Mode().Perm()); chmodErr != nil {
+			logger.Debugf("Failed to set directory permissions %v on %s: %v\n", info.Mode().Perm(), path, chmodErr)
+		}
+	}
+}
+
 // Add a plugin to plugin home directory
 // 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
 // 2. If the plugin is a custom plugin, install the plugin from the specified URL.
@@ -702,11 +716,7 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 			return preparePluginDirError(pluginsDir, err)
 		}
 	}
-	if info, statErr := os.Stat(pluginsDir); statErr == nil {
-		if chmodErr := os.Chmod(tempPlugin.InstalledPath, info.Mode().Perm()); chmodErr != nil {
-			logger.Debugf("Failed to set directory permissions %v on %s: %v\n", info.Mode().Perm(), tempPlugin.InstalledPath, chmodErr)
-		}
-	}
+	m.matchPluginsDirMode(tempPlugin.InstalledPath)
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
 	if err = util.MovePath(tempPlugin.InstalledPath, installPath); err != nil {
 		logger.Debugf("Failed to move plugin: %v\n", err)

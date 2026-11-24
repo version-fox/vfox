@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -317,6 +318,71 @@ func TestUpdateAlreadyLatestFromRegistry(t *testing.T) {
 	}
 	if !strings.Contains(string(content), `version="0.0.1"`) {
 		t.Fatalf("plugin = %q, want it unchanged", content)
+	}
+}
+
+// An update stages the plugin in an os.MkdirTemp directory, whose mode is
+// 0700, and moves that directory into the plugin home. The moved directory
+// must take the plugin home's permission bits instead, or every other user
+// sharing the VFOX_HOME loses read and execute access to the plugin (#829).
+func TestUpdatePluginDirTakesPluginHomePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits do not apply")
+	}
+	newPlugin := fmt.Sprintf(updateTestPlugin, "9.9.9", "")
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+	entry, err := zw.Create("main.lua")
+	if err != nil {
+		t.Fatalf("create zip entry: %v", err)
+	}
+	if _, err = entry.Write([]byte(newPlugin)); err != nil {
+		t.Fatalf("write zip entry: %v", err)
+	}
+	if err = zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/demo.json":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"name":"demo","version":"9.9.9","downloadUrl":"http://%s/files/demo.zip"}`, r.Host)
+		case "/files/demo.zip":
+			_, _ = w.Write(zipBuf.Bytes())
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	f := newManagerFixture(t)
+	f.RuntimeEnvContext.UserConfig = &config.Config{
+		Proxy:    config.EmptyProxy,
+		Registry: &config.Registry{Address: srv.URL},
+	}
+
+	pluginDir := filepath.Join(f.meta.Shared.Plugins, "demo")
+	if err = os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(pluginDir, "main.lua"), []byte(fmt.Sprintf(updateTestPlugin, "0.0.1", "")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = f.Update("demo"); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	homeInfo, err := os.Stat(f.meta.Shared.Plugins)
+	if err != nil {
+		t.Fatalf("stat plugin home: %v", err)
+	}
+	info, err := os.Stat(pluginDir)
+	if err != nil {
+		t.Fatalf("stat updated plugin dir: %v", err)
+	}
+	if got, want := info.Mode().Perm(), homeInfo.Mode().Perm(); got != want {
+		t.Fatalf("updated plugin dir mode = %o, want plugin home mode %o", got, want)
 	}
 }
 
