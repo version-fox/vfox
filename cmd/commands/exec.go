@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -76,7 +77,8 @@ func execCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	return executeInVfoxEnv(sdkSpecs, command, cmdArgs)
+	hasSeparator := slices.Index(args, "--") >= 0
+	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, hasSeparator)
 }
 
 func showExecHelp(cmd *cli.Command) error {
@@ -88,6 +90,27 @@ func showExecHelp(cmd *cli.Command) error {
 	return nil
 }
 
+func parseExecDebugFlag(arg string) (bool, bool) {
+	switch arg {
+	case "--debug", "-debug":
+		return true, true
+	}
+	var raw string
+	switch {
+	case strings.HasPrefix(arg, "--debug="):
+		raw = strings.TrimPrefix(arg, "--debug=")
+	case strings.HasPrefix(arg, "-debug="):
+		raw = strings.TrimPrefix(arg, "-debug=")
+	default:
+		return false, false
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, false
+	}
+	return parsed, true
+}
+
 func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
 	var opts execOptions
 	for i, arg := range args {
@@ -97,13 +120,12 @@ func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
 		switch arg {
 		case "--help", "-h":
 			opts.ShowHelp = true
-		case "--debug", "--debug=true":
-			opts.Debug = true
-			opts.DebugSet = true
-		case "--debug=false":
-			opts.Debug = false
-			opts.DebugSet = true
 		default:
+			if debug, ok := parseExecDebugFlag(arg); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				continue
+			}
 			return nil, opts, fmt.Errorf("unexpected flag %q before SDK\n%s", arg, execUsageLine())
 		}
 	}
@@ -181,6 +203,10 @@ func execUsageError() error {
 
 // executeInVfoxEnv executes a command in vfox managed environment
 func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) error {
+	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, len(sdkSpecs) > 1)
+}
+
+func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdArgs []string, hasSeparator bool) error {
 	manager, err := internal.NewSdkManager()
 	if err != nil {
 		return fmt.Errorf("failed to create sdk manager: %w", err)
@@ -191,8 +217,8 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 	for i, sdkSpec := range sdkSpecs {
 		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
-			if len(sdkSpecs) > 1 && i > 0 {
-				return fmt.Errorf("%w\nnote: arguments before the first '--' are parsed as SDKs; pass '--' before the command when it also uses '--'", err)
+			if len(sdkSpecs) > 1 && i > 0 && sdkSpec.Version == "" {
+				return fmt.Errorf("%w\nnote: arguments before the first '--' (including %q) are parsed as SDKs; pass '--' before the command when it also uses '--'", err, sdkSpec.Name)
 			}
 			return err
 		}
@@ -209,7 +235,20 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 		}
 	}
 	envMap["PATH"] = buildExecPath(mergedEnvs.Paths)
-	return executeCommand(command, cmdArgs, envMap)
+	err = executeCommand(command, cmdArgs, envMap)
+	if err != nil && len(sdkSpecs) > 0 && isExecCommandNotFound(err) {
+		if hasSeparator && strings.HasPrefix(command, "-") {
+			return fmt.Errorf("%w\nnote: arguments before the first '--' (including %q) are parsed as SDKs; pass '--' before the command", err, sdkSpecs[len(sdkSpecs)-1].Name)
+		}
+		if !hasSeparator {
+			return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
+		}
+	}
+	return err
+}
+
+func isExecCommandNotFound(err error) bool {
+	return err != nil && strings.HasPrefix(err.Error(), "command not found: ")
 }
 
 // buildExecPath builds the PATH passed to the process that exec launches.

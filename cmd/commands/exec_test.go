@@ -158,8 +158,44 @@ func TestParseExecLeadingArgs(t *testing.T) {
 				wantOpts:      execOptions{Debug: true, DebugSet: true},
 			},
 			{
+				name:          "leading -debug before sdk",
+				args:          []string{"-debug", "etcd@3.5.12", "etcd", "put"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "put"},
+				wantOpts:      execOptions{Debug: true, DebugSet: true},
+			},
+			{
+				name:          "leading -debug=true before sdk",
+				args:          []string{"-debug=true", "etcd@3.5.12", "etcd", "put"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "put"},
+				wantOpts:      execOptions{Debug: true, DebugSet: true},
+			},
+			{
+				name:          "leading --debug=1 before sdk",
+				args:          []string{"--debug=1", "etcd@3.5.12", "etcd", "put"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "put"},
+				wantOpts:      execOptions{Debug: true, DebugSet: true},
+			},
+			{
+				name:          "leading --debug=TRUE before sdk",
+				args:          []string{"--debug=TRUE", "etcd@3.5.12", "etcd", "put"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "put"},
+				wantOpts:      execOptions{Debug: true, DebugSet: true},
+			},
+			{
+				name:          "leading --debug=0 before sdk",
+				args:          []string{"--debug=0", "etcd@3.5.12", "etcd", "--debug"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "--debug"},
+				wantOpts:      execOptions{Debug: false, DebugSet: true},
+			},
+			{
 				name:          "leading --debug=false before sdk",
 				args:          []string{"--debug=false", "etcd@3.5.12", "etcd", "--debug"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "--debug"},
+				wantOpts:      execOptions{Debug: false, DebugSet: true},
+			},
+			{
+				name:          "leading -debug=false before sdk",
+				args:          []string{"-debug=false", "etcd@3.5.12", "etcd", "--debug"},
 				wantRemaining: []string{"etcd@3.5.12", "etcd", "--debug"},
 				wantOpts:      execOptions{Debug: false, DebugSet: true},
 			},
@@ -206,6 +242,7 @@ func TestParseExecLeadingArgs(t *testing.T) {
 			{name: "-v before sdk", args: []string{"-v", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-v"},
 			{name: "-V before sdk", args: []string{"-V", "etcd@3.5.12", "etcd", "put"}, wantFlag: "-V"},
 			{name: "--version before sdk", args: []string{"--version", "etcd@3.5.12", "etcd", "put"}, wantFlag: "--version"},
+			{name: "--debug=invalid before sdk", args: []string{"--debug=invalid", "etcd@3.5.12", "etcd"}, wantFlag: "--debug=invalid"},
 			{name: "--unknown after --debug", args: []string{"--debug", "--unknown", "etcd@3.5.12", "etcd"}, wantFlag: "--unknown"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {

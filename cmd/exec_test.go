@@ -80,6 +80,13 @@ func runExecCLI(t *testing.T, root string, args ...string) (string, string, int)
 	return stdout.String(), stderr.String(), code
 }
 
+func execExpectedLine(args string) string {
+	if runtime.GOOS == "windows" {
+		return "windows-tools:args=" + args
+	}
+	return "sdk:args=" + args
+}
+
 func setupExecFakeSDK(t *testing.T, root string) {
 	t.Helper()
 	pluginDir := filepath.Join(root, "shared", "plugin", "etcd")
@@ -89,20 +96,30 @@ function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
 function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 `)
 	binDir := filepath.Join(root, "shared", "cache", "etcd", "v-3.5.12", "etcd-3.5.12", "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	toolDir := filepath.Join(root, "tools")
-	for _, dir := range []string{binDir, toolDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(toolDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if runtime.GOOS == "windows" {
+		// Pre-existing lookPathInEnv limitation on Windows checks extensionless
+		// paths in custom PATH entries and falls back to exec.LookPath; keep a
+		// distinctly tagged tools/etcd.cmd only on Windows so Unix proves the SDK
+		// bin directory itself is used while Windows still exercises flag forwarding.
+		if err := os.WriteFile(filepath.Join(binDir, "etcd.cmd"), []byte("@echo off\r\necho sdk:args=%*\r\n"), 0755); err != nil {
 			t.Fatal(err)
 		}
-		toolName := "etcd"
-		toolContent := "#!/bin/sh\nprintf 'args=%s\\n' \"$*\"\n"
-		if runtime.GOOS == "windows" {
-			toolName = "etcd.cmd"
-			toolContent = "@echo off\r\necho args=%*\r\n"
-		}
-		if err := os.WriteFile(filepath.Join(dir, toolName), []byte(toolContent), 0755); err != nil {
+		if err := os.WriteFile(filepath.Join(toolDir, "etcd.cmd"), []byte("@echo off\r\necho windows-tools:args=%*\r\n"), 0755); err != nil {
 			t.Fatal(err)
 		}
+		return
+	}
+
+	if err := os.WriteFile(filepath.Join(binDir, "etcd"), []byte("#!/bin/sh\nprintf 'sdk:args=%s\\n' \"$*\"\n"), 0755); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -115,10 +132,10 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "-- with --version", args: []string{"exec", "etcd@3.5.12", "--", "etcd", "--version"}, want: "args=--version"},
-		{name: "without -- with --version", args: []string{"exec", "etcd@3.5.12", "etcd", "--version"}, want: "args=--version"},
-		{name: "without -- with --help", args: []string{"exec", "etcd@3.5.12", "etcd", "--help"}, want: "args=--help"},
-		{name: "without -- with -v -V -h", args: []string{"exec", "etcd@3.5.12", "etcd", "-v", "-V", "-h"}, want: "args=-v -V -h"},
+		{name: "-- with --version", args: []string{"exec", "etcd@3.5.12", "--", "etcd", "--version"}, want: execExpectedLine("--version")},
+		{name: "without -- with --version", args: []string{"exec", "etcd@3.5.12", "etcd", "--version"}, want: execExpectedLine("--version")},
+		{name: "without -- with --help", args: []string{"exec", "etcd@3.5.12", "etcd", "--help"}, want: execExpectedLine("--help")},
+		{name: "without -- with -v -V -h", args: []string{"exec", "etcd@3.5.12", "etcd", "-v", "-V", "-h"}, want: execExpectedLine("-v -V -h")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			stdout, stderr, code := runExecCLI(t, root, tc.args...)
@@ -145,26 +162,41 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if !strings.Contains(stdout, "Looking up SDK: etcd") {
 			t.Fatalf("stdout missing debug log output:\n%s", stdout)
 		}
-		if !strings.Contains(stdout, "args=--version") {
-			t.Fatalf("stdout missing target output %q:\n%s", "args=--version", stdout)
+		if !strings.Contains(stdout, execExpectedLine("--version")) {
+			t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("--version"), stdout)
 		}
 		if strings.Contains(stderr, internal.RuntimeVersion) {
 			t.Fatalf("stderr leaked vfox version %q:\n%s", internal.RuntimeVersion, stderr)
 		}
 	})
 
-	t.Run("exec --debug between exec and sdk enables debug and runs command", func(t *testing.T) {
-		stdout, stderr, code := runExecCLI(t, root, "exec", "--debug", "etcd@3.5.12", "etcd", "put")
-		if code != 0 {
-			t.Fatalf("vfox exec --debug exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
-		}
-		if !strings.Contains(stdout, "Looking up SDK: etcd") {
-			t.Fatalf("stdout missing debug log output:\n%s", stdout)
-		}
-		if !strings.Contains(stdout, "args=put") {
-			t.Fatalf("stdout missing target output %q:\n%s", "args=put", stdout)
-		}
-	})
+	for _, tc := range []struct {
+		name      string
+		cmdArgs   []string
+		wantDebug bool
+	}{
+		{name: "exec --debug", cmdArgs: []string{"exec", "--debug", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "exec -debug", cmdArgs: []string{"exec", "-debug", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "exec -debug=true", cmdArgs: []string{"exec", "-debug=true", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "exec --debug=1", cmdArgs: []string{"exec", "--debug=1", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "exec --debug=TRUE", cmdArgs: []string{"exec", "--debug=TRUE", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "x -debug alias", cmdArgs: []string{"x", "-debug", "etcd@3.5.12", "etcd", "put"}, wantDebug: true},
+		{name: "exec --debug=0", cmdArgs: []string{"exec", "--debug=0", "etcd@3.5.12", "etcd", "put"}, wantDebug: false},
+		{name: "exec --debug=false", cmdArgs: []string{"exec", "--debug=false", "etcd@3.5.12", "etcd", "put"}, wantDebug: false},
+	} {
+		t.Run(tc.name+" between exec and sdk matches debug parsing", func(t *testing.T) {
+			stdout, stderr, code := runExecCLI(t, root, tc.cmdArgs...)
+			if code != 0 {
+				t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.cmdArgs, code, stderr, stdout)
+			}
+			if got := strings.Contains(stdout, "Looking up SDK: etcd"); got != tc.wantDebug {
+				t.Fatalf("debug log present = %v, want %v (stdout:\n%s)", got, tc.wantDebug, stdout)
+			}
+			if !strings.Contains(stdout, execExpectedLine("put")) {
+				t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("put"), stdout)
+			}
+		})
+	}
 
 	t.Run("exec --debug before -- still preserves --debug after command", func(t *testing.T) {
 		stdout, stderr, code := runExecCLI(t, root, "exec", "--debug", "etcd@3.5.12", "--", "etcd", "--debug", "--version")
@@ -174,8 +206,8 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if !strings.Contains(stdout, "Looking up SDK: etcd") {
 			t.Fatalf("stdout missing debug log output:\n%s", stdout)
 		}
-		if !strings.Contains(stdout, "args=--debug --version") {
-			t.Fatalf("stdout missing target output %q:\n%s", "args=--debug --version", stdout)
+		if !strings.Contains(stdout, execExpectedLine("--debug --version")) {
+			t.Fatalf("stdout missing target output %q:\n%s", execExpectedLine("--debug --version"), stdout)
 		}
 	})
 
@@ -200,24 +232,28 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		})
 	}
 
-	t.Run("first -- separates sdks and names word parsed as sdk on failure", func(t *testing.T) {
+	t.Run("separator notes distinguish missing or misplaced -- from explicit sdk@version errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			name     string
-			args     []string
-			wantWord string
-			wantErr  string
+			name            string
+			args            []string
+			wantErrContains []string
+			wantErrAbsent   string
 		}{
 			{
-				name:     "installed sdk without version before --",
-				args:     []string{"exec", "etcd@3.5.12", "etcd", "--", "--version"},
-				wantWord: "etcd",
-				wantErr:  "no version configured for etcd",
+				name:            "installed sdk without version before --",
+				args:            []string{"exec", "etcd@3.5.12", "etcd", "--", "--version"},
+				wantErrContains: []string{"no version configured for etcd", "first '--'"},
 			},
 			{
-				name:     "uninstalled command word before --",
-				args:     []string{"exec", "etcd@3.5.12", "npm", "run", "build", "--", "--watch"},
-				wantWord: "npm",
-				wantErr:  "npm not supported",
+				name:            "uninstalled command word before --",
+				args:            []string{"exec", "etcd@3.5.12", "npm", "run", "build", "--", "--watch"},
+				wantErrContains: []string{"npm not supported", "first '--'"},
+			},
+			{
+				name:            "explicit missing sdk@version after -- omits misplaced-separator note",
+				args:            []string{"exec", "etcd@3.5.12", "nosuch@1", "--", "etcd", "put"},
+				wantErrContains: []string{"nosuch not supported"},
+				wantErrAbsent:   "pass '--' before the command",
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -225,11 +261,59 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 				if code == 0 {
 					t.Fatalf("expected non-zero exit code for %v, got 0 (stdout:\n%s)", tc.args, stdout)
 				}
-				if !strings.Contains(stderr, tc.wantErr) {
-					t.Fatalf("stderr missing %q naming %q:\n%s", tc.wantErr, tc.wantWord, stderr)
+				for _, want := range tc.wantErrContains {
+					if !strings.Contains(stderr, want) {
+						t.Fatalf("stderr missing %q:\n%s", want, stderr)
+					}
 				}
-				if !strings.Contains(stderr, "first '--'") {
-					t.Fatalf("stderr missing first '--' separator explanation:\n%s", stderr)
+				if tc.wantErrAbsent != "" && strings.Contains(stderr, tc.wantErrAbsent) {
+					t.Fatalf("stderr unexpectedly contained %q:\n%s", tc.wantErrAbsent, stderr)
+				}
+			})
+		}
+	})
+
+	t.Run("command not found explains separator rules when misplaced or omitted", func(t *testing.T) {
+		if err := os.WriteFile(filepath.Join(root, ".vfox.toml"), []byte("[tools]\netcd = \"3.5.12\"\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(filepath.Join(root, ".vfox.toml")) })
+
+		for _, tc := range []struct {
+			name            string
+			args            []string
+			wantErrContains []string
+			wantErrAbsent   string
+		}{
+			{
+				name:            "configured sdk repeated before -- turns flag into command",
+				args:            []string{"exec", "etcd", "etcd", "--", "--version"},
+				wantErrContains: []string{"command not found: --version", "first '--'", `"etcd"`},
+			},
+			{
+				name:            "unseparated missing command notes single-sdk parsing",
+				args:            []string{"exec", "etcd", "nosuch", "put"},
+				wantErrContains: []string{"command not found: nosuch", `"etcd"`, `"nosuch"`, "pass '--'"},
+			},
+			{
+				name:            "separated missing non-flag command omits separator note",
+				args:            []string{"exec", "etcd@3.5.12", "--", "nosuchcmd"},
+				wantErrContains: []string{"command not found: nosuchcmd"},
+				wantErrAbsent:   "note:",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, tc.args...)
+				if code == 0 {
+					t.Fatalf("expected non-zero exit code for %v, got 0 (stdout:\n%s)", tc.args, stdout)
+				}
+				for _, want := range tc.wantErrContains {
+					if !strings.Contains(stderr, want) {
+						t.Fatalf("stderr missing %q:\n%s", want, stderr)
+					}
+				}
+				if tc.wantErrAbsent != "" && strings.Contains(stderr, tc.wantErrAbsent) {
+					t.Fatalf("stderr unexpectedly contained %q:\n%s", tc.wantErrAbsent, stderr)
 				}
 			})
 		}
@@ -240,8 +324,8 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("vfox exec -- etcd put -- key exited %d (stderr:\n%s\nstdout:\n%s)", code, stderr, stdout)
 		}
-		if got := strings.TrimSpace(stdout); got != "args=put -- key" {
-			t.Fatalf("stdout = %q, want %q (stderr:\n%s)", got, "args=put -- key", stderr)
+		if got := strings.TrimSpace(stdout); got != execExpectedLine("put -- key") {
+			t.Fatalf("stdout = %q, want %q (stderr:\n%s)", got, execExpectedLine("put -- key"), stderr)
 		}
 	})
 
