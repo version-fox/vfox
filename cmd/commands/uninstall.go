@@ -81,7 +81,8 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	} else if len(removed) > 0 {
 		pterm.Printf("Removed the alias(es) %s of %s@%s.\n", strings.Join(removed, ", "), name, resolvedVersion)
 	}
-	if len(source.InstalledList()) == 0 {
+	// A version that no longer works keeps its directory: doctor reports it.
+	if !source.HasVersionDirs() {
 		_ = os.RemoveAll(source.Metadata().SdkInstalledPath)
 	}
 	return uninstallErr

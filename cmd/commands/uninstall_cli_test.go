@@ -616,15 +616,26 @@ func TestUninstallChangesNothingWhenTheGlobalConfigCannotBeRead(t *testing.T) {
 	broken := "[tools\nalpha = \"2.0.0\"\n"
 	must(t, os.WriteFile(globalConfig, []byte(broken), 0644))
 
-	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
-	mustContain(t, "uninstall", out, "could not read the global version", "nothing was removed")
-	mustNotContain(t, "uninstall", out, "Uninstalled")
-	if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha", "v-2.0.0", "alpha-2.0.0")); err != nil {
-		t.Errorf("alpha@2.0.0 is gone: %v", err)
+	// The config cannot be asked whether it names 1.0.0 or a version linked into it.
+	for _, v := range []string{"2.0.0", "1.0.0"} {
+		out := f.run(t, "uninstall", "alpha@"+v).mustFail(t, "uninstall alpha@"+v).output()
+		mustContain(t, "uninstall", out, "could not read the global version", "nothing was removed", ".vfox.toml")
+		mustNotContain(t, "uninstall", out, "Uninstalled")
+		if _, err := os.Stat(filepath.Join(f.shared, "cache", "alpha", "v-"+v, "alpha-"+v)); err != nil {
+			t.Errorf("alpha@%s is gone: %v", v, err)
+		}
 	}
 	if got := readFile(t, globalConfig); got != broken {
 		t.Errorf("global config = %q, want it untouched", got)
 	}
+
+	// Correcting the file is all it takes, and so is deleting it.
+	must(t, os.WriteFile(globalConfig, []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
+	f.run(t, "uninstall", "alpha@1.0.0").mustSucceed(t, "uninstall alpha@1.0.0 after the config is corrected")
+	must(t, os.WriteFile(globalConfig, []byte(broken), 0644))
+	f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0 with the broken config")
+	must(t, os.Remove(globalConfig))
+	f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0 after the config is deleted")
 }
 
 // A version linked into the directory that is being removed cannot take over.
@@ -653,13 +664,17 @@ func TestUninstallRefusesAVersionTheGlobalOneIsLinkedInto(t *testing.T) {
 	f.run(t, "use", "-g", "alpha@x").mustSucceed(t, "use -g alpha@x")
 
 	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
-	mustContain(t, "uninstall", out, "the global version alpha@x is linked into the directory of alpha@2.0.0", "nothing was removed")
+	mustContain(t, "uninstall", out, "the global version alpha@x is linked into the directory of alpha@2.0.0", "nothing was removed", "vfox unuse -g alpha")
 	mustNotContain(t, "uninstall", out, "Uninstalled")
 	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "x"`)
 	mustContain(t, "list", f.run(t, "list", "alpha").output(), "2.0.0", "x")
 	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
 		t.Errorf("the link of alpha is broken: %v", err)
 	}
+
+	// There is no other version to switch to, so what the message says has to do.
+	f.run(t, "unuse", "-g", "alpha").mustSucceed(t, "unuse -g alpha")
+	f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0 after unuse")
 }
 
 // A version that is not global, and is linked into the one that goes, is named.
@@ -673,6 +688,53 @@ func TestUninstallWarnsOfAVersionLinkedIntoTheRemovedOne(t *testing.T) {
 
 	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
 	mustContain(t, "uninstall", out, "Uninstalled alpha@2.0.0 successfully!", "alpha@x no longer works")
+}
+
+// The entry of a version that breaks is kept, whether another version works or not,
+// so that doctor reports it. Its own uninstall removes it.
+func TestUninstallKeepsTheEntriesThatBreak(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		other bool // whether another version is installed
+	}{
+		{"another version is left", true},
+		{"no other version is left", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			main := f.installOnDisk(t, "alpha", "2.0.0", "alpha")
+			if tc.other {
+				f.installOnDisk(t, "alpha", "1.0.0", "alpha")
+			}
+			keepRegistry(t)
+			f.run(t, "link", "alpha@x", main).mustSucceed(t, "link alpha@x")
+
+			out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
+			mustContain(t, "uninstall", out, "Uninstalled alpha@2.0.0 successfully!", "alpha@x no longer works")
+			out = f.run(t, "doctor", "alpha").mustFail(t, "doctor alpha").output()
+			mustContain(t, "doctor", out, "sdk.link-dangling  alpha@x", "fix: vfox uninstall alpha@x")
+
+			f.run(t, "uninstall", "alpha@x").mustSucceed(t, "uninstall alpha@x")
+			out = f.run(t, "doctor", "alpha").mustSucceed(t, "doctor alpha after the fix").output()
+			mustNotContain(t, "doctor", out, "sdk.link-dangling")
+			if got := exists(filepath.Join(f.shared, "cache", "alpha")); got != tc.other {
+				t.Errorf("the directory of alpha exists = %v, want %v", got, tc.other)
+			}
+		})
+	}
+}
+
+// Neither does an interrupted installation go with the last version.
+func TestUninstallKeepsAnInterruptedInstallation(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "2.0.0", "alpha")
+	keepRegistry(t)
+	marker := filepath.Join(f.shared, "cache", "alpha", ".v-3.0.0.installing")
+	must(t, os.WriteFile(marker, nil, 0644))
+
+	f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0")
+	out := f.run(t, "doctor", "alpha").output()
+	mustContain(t, "doctor", out, "sdk.install-interrupted  alpha@3.0.0")
 }
 
 // When the global setting cannot be changed, nothing is removed, and a retry

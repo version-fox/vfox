@@ -75,6 +75,9 @@ type Sdk interface {
 	// HasLeftovers reports whether files of a version that is not installed any more, or global
 	// links into it, are left, because an uninstall could not remove them. Uninstall removes them.
 	HasLeftovers(version Version) bool
+	// HasVersionDirs reports whether the directory of the SDK holds a version, usable or not, or an
+	// interrupted installation of one.
+	HasVersionDirs() bool
 
 	// Installation describes an installed version: who owns it and what vfox recorded about it.
 	Installation(version Version) (*Installation, error)
@@ -597,7 +600,8 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	label := b.Label(version)
 	logger.Debugf("Uninstalling SDK: %s\n", label)
 
-	// Without the global config there is no telling whether it names the version.
+	// Without the global config there is no telling whether it names the version, or
+	// one that is linked into its directory.
 	globalEntry, err := b.globalEntry()
 	if err != nil {
 		return fmt.Errorf("could not read the global version, so nothing was removed: %w", err)
@@ -648,7 +652,7 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	dependents := b.dependents(version)
 	if globalEntry != nil {
 		if global := Version(globalEntry.Version); slices.Contains(dependents, global) {
-			return fmt.Errorf("the global version %s is linked into the directory of %s, so nothing was removed: switch the global version to another one first", b.Label(global), label)
+			return fmt.Errorf("the global version %s is linked into the directory of %s, so nothing was removed: switch or unset the global version first (vfox unuse -g %s)", b.Label(global), label, strings.ToLower(b.Name))
 		}
 	}
 
@@ -1861,6 +1865,20 @@ func (b *impl) HasLeftovers(version Version) bool {
 	}
 	left, err := b.linksLeft(version, entry)
 	return err == nil && left
+}
+
+// HasVersionDirs reports whether the directory of the SDK holds a version, usable
+// or not, or an interrupted installation of one.
+func (b *impl) HasVersionDirs() bool {
+	entries, err := os.ReadDir(b.InstallPath)
+	if err != nil {
+		return !os.IsNotExist(err)
+	}
+	return slices.ContainsFunc(entries, func(entry os.DirEntry) bool {
+		name := entry.Name()
+		return strings.HasPrefix(name, packageInstalledPrefix) ||
+			strings.HasPrefix(name, ".v-") && strings.HasSuffix(name, ".installing")
+	})
 }
 
 func (b *impl) installMarkerPath(version Version) string {
