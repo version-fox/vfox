@@ -46,10 +46,22 @@ func RedirectStdIO(writer func() io.Writer) func() {
 	}
 }
 
-func redirectLuaIO(L *lua.LState, outputFn func() io.Writer, raiseOnWriteError, interceptClose bool) {
+func redirectLuaIO(L *lua.LState, outputFn func() io.Writer, raiseOnWriteError bool) {
 	ioModule := L.GetGlobal("io").(*lua.LTable)
-	stdout, stderr := ioModule.RawGetString("stdout"), ioModule.RawGetString("stderr")
-	isStandard := func(value lua.LValue) bool { return value == stdout || value == stderr }
+	stdin, stdout, stderr := ioModule.RawGetString("stdin"), ioModule.RawGetString("stdout"), ioModule.RawGetString("stderr")
+	isStdOutErr := func(value lua.LValue) bool { return value == stdout || value == stderr }
+	standardStreamName := func(value lua.LValue) string {
+		switch value {
+		case stdin:
+			return "input"
+		case stdout:
+			return "output"
+		case stderr:
+			return "error"
+		default:
+			return ""
+		}
+	}
 	write := func(L *lua.LState, start int) int {
 		writer := outputFn()
 		for i := start; i <= L.GetTop(); i++ {
@@ -68,51 +80,55 @@ func redirectLuaIO(L *lua.LState, outputFn func() io.Writer, raiseOnWriteError, 
 		L.Push(lua.LTrue)
 		return 1
 	}
-	standardResult := func(L *lua.LState, name string, start int) int {
+	closeStandard := func(L *lua.LState, streamName string) int {
+		L.Push(lua.LNil)
+		L.Push(lua.LString("cannot close standard " + streamName))
+		return 2
+	}
+	standardWriteOrFlush := func(L *lua.LState, name string, start int) int {
 		switch name {
 		case "write":
 			return write(L, start)
-		case "close":
-			L.Push(lua.LNil)
-			L.Push(lua.LString("cannot close standard output"))
-			return 2
 		default:
 			L.Push(lua.LTrue)
 			return 1
 		}
 	}
 	methods := L.GetMetatable(stdout).(*lua.LTable)
-	methodNames := []string{"write", "flush", "setvbuf"}
-	ioNames := []string{"write", "flush"}
-	if interceptClose {
-		methodNames = append(methodNames, "close")
-		ioNames = append(ioNames, "close")
-	}
-	for _, name := range methodNames {
+	for _, name := range []string{"write", "flush", "setvbuf", "close"} {
 		original := methods.RawGetString(name)
-		methods.RawSetString(name, L.NewFunction(func(L *lua.LState) int {
-			if isStandard(L.Get(1)) {
-				return standardResult(L, name, 2)
+		methods.RawSetString(name, wrapLuaFunction(L, original, func(L *lua.LState) int {
+			file := L.Get(1)
+			if name == "close" {
+				if stream := standardStreamName(file); stream != "" {
+					return closeStandard(L, stream)
+				}
+			} else if isStdOutErr(file) {
+				return standardWriteOrFlush(L, name, 2)
 			}
-			return forwardLua(L, original, luaArguments(L)...)
+			return callLuaOriginal(L, original)
 		}))
 	}
 	originalOutput := ioModule.RawGetString("output")
-	for _, name := range ioNames {
+	for _, name := range []string{"write", "flush", "close"} {
 		original := ioModule.RawGetString(name)
-		ioModule.RawSetString(name, L.NewFunction(func(L *lua.LState) int {
+		ioModule.RawSetString(name, wrapLuaFunction(L, original, func(L *lua.LState) int {
 			file := L.Get(1)
-			if name != "close" || L.GetTop() == 0 {
+			if name != "close" || L.GetTop() == 0 || file == lua.LNil {
 				if err := L.CallByParam(lua.P{Fn: originalOutput, NRet: 1, Protect: true}); err != nil {
 					L.RaiseError("%s", err)
 				}
 				file = L.Get(-1)
 				L.Pop(1)
 			}
-			if isStandard(file) {
-				return standardResult(L, name, 1)
+			if name == "close" {
+				if stream := standardStreamName(file); stream != "" {
+					return closeStandard(L, stream)
+				}
+			} else if isStdOutErr(file) {
+				return standardWriteOrFlush(L, name, 1)
 			}
-			return forwardLua(L, original, luaArguments(L)...)
+			return callLuaOriginal(L, original)
 		}))
 	}
 }
@@ -124,21 +140,24 @@ func currentExecStdioWriter() func() io.Writer {
 	return w
 }
 
-// forwardLua preserves all results when wrapping a standard library function.
-func forwardLua(L *lua.LState, fn lua.LValue, args ...lua.LValue) int {
-	top := L.GetTop()
-	if err := L.CallByParam(lua.P{Fn: fn, NRet: lua.MultRet, Protect: true}, args...); err != nil {
-		L.RaiseError("%s", err)
+func wrapLuaFunction(L *lua.LState, original lua.LValue, fn lua.LGFunction) *lua.LFunction {
+	wrapper := L.NewFunction(fn)
+	if origFn, ok := original.(*lua.LFunction); ok && len(origFn.Upvalues) > 0 {
+		wrapper.Upvalues = origFn.Upvalues
 	}
-	return L.GetTop() - top
+	return wrapper
 }
 
-func luaArguments(L *lua.LState) []lua.LValue {
-	args := make([]lua.LValue, L.GetTop())
-	for i := range args {
-		args[i] = L.Get(i + 1)
+// callLuaOriginal invokes an unwrapped Go stdlib function directly on L so
+// errors on ordinary files preserve the native frame name and single traceback.
+func callLuaOriginal(L *lua.LState, original lua.LValue) int {
+	if fn, ok := original.(*lua.LFunction); ok && fn.IsG && fn.GFunction != nil {
+		return fn.GFunction(L)
 	}
-	return args
+	top := L.GetTop()
+	L.Insert(original, 1)
+	L.Call(top, lua.MultRet)
+	return L.GetTop()
 }
 
 // Redirect writes per VM, retaining normal Lua file handles and io.output.
@@ -154,7 +173,7 @@ func configureDevelopmentOutput(L *lua.LState, output io.Writer, testing bool) {
 		}
 		return 0
 	}))
-	redirectLuaIO(L, func() io.Writer { return output }, true, true)
+	redirectLuaIO(L, func() io.Writer { return output }, true)
 	ioModule := L.GetGlobal("io").(*lua.LTable)
 	osModule := L.GetGlobal("os").(*lua.LTable)
 	osModule.RawSetString("exit", L.NewFunction(func(L *lua.LState) int {
