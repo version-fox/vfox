@@ -152,9 +152,11 @@ func NewPathMeta(userHome, sharedRoot, currentDir string, pid int) *PathMeta {
 	if err := os.MkdirAll(meta.Working.GlobalSdkDir, ReadWriteAuth); err != nil {
 		logger.Debugf("create global sdk dir failed: %v\n", err)
 	}
-	for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
-		if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
-			logger.Debugf("create shared directory %s failed: %v\n", dir, err)
+	if util.FileExists(meta.Shared.Root) {
+		for _, dir := range []string{meta.Shared.Installs, meta.Shared.Plugins} {
+			if err := os.Mkdir(dir, ReadWriteAuth); err != nil && !errors.Is(err, fs.ErrExist) {
+				logger.Debugf("create shared directory %s failed: %v\n", dir, err)
+			}
 		}
 	}
 
@@ -170,7 +172,7 @@ func generateSessionShimPath(userTemp string, pid int) string {
 	if !util.FileExists(curTmpPath) {
 		err := os.MkdirAll(curTmpPath, ReadWriteAuth)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "create temp dir failed: %v\n", err)
+			logger.Debugf("create temp dir failed: %v\n", err)
 		}
 	}
 	return curTmpPath
@@ -182,7 +184,7 @@ var Executable = os.Executable
 func getExecutablePath() string {
 	exePath, err := Executable()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "get executable path failed: %v\n", err)
+		logger.Debugf("get executable path failed: %v\n", err)
 		return ""
 	}
 	return exePath

@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/env"
@@ -718,7 +719,7 @@ func TestPreparePluginDirErrorWithoutVfoxHome(t *testing.T) {
 	}
 }
 
-func TestDownloadPluginSavesToPrivateTempAndTruncates(t *testing.T) {
+func TestDownloadPluginSavesToPrivateTemp(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("small-payload"))
 	}))
@@ -763,5 +764,63 @@ func TestDownloadPluginSavesToPrivateTempAndTruncates(t *testing.T) {
 	leftoverBytes, err := os.ReadFile(leftover)
 	if err != nil || len(leftoverBytes) != 4096 {
 		t.Fatalf("expected leftover file in pluginsDir to stay untouched (err=%v, len=%d)", err, len(leftoverBytes))
+	}
+}
+
+func TestPluginFileNameRejectsWindowsReservedNames(t *testing.T) {
+	tests := []struct {
+		url  string
+		want string
+	}{
+		{url: "https://example.com/nul.zip", want: "plugin.zip"},
+		{url: "https://example.com/CON.zip", want: "plugin.zip"},
+		{url: "https://example.com/prn.zip", want: "plugin.zip"},
+		{url: "https://example.com/aux.lua", want: "plugin.lua"},
+		{url: "https://example.com/com0.zip", want: "plugin.zip"},
+		{url: "https://example.com/com1.zip", want: "plugin.zip"},
+		{url: "https://example.com/COM9.tar.xz", want: "plugin.xz"},
+		{url: "https://example.com/lpt0.zip", want: "plugin.zip"},
+		{url: "https://example.com/lpt9.tar.gz", want: "plugin.gz"},
+		{url: "https://example.com/nul", want: "plugin"},
+		{url: "https://example.com/console.zip", want: "console.zip"},
+		{url: "https://example.com/my-nul.zip", want: "my-nul.zip"},
+		{url: "https://example.com/demo.zip", want: "demo.zip"},
+	}
+	for _, tc := range tests {
+		if got := pluginFileName(tc.url); got != tc.want {
+			t.Errorf("pluginFileName(%q) = %q, want %q", tc.url, got, tc.want)
+		}
+	}
+}
+
+func TestCleanTmpSweepsStaleDownloadDirs(t *testing.T) {
+	userTemp := t.TempDir()
+	staleDir := filepath.Join(userTemp, "vfox-dl-stale")
+	freshDir := filepath.Join(userTemp, "vfox-dl-fresh")
+	for _, dir := range []string{staleDir, freshDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "partial.zip"), []byte("partial"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	staleTime := time.Now().Add(-25 * time.Hour)
+	if err := os.Chtimes(staleDir, staleTime, staleTime); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{RuntimeEnvContext: &env.RuntimeEnvContext{
+		PathMeta: &pathmeta.PathMeta{
+			User: pathmeta.UserPaths{Temp: userTemp},
+		},
+	}}
+	m.CleanTmp()
+
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Fatalf("expected stale download dir %q to be removed, stat err = %v", staleDir, err)
+	}
+	if info, err := os.Stat(freshDir); err != nil || !info.IsDir() {
+		t.Fatalf("expected fresh download dir %q to be kept (info=%v, err=%v)", freshDir, info, err)
 	}
 }

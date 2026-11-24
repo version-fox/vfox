@@ -254,6 +254,47 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		}
 	})
 
+	t.Run("does not log shared directory failure at debug level when shared root does not exist", func(t *testing.T) {
+		root := t.TempDir()
+		home := filepath.Join(root, "home")
+		missingShared := filepath.Join(root, "no-such-dir", "vfox-home")
+		t.Setenv(HookCurTmpPath, t.TempDir())
+
+		logger.SetLevel(logger.DebugLevel)
+		t.Cleanup(func() { logger.SetLevel(logger.InfoLevel) })
+
+		origStdout, origStderr := os.Stdout, os.Stderr
+		rOut, wOut, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		rErr, wErr, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		os.Stdout, os.Stderr = wOut, wErr
+		NewPathMeta(home, missingShared, root, 4242)
+		_ = wOut.Close()
+		_ = wErr.Close()
+		os.Stdout, os.Stderr = origStdout, origStderr
+
+		var out, errBuf bytes.Buffer
+		_, _ = io.Copy(&out, rOut)
+		_, _ = io.Copy(&errBuf, rErr)
+		_ = rOut.Close()
+		_ = rErr.Close()
+
+		if errBuf.Len() != 0 {
+			t.Fatalf("NewPathMeta wrote unexpected stderr at debug level: %q", errBuf.String())
+		}
+		if strings.Contains(out.String(), "create shared directory") || strings.Contains(out.String(), "failed") {
+			t.Fatalf("unexpected failure log at debug level for missing Shared.Root: %q", out.String())
+		}
+		if _, statErr := os.Stat(filepath.Join(root, "no-such-dir")); !os.IsNotExist(statErr) {
+			t.Fatalf("expected missing Shared.Root parent not to be created, stat err = %v", statErr)
+		}
+	})
+
 	t.Run("does not create missing shared root or parent trees on read paths", func(t *testing.T) {
 		for _, tc := range []struct {
 			name      string
@@ -278,16 +319,16 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 		}
 	})
 
-	t.Run("writes session and executable diagnostics to stderr and keeps stdout clean", func(t *testing.T) {
+	t.Run("keeps stdout and stderr clean on normal runs and logs diagnostics only at debug level", func(t *testing.T) {
 		for _, tc := range []struct {
-			name       string
-			blockTemp  bool
-			failExe    bool
-			wantStderr string
+			name      string
+			blockTemp bool
+			failExe   bool
+			wantDebug string
 		}{
-			{name: "blocked GlobalSdkDir and SharedRoot", wantStderr: ""},
-			{name: "blocked session temp directory", blockTemp: true, wantStderr: "create temp dir failed:"},
-			{name: "executable lookup failure", failExe: true, wantStderr: "get executable path failed:"},
+			{name: "blocked GlobalSdkDir and missing SharedRoot", wantDebug: "create global sdk dir failed:"},
+			{name: "blocked session temp directory", blockTemp: true, wantDebug: "create temp dir failed:"},
+			{name: "executable lookup failure", failExe: true, wantDebug: "get executable path failed:"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -303,7 +344,7 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 					}
 					t.Cleanup(func() { Executable = origExe })
 				}
-				// Block GlobalSdkDir and SharedRoot with regular files so directory creation fails.
+				// Block GlobalSdkDir and SharedRoot parent with regular files so directory creation fails.
 				if err := os.WriteFile(filepath.Join(userVfox, "sdks"), []byte("file"), 0644); err != nil {
 					t.Fatal(err)
 				}
@@ -321,44 +362,59 @@ func TestNewPathMetaSharedDirectories(t *testing.T) {
 				}
 				shared := filepath.Join(blocker, "vfox-home")
 
-				origStdout, origStderr := os.Stdout, os.Stderr
-				rOut, wOut, err := os.Pipe()
-				if err != nil {
-					t.Fatal(err)
-				}
-				rErr, wErr, err := os.Pipe()
-				if err != nil {
-					t.Fatal(err)
-				}
-				os.Stdout, os.Stderr = wOut, wErr
-				meta := NewPathMeta(home, shared, root, 4242)
-				_ = wOut.Close()
-				_ = wErr.Close()
-				os.Stdout, os.Stderr = origStdout, origStderr
+				captureNewPathMeta := func(level logger.LoggerLevel) (meta *PathMeta, stdout, stderr string) {
+					logger.SetLevel(level)
+					t.Cleanup(func() { logger.SetLevel(logger.InfoLevel) })
 
-				var out, errBuf bytes.Buffer
-				_, _ = io.Copy(&out, rOut)
-				_, _ = io.Copy(&errBuf, rErr)
-				_ = rOut.Close()
-				_ = rErr.Close()
+					origStdout, origStderr := os.Stdout, os.Stderr
+					rOut, wOut, err := os.Pipe()
+					if err != nil {
+						t.Fatal(err)
+					}
+					rErr, wErr, err := os.Pipe()
+					if err != nil {
+						t.Fatal(err)
+					}
+					os.Stdout, os.Stderr = wOut, wErr
+					meta = NewPathMeta(home, shared, root, 4242)
+					_ = wOut.Close()
+					_ = wErr.Close()
+					os.Stdout, os.Stderr = origStdout, origStderr
 
+					var out, errBuf bytes.Buffer
+					_, _ = io.Copy(&out, rOut)
+					_, _ = io.Copy(&errBuf, rErr)
+					_ = rOut.Close()
+					_ = rErr.Close()
+					return meta, out.String(), errBuf.String()
+				}
+
+				meta, outNormal, errNormal := captureNewPathMeta(logger.InfoLevel)
 				if meta == nil || meta.Shared.Root != shared {
 					t.Fatalf("unexpected PathMeta: %+v", meta)
 				}
 				if tc.failExe && meta.Executable != "" {
 					t.Fatalf("expected empty Executable on error, got %q", meta.Executable)
 				}
-				if out.Len() != 0 {
-					t.Fatalf("NewPathMeta wrote to stdout on failure: %q", out.String())
+				if outNormal != "" {
+					t.Fatalf("NewPathMeta wrote to stdout at InfoLevel: %q", outNormal)
 				}
-				if tc.wantStderr == "" {
-					if errBuf.Len() != 0 {
-						t.Fatalf("NewPathMeta wrote unexpected stderr on failure: %q", errBuf.String())
-					}
-				} else if !strings.Contains(errBuf.String(), tc.wantStderr) {
-					t.Fatalf("NewPathMeta stderr = %q, want substring %q", errBuf.String(), tc.wantStderr)
-				} else if tc.blockTemp && strings.Count(errBuf.String(), tc.wantStderr) != 1 {
-					t.Fatalf("NewPathMeta logged duplicate temp dir failure to stderr: %q", errBuf.String())
+				if errNormal != "" {
+					t.Fatalf("NewPathMeta wrote to stderr at InfoLevel: %q", errNormal)
+				}
+
+				_, outDebug, errDebug := captureNewPathMeta(logger.DebugLevel)
+				if errDebug != "" {
+					t.Fatalf("NewPathMeta wrote unexpected stderr at DebugLevel: %q", errDebug)
+				}
+				if !strings.Contains(outDebug, tc.wantDebug) {
+					t.Fatalf("NewPathMeta debug output = %q, want substring %q", outDebug, tc.wantDebug)
+				}
+				if tc.blockTemp && strings.Count(outDebug, tc.wantDebug) != 1 {
+					t.Fatalf("NewPathMeta logged duplicate temp dir failure at DebugLevel: %q", outDebug)
+				}
+				if strings.Contains(outDebug, "create shared directory") {
+					t.Fatalf("NewPathMeta logged shared directory failure when Shared.Root does not exist: %q", outDebug)
 				}
 			})
 		}

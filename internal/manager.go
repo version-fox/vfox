@@ -453,7 +453,19 @@ func isSafePluginFileName(name string) bool {
 			return false
 		}
 	}
-	return true
+	base, _, _ := strings.Cut(name, ".")
+	return !isWindowsReservedDeviceName(base)
+}
+
+func isWindowsReservedDeviceName(base string) bool {
+	switch strings.ToUpper(base) {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return true
+	default:
+		return false
+	}
 }
 
 // downloadPlugin download plugin from downloadUrl to plugin home directory.
@@ -517,7 +529,7 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	}()
 	path := filepath.Join(dlDir, fileName)
 	logger.Debugf("Saving plugin to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Debugf("Failed to create file: %v\n", err)
 		return "", err
@@ -811,8 +823,16 @@ func (m *Manager) CleanTmp() {
 
 	dir, err := os.ReadDir(m.RuntimeEnvContext.PathMeta.User.Temp)
 	if err == nil {
+		const dlTmpPrefix = "vfox-dl-"
+		cutoff := time.Now().Add(-24 * time.Hour)
 		for _, file := range dir {
 			if !file.IsDir() {
+				continue
+			}
+			if strings.HasPrefix(file.Name(), dlTmpPrefix) {
+				if info, infoErr := file.Info(); infoErr == nil && info.ModTime().Before(cutoff) {
+					_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
+				}
 				continue
 			}
 			dateStr, pid, ok := strings.Cut(file.Name(), "-")
@@ -890,7 +910,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName := range legacyFileRecord.Record {
+		for sdkName, _ := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,
@@ -951,7 +971,7 @@ var Getwd = os.Getwd
 func getWorkingDirectory() string {
 	wd, err := Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "get current working directory failed: %v\n", err)
+		logger.Debugf("get current working directory failed: %v\n", err)
 		return ""
 	}
 	return wd

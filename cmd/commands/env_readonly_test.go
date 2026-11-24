@@ -29,6 +29,7 @@ import (
 
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/pathmeta"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
@@ -46,9 +47,21 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		typoRoot := filepath.Join(f.root, "typo")
 		f.env["VFOX_HOME"] = filepath.Join(typoRoot, "a", "b")
 
-		f.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with missing nested VFOX_HOME")
+		res := f.runProcess(t, "env", "-s", "bash").mustSucceed(t, "env -s bash with missing nested VFOX_HOME")
+		if res.stderr != "" {
+			t.Fatalf("env -s bash wrote unexpected stderr on missing VFOX_HOME: %q", res.stderr)
+		}
 		if _, err := os.Stat(typoRoot); !os.IsNotExist(err) {
 			t.Fatalf("expected env read path not to create %q, stat err = %v", typoRoot, err)
+		}
+
+		debugOut, debugErr := runInProcessCaptured(t, f, logger.DebugLevel, "env", "-s", "bash")
+		if debugErr != "" {
+			t.Fatalf("env -s bash wrote unexpected stderr at debug level: %q", debugErr)
+		}
+		mustNotContain(t, "debug output for missing VFOX_HOME", debugOut, "create shared directory")
+		if _, err := os.Stat(typoRoot); !os.IsNotExist(err) {
+			t.Fatalf("expected debug env read path not to create %q, stat err = %v", typoRoot, err)
 		}
 	})
 
@@ -65,9 +78,12 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if blockedEnv.stdout != want {
 			t.Fatalf("env stdout changed when GlobalSdkDir could not be created:\ngot:\n%s\nwant:\n%s", blockedEnv.stdout, want)
 		}
+		if blockedEnv.stderr != "" {
+			t.Fatalf("env wrote unexpected stderr when GlobalSdkDir was blocked: %q", blockedEnv.stderr)
+		}
 	})
 
-	t.Run("env and activate write temp-dir diagnostic to stderr while keeping stdout clean", func(t *testing.T) {
+	t.Run("env and activate keep stdout and stderr clean when session temp dir cannot be created", func(t *testing.T) {
 		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
 
@@ -81,52 +97,49 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if blockedEnv.stdout != want {
 			t.Fatalf("env stdout changed when session temp dir could not be created:\ngot:\n%s\nwant:\n%s", blockedEnv.stdout, want)
 		}
-		mustContain(t, "env stderr", blockedEnv.stderr, "create temp dir failed:")
+		if blockedEnv.stderr != "" {
+			t.Fatalf("env wrote unexpected stderr on blocked session temp dir: %q", blockedEnv.stderr)
+		}
 		mustNotContain(t, "env stdout", blockedEnv.stdout, "create temp dir failed:")
 
 		blockedAct := fBlocked.runProcess(t, "activate", "bash").mustSucceed(t, "activate bash with blocked session temp dir")
-		mustContain(t, "activate stderr", blockedAct.stderr, "create temp dir failed:")
+		if blockedAct.stderr != "" {
+			t.Fatalf("activate wrote unexpected stderr on blocked session temp dir: %q", blockedAct.stderr)
+		}
 		mustNotContain(t, "activate stdout", blockedAct.stdout, "create temp dir failed:")
+
+		debugEnvOut, debugEnvErr := runInProcessCaptured(t, fBlocked, logger.DebugLevel, "env", "-s", "bash")
+		if debugEnvErr != "" {
+			t.Fatalf("env debug run wrote unexpected stderr: %q", debugEnvErr)
+		}
+		mustContain(t, "env debug output", debugEnvOut, "create temp dir failed:")
+
+		debugActOut, debugActErr := runInProcessCaptured(t, fBlocked, logger.DebugLevel, "activate", "bash")
+		if debugActErr != "" {
+			t.Fatalf("activate debug run wrote unexpected stderr: %q", debugActErr)
+		}
+		mustContain(t, "activate debug output", debugActOut, "create temp dir failed:")
 	})
 
-	t.Run("activate writes executable lookup diagnostic to stderr and not stdout", func(t *testing.T) {
+	t.Run("activate keeps stdout and stderr clean on normal runs and logs executable diagnostic at debug level", func(t *testing.T) {
 		f := newCLIFixtureWithoutRegistryGuard(t, false)
-		for k, v := range f.environ() {
-			if v == "-" {
-				t.Setenv(k, "")
-			} else {
-				t.Setenv(k, v)
-			}
-		}
 		origExe := pathmeta.Executable
 		pathmeta.Executable = func() (string, error) {
 			return "", errors.New("readlink /proc/self/exe: no such file or directory")
 		}
 		t.Cleanup(func() { pathmeta.Executable = origExe })
 
-		origStdout, origStderr := os.Stdout, os.Stderr
-		rOut, wOut, err := os.Pipe()
-		must(t, err)
-		rErr, wErr, err := os.Pipe()
-		must(t, err)
-		os.Stdout, os.Stderr = wOut, wErr
-
-		runErr := newTestApp().Run(context.Background(), []string{"vfox", "activate", "bash"})
-		_ = wOut.Close()
-		_ = wErr.Close()
-		os.Stdout, os.Stderr = origStdout, origStderr
-
-		var out, errBuf bytes.Buffer
-		_, _ = io.Copy(&out, rOut)
-		_, _ = io.Copy(&errBuf, rErr)
-		_ = rOut.Close()
-		_ = rErr.Close()
-
-		if runErr != nil {
-			t.Fatalf("activate bash returned unexpected error: %v", runErr)
+		normalOut, normalErr := runInProcessCaptured(t, f, logger.InfoLevel, "activate", "bash")
+		if normalErr != "" {
+			t.Fatalf("activate bash wrote unexpected stderr on executable lookup failure: %q", normalErr)
 		}
-		mustContain(t, "activate stderr", errBuf.String(), "get executable path failed:")
-		mustNotContain(t, "activate stdout", out.String(), "get executable path failed:")
+		mustNotContain(t, "activate stdout", normalOut, "get executable path failed:")
+
+		debugOut, debugErr := runInProcessCaptured(t, f, logger.DebugLevel, "activate", "bash")
+		if debugErr != "" {
+			t.Fatalf("activate bash debug run wrote unexpected stderr: %q", debugErr)
+		}
+		mustContain(t, "activate debug output", debugOut, "get executable path failed:")
 	})
 
 	t.Run("read-only VFOX_HOME without cache or plugin keeps env and activate identical", func(t *testing.T) {
@@ -163,7 +176,7 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		}
 	})
 
-	t.Run("env writes deleted cwd diagnostic to stderr while keeping stdout clean shell code", func(t *testing.T) {
+	t.Run("env keeps stdout and stderr clean when cwd was deleted", func(t *testing.T) {
 		if runtime.GOOS != "linux" {
 			t.Skip("Linux reliably fails getcwd on an unlinked cwd; darwin caches F_GETPATH and Windows locks open cwd handles")
 		}
@@ -181,19 +194,14 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		if deletedEnv.stdout != want {
 			t.Fatalf("env stdout changed when cwd was deleted:\ngot:\n%s\nwant:\n%s", deletedEnv.stdout, want)
 		}
-		mustContain(t, "env stderr", deletedEnv.stderr, "get current working directory failed:")
+		if deletedEnv.stderr != "" {
+			t.Fatalf("env wrote unexpected stderr when cwd was deleted: %q", deletedEnv.stderr)
+		}
 		mustNotContain(t, "env stdout", deletedEnv.stdout, "get current working directory failed:")
 	})
 
-	t.Run("env writes getwd failure diagnostic to stderr and keeps stdout clean shell code", func(t *testing.T) {
+	t.Run("env keeps stdout and stderr clean on getwd failure and logs diagnostic at debug level", func(t *testing.T) {
 		f := newCLIFixtureWithoutRegistryGuard(t, false)
-		for k, v := range f.environ() {
-			if v == "-" {
-				t.Setenv(k, "")
-			} else {
-				t.Setenv(k, v)
-			}
-		}
 		baseline := f.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
 
 		origGetwd := internal.Getwd
@@ -202,32 +210,20 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		}
 		t.Cleanup(func() { internal.Getwd = origGetwd })
 
-		origStdout, origStderr := os.Stdout, os.Stderr
-		rOut, wOut, err := os.Pipe()
-		must(t, err)
-		rErr, wErr, err := os.Pipe()
-		must(t, err)
-		os.Stdout, os.Stderr = wOut, wErr
-
-		runErr := newTestApp().Run(context.Background(), []string{"vfox", "env", "-s", "bash"})
-		_ = wOut.Close()
-		_ = wErr.Close()
-		os.Stdout, os.Stderr = origStdout, origStderr
-
-		var out, errBuf bytes.Buffer
-		_, _ = io.Copy(&out, rOut)
-		_, _ = io.Copy(&errBuf, rErr)
-		_ = rOut.Close()
-		_ = rErr.Close()
-
-		if runErr != nil {
-			t.Fatalf("env -s bash returned unexpected error: %v", runErr)
+		normalOut, normalErr := runInProcessCaptured(t, f, logger.InfoLevel, "env", "-s", "bash")
+		if normalErr != "" {
+			t.Fatalf("env -s bash wrote unexpected stderr on getwd failure: %q", normalErr)
 		}
-		if out.String() != baseline.stdout {
-			t.Fatalf("env stdout changed on getwd failure:\ngot:\n%s\nwant:\n%s", out.String(), baseline.stdout)
+		if normalOut != baseline.stdout {
+			t.Fatalf("env stdout changed on getwd failure:\ngot:\n%s\nwant:\n%s", normalOut, baseline.stdout)
 		}
-		mustContain(t, "env stderr", errBuf.String(), "get current working directory failed: getwd: no such file or directory\n")
-		mustNotContain(t, "env stdout", out.String(), "get current working directory failed:")
+		mustNotContain(t, "env stdout", normalOut, "get current working directory failed:")
+
+		debugOut, debugErr := runInProcessCaptured(t, f, logger.DebugLevel, "env", "-s", "bash")
+		if debugErr != "" {
+			t.Fatalf("env -s bash debug run wrote unexpected stderr on getwd failure: %q", debugErr)
+		}
+		mustContain(t, "env debug output", debugOut, "get current working directory failed: getwd: no such file or directory\n")
 	})
 
 	t.Run("read-only VFOX_HOME honors storage.sdkPath override", func(t *testing.T) {
@@ -255,4 +251,40 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		listRes := f.runHere(t, "list", "alpha").mustSucceed(t, "list alpha with storage.sdkPath")
 		mustContain(t, "listed version under storage.sdkPath", listRes.output(), "1.0.0")
 	})
+}
+
+func runInProcessCaptured(t *testing.T, f *cliFixture, level logger.LoggerLevel, args ...string) (string, string) {
+	t.Helper()
+	for k, v := range f.environ() {
+		if v == "-" {
+			t.Setenv(k, "")
+		} else {
+			t.Setenv(k, v)
+		}
+	}
+	logger.SetLevel(level)
+	t.Cleanup(func() { logger.SetLevel(logger.InfoLevel) })
+
+	origStdout, origStderr := os.Stdout, os.Stderr
+	rOut, wOut, err := os.Pipe()
+	must(t, err)
+	rErr, wErr, err := os.Pipe()
+	must(t, err)
+	os.Stdout, os.Stderr = wOut, wErr
+
+	runErr := newTestApp().Run(context.Background(), append([]string{"vfox"}, args...))
+	_ = wOut.Close()
+	_ = wErr.Close()
+	os.Stdout, os.Stderr = origStdout, origStderr
+
+	var out, errBuf bytes.Buffer
+	_, _ = io.Copy(&out, rOut)
+	_, _ = io.Copy(&errBuf, rErr)
+	_ = rOut.Close()
+	_ = rErr.Close()
+
+	if runErr != nil {
+		t.Fatalf("vfox %v (level=%v) returned unexpected error: %v", args, level, runErr)
+	}
+	return out.String(), errBuf.String()
 }
