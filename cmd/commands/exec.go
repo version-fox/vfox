@@ -24,7 +24,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
+
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
 	"github.com/version-fox/vfox/internal/sdk"
@@ -125,11 +127,34 @@ func execUsageError() error {
 	return fmt.Errorf("%s", execUsageLine())
 }
 
+// redirectStdoutToStderr routes setup, auto-install, and plugin output to
+// stderr and restores the caller's stdout before running the target command.
+func redirectStdoutToStderr() func() {
+	origStdout := os.Stdout
+	os.Stdout = os.Stderr
+	pterm.SetDefaultOutput(os.Stderr)
+	return func() {
+		os.Stdout = origStdout
+		pterm.SetDefaultOutput(origStdout)
+	}
+}
+
 // executeInVfoxEnv executes a command in vfox managed environment
 func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) error {
+	envMap, err := resolveExecCommandEnv(sdkSpecs)
+	if err != nil {
+		return err
+	}
+	return executeCommand(command, cmdArgs, envMap)
+}
+
+func resolveExecCommandEnv(sdkSpecs []execSDKSpec) (map[string]string, error) {
+	restore := redirectStdoutToStderr()
+	defer restore()
+
 	manager, err := internal.NewSdkManager()
 	if err != nil {
-		return fmt.Errorf("failed to create sdk manager: %w", err)
+		return nil, fmt.Errorf("failed to create sdk manager: %w", err)
 	}
 	defer manager.Close()
 
@@ -137,7 +162,7 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 	for _, sdkSpec := range sdkSpecs {
 		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		sdkEnvs = append(sdkEnvs, specEnvs)
 	}
@@ -152,7 +177,7 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 		}
 	}
 	envMap["PATH"] = buildExecPath(mergedEnvs.Paths)
-	return executeCommand(command, cmdArgs, envMap)
+	return envMap, nil
 }
 
 // buildExecPath builds the PATH passed to the process that exec launches.
@@ -164,6 +189,9 @@ func buildExecPath(paths *env.Paths) string {
 }
 
 func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Envs, error) {
+	restore := redirectStdoutToStderr()
+	defer restore()
+
 	sdkSource, err := manager.LookupSdk(sdkSpec.Name)
 	if err != nil {
 		return nil, fmt.Errorf("%s not supported, error: %w", sdkSpec.Name, err)
@@ -174,8 +202,8 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 		return nil, err
 	}
 	if sdkSpec.Version != "" && !sdkSource.CheckRuntimeExist(resolvedVersion) {
-		fmt.Printf("SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
-		installedVersion, err := sdkSource.InstallResolved(resolvedVersion, false)
+		fmt.Fprintf(os.Stderr, "SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
+		installedVersion, err := sdkSource.InstallResolvedWithOptions(resolvedVersion, sdk.InstallOptions{NoClipboard: true})
 		if err != nil {
 			return nil, fmt.Errorf("failed to install %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
 		}

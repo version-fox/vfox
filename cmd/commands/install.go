@@ -20,7 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -116,7 +119,7 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 
 	manager, err := internal.NewSdkManager()
 	if err != nil {
-		return nil
+		return err
 	}
 	defer manager.Close()
 
@@ -232,14 +235,20 @@ func installCmd(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
+var openInstallAllDevNull = func() (*os.File, error) {
+	return os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+}
+
 func installAll(autoConfirm bool) error {
 	manager, err := internal.NewSdkManager()
 	if err != nil {
-		return nil
+		return err
 	}
 	defer manager.Close()
 
+	restoreNotInstalled := redirectStdoutToStderr()
 	plugins, sdks, err := notInstalled(manager)
+	restoreNotInstalled()
 	if err != nil {
 		return err
 	}
@@ -268,22 +277,27 @@ func installAll(autoConfirm bool) error {
 		index         = 0
 		errorStr      string
 		stdout        = os.Stdout
-		stderr        = os.Stderr
 		pluginsResult = make(map[string]bool)
 		sdksResult    = make(map[string]bool)
 	)
-	os.Stdout = nil
-	os.Stderr = nil
-	pterm.SetDefaultOutput(os.Stdout)
+	devNull, devErr := openInstallAllDevNull()
+	if devErr != nil {
+		return fmt.Errorf("open %s: %w", os.DevNull, devErr)
+	}
+	// Route plugin stdout (top-level print/io.write during Add/LookupSdk and
+	// os.execute) to stderr while keeping pterm spinners/notes on os.DevNull.
+	os.Stdout = os.Stderr
+	pterm.SetDefaultOutput(devNull)
+	defer func() {
+		os.Stdout = stdout
+		pterm.SetDefaultOutput(stdout)
+		// Best-effort close on the os.DevNull write handle opened only for batch stdout suppression.
+		_ = devNull.Close()
+	}()
 
-	spinnerInfo, _ := pterm.DefaultSpinner.
-		WithSequence([]string{"⣾ ", "⣽ ", "⣻ ", "⢿ ", "⡿ ", "⣟ ", "⣯ ", "⣷ "}...).
-		WithText("Installing...").
-		WithWriter(stdout).
-		Start()
 	for _, plugin := range plugins {
 		index++
-		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s installing...\033[K", index, count, "Plugin", plugin))
+		fmt.Fprintf(stdout, "[%v/%v] %s: %s installing...\n", index, count, "Plugin", plugin)
 		pluginsResult[plugin] = false
 		if err := manager.Add(plugin, "", ""); err != nil {
 			if errors.Is(err, internal.ManifestNotFound) {
@@ -295,27 +309,37 @@ func installAll(autoConfirm bool) error {
 		}
 		pluginsResult[plugin] = true
 	}
-	for sdkName, version := range sdks {
+	for _, sdkName := range slices.Sorted(maps.Keys(sdks)) {
+		version := sdks[sdkName]
 		index++
-		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s@%s installing...\033[K", index, count, "SDK", sdkName, version))
+		fmt.Fprintf(stdout, "[%v/%v] %s: %s@%s installing...\n", index, count, "SDK", sdkName, version)
 		sdkVersion := fmt.Sprintf("%s@%s", sdkName, version)
 		sdksResult[sdkVersion] = false
+		if ok, planned := pluginsResult[sdkName]; planned && !ok {
+			continue
+		}
 		lookupSdk, err := manager.LookupSdk(sdkName)
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
 		}
-		err = lookupSdk.Install(sdk.Version(version))
+		_, err = lookupSdk.InstallResolvedWithOptions(sdk.Version(version), sdk.InstallOptions{
+			NoClipboard:    true,
+			ProgressWriter: io.Discard,
+			OutputWriter:   os.Stderr,
+		})
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
 			continue
 		}
 		sdksResult[sdkVersion] = true
 	}
-	spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] Installation completed.\033[K", count, count))
-	_ = spinnerInfo.Stop()
+	if len(errorStr) > 0 {
+		fmt.Fprintf(stdout, "[%v/%v] Installation finished with failures.\n", count, count)
+	} else {
+		fmt.Fprintf(stdout, "[%v/%v] Installation completed.\n", count, count)
+	}
 	os.Stdout = stdout
-	os.Stderr = stderr
 	pterm.SetDefaultOutput(os.Stdout)
 
 	fmt.Printf("%s indicates successful installation, while %s indicates installation failure.\n", pterm.Green("Green"), pterm.Red("red"))
@@ -323,7 +347,7 @@ func installAll(autoConfirm bool) error {
 	printSdk(sdks, sdksResult)
 
 	if len(errorStr) > 0 {
-		fmt.Println(errorStr)
+		return errors.New(strings.TrimPrefix(errorStr, "\n"))
 	}
 	return nil
 }
@@ -344,13 +368,15 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 	for name, version := range allTools {
 		lookupSdk, err := manager.LookupSdk(name)
 		if err != nil {
-			// Plugin not installed
+			// Plugin not installed yet: install the plugin first and the recorded SDK version afterwards.
 			plugins = append(plugins, name)
+			sdks[name] = version
 		} else if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
 			// SDK not installed
 			sdks[name] = version
 		}
 	}
+	slices.Sort(plugins)
 	return
 }
 
@@ -373,7 +399,8 @@ func printPlugin(plugins []string, result map[string]bool) {
 
 func printSdk(sdks map[string]string, result map[string]bool) {
 	fmt.Println("SDK:")
-	for sdk, version := range sdks {
+	for _, sdk := range slices.Sorted(maps.Keys(sdks)) {
+		version := sdks[sdk]
 		sdkVersion := fmt.Sprintf("%s@%s", sdk, version)
 		if result != nil {
 			if result[sdkVersion] {

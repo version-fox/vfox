@@ -47,21 +47,35 @@ const (
 	additionRuntimePrefix  = "add-" // Prefix of path for additional runtime packages
 )
 
+// InstallOptions controls optional behavior for InstallResolvedWithOptions.
+type InstallOptions struct {
+	Reinstall      bool
+	NoClipboard    bool
+	ProgressWriter io.Writer
+	OutputWriter   io.Writer
+}
+
+var (
+	isTTY           = func() bool { return util.IsTTY() }
+	copyToClipboard = util.CopyToClipboard
+)
+
 // Sdk interface defines the methods for managing software development kits (SDKs).
 type Sdk interface {
-	Install(version Version) error                                        // Install a specific runtime of the SDK
-	Reinstall(version Version) error                                      // Replace an installed runtime with a fresh copy
-	InstallResolved(version Version, reinstall bool) (Version, error)     // Install and report the version that ended up on disk
-	InstallAs(version Version, name Version) (Version, error)             // Install version as a second copy kept under name
-	Uninstall(version Version) error                                      // Uninstall a specific runtime of the SDK
-	Available(args []string) ([]*AvailableRuntimePackage, error)          // List available runtime of the SDK
-	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)            // Get environment variables for a specific runtime of the SDK
-	Use(version Version, scope env.UseScope) error                        // Use a specific runtime in a given scope
-	UseWithConfig(version Version, scope env.UseScope, unlink bool) error // Use with link configuration
-	Unuse(scopes ...env.UseScope) error                                   // Unuse the current runtime in a given scope
-	GetRuntimePackage(version Version) (*RuntimePackage, error)           // Get the runtime package for a specific version
-	CheckRuntimeExist(version Version) bool                               // Check if a specific runtime version is installed
-	ResolveInstalledVersion(version Version) (Version, error)             // The installed version a typed one stands for, as `vfox use` selects it
+	Install(version Version) error                                                    // Install a specific runtime of the SDK
+	Reinstall(version Version) error                                                  // Replace an installed runtime with a fresh copy
+	InstallResolved(version Version, reinstall bool) (Version, error)                 // Install and report the version that ended up on disk
+	InstallResolvedWithOptions(version Version, opts InstallOptions) (Version, error) // InstallResolved with explicit behavior options
+	InstallAs(version Version, name Version) (Version, error)                         // Install version as a second copy kept under name
+	Uninstall(version Version) error                                                  // Uninstall a specific runtime of the SDK
+	Available(args []string) ([]*AvailableRuntimePackage, error)                      // List available runtime of the SDK
+	EnvKeys(runtimePackage *RuntimePackage) (*env.Envs, error)                        // Get environment variables for a specific runtime of the SDK
+	Use(version Version, scope env.UseScope) error                                    // Use a specific runtime in a given scope
+	UseWithConfig(version Version, scope env.UseScope, unlink bool) error             // Use with link configuration
+	Unuse(scopes ...env.UseScope) error                                               // Unuse the current runtime in a given scope
+	GetRuntimePackage(version Version) (*RuntimePackage, error)                       // Get the runtime package for a specific version
+	CheckRuntimeExist(version Version) bool                                           // Check if a specific runtime version is installed
+	ResolveInstalledVersion(version Version) (Version, error)                         // The installed version a typed one stands for, as `vfox use` selects it
 	InstalledList() []Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
@@ -192,7 +206,13 @@ func (b *impl) Reinstall(version Version) error {
 // not called. The version is only meaningful when err is nil. Install and Reinstall
 // wrap this for callers that do not need it.
 func (b *impl) InstallResolved(version Version, reinstall bool) (Version, error) {
-	return b.install(version, "", reinstall)
+	return b.install(version, "", InstallOptions{Reinstall: reinstall})
+}
+
+// InstallResolvedWithOptions installs version according to opts and returns the
+// resolved version on disk.
+func (b *impl) InstallResolvedWithOptions(version Version, opts InstallOptions) (Version, error) {
+	return b.install(version, "", opts)
 }
 
 // InstallAs installs version as a second copy of it, kept under name, which is what
@@ -206,13 +226,14 @@ func (b *impl) InstallAs(version Version, name Version) (Version, error) {
 	if name == "" {
 		return "", fmt.Errorf("a copy of %s needs a name", version)
 	}
-	return b.install(version, name, false)
+	return b.install(version, name, InstallOptions{})
 }
 
 // install is InstallResolved and InstallAs. Without a name the installation is kept
 // under the version PreInstall resolves the request to; with one, under name, and the
 // version it resolves to is recorded in the receipt.
-func (b *impl) install(version, name Version, reinstall bool) (installed Version, installErr error) {
+func (b *impl) install(version, name Version, opts InstallOptions) (installed Version, installErr error) {
+	reinstall := opts.Reinstall
 	// PreInstall does not know the name of a copy, so a copy is reinstalled from the
 	// version it was asked for, and the reinstall has to resolve to the version it has.
 	exact := version
@@ -243,6 +264,21 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists\n", label)
 		return version, nil
+	}
+
+	if opts.ProgressWriter != nil {
+		if setter, ok := b.plugin.Plugin.(interface {
+			SetProgressWriter(io.Writer) func()
+		}); ok {
+			defer setter.SetProgressWriter(opts.ProgressWriter)()
+		}
+	}
+	if opts.OutputWriter != nil {
+		if setter, ok := b.plugin.Plugin.(interface {
+			SetOutputWriter(io.Writer) func()
+		}); ok {
+			defer setter.SetOutputWriter(opts.OutputWriter)()
+		}
 	}
 
 	ctx := &plugin.PreInstallHookCtx{
@@ -334,7 +370,7 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 
 	// The main runtime is where mainRuntimePath looks for it, so it is named after the
 	// installation, which for a copy is not the version the plugin resolved to.
-	path, err := b.preInstallSdk(mainSdk, b.mainRuntimePath(key))
+	path, err := b.preInstallSdk(mainSdk, b.mainRuntimePath(key), opts.ProgressWriter)
 
 	if err != nil {
 		return "", err
@@ -348,7 +384,7 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 	if len(installInfo.Addition) > 0 {
 		pterm.Printf("There are %d additional files that need to be downloaded...\n", len(installInfo.Addition))
 		for _, oSdk := range installInfo.Addition {
-			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, additionDirName(oSdk)))
+			path, err = b.preInstallSdk(oSdk, filepath.Join(newDirPath, additionDirName(oSdk)), opts.ProgressWriter)
 			if err != nil {
 				return "", err
 			}
@@ -383,9 +419,9 @@ func (b *impl) install(version, name Version, reinstall bool) (installed Version
 	useCommand := fmt.Sprintf("vfox use %s", label)
 	pterm.Printf("Please use `%s` to use it.\n", pterm.LightBlue(useCommand))
 
-	// Copy command to clipboard in TTY mode
-	if util.IsTTY() {
-		if err := util.CopyToClipboard(useCommand); err == nil {
+	// Copy command to clipboard in interactive TTY mode unless suppressed (e.g. non-interactive exec).
+	if !opts.NoClipboard && isTTY() {
+		if err := copyToClipboard(useCommand); err == nil {
 			pterm.Printf("%s\n", pterm.LightYellow("Copied to clipboard, you can paste it now."))
 		}
 		// Silently ignore clipboard errors (not supported, utility not found, etc.)
@@ -497,13 +533,13 @@ func (b *impl) moveLocalFile(info *plugin.PreInstallPackageItem, targetPath stri
 	return nil
 }
 
-func (b *impl) moveRemoteFile(info *plugin.PreInstallPackageItem, targetPath string) error {
+func (b *impl) moveRemoteFileWithProgressWriter(info *plugin.PreInstallPackageItem, targetPath string, progressWriter io.Writer) error {
 	u, err := url.Parse(info.Path)
 	label := info.Label()
 	if err != nil {
 		return util.RedactError(err)
 	}
-	filePath, err := b.Download(u, info.Headers)
+	filePath, err := b.downloadWithProgressWriter(u, info.Headers, progressWriter)
 	if err != nil {
 		return fmt.Errorf("failed to download %s file, err:%w", label, err)
 	}
@@ -545,7 +581,7 @@ func additionDirName(info *plugin.PreInstallPackageItem) string {
 	return additionRuntimePrefix + info.Name + "-" + info.Version
 }
 
-func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string) (string, error) {
+func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath string, progressWriter io.Writer) (string, error) {
 	pterm.Printf("Preinstalling %s...\n", info.Name+"@"+info.Version)
 
 	path := sdkDestPath
@@ -558,7 +594,7 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 		return path, nil
 	}
 	if strings.HasPrefix(info.Path, "https://") || strings.HasPrefix(info.Path, "http://") {
-		if err := b.moveRemoteFile(info, path); err != nil {
+		if err := b.moveRemoteFileWithProgressWriter(info, path, progressWriter); err != nil {
 			return "", err
 		}
 		return path, nil
@@ -1208,6 +1244,13 @@ func (b *impl) packagePath(version Version) string {
 }
 
 func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
+	return b.downloadWithProgressWriter(u, headers, os.Stderr)
+}
+
+func (b *impl) downloadWithProgressWriter(u *url.URL, headers map[string]string, progressWriter io.Writer) (string, error) {
+	if progressWriter == nil {
+		progressWriter = os.Stderr
+	}
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", util.RedactError(err)
@@ -1272,12 +1315,12 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 
 	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionSetWriter(progressWriter),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
 		progressbar.OptionFullWidth(),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Fprintf(os.Stderr, "\n")
+			fmt.Fprintf(progressWriter, "\n")
 		}),
 		progressbar.OptionSetDescription("Downloading..."),
 		progressbar.OptionSetTheme(progressbar.Theme{

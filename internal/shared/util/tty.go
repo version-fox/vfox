@@ -25,7 +25,9 @@ import (
 // IsTTY checks if the process is running in a TTY (interactive terminal). On
 // Windows, Git Bash in mintty counts as one: its pty reaches native programs as
 // a pipe, and isCygwinTerminal reports that pipe as a terminal.
-func IsTTY() bool {
+var IsTTY = defaultIsTTY
+
+func defaultIsTTY() bool {
 	return term.IsTerminal(int(os.Stdout.Fd())) || isCygwinTerminal(os.Stdout.Fd())
 }
 

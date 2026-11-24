@@ -66,7 +66,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Alias, Config, Current, Doctor, Env, Info, Install, Link, List, Uninstall, Use,
+	Activate, Alias, Config, Current, Doctor, Env, Exec, Info, Install, Link, List, Uninstall, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -137,6 +137,13 @@ func newCLIFixture(t *testing.T, splitShared bool) *cliFixture {
 	if runtime.GOOS == "windows" && os.Getenv("VFOX_TEST_WINDOWS_REGISTRY") != "1" {
 		t.Skip("these tests change the user PATH in the Windows registry: set VFOX_TEST_WINDOWS_REGISTRY=1 on a runner or VM that is thrown away (CI does)")
 	}
+	return newIsolatedCLIFixture(t, splitShared)
+}
+
+// newIsolatedCLIFixture sets up a vfox home inside t.TempDir() for commands
+// that never touch global machine state such as the Windows registry.
+func newIsolatedCLIFixture(t *testing.T, splitShared bool) *cliFixture {
+	t.Helper()
 	root := t.TempDir()
 	if runtime.GOOS == "windows" {
 		// TEMP can name the user's directory by its short name (RUNNER~1) while

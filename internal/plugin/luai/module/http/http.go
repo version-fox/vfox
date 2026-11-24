@@ -41,6 +41,7 @@ type Module struct {
 	client         *http.Client
 	downloadClient *http.Client
 	output         io.Writer
+	outputFunc     func() io.Writer
 }
 
 // Options customize a single VM's HTTP module without replacing its Lua API.
@@ -48,6 +49,7 @@ type Options struct {
 	// WrapTransport runs synchronously on the invoking Lua thread.
 	WrapTransport func(http.RoundTripper) http.RoundTripper
 	Output        io.Writer
+	OutputFunc    func() io.Writer
 }
 
 type requestStateKey struct{}
@@ -247,14 +249,15 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 		desc = name
 	}
 
+	progressOut := m.progressWriter()
 	bar := progressbar.NewOptions64(
 		resp.ContentLength,
-		progressbar.OptionSetWriter(m.output),
+		progressbar.OptionSetWriter(progressOut),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
 		progressbar.OptionFullWidth(),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Fprintln(m.output)
+			fmt.Fprintln(progressOut)
 		}),
 		progressbar.OptionSetDescription(desc),
 		progressbar.OptionSetTheme(progressbar.Theme{
@@ -282,6 +285,18 @@ func (m *Module) luaMap() map[string]lua.LGFunction {
 	}
 }
 
+func (m *Module) progressWriter() io.Writer {
+	if m.outputFunc != nil {
+		if w := m.outputFunc(); w != nil {
+			return w
+		}
+	}
+	if m.output != nil {
+		return m.output
+	}
+	return os.Stderr
+}
+
 func newModule(proxy *config.Proxy, settings *config.HTTP) *Module {
 	requestTimeout, downloadTimeout := settings.Timeouts()
 	// Keep the standard transport defaults (including TLS handshake timeout)
@@ -298,7 +313,6 @@ func newModule(proxy *config.Proxy, settings *config.HTTP) *Module {
 		}
 	}
 	return &Module{
-		output: os.Stderr,
 		proxy:  proxy,
 		client: &http.Client{Transport: transport, Timeout: requestTimeout},
 		// Downloads need a larger total budget, while retaining the connection
@@ -317,6 +331,9 @@ func createModule(proxy *config.Proxy, settings *config.HTTP, options Options) l
 		}
 		if options.Output != nil {
 			m.output = options.Output
+		}
+		if options.OutputFunc != nil {
+			m.outputFunc = options.OutputFunc
 		}
 		t := L.NewTable()
 		L.SetFuncs(t, m.luaMap())

@@ -20,7 +20,10 @@ package plugin
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
+	"sync"
 
 	lua "github.com/yuin/gopher-lua"
 
@@ -32,10 +35,59 @@ import (
 	"github.com/version-fox/vfox/internal/shared/util"
 )
 
+type lockedWriter struct {
+	mu sync.RWMutex
+	w  io.Writer
+}
+
+func (p *lockedWriter) writer() io.Writer {
+	if p == nil {
+		return nil
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.w
+}
+
+func (p *lockedWriter) set(w io.Writer) func() {
+	if p == nil {
+		return func() {}
+	}
+	p.mu.Lock()
+	prev := p.w
+	p.w = w
+	p.mu.Unlock()
+	return func() {
+		p.mu.Lock()
+		p.w = prev
+		p.mu.Unlock()
+	}
+}
+
 type LuaPlugin struct {
 	vm          *luai.LuaVM
 	pluginObj   *lua.LTable
 	development bool
+	progressOut *lockedWriter
+	stdoutOut   *lockedWriter
+}
+
+// SetProgressWriter routes Lua module download progress (such as http.download_file)
+// for the duration of an install operation and returns a function to restore the prior writer.
+func (l *LuaPlugin) SetProgressWriter(w io.Writer) func() {
+	if l == nil {
+		return func() {}
+	}
+	return l.progressOut.set(w)
+}
+
+// SetOutputWriter overrides where Lua print, io.write, and io.stdout:write write
+// for the duration of an operation, falling back to os.Stdout when nil.
+func (l *LuaPlugin) SetOutputWriter(w io.Writer) func() {
+	if l == nil {
+		return func() {}
+	}
+	return l.stdoutOut.set(w)
 }
 
 func (l *LuaPlugin) HasFunction(name string) bool {
@@ -233,19 +285,31 @@ func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (lua.LValu
 }
 
 func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaPlugin, *Metadata, error) {
+	progressOut := &lockedWriter{}
+	stdoutOut := &lockedWriter{}
 	vm := luai.NewLuaVM()
 	if err := vm.Prepare(&module.PreloadOptions{
-		Config: envCtx.UserConfig,
+		Config:         envCtx.UserConfig,
+		ProgressOutput: progressOut.writer,
 	}); err != nil {
 		vm.Close()
 		return nil, nil, err
 	}
+	redirectLuaOutput(vm.Instance, func() io.Writer {
+		if w := stdoutOut.writer(); w != nil {
+			return w
+		}
+		return os.Stdout
+	}, func() io.Writer { return os.Stderr }, false)
 	p, metadata, err := loadLuaPlugin(vm, pluginDirPath, RuntimeInfo{
 		OsType: string(util.GetOSType()), ArchType: string(util.GetArchType()),
 		Version: envCtx.RuntimeVersion, PluginDirPath: pluginDirPath,
 	})
 	if err != nil {
 		vm.Close()
+	} else {
+		p.progressOut = progressOut
+		p.stdoutOut = stdoutOut
 	}
 	return p, metadata, err
 }

@@ -198,12 +198,12 @@ func TestSdk_Download_RedactsConnectionError(t *testing.T) {
 
 func TestSdk_MoveRemoteFileRedactsParseError(t *testing.T) {
 	sdk := newDownloadTestSDK(t)
-	err := sdk.moveRemoteFile(&plugin.PreInstallPackageItem{Path: "http://user:Zq9%ss@127.0.0.1/repro.zip"}, t.TempDir())
+	err := sdk.moveRemoteFileWithProgressWriter(&plugin.PreInstallPackageItem{Path: "http://user:Zq9%ss@127.0.0.1/repro.zip"}, t.TempDir(), os.Stderr)
 	if err == nil {
-		t.Fatal("moveRemoteFile() error = nil, want a parse error")
+		t.Fatal("moveRemoteFileWithProgressWriter() error = nil, want a parse error")
 	}
 	if msg := err.Error(); strings.Contains(msg, "Zq9") || strings.Contains(msg, "%ss") {
-		t.Fatalf("moveRemoteFile() error = %q, want the rejected URL credentials hidden", msg)
+		t.Fatalf("moveRemoteFileWithProgressWriter() error = %q, want the rejected URL credentials hidden", msg)
 	}
 }
 
