@@ -78,11 +78,15 @@ func TestLookPathInEnvResolvesPATHEXT(t *testing.T) {
 	}
 }
 
-func TestExecuteCommandRejectsWindowsBatchMetacharacters(t *testing.T) {
-	binDir := t.TempDir()
+func TestExecuteCommandWindowsBatchQuotingAndGuard(t *testing.T) {
+	binDir := filepath.Join(t.TempDir(), "R&D")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	marker := filepath.Join(t.TempDir(), "injected.txt")
+	outFile := filepath.Join(t.TempDir(), "captured.txt")
 	shim := filepath.Join(binDir, "shim.cmd")
-	if err := os.WriteFile(shim, []byte("@echo off\r\necho %*\r\n"), 0o755); err != nil {
+	if err := os.WriteFile(shim, []byte("@echo off\r\n> \""+outFile+"\" echo %*\r\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,33 +94,63 @@ func TestExecuteCommandRejectsWindowsBatchMetacharacters(t *testing.T) {
 		"PATH":    binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"PATHEXT": ".COM;.EXE;.BAT;.CMD",
 	}
+
 	for _, arg := range []string{
-		"x&echo>marker",
-		"x&calc",
-		"x|calc",
+		"ok",
+		"express@^4.18.0",
+		"x&echo>" + marker,
+		"a|b",
 		"x>out",
 		"x<in",
 		"x^&calc",
+		"x(1)",
+	} {
+		if err := executeCommand("shim", []string{arg}, envMap); err != nil {
+			t.Fatalf("executeCommand failed for safe batch arg %q: %v", arg, err)
+		}
+		gotBytes, err := os.ReadFile(outFile)
+		if err != nil {
+			t.Fatalf("read captured args for %q: %v", arg, err)
+		}
+		if !strings.Contains(string(gotBytes), arg) {
+			t.Fatalf("captured batch args %q missing literal %q", string(gotBytes), arg)
+		}
+	}
+	if err := executeCommand("shim", nil, envMap); err != nil {
+		t.Fatalf("executeCommand failed with no args on &-containing batch path %q: %v", shim, err)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("quoted batch arg created marker %q (stat err=%v)", marker, err)
+	}
+
+	for _, arg := range []string{
 		"x%COMSPEC%",
 		"x!PATH!",
-		"x(1)",
 		"a\"b",
 		"a\nb",
+		"a\rb",
+		"a\x00b",
 	} {
 		err := executeCommand("shim", []string{arg}, envMap)
 		if err == nil {
-			t.Fatalf("executeCommand unexpectedly allowed batch arg %q", arg)
+			t.Fatalf("executeCommand unexpectedly allowed unquotable batch arg %q", arg)
 		}
 		if !strings.Contains(err.Error(), "metacharacters") {
 			t.Fatalf("unexpected error for batch arg %q: %v", arg, err)
 		}
 	}
 
-	injectedArg := "x&echo>" + marker
-	if err := executeCommand("shim", []string{injectedArg}, envMap); err == nil {
-		t.Fatalf("executeCommand unexpectedly ran injected redirect %q", injectedArg)
+	badPathDir := filepath.Join(t.TempDir(), "bad%env%")
+	if err := os.MkdirAll(badPathDir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := os.Stat(marker); !os.IsNotExist(err) {
-		t.Fatalf("injected command created marker %q (stat err=%v)", marker, err)
+	badShim := filepath.Join(badPathDir, "shim.cmd")
+	if err := os.WriteFile(badShim, []byte("@echo off\r\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := executeCommand(badShim, []string{"ok"}, envMap); err == nil {
+		t.Fatalf("executeCommand unexpectedly allowed unquotable batch path %q", badShim)
+	} else if !strings.Contains(err.Error(), "metacharacters") {
+		t.Fatalf("unexpected error for batch path %q: %v", badShim, err)
 	}
 }

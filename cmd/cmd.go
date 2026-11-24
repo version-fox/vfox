@@ -112,7 +112,9 @@ func newCmd() *cmd {
 		commands.Cd,
 	}
 	for _, command := range app.Commands {
-		command.ShellComplete = completeCommand
+		if command.ShellComplete == nil {
+			command.ShellComplete = completeCommand
+		}
 	}
 
 	return &cmd{app: app, version: version}

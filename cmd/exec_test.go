@@ -151,7 +151,7 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		})
 	}
 
-	t.Run("trailing --generate-shell-completion completes without running target with or without --", func(t *testing.T) {
+	t.Run("trailing --generate-shell-completion emits empty output without running target with or without --", func(t *testing.T) {
 		probeDir := t.TempDir()
 		marker := filepath.Join(probeDir, "ran.txt")
 		var probeCmd string
@@ -167,18 +167,11 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 			}
 		}
 
-		baselineOut, baselineErr, baselineCode := runExecCLI(t, root, "exec", "etcd@3.5.12", probeCmd, "--generate-shell-completion")
-		if baselineCode != 0 {
-			t.Fatalf("without -- completion probe exited %d (stderr:\n%s\nstdout:\n%s)", baselineCode, baselineErr, baselineOut)
-		}
-		if _, err := os.Stat(marker); !os.IsNotExist(err) {
-			t.Fatalf("without -- completion probe invoked target script %q", marker)
-		}
-
 		for _, tc := range []struct {
 			name string
 			args []string
 		}{
+			{name: "exec without --", args: []string{"exec", "etcd@3.5.12", probeCmd, "--generate-shell-completion"}},
 			{name: "exec with --", args: []string{"exec", "etcd@3.5.12", "--", probeCmd, "--generate-shell-completion"}},
 			{name: "x alias with --", args: []string{"x", "etcd@3.5.12", "--", probeCmd, "--generate-shell-completion"}},
 			{name: "x alias without --", args: []string{"x", "etcd@3.5.12", probeCmd, "--generate-shell-completion"}},
@@ -191,11 +184,8 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 				if stderr != "" {
 					t.Fatalf("vfox %v wrote unexpected stderr:\n%s", tc.args, stderr)
 				}
-				if stdout != baselineOut {
-					t.Fatalf("vfox %v stdout = %q, want %q", tc.args, stdout, baselineOut)
-				}
-				if strings.Contains(stdout, "sdk:args=") || strings.Contains(stdout, "decoy-tools:") {
-					t.Fatalf("vfox %v unexpectedly ran target script:\n%s", tc.args, stdout)
+				if stdout != "" {
+					t.Fatalf("vfox %v stdout = %q, want empty", tc.args, stdout)
 				}
 				if _, err := os.Stat(marker); !os.IsNotExist(err) {
 					t.Fatalf("vfox %v invoked target script %q", tc.args, marker)
@@ -342,15 +332,33 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 				wantErrAbsent:   "pass '--' before the command",
 			},
 			{
-				name:            "missing sdk before -- with plain command omits misplaced-separator note",
+				name:            "missing sdk before -- with plain command states separator rule without pass instruction",
 				args:            []string{"exec", "etcd@3.5.12", "nosuch", "--", "etcd", "put"},
-				wantErrContains: []string{"nosuch not supported"},
+				wantErrContains: []string{"nosuch not supported", "first '--'", `"nosuch"`},
 				wantErrAbsent:   "pass '--' before the command",
 			},
 			{
-				name:            "configured sdk then missing sdk before -- with plain command omits misplaced-separator note",
+				name:            "configured sdk then missing sdk before -- states separator rule without pass instruction",
 				args:            []string{"exec", "etcd@3.5.12", "etcd", "--", "etcd", "put"},
-				wantErrContains: []string{"no version configured for etcd"},
+				wantErrContains: []string{"no version configured for etcd", "first '--'", `"etcd"`},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "misplaced -- after command with plain arg states separator rule",
+				args:            []string{"exec", "etcd@3.5.12", "etcd", "put", "--", "key"},
+				wantErrContains: []string{"no version configured for etcd", "first '--'", `"etcd"`},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "missing sdk before -- when command itself passes -- omits pass instruction",
+				args:            []string{"exec", "etcd@3.5.12", "nosuch", "--", "etcd", "put", "--", "key"},
+				wantErrContains: []string{"nosuch not supported", "first '--'", `"nosuch"`},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "missing sdk before -- when command takes --save omits pass instruction",
+				args:            []string{"exec", "etcd@3.5.12", "nosuch", "--", "npm", "install", "--save", "foo"},
+				wantErrContains: []string{"nosuch not supported", "first '--'", `"nosuch"`},
 				wantErrAbsent:   "pass '--' before the command",
 			},
 		} {
@@ -446,7 +454,19 @@ function PLUGIN:EnvKeys(ctx) return {} end
 			{
 				name:            "configured sdk then missing sdk before -- omits misplaced-separator note",
 				args:            []string{"exec", "etcd", "nosuch", "--", "etcd", "put"},
-				wantErrContains: []string{"nosuch not supported"},
+				wantErrContains: []string{"nosuch not supported", "first '--'", `"nosuch"`},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "configured sdk with misplaced -- after put states separator rule",
+				args:            []string{"exec", "etcd", "etcd", "put", "--", "key"},
+				wantErrContains: []string{"put not supported", "first '--'", `"put"`},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "unconfigured second plugin before -- when command takes -- omits pass instruction",
+				args:            []string{"exec", "etcd@3.5.12", "alpha", "--", "etcd", "put", "--", "key"},
+				wantErrContains: []string{"no version configured for alpha", "first '--'", `"alpha"`},
 				wantErrAbsent:   "pass '--' before the command",
 			},
 		} {
@@ -514,20 +534,40 @@ function PLUGIN:EnvKeys(ctx) return {} end
 		}
 	})
 
-	t.Run("windows batch shim rejects cmd metacharacters without executing second command", func(t *testing.T) {
+	t.Run("windows batch shim quotes ^ and & safely and refuses unquotable cmd metacharacters", func(t *testing.T) {
 		if runtime.GOOS != "windows" {
 			t.Skip("Windows batch shim execution applies on Windows")
 		}
 		marker := filepath.Join(t.TempDir(), "injected.txt")
-		stdout, stderr, code := runExecCLI(t, root, "exec", "etcd@3.5.12", "etcd", "x&echo>"+marker)
-		if code == 0 {
-			t.Fatalf("expected non-zero exit code for batch metacharacter arg, got 0 (stdout:\n%s)", stdout)
-		}
-		if !strings.Contains(stderr, "metacharacters") {
-			t.Fatalf("stderr missing metacharacters diagnostic:\n%s", stderr)
+		for _, tc := range []struct {
+			name string
+			args []string
+		}{
+			{name: "caret package spec", args: []string{"exec", "etcd@3.5.12", "etcd", "install", "express@^4.18.0"}},
+			{name: "quoted redirect and ampersand", args: []string{"exec", "etcd@3.5.12", "etcd", "x&echo>" + marker}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, tc.args...)
+				if code != 0 {
+					t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.args, code, stderr, stdout)
+				}
+				if !strings.Contains(stdout, tc.args[len(tc.args)-1]) {
+					t.Fatalf("stdout missing literal arg %q:\n%s", tc.args[len(tc.args)-1], stdout)
+				}
+			})
 		}
 		if _, err := os.Stat(marker); !os.IsNotExist(err) {
-			t.Fatalf("injected command created marker %q (stat err=%v)", marker, err)
+			t.Fatalf("quoted batch arg created marker %q (stat err=%v)", marker, err)
+		}
+
+		for _, badArg := range []string{"x%PATH%", "x!PATH!", `a"b`} {
+			stdout, stderr, code := runExecCLI(t, root, "exec", "etcd@3.5.12", "etcd", badArg)
+			if code == 0 {
+				t.Fatalf("expected non-zero exit code for unquotable batch arg %q, got 0 (stdout:\n%s)", badArg, stdout)
+			}
+			if !strings.Contains(stderr, "metacharacters") {
+				t.Fatalf("stderr missing metacharacters diagnostic for %q:\n%s", badArg, stderr)
+			}
 		}
 	})
 

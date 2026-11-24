@@ -359,7 +359,7 @@ vfox x <sdk-name>[@<version>] <command> [args...]
 
 `version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
 
-For a single SDK, `--` is optional unless `<command>` or its arguments contain `--`: flags after `<command>` (such as `--version` or `--help`) are passed directly to `<command>`, except a trailing `--generate-shell-completion` probe, which `vfox` handles for shell completion without running `<command>` (with or without `--`).
+For a single SDK, `--` is optional unless `<command>` or its arguments contain `--`: flags after `<command>` (such as `--version` or `--help`) are passed directly to `<command>`, except a trailing `--generate-shell-completion` probe. In both the `--` and non-`--` forms, `vfox` intercepts a trailing `--generate-shell-completion` with empty output instead of running `<command>`, so the `--` form no longer lets `<command>` answer completion probes.
 
 The first `--` always separates SDK specs from `<command>`, so anything before the first `--` is read as an SDK spec. Multiple SDKs require `--` before `<command>`, and if `<command>` itself takes `--`, place `--` before `<command>` (for example, `vfox exec nodejs@24.14.0 -- npm run build -- --watch`). Multiple SDKs are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
 
