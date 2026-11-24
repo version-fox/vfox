@@ -228,6 +228,33 @@ func TestUninstallThatLeavesFilesIsFinishedByARetry(t *testing.T) {
 	}
 }
 
+// Files left of v1.0.0 do not change what v1.0.0 stands for while 1.0.0 is
+// installed. Once it is not, the name as typed finds them.
+func TestLeftoverFilesDoNotChangeALeadingV(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0")
+	keepRegistry(t)
+	installs := filepath.Join(f.shared, "cache", "alpha")
+	left := filepath.Join(installs, ".v-v1.0.0.removing")
+	must(t, os.MkdirAll(left, 0755))
+
+	f.run(t, "use", "-g", "alpha@v1.0.0").mustSucceed(t, "use -g alpha@v1.0.0")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "1.0.0"`)
+
+	out := f.run(t, "uninstall", "alpha@v1.0.0").mustSucceed(t, "uninstall alpha@v1.0.0").output()
+	mustContain(t, "uninstall", out, "Uninstalled alpha@1.0.0")
+	if _, err := os.Lstat(filepath.Join(installs, "v-1.0.0")); !os.IsNotExist(err) {
+		t.Errorf("alpha@1.0.0 is still there: %v", err)
+	}
+	must(t, os.MkdirAll(left, 0755)) // the empty SDK directory went with the last version
+
+	out = f.run(t, "uninstall", "alpha@v1.0.0").mustSucceed(t, "uninstall alpha@v1.0.0 again").output()
+	mustContain(t, "uninstall again", out, "Deleted the files that were left of alpha@v1.0.0")
+	if _, err := os.Lstat(left); !os.IsNotExist(err) {
+		t.Errorf("%s is still there: %v", left, err)
+	}
+}
+
 // Files that an earlier uninstall left do not get in the way of the same version.
 func TestUninstallWhileFilesOfAnEarlierOneAreLeft(t *testing.T) {
 	f := newCLIFixture(t, false)

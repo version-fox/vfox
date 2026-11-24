@@ -17,6 +17,7 @@
 package sdk
 
 import (
+	"cmp"
 	"slices"
 	"testing"
 
@@ -38,6 +39,18 @@ func TestInstalledListIsNewestFirst(t *testing.T) {
 func TestCompareInstalledTreatsMissingPartsAsZero(t *testing.T) {
 	if c := compareInstalled("1.0", "1.0.0"); c != 0 {
 		t.Errorf("compareInstalled(1.0, 1.0.0) = %d, want 0", c)
+	}
+}
+
+func TestCompareInstalledOrdersSuffixes(t *testing.T) {
+	// Each name comes before the ones after it.
+	ascending := []string{"2.0.0-beta", "2.0.0-beta.2", "2.0.0-rc", "2.0.0-rc9", "2.0.0-rc10", "2.0.0-rc10.1", "2.0.0", "2.0.1-rc1"}
+	for i, a := range ascending {
+		for j, b := range ascending {
+			if got := compareInstalled(a, b); got != cmp.Compare(i, j) {
+				t.Errorf("compareInstalled(%s, %s) = %d, want %d", a, b, got, cmp.Compare(i, j))
+			}
+		}
 	}
 }
 

@@ -383,3 +383,119 @@ func TestUninstallRestoresTheGlobalVersionWhenPreUninstallFails(t *testing.T) {
 		})
 	}
 }
+
+// When the global setting cannot be set back either, the error says what it is
+// and how to fix it, and the links agree with the config.
+func TestUninstallSaysWhatTheGlobalVersionIsWhenItCannotBeRestored(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop the write")
+	}
+	for _, tc := range []struct {
+		name      string
+		fallbacks []Version
+		lockLinks bool
+		global    Version
+		says      string
+		link      string
+	}{
+		{"the config, with a fallback", []Version{"1.0.0"}, false, "1.0.0", "the global version is test-sdk@1.0.0 now", "1.0.0"},
+		{"the config, without a fallback", nil, false, "", "there is no global version now", "2.0.0"},
+		{"the links, with a fallback", []Version{"1.0.0"}, true, "1.0.0", "the global version is test-sdk@1.0.0 now", "1.0.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var s *impl
+			p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error {
+				home := s.envContext.PathMeta.User.Home
+				paths := []string{filepath.Join(home, ".vfox.toml"), home, s.InstallPath}
+				if tc.lockLinks {
+					paths = []string{s.envContext.PathMeta.Working.GlobalSdkDir, s.InstallPath}
+				}
+				for _, path := range paths {
+					if err := os.Chmod(path, 0555); err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() { _ = os.Chmod(path, 0755) })
+				}
+				return nil
+			}}
+			s = newTestSDK(t, p)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "1.0.0")
+			mustInstall(t, s, "2.0.0")
+			mustUseGlobal(t, s, "2.0.0")
+
+			err := s.Uninstall("2.0.0", tc.fallbacks...)
+			if err == nil {
+				t.Fatal("Uninstall(2.0.0) succeeded, want the error of the rename")
+			}
+			for _, want := range []string{"its PreUninstall hook has already run", tc.says, "vfox use -g test-sdk@2.0.0"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("Uninstall(2.0.0) = %v, want it to say %q", err, want)
+				}
+			}
+			if got := s.globalVersion(); got != tc.global {
+				t.Errorf("global version = %q, want %q", got, tc.global)
+			}
+			if !s.CheckRuntimeExist("2.0.0") {
+				t.Error("2.0.0 is gone")
+			}
+			target, err := env.ReadDirSymlink(filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "test-sdk"))
+			if err != nil || !strings.Contains(target, tc.link) {
+				t.Errorf("the link points at %q (%v), want %s", target, err, tc.link)
+			}
+		})
+	}
+}
+
+// A fallback that PreUse resolves to the version being removed cannot take over,
+// and PreUninstall does not run.
+func TestUninstallRefusesAFallbackThatResolvesToTheRemovedVersion(t *testing.T) {
+	p := &testPlugin{
+		preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil },
+		preUse: func(*plugin.PreUseHookCtx) (*plugin.PreUseHookResult, error) {
+			return &plugin.PreUseHookResult{Version: "2.0.0"}, nil
+		},
+	}
+	s := newTestSDK(t, p)
+	stubShellAndRegistry(t)
+	capturePterm(t)
+	mustInstall(t, s, "1.0.0")
+	mustInstall(t, s, "2.0.0")
+	mustUseGlobal(t, s, "2.0.0")
+
+	err := s.Uninstall("2.0.0", "1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "resolves to the version that is being removed") {
+		t.Fatalf("Uninstall(2.0.0) = %v, want the fallback to be refused", err)
+	}
+	if p.preUninstallCall != 0 {
+		t.Errorf("PreUninstall ran %d times for a version that stays installed", p.preUninstallCall)
+	}
+	if !s.CheckRuntimeExist("2.0.0") || s.globalVersion() != "2.0.0" {
+		t.Errorf("2.0.0 installed = %v, global version = %q, want it untouched", s.CheckRuntimeExist("2.0.0"), s.globalVersion())
+	}
+}
+
+// PreUninstall is given the main runtime and the additions.
+func TestUninstallGivesPreUninstallTheAdditions(t *testing.T) {
+	var got map[string]*plugin.InstalledPackageItem
+	p := &testPlugin{preUninstall: func(ctx *plugin.PreUninstallHookCtx) error {
+		got = ctx.SdkInfo
+		return nil
+	}}
+	s := newTestSDK(t, p)
+	stubShellAndRegistry(t)
+	capturePterm(t)
+	mustInstall(t, s, "1.0.0")
+	extra := filepath.Join(s.packagePath("1.0.0"), "extra-1.0.0")
+	if err := os.MkdirAll(extra, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Uninstall("1.0.0"); err != nil {
+		t.Fatalf("Uninstall(1.0.0): %v", err)
+	}
+	if len(got) != 2 || got["test-sdk"] == nil || got["extra"] == nil || got["extra"].Path != extra {
+		t.Errorf("PreUninstall got %v, want test-sdk and extra", got)
+	}
+}

@@ -68,9 +68,12 @@ type Sdk interface {
 	InstalledList() []Version
 
 	// HasVersion reports whether anything is on disk under the version's name, whole or not: an
-	// installation, a link whose target is gone, an interrupted installation, files that an uninstall
-	// could not delete. CheckRuntimeExist is the stricter question, whether the version can be used.
+	// installation, a link whose target is gone, an interrupted installation. CheckRuntimeExist is
+	// the stricter question, whether the version can be used.
 	HasVersion(version Version) bool
+	// HasLeftovers reports whether files of a version that is not installed any more are left,
+	// because an uninstall could not delete them. Uninstall deletes them.
+	HasLeftovers(version Version) bool
 
 	// Installation describes an installed version: who owns it and what vfox recorded about it.
 	Installation(version Version) (*Installation, error)
@@ -580,8 +583,8 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 //
 // The removal takes effect in one step, by renaming the directory of the
 // version. If anything fails up to and including that step, the version stays
-// installed and the global setting names it as before. After it, the version is
-// gone, and all that can fail is deleting its files: that error is ErrFilesLeft,
+// installed and the global setting is set back to it. If that fails too, the
+// error says what the global version is. After the rename, the version is gone, and all that can fail is deleting its files: that error is ErrFilesLeft,
 // and Uninstall of the same version again deletes the files that are left.
 func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 	label := b.Label(version)
@@ -631,7 +634,11 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 			return cause
 		}
 		if undoErr := b.restoreGlobal(version, takesOver); undoErr != nil {
-			return errors.Join(cause, fmt.Errorf("the global version could not be set back to %s: %w", label, undoErr))
+			now := "there is no global version now"
+			if current := b.globalVersion(); current != "" {
+				now = "the global version is " + b.Label(current) + " now"
+			}
+			return errors.Join(cause, fmt.Errorf("%s is still installed, but %s: it could not be set back, `vfox use -g %s` does it: %w", label, now, label, undoErr))
 		}
 		return cause
 	}
@@ -726,15 +733,29 @@ func (b *impl) releaseGlobal(version Version, fallbacks []Version) (Version, err
 	return "", nil
 }
 
-// restoreGlobal undoes releaseGlobal for version, which tookOver had replaced.
+// restoreGlobal undoes releaseGlobal for version, which tookOver had replaced. As
+// in apply, the order is links, config, registry, and if the config fails, the
+// links go back to what it still asks for.
 func (b *impl) restoreGlobal(version, tookOver Version) error {
-	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(env.Global)
-	if err != nil {
-		return err
+	moveLinks := func(from, to Version) error {
+		if tookOver == "" {
+			return nil // the links were not touched
+		}
+		if !b.CheckRuntimeExist(to) {
+			to = "" // a link whose target is gone
+		}
+		return b.revertLinks(from, to, env.Global)
 	}
-	vfoxToml.SetTool(b.Name, string(version))
-	if err := vfoxToml.Save(); err != nil {
-		return err
+	if err := moveLinks(tookOver, version); err != nil {
+		return errors.Join(err, moveLinks(version, tookOver))
+	}
+	vfoxToml, err := b.envContext.LoadVfoxTomlByScope(env.Global)
+	if err == nil {
+		vfoxToml.SetTool(b.Name, string(version))
+		err = vfoxToml.Save()
+	}
+	if err != nil {
+		return errors.Join(err, moveLinks(version, tookOver))
 	}
 	if runtime.GOOS == "windows" {
 		if tookOver != "" {
@@ -748,10 +769,7 @@ func (b *impl) restoreGlobal(version, tookOver Version) error {
 			}
 		}
 	}
-	if tookOver == "" {
-		return nil // the links were not touched
-	}
-	return b.revertLinks(tookOver, version, env.Global)
+	return nil
 }
 
 // leftoverPath returns the path that the directory of version is moved to before
@@ -1602,7 +1620,12 @@ func (b *impl) HasVersion(version Version) bool {
 			return true
 		}
 	}
-	return len(b.leftovers(version)) > 0
+	return false
+}
+
+// HasLeftovers reports whether files of version are left that an uninstall could not delete.
+func (b *impl) HasLeftovers(version Version) bool {
+	return version != "" && len(b.leftovers(version)) > 0
 }
 
 func (b *impl) installMarkerPath(version Version) string {

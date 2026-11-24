@@ -60,7 +60,13 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w", name, err)
 	}
-	resolvedVersion := manager.ResolveVersionName(name, source, manager.ResolveVersion(name, version))
+	typedVersion := manager.ResolveVersion(name, version)
+	resolvedVersion := manager.ResolveVersionName(name, source, typedVersion)
+	// Files left of a version that is gone are found under the name as typed, but
+	// only when nothing is installed under that name or without its "v".
+	if !source.HasVersion(resolvedVersion) && source.HasLeftovers(typedVersion) {
+		resolvedVersion = typedVersion
+	}
 	// If the global scope asks for this version, Uninstall switches it to the
 	// first of these that can be used. A version only a project or session asks
 	// for is left alone.
