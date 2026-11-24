@@ -945,8 +945,11 @@ func NewSdkManager() (*Manager, error) {
 	}, nil
 }
 
+// Getwd resolves the working directory; tests override it to simulate lookup failures.
+var Getwd = os.Getwd
+
 func getWorkingDirectory() string {
-	wd, err := os.Getwd()
+	wd, err := Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "get current working directory failed: %v\n", err)
 		return ""

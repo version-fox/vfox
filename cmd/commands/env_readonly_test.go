@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/pathmeta"
 )
 
@@ -163,8 +164,8 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 	})
 
 	t.Run("env writes deleted cwd diagnostic to stderr while keeping stdout clean shell code", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("Windows holds an open handle on a process working directory")
+		if runtime.GOOS != "linux" {
+			t.Skip("Linux reliably fails getcwd on an unlinked cwd; darwin caches F_GETPATH and Windows locks open cwd handles")
 		}
 		fClean := newCLIFixtureWithoutRegistryGuard(t, false)
 		cleanEnv := fClean.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
@@ -182,6 +183,51 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 		}
 		mustContain(t, "env stderr", deletedEnv.stderr, "get current working directory failed:")
 		mustNotContain(t, "env stdout", deletedEnv.stdout, "get current working directory failed:")
+	})
+
+	t.Run("env writes getwd failure diagnostic to stderr and keeps stdout clean shell code", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		for k, v := range f.environ() {
+			if v == "-" {
+				t.Setenv(k, "")
+			} else {
+				t.Setenv(k, v)
+			}
+		}
+		baseline := f.runProcess(t, "env", "-s", "bash").mustSucceed(t, "baseline env -s bash")
+
+		origGetwd := internal.Getwd
+		internal.Getwd = func() (string, error) {
+			return "", errors.New("getwd: no such file or directory")
+		}
+		t.Cleanup(func() { internal.Getwd = origGetwd })
+
+		origStdout, origStderr := os.Stdout, os.Stderr
+		rOut, wOut, err := os.Pipe()
+		must(t, err)
+		rErr, wErr, err := os.Pipe()
+		must(t, err)
+		os.Stdout, os.Stderr = wOut, wErr
+
+		runErr := newTestApp().Run(context.Background(), []string{"vfox", "env", "-s", "bash"})
+		_ = wOut.Close()
+		_ = wErr.Close()
+		os.Stdout, os.Stderr = origStdout, origStderr
+
+		var out, errBuf bytes.Buffer
+		_, _ = io.Copy(&out, rOut)
+		_, _ = io.Copy(&errBuf, rErr)
+		_ = rOut.Close()
+		_ = rErr.Close()
+
+		if runErr != nil {
+			t.Fatalf("env -s bash returned unexpected error: %v", runErr)
+		}
+		if out.String() != baseline.stdout {
+			t.Fatalf("env stdout changed on getwd failure:\ngot:\n%s\nwant:\n%s", out.String(), baseline.stdout)
+		}
+		mustContain(t, "env stderr", errBuf.String(), "get current working directory failed: getwd: no such file or directory\n")
+		mustNotContain(t, "env stdout", out.String(), "get current working directory failed:")
 	})
 
 	t.Run("read-only VFOX_HOME honors storage.sdkPath override", func(t *testing.T) {
