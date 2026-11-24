@@ -228,15 +228,27 @@ func TestParseExecLeadingArgs(t *testing.T) {
 				wantOpts:      execOptions{ShowHelp: true},
 			},
 			{
+				name:          "leading -help",
+				args:          []string{"-help"},
+				wantRemaining: nil,
+				wantOpts:      execOptions{ShowHelp: true},
+			},
+			{
 				name:          "leading --debug then -h",
 				args:          []string{"--debug", "-h"},
 				wantRemaining: nil,
 				wantOpts:      execOptions{ShowHelp: true, Debug: true, DebugSet: true},
 			},
 			{
+				name:          "leading --debug then -help",
+				args:          []string{"--debug", "-help"},
+				wantRemaining: nil,
+				wantOpts:      execOptions{ShowHelp: true, Debug: true, DebugSet: true},
+			},
+			{
 				name:          "stops at sdk so trailing flags pass to command",
-				args:          []string{"etcd@3.5.12", "etcd", "-v", "--debug", "--help"},
-				wantRemaining: []string{"etcd@3.5.12", "etcd", "-v", "--debug", "--help"},
+				args:          []string{"etcd@3.5.12", "etcd", "-v", "-help", "--debug", "--help"},
+				wantRemaining: []string{"etcd@3.5.12", "etcd", "-v", "-help", "--debug", "--help"},
 				wantOpts:      execOptions{},
 			},
 		} {

@@ -62,8 +62,13 @@ var Exec = &cli.Command{
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	rawArgs := restoreExecTrailingCompletionArg(cmd, cmd.Args().Slice())
-	args, opts, err := parseExecLeadingArgs(rawArgs)
+	if hasTrailingCompletionFlag(cmd) {
+		if cmd.ShellComplete != nil {
+			cmd.ShellComplete(ctx, cmd)
+		}
+		return nil
+	}
+	args, opts, err := parseExecLeadingArgs(cmd.Args().Slice())
 	if err != nil {
 		return err
 	}
@@ -85,10 +90,10 @@ func execCmd(ctx context.Context, cmd *cli.Command) error {
 	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, hasSeparator)
 }
 
-func restoreExecTrailingCompletionArg(cmd *cli.Command, args []string) []string {
+func hasTrailingCompletionFlag(cmd *cli.Command) bool {
 	root := cmd.Root()
-	if root == nil || !root.EnableShellCompletion || !slices.Contains(args, "--") {
-		return args
+	if root == nil || !root.EnableShellCompletion {
+		return false
 	}
 	raw := os.Args
 	if root.Metadata != nil {
@@ -97,10 +102,7 @@ func restoreExecTrailingCompletionArg(cmd *cli.Command, args []string) []string 
 		}
 	}
 	const completionFlag = "--generate-shell-completion"
-	if len(raw) > 0 && raw[len(raw)-1] == completionFlag {
-		return append(slices.Clone(args), completionFlag)
-	}
-	return args
+	return len(raw) > 0 && raw[len(raw)-1] == completionFlag
 }
 
 func showExecHelp(cmd *cli.Command) error {
@@ -140,7 +142,7 @@ func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
 			return args[i:], opts, nil
 		}
 		switch arg {
-		case "--help", "-h":
+		case "--help", "-help", "-h":
 			opts.ShowHelp = true
 		default:
 			if debug, ok := parseExecDebugFlag(arg); ok {
@@ -289,7 +291,9 @@ func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdAr
 			return fmt.Errorf("%w\nnote: arguments before the first '--' (including %q) are parsed as SDKs; pass '--' before the command", err, sdkSpecs[len(sdkSpecs)-1].Name)
 		}
 		if !hasSeparator && len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") {
-			return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
+			if _, lookupErr := manager.LookupSdk(command); lookupErr == nil {
+				return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
+			}
 		}
 	}
 	return err
@@ -432,6 +436,9 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	if err != nil {
 		return &execCommandNotFoundError{command: command, err: err}
 	}
+	if err := validateWindowsBatchArgs(execPath, args); err != nil {
+		return err
+	}
 
 	// Execute command
 	execCmd := exec.Command(execPath, args...)
@@ -444,9 +451,22 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	return execCmd.Run()
 }
 
-// lookPathInEnv searches for executable file in specified PATH environment variable
-func lookPathInEnv(command, pathEnv string) (string, error) {
-	return lookPathInEnvWithExt(command, pathEnv, os.Getenv("PATHEXT"))
+func isWindowsBatchFile(path string) bool {
+	ext := filepath.Ext(path)
+	return strings.EqualFold(ext, ".cmd") || strings.EqualFold(ext, ".bat")
+}
+
+func validateWindowsBatchArgs(execPath string, args []string) error {
+	if runtime.GOOS != "windows" || !isWindowsBatchFile(execPath) {
+		return nil
+	}
+	const unsafeBatchChars = "&|<>()^%!\"\r\n\x00"
+	for _, arg := range args {
+		if strings.ContainsAny(arg, unsafeBatchChars) {
+			return fmt.Errorf("refusing to pass cmd.exe metacharacters in argument %q to Windows batch file %q", arg, execPath)
+		}
+	}
+	return nil
 }
 
 func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {

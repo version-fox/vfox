@@ -29,8 +29,8 @@ import (
 
 // When a bash/zsh hook is active, env.Paths.String() emits a POSIX-style PATH
 // (":" separated, "/c/..." drive letters) meant for the shell. exec passes that
-// PATH to a native Windows process, whose lookPathInEnv splits on ";", so the
-// POSIX PATH becomes a single unusable entry and no SDK bin dir is searched.
+// PATH to a native Windows process, whose lookPathInEnvWithExt splits on ";",
+// so the POSIX PATH becomes a single unusable entry and no SDK bin dir is searched.
 func TestBuildExecPathIsNativeOnWindowsWithBashHook(t *testing.T) {
 	for _, shell := range []string{"bash", "zsh", ""} {
 		t.Run("shell="+shell, func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestBuildExecPathIsNativeOnWindowsWithBashHook(t *testing.T) {
 			paths.Add(binDir)
 
 			pathValue := buildExecPath(paths)
-			got, err := lookPathInEnv("vfox-probe.exe", pathValue)
+			got, err := lookPathInEnvWithExt("vfox-probe.exe", pathValue, os.Getenv("PATHEXT"))
 			if err != nil {
 				t.Fatalf("shell=%q: SDK tool not found in exec PATH %q: %v", shell, pathValue, err)
 			}
@@ -75,5 +75,48 @@ func TestLookPathInEnvResolvesPATHEXT(t *testing.T) {
 	}
 	if !strings.EqualFold(got, sdkCmd) {
 		t.Fatalf("found %q, want SDK entry %q", got, sdkCmd)
+	}
+}
+
+func TestExecuteCommandRejectsWindowsBatchMetacharacters(t *testing.T) {
+	binDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "injected.txt")
+	shim := filepath.Join(binDir, "shim.cmd")
+	if err := os.WriteFile(shim, []byte("@echo off\r\necho %*\r\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	envMap := map[string]string{
+		"PATH":    binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"PATHEXT": ".COM;.EXE;.BAT;.CMD",
+	}
+	for _, arg := range []string{
+		"x&echo>marker",
+		"x&calc",
+		"x|calc",
+		"x>out",
+		"x<in",
+		"x^&calc",
+		"x%COMSPEC%",
+		"x!PATH!",
+		"x(1)",
+		"a\"b",
+		"a\nb",
+	} {
+		err := executeCommand("shim", []string{arg}, envMap)
+		if err == nil {
+			t.Fatalf("executeCommand unexpectedly allowed batch arg %q", arg)
+		}
+		if !strings.Contains(err.Error(), "metacharacters") {
+			t.Fatalf("unexpected error for batch arg %q: %v", arg, err)
+		}
+	}
+
+	injectedArg := "x&echo>" + marker
+	if err := executeCommand("shim", []string{injectedArg}, envMap); err == nil {
+		t.Fatalf("executeCommand unexpectedly ran injected redirect %q", injectedArg)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("injected command created marker %q (stat err=%v)", marker, err)
 	}
 }

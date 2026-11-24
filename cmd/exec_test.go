@@ -129,9 +129,9 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		want string
 	}{
 		{name: "-- with --version", args: []string{"exec", "etcd@3.5.12", "--", "etcd", "--version"}, want: execExpectedLine("--version")},
-		{name: "-- with --generate-shell-completion", args: []string{"exec", "etcd@3.5.12", "--", "etcd", "--generate-shell-completion"}, want: execExpectedLine("--generate-shell-completion")},
 		{name: "without -- with --version", args: []string{"exec", "etcd@3.5.12", "etcd", "--version"}, want: execExpectedLine("--version")},
 		{name: "without -- with --help", args: []string{"exec", "etcd@3.5.12", "etcd", "--help"}, want: execExpectedLine("--help")},
+		{name: "without -- with -help", args: []string{"exec", "etcd@3.5.12", "etcd", "-help"}, want: execExpectedLine("-help")},
 		{name: "without -- with -v -V -h", args: []string{"exec", "etcd@3.5.12", "etcd", "-v", "-V", "-h"}, want: execExpectedLine("-v -V -h")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,6 +150,59 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("trailing --generate-shell-completion completes without running target with or without --", func(t *testing.T) {
+		probeDir := t.TempDir()
+		marker := filepath.Join(probeDir, "ran.txt")
+		var probeCmd string
+		if runtime.GOOS == "windows" {
+			probeCmd = filepath.Join(probeDir, "probe.cmd")
+			if err := os.WriteFile(probeCmd, []byte("@echo off\r\necho ran>\""+marker+"\"\r\necho sdk:args=%*\r\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			probeCmd = filepath.Join(probeDir, "probe")
+			if err := os.WriteFile(probeCmd, []byte("#!/bin/sh\necho ran >\""+marker+"\"\nprintf 'sdk:args=%s\\n' \"$*\"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		baselineOut, baselineErr, baselineCode := runExecCLI(t, root, "exec", "etcd@3.5.12", probeCmd, "--generate-shell-completion")
+		if baselineCode != 0 {
+			t.Fatalf("without -- completion probe exited %d (stderr:\n%s\nstdout:\n%s)", baselineCode, baselineErr, baselineOut)
+		}
+		if _, err := os.Stat(marker); !os.IsNotExist(err) {
+			t.Fatalf("without -- completion probe invoked target script %q", marker)
+		}
+
+		for _, tc := range []struct {
+			name string
+			args []string
+		}{
+			{name: "exec with --", args: []string{"exec", "etcd@3.5.12", "--", probeCmd, "--generate-shell-completion"}},
+			{name: "x alias with --", args: []string{"x", "etcd@3.5.12", "--", probeCmd, "--generate-shell-completion"}},
+			{name: "x alias without --", args: []string{"x", "etcd@3.5.12", probeCmd, "--generate-shell-completion"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, tc.args...)
+				if code != 0 {
+					t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.args, code, stderr, stdout)
+				}
+				if stderr != "" {
+					t.Fatalf("vfox %v wrote unexpected stderr:\n%s", tc.args, stderr)
+				}
+				if stdout != baselineOut {
+					t.Fatalf("vfox %v stdout = %q, want %q", tc.args, stdout, baselineOut)
+				}
+				if strings.Contains(stdout, "sdk:args=") || strings.Contains(stdout, "decoy-tools:") {
+					t.Fatalf("vfox %v unexpectedly ran target script:\n%s", tc.args, stdout)
+				}
+				if _, err := os.Stat(marker); !os.IsNotExist(err) {
+					t.Fatalf("vfox %v invoked target script %q", tc.args, marker)
+				}
+			})
+		}
+	})
 
 	t.Run("root --debug before exec still enables debug while preserving target flags", func(t *testing.T) {
 		stdout, stderr, code := runExecCLI(t, root, "--debug", "exec", "etcd@3.5.12", "etcd", "--version")
@@ -324,6 +377,14 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = os.Remove(filepath.Join(root, ".vfox.toml")) })
 
+		alphaPluginDir := filepath.Join(root, "shared", "plugin", "alpha")
+		writeCLIPluginFile(t, alphaPluginDir, "main.lua", `PLUGIN = {name="alpha", version="0.1.0", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {} end
+function PLUGIN:EnvKeys(ctx) return {} end
+`)
+		t.Cleanup(func() { _ = os.RemoveAll(alphaPluginDir) })
+
 		for _, tc := range []struct {
 			name            string
 			args            []string
@@ -336,9 +397,21 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 				wantErrContains: []string{"command not found: --version", "first '--'", `"etcd"`},
 			},
 			{
-				name:            "unseparated missing command notes single-sdk parsing",
+				name:            "unseparated known sdk command notes single-sdk parsing",
+				args:            []string{"exec", "etcd", "alpha", "put"},
+				wantErrContains: []string{"command not found: alpha", `"etcd"`, `"alpha"`, "pass '--'"},
+			},
+			{
+				name:            "unseparated pinned sdk with typo command omits multi-sdk note",
+				args:            []string{"exec", "etcd@3.5.12", "etcdx", "put"},
+				wantErrContains: []string{"command not found: etcdx"},
+				wantErrAbsent:   "note:",
+			},
+			{
+				name:            "unseparated unknown command omits multi-sdk note",
 				args:            []string{"exec", "etcd", "nosuch", "put"},
-				wantErrContains: []string{"command not found: nosuch", `"etcd"`, `"nosuch"`, "pass '--'"},
+				wantErrContains: []string{"command not found: nosuch"},
+				wantErrAbsent:   "note:",
 			},
 			{
 				name:            "separated missing non-flag command omits separator note",
@@ -418,7 +491,7 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 	})
 
 	t.Run("exec --help prints command help including global options", func(t *testing.T) {
-		for _, flag := range []string{"--help", "-h"} {
+		for _, flag := range []string{"--help", "-help", "-h"} {
 			t.Run(flag, func(t *testing.T) {
 				stdout, stderr, code := runExecCLI(t, root, "exec", flag)
 				if code != 0 {
@@ -438,6 +511,23 @@ func TestExecForwardsFlagsAfterCommandWithoutSeparator(t *testing.T) {
 					}
 				}
 			})
+		}
+	})
+
+	t.Run("windows batch shim rejects cmd metacharacters without executing second command", func(t *testing.T) {
+		if runtime.GOOS != "windows" {
+			t.Skip("Windows batch shim execution applies on Windows")
+		}
+		marker := filepath.Join(t.TempDir(), "injected.txt")
+		stdout, stderr, code := runExecCLI(t, root, "exec", "etcd@3.5.12", "etcd", "x&echo>"+marker)
+		if code == 0 {
+			t.Fatalf("expected non-zero exit code for batch metacharacter arg, got 0 (stdout:\n%s)", stdout)
+		}
+		if !strings.Contains(stderr, "metacharacters") {
+			t.Fatalf("stderr missing metacharacters diagnostic:\n%s", stderr)
+		}
+		if _, err := os.Stat(marker); !os.IsNotExist(err) {
+			t.Fatalf("injected command created marker %q (stat err=%v)", marker, err)
 		}
 	})
 
