@@ -58,8 +58,61 @@ var Exec = &cli.Command{
 	ArgsUsage:       "<sdk>[@<version>]... -- <command> [args...] | <sdk>[@<version>] <command> [args...]",
 	Description:     "The first '--' always separates SDK specs from the command. If <command> itself takes '--', pass '--' before <command>, for example: vfox exec nodejs@24.14.0 -- npm run build -- --watch",
 	SkipFlagParsing: true,
-	ShellComplete:   func(context.Context, *cli.Command) {},
+	ShellComplete:   completeExec,
 	Action:          execCmd,
+}
+
+func execRawArgs(cmd *cli.Command) []string {
+	root := cmd.Root()
+	raw := os.Args
+	if root != nil && root.Metadata != nil {
+		if metaArgs, ok := root.Metadata["rawArgs"].([]string); ok && len(metaArgs) > 0 {
+			raw = metaArgs
+		}
+	}
+	return raw
+}
+
+func hasExecSDKSpecBeforeCompletion(raw []string) bool {
+	const completionFlag = "--generate-shell-completion"
+	end := len(raw)
+	if end > 0 && raw[end-1] == completionFlag {
+		end--
+	}
+	cmdIdx := -1
+	for i := 1; i < end; i++ {
+		if strings.HasPrefix(raw[i], "-") {
+			continue
+		}
+		if raw[i] == execCommandName || raw[i] == execCommandAlias {
+			cmdIdx = i + 1
+		}
+		break
+	}
+	if cmdIdx < 0 || cmdIdx >= end {
+		return false
+	}
+	for _, tok := range raw[cmdIdx:end] {
+		if tok == "--" || !strings.HasPrefix(tok, "-") {
+			return true
+		}
+	}
+	return false
+}
+
+func completeExec(ctx context.Context, cmd *cli.Command) {
+	if hasExecSDKSpecBeforeCompletion(execRawArgs(cmd)) {
+		return
+	}
+	root := cmd.Root()
+	if root == nil {
+		return
+	}
+	completion := &cli.Command{
+		Flags:  cmd.Flags,
+		Writer: root.Writer,
+	}
+	cli.DefaultCompleteWithFlags(ctx, completion)
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
@@ -88,12 +141,7 @@ func hasTrailingCompletionFlag(cmd *cli.Command) bool {
 	if root == nil || !root.EnableShellCompletion {
 		return false
 	}
-	raw := os.Args
-	if root.Metadata != nil {
-		if metaArgs, ok := root.Metadata["rawArgs"].([]string); ok && len(metaArgs) > 0 {
-			raw = metaArgs
-		}
-	}
+	raw := execRawArgs(cmd)
 	const completionFlag = "--generate-shell-completion"
 	return len(raw) > 0 && raw[len(raw)-1] == completionFlag
 }
@@ -563,15 +611,23 @@ func windowsPathExts(pathExtEnv string) []string {
 	return exts
 }
 
+func joinRelativeExecutable(dir, name string) string {
+	fullPath := filepath.Join(dir, name)
+	if !filepath.IsAbs(fullPath) && !strings.ContainsAny(fullPath, `/\`) {
+		return "." + string(filepath.Separator) + fullPath
+	}
+	return fullPath
+}
+
 func findWindowsExecutable(dir, command string, exts []string) (string, bool) {
 	if filepath.Ext(command) != "" {
-		fullPath := filepath.Join(dir, command)
+		fullPath := joinRelativeExecutable(dir, command)
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 			return fullPath, true
 		}
 	}
 	for _, ext := range exts {
-		fullPath := filepath.Join(dir, command+ext)
+		fullPath := joinRelativeExecutable(dir, command+ext)
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 			return fullPath, true
 		}

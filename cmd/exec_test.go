@@ -592,4 +592,38 @@ function PLUGIN:EnvKeys(ctx) return {} end
 			}
 		})
 	}
+
+	t.Run("shell completion suggests --help only before sdk spec", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			args     []string
+			wantHelp bool
+		}{
+			{name: "exec dash", args: []string{"exec", "-", "--generate-shell-completion"}, wantHelp: true},
+			{name: "exec partial help", args: []string{"exec", "--he", "--generate-shell-completion"}, wantHelp: true},
+			{name: "exec debug then partial help", args: []string{"exec", "--debug", "--he", "--generate-shell-completion"}, wantHelp: true},
+			{name: "x alias dash", args: []string{"x", "-", "--generate-shell-completion"}, wantHelp: true},
+			{name: "x alias partial help", args: []string{"x", "--he", "--generate-shell-completion"}, wantHelp: true},
+			{name: "after sdk partial help", args: []string{"exec", "etcd@3.5.12", "--he", "--generate-shell-completion"}, wantHelp: false},
+			{name: "after sdk dash", args: []string{"exec", "etcd@3.5.12", "-", "--generate-shell-completion"}, wantHelp: false},
+			{name: "x after sdk partial help", args: []string{"x", "etcd@3.5.12", "--he", "--generate-shell-completion"}, wantHelp: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				stdout, stderr, code := runExecCLI(t, root, tc.args...)
+				if code != 0 {
+					t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.args, code, stderr, stdout)
+				}
+				if stderr != "" {
+					t.Fatalf("vfox %v wrote unexpected stderr:\n%s", tc.args, stderr)
+				}
+				if tc.wantHelp {
+					if !strings.Contains(stdout, "--help") {
+						t.Fatalf("vfox %v stdout = %q, want --help", tc.args, stdout)
+					}
+				} else if stdout != "" {
+					t.Fatalf("vfox %v stdout = %q, want empty", tc.args, stdout)
+				}
+			})
+		}
+	})
 }

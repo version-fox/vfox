@@ -391,3 +391,46 @@ func TestLookPathInEnvWithDotEntry(t *testing.T) {
 		t.Fatalf("executeCommand with PATH=. failed: %v", err)
 	}
 }
+
+func TestFindWindowsExecutableRelativeDirPreservesSeparator(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "etcd.exe")
+	if runtime.GOOS == "windows" {
+		// Copy the already-built test binary so exec.Command launches a real Windows executable.
+		self, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(self)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(bin, data, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(bin, []byte("stub"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(dir)
+
+	got, ok := findWindowsExecutable(".", "etcd.exe", []string{".EXE"})
+	if !ok {
+		t.Fatal("findWindowsExecutable returned ok=false for ./etcd.exe")
+	}
+	want := "." + string(filepath.Separator) + "etcd.exe"
+	if got != want {
+		t.Fatalf("findWindowsExecutable = %q, want %q", got, want)
+	}
+	gotExt, ok := findWindowsExecutable(".", "etcd", []string{".exe"})
+	if !ok || gotExt != want {
+		t.Fatalf("findWindowsExecutable without ext = (%q, %v), want (%q, true)", gotExt, ok, want)
+	}
+
+	if runtime.GOOS == "windows" {
+		if err := executeCommand("etcd.exe", []string{"-test.run=^$"}, map[string]string{"PATH": "."}); err != nil {
+			t.Fatalf("executeCommand(etcd.exe) with PATH=. failed: %v", err)
+		}
+	}
+}
