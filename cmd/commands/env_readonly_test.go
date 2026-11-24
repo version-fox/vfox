@@ -228,7 +228,8 @@ func TestReadOnlyAndBlockedVfoxHomeReadPaths(t *testing.T) {
 
 		// Case 2: read-only shared root with plugin/ existing, cache/ missing, and custom storage.sdkPath.
 		fNoCache := newCLIFixtureWithoutRegistryGuard(t, false)
-		fNoCache.runProcess(t, "install", "alpha@1.0.0").mustSucceed(t, "install alpha@1.0.0")
+		fNoCache.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+		fNoCache.runHere(t, "doctor", "--adopt").mustSucceed(t, "adopt alpha@1.0.0")
 		roNoCache := filepath.Join(fNoCache.root, "ro-no-cache")
 		must(t, os.MkdirAll(filepath.Join(roNoCache, "plugin", "alpha"), 0755))
 		pluginSrc, err := os.ReadFile(filepath.Join(fNoCache.shared, "plugin", "alpha", "main.lua"))
