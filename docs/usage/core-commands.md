@@ -162,7 +162,7 @@ vfox un <sdk-name>@<version>
 
 `version`: The specific version number
 
-If the version is the global version, the newest other installed version becomes the global version. Copies made with `install --as` are used only when nothing else is left. A version the plugin cannot set up is skipped, and if no version can take over, nothing is removed. When it was the only installed version, the global version is unset.
+If the version is the global version, the newest other installed version becomes the global version. Copies made with `install --as` are used only when nothing else is left. A version the plugin cannot set up is skipped, and if no version can take over, nothing is removed. When it was the only installed version, the global version is unset. If some files of the version cannot be deleted, the version is uninstalled all the same, and running the command again deletes the rest.
 
 ::: tip Linked versions
 Uninstalling a version registered with [`vfox link`](#link) removes the link only. The SDK it points to is left untouched.

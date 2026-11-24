@@ -62,11 +62,11 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	resolvedVersion := manager.ResolveVersionName(name, source, manager.ResolveVersion(name, version))
 	// If the global scope asks for this version, Uninstall switches it to the
-	// first of these that can be used, after its checks and before it removes
-	// anything. A version only a project or session asks for is left alone.
+	// first of these that can be used. A version only a project or session asks
+	// for is left alone.
 	fallbacks := fallbackVersions(source, otherVersions(source.InstalledList(), resolvedVersion))
 	uninstallErr := source.Uninstall(resolvedVersion, fallbacks...)
-	if uninstallErr != nil && !errors.Is(uninstallErr, sdk.ErrGlobalNotUnset) {
+	if uninstallErr != nil && !errors.Is(uninstallErr, sdk.ErrFilesLeft) {
 		return uninstallErr
 	}
 	// An alias must not outlive the version it names.
@@ -81,7 +81,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	return uninstallErr
 }
 
-// otherVersions returns the entries of versions that are not version.
+// otherVersions returns versions without version.
 func otherVersions(versions []sdk.Version, version sdk.Version) []sdk.Version {
 	var others []sdk.Version
 	for _, v := range versions {

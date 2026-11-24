@@ -22,6 +22,6 @@ import "errors"
 
 var ErrRuntimeNotFound = errors.New("runtime not found")
 
-// ErrGlobalNotUnset is returned by Uninstall when the version was removed, but
-// the global setting still names it.
-var ErrGlobalNotUnset = errors.New("the global version could not be unset")
+// ErrFilesLeft is returned by Uninstall when the version is no longer installed,
+// but some of its files could not be deleted.
+var ErrFilesLeft = errors.New("could not delete all files of")

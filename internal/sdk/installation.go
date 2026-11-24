@@ -127,18 +127,21 @@ func (b *impl) linkedTarget(version Version) (string, bool) {
 	return "", false
 }
 
+// checkLink refuses a linked version whose link has been replaced by a real directory.
+func (b *impl) checkLink(version Version) error {
+	main := b.mainRuntimePath(version)
+	if _, err := os.Lstat(main); err == nil && !env.IsDirSymlink(main) {
+		return fmt.Errorf("refusing to delete %s: it is a real directory, not a link", main)
+	}
+	return nil
+}
+
 // removeLink deletes a linked version: the link and the receipt, never the target.
 func (b *impl) removeLink(version Version) error {
-	main := b.mainRuntimePath(version)
-	if _, err := os.Lstat(main); err == nil {
-		if !env.IsDirSymlink(main) {
-			return fmt.Errorf("refusing to delete %s: it is a real directory, not a link", main)
-		}
-		if err := env.RemoveDirSymlink(main); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove link %s: %w", main, err)
-		}
+	if err := b.checkLink(version); err != nil {
+		return err
 	}
-	return os.RemoveAll(b.packagePath(version))
+	return deletePackage(b.packagePath(version))
 }
 
 func (b *impl) vfoxVersion() string {

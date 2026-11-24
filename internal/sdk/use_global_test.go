@@ -43,18 +43,20 @@ func stubShellAndRegistry(t *testing.T) *int {
 	return &opened
 }
 
-// UseGlobal selects the version with or without the hook, and never hands off
-// to a new shell.
-func TestUseGlobalOpensNoShell(t *testing.T) {
+// Uninstall moves the global version with or without the hook, and never hands
+// off to a new shell.
+func TestUninstallOpensNoShell(t *testing.T) {
 	for _, hook := range []string{"", "bash"} {
 		t.Run("hook="+hook, func(t *testing.T) {
 			s := installedSDK(t)
 			opened := stubShellAndRegistry(t)
-			t.Setenv(env.HookFlag, hook)
 			capturePterm(t)
+			mustInstall(t, s, "2.0.0")
+			mustUseGlobal(t, s, "2.0.0")
+			t.Setenv(env.HookFlag, hook)
 
-			if err := s.UseGlobal("1.0.0"); err != nil {
-				t.Fatalf("UseGlobal(1.0.0): %v", err)
+			if err := s.Uninstall("2.0.0", "1.0.0"); err != nil {
+				t.Fatalf("Uninstall(2.0.0): %v", err)
 			}
 			if got := s.globalVersion(); got != "1.0.0" {
 				t.Errorf("global version = %q, want 1.0.0", got)
@@ -63,6 +65,15 @@ func TestUseGlobalOpensNoShell(t *testing.T) {
 				t.Errorf("opened %d shells, want none", *opened)
 			}
 		})
+	}
+}
+
+// mustUseGlobal makes version the global one, as vfox use -g does in a shell with the hook.
+func mustUseGlobal(t *testing.T, s *impl, version Version) {
+	t.Helper()
+	t.Setenv(env.HookFlag, "bash")
+	if err := s.UseWithConfig(version, env.Global, false); err != nil {
+		t.Fatalf("UseWithConfig(%s, global): %v", version, err)
 	}
 }
 
@@ -120,19 +131,16 @@ func TestUseReturnsTheEnvKeysError(t *testing.T) {
 
 // A version that is not installed is refused, and the global config keeps the
 // version it had.
-func TestUseGlobalRefusesAVersionThatIsNotInstalled(t *testing.T) {
+func TestUseRefusesAVersionThatIsNotInstalled(t *testing.T) {
 	s := installedSDK(t)
 	stubShellAndRegistry(t)
-	t.Setenv(env.HookFlag, "") // UseGlobal does not need the hook
 	capturePterm(t)
 
-	if err := s.UseGlobal("1.0.0"); err != nil {
-		t.Fatalf("UseGlobal(1.0.0): %v", err)
-	}
-	err := s.UseGlobal("2.0.0")
+	mustUseGlobal(t, s, "1.0.0")
+	err := s.UseWithConfig("2.0.0", env.Global, false)
 	var notExists *VersionNotExistsError
 	if !errors.As(err, &notExists) {
-		t.Fatalf("UseGlobal(2.0.0) = %v, want a VersionNotExistsError", err)
+		t.Fatalf("UseWithConfig(2.0.0, global) = %v, want a VersionNotExistsError", err)
 	}
 	if got := s.globalVersion(); got != "1.0.0" {
 		t.Errorf("global version = %q, want 1.0.0 unchanged", got)
@@ -146,9 +154,9 @@ function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 function PLUGIN:PreUse(ctx) error("no version for you") end
 `
 
-// An error from the plugin's PreUse hook is returned, and the global config is
-// not written.
-func TestUseGlobalReturnsThePreUseError(t *testing.T) {
+// An error from the plugin's PreUse hook is returned, by use and by an uninstall
+// that needs a version to take over, and the global config is not written.
+func TestPreUseErrorLeavesTheGlobalVersionAlone(t *testing.T) {
 	s := newTestSDK(t, &testPlugin{})
 	dir := filepath.Join(t.TempDir(), "delta")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -165,32 +173,42 @@ func TestUseGlobalReturnsThePreUseError(t *testing.T) {
 	s.plugin = plug
 	s.Name = "delta"
 	stubShellAndRegistry(t)
-	t.Setenv(env.HookFlag, "")
+	t.Setenv(env.HookFlag, "bash")
 	capturePterm(t)
 	mustInstall(t, s, "1.0.0")
+	mustInstall(t, s, "2.0.0")
 
-	err = s.UseGlobal("1.0.0")
+	err = s.UseWithConfig("1.0.0", env.Global, false)
 	if err == nil || !strings.Contains(err.Error(), "no version for you") {
-		t.Fatalf("UseGlobal(1.0.0) = %v, want the PreUse error", err)
+		t.Fatalf("UseWithConfig(1.0.0, global) = %v, want the PreUse error", err)
 	}
 	if got := s.globalVersion(); got != "" {
 		t.Errorf("global version = %q, want none", got)
 	}
+
+	// apply does not call PreUse.
+	if _, err := s.apply("2.0.0", env.Global, false); err != nil {
+		t.Fatal(err)
+	}
+	err = s.Uninstall("2.0.0", "1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "no version for you") {
+		t.Fatalf("Uninstall(2.0.0) = %v, want the PreUse error", err)
+	}
+	if got := s.globalVersion(); got != "2.0.0" || !s.CheckRuntimeExist("2.0.0") {
+		t.Errorf("global version = %q, installed = %v, want 2.0.0 untouched", got, s.CheckRuntimeExist("2.0.0"))
+	}
 }
 
 // When the config cannot be written, the links go back to the version it asks for.
-func TestUseGlobalRevertsTheLinksWhenTheConfigCannotBeWritten(t *testing.T) {
+func TestUseRevertsTheLinksWhenTheConfigCannotBeWritten(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("a read-only file does not stop the write")
 	}
 	s := installedSDK(t)
 	stubShellAndRegistry(t)
-	t.Setenv(env.HookFlag, "")
 	capturePterm(t)
 	mustInstall(t, s, "2.0.0")
-	if err := s.UseGlobal("1.0.0"); err != nil {
-		t.Fatalf("UseGlobal(1.0.0): %v", err)
-	}
+	mustUseGlobal(t, s, "1.0.0")
 	home := s.envContext.PathMeta.User.Home
 	config := filepath.Join(home, ".vfox.toml")
 	for _, path := range []string{config, home} {
@@ -200,8 +218,8 @@ func TestUseGlobalRevertsTheLinksWhenTheConfigCannotBeWritten(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chmod(path, 0755) })
 	}
 
-	if err := s.UseGlobal("2.0.0"); err == nil {
-		t.Fatal("UseGlobal(2.0.0) succeeded, want an error from the config")
+	if err := s.UseWithConfig("2.0.0", env.Global, false); err == nil {
+		t.Fatal("UseWithConfig(2.0.0, global) succeeded, want an error from the config")
 	}
 	if got := s.globalVersion(); got != "1.0.0" {
 		t.Errorf("global version = %q, want 1.0.0 unchanged", got)
@@ -230,13 +248,10 @@ func TestUninstallChecksTheFallbacksBeforePreUninstall(t *testing.T) {
 	}
 	s := newTestSDK(t, p)
 	stubShellAndRegistry(t)
-	t.Setenv(env.HookFlag, "")
 	capturePterm(t)
 	mustInstall(t, s, "1.0.0")
 	mustInstall(t, s, "2.0.0")
-	if err := s.UseGlobal("2.0.0"); err != nil {
-		t.Fatalf("UseGlobal(2.0.0): %v", err)
-	}
+	mustUseGlobal(t, s, "2.0.0")
 
 	boom = true
 	if err := s.Uninstall("2.0.0", "1.0.0"); err == nil || !strings.Contains(err.Error(), "EnvKeys exploded") {
@@ -258,5 +273,113 @@ func TestUninstallChecksTheFallbacksBeforePreUninstall(t *testing.T) {
 	}
 	if got := s.globalVersion(); got != "1.0.0" {
 		t.Errorf("global version = %q, want 1.0.0", got)
+	}
+}
+
+// PreUninstall does not run when the global setting cannot be changed, and it runs
+// once when a retry can change it. The registry is not touched before the config.
+func TestUninstallWithAnUnwritableConfig(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only file does not stop the write")
+	}
+	for _, tc := range []struct {
+		name      string
+		fallbacks []Version
+		want      Version
+	}{
+		{"with a fallback", []Version{"1.0.0"}, "1.0.0"},
+		{"without a fallback", nil, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil }}
+			s := newTestSDK(t, p)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "1.0.0")
+			mustInstall(t, s, "2.0.0")
+			mustUseGlobal(t, s, "2.0.0")
+			registry := 0
+			env.ApplyEnvsToRegistry = func(*env.Envs) error { registry++; return nil }
+			env.RemoveEnvsFromRegistry = func(*env.Envs) error { registry++; return nil }
+			home := s.envContext.PathMeta.User.Home
+			config := filepath.Join(home, ".vfox.toml")
+			for _, path := range []string{config, home} {
+				if err := os.Chmod(path, 0555); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.Chmod(path, 0755) })
+			}
+
+			if err := s.Uninstall("2.0.0", tc.fallbacks...); err == nil || !strings.Contains(err.Error(), "nothing was removed") {
+				t.Fatalf("Uninstall(2.0.0) = %v, want an error from the config", err)
+			}
+			if p.preUninstallCall != 0 {
+				t.Errorf("PreUninstall ran %d times for a version that stays installed", p.preUninstallCall)
+			}
+			if registry != 0 {
+				t.Errorf("the registry was changed %d times, want none before the config is saved", registry)
+			}
+			if !s.CheckRuntimeExist("2.0.0") || s.globalVersion() != "2.0.0" {
+				t.Errorf("2.0.0 installed = %v, global version = %q, want it untouched", s.CheckRuntimeExist("2.0.0"), s.globalVersion())
+			}
+
+			_ = os.Chmod(home, 0755)
+			_ = os.Chmod(config, 0644)
+			if err := s.Uninstall("2.0.0", tc.fallbacks...); err != nil {
+				t.Fatalf("Uninstall(2.0.0) again: %v", err)
+			}
+			if p.preUninstallCall != 1 {
+				t.Errorf("PreUninstall ran %d times, want 1", p.preUninstallCall)
+			}
+			if got := s.globalVersion(); got != tc.want {
+				t.Errorf("global version = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// When PreUninstall fails, the global setting and the links go back to the version.
+func TestUninstallRestoresTheGlobalVersionWhenPreUninstallFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		fallbacks []Version
+	}{
+		{"with a fallback", []Version{"1.0.0"}},
+		{"without a fallback", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			boom := true
+			p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error {
+				if boom {
+					return errors.New("PreUninstall refused")
+				}
+				return nil
+			}}
+			s := newTestSDK(t, p)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "1.0.0")
+			mustInstall(t, s, "2.0.0")
+			mustUseGlobal(t, s, "2.0.0")
+			link := filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "test-sdk")
+
+			if err := s.Uninstall("2.0.0", tc.fallbacks...); err == nil || !strings.Contains(err.Error(), "PreUninstall refused") {
+				t.Fatalf("Uninstall(2.0.0) = %v, want the PreUninstall error", err)
+			}
+			if got := s.globalVersion(); got != "2.0.0" {
+				t.Errorf("global version = %q, want 2.0.0 again", got)
+			}
+			if target, err := env.ReadDirSymlink(link); err != nil || !strings.Contains(target, "2.0.0") {
+				t.Errorf("the link points at %q (%v), want 2.0.0", target, err)
+			}
+
+			boom = false
+			if err := s.Uninstall("2.0.0", tc.fallbacks...); err != nil {
+				t.Fatalf("Uninstall(2.0.0) again: %v", err)
+			}
+			if got := s.globalVersion(); got == "2.0.0" {
+				t.Error("the global version still names the removed version")
+			}
+		})
 	}
 }
