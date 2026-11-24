@@ -63,10 +63,11 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 		seen := make(map[string]struct{}, args.Len())
 		uniqueArgs := make([]string, 0, args.Len())
 		for _, sdkName := range args.Slice() {
-			if _, ok := seen[sdkName]; ok {
+			key := internal.NormalizePluginName(sdkName)
+			if _, ok := seen[key]; ok {
 				continue
 			}
-			seen[sdkName] = struct{}{}
+			seen[key] = struct{}{}
 			uniqueArgs = append(uniqueArgs, sdkName)
 		}
 
@@ -79,7 +80,7 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 		for index, sdkName := range uniqueArgs {
 			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), len(uniqueArgs), pterm.Green(sdkName))
 			if err := manager.Add(sdkName, "", ""); err != nil {
-				fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", pterm.Red(sdkName), err.Error())
+				fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", sdkName, err.Error())
 				failed = append(failed, sdkName)
 			}
 		}

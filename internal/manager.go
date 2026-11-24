@@ -503,6 +503,15 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	return path, nil
 }
 
+// NormalizePluginName returns the installed plugin name for an add argument,
+// stripping any legacy "<category>/" prefix.
+func NormalizePluginName(name string) string {
+	if strings.Contains(name, "/") {
+		return strings.Split(name, "/")[1]
+	}
+	return name
+}
+
 // Add a plugin to plugin home directory
 // 1. If the plugin is an official plugin, fetch the plugin manifest from the registry.
 // 2. If the plugin is a custom plugin, install the plugin from the specified URL.
@@ -517,8 +526,8 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	logger.Debugf("Adding plugin: name=%s, url=%s, alias=%s\n", pluginName, util.RedactSourceURL(url), alias)
 
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
-	if strings.Contains(pluginName, "/") {
-		pluginName = strings.Split(pluginName, "/")[1]
+	if normalized := NormalizePluginName(pluginName); normalized != pluginName {
+		pluginName = normalized
 		logger.Debugf("Normalized plugin name to: %s\n", pluginName)
 	}
 	pluginPath := url
@@ -801,7 +810,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName, _ := range legacyFileRecord.Record {
+		for sdkName := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,

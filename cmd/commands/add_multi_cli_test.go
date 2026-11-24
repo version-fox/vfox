@@ -66,8 +66,11 @@ func TestAddMultiplePluginsExitStatus(t *testing.T) {
 	t.Run("all fail exits non-zero", func(t *testing.T) {
 		f := newRegistryFixture(t)
 		res := f.runProcess(t, "add", "missing-a", "missing-b").mustFail(t, "add missing-a missing-b")
-		mustContain(t, "add missing-a stderr failure", res.stderr, "Add plugin(", "missing-a", "failed:", "manifest not found")
-		mustContain(t, "add missing-b stderr failure", res.stderr, "Add plugin(", "missing-b", "failed:", "manifest not found")
+		mustContain(t, "add missing-a stderr failure", res.stderr, "Add plugin(missing-a) failed:", "manifest not found")
+		mustContain(t, "add missing-b stderr failure", res.stderr, "Add plugin(missing-b) failed:", "manifest not found")
+		if strings.Contains(res.stderr, "\x1b[") {
+			t.Fatalf("expected plain text on stderr without ANSI escapes, got %q", res.stderr)
+		}
 		if strings.Contains(res.stdout, "Add plugin(") {
 			t.Fatalf("expected failure details on stderr, not stdout: %q", res.stdout)
 		}
@@ -77,7 +80,10 @@ func TestAddMultiplePluginsExitStatus(t *testing.T) {
 	t.Run("partial failure installs valid plugin and exits non-zero", func(t *testing.T) {
 		f := newRegistryFixture(t)
 		res := f.runHere(t, "add", "one", "missing").mustFail(t, "add one missing")
-		mustContain(t, "add missing stderr failure", res.stderr, "Add plugin(", "missing", "failed:", "manifest not found")
+		mustContain(t, "add missing stderr failure", res.stderr, "Add plugin(missing) failed:", "manifest not found")
+		if strings.Contains(res.stderr, "\x1b[") {
+			t.Fatalf("expected plain text on stderr without ANSI escapes, got %q", res.stderr)
+		}
 		if strings.Contains(res.stdout, "Add plugin(") {
 			t.Fatalf("expected failure details on stderr, not stdout: %q", res.stdout)
 		}
@@ -105,6 +111,27 @@ func TestAddMultiplePluginsExitStatus(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(f.shared, "plugin", "two", "main.lua")); err != nil {
 			t.Fatalf("expected plugin two to be installed: %v", err)
+		}
+	})
+
+	t.Run("category-qualified duplicate plugin names succeed once", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			args []string
+		}{
+			{name: "category_first", args: []string{"add", "cat/two", "two"}},
+			{name: "bare_first", args: []string{"add", "two", "cat/two"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := newRegistryFixture(t)
+				res := f.runProcess(t, tc.args...).mustSucceed(t, strings.Join(tc.args, " "))
+				if strings.Contains(res.output(), "failed:") {
+					t.Fatalf("expected deduplicated add to succeed without failure output: %s", res.output())
+				}
+				if _, err := os.Stat(filepath.Join(f.shared, "plugin", "two", "main.lua")); err != nil {
+					t.Fatalf("expected plugin two to be installed: %v", err)
+				}
+			})
 		}
 	})
 
