@@ -810,7 +810,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName := range legacyFileRecord.Record {
+		for sdkName, _ := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,
