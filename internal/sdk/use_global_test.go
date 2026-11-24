@@ -20,6 +20,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -399,7 +400,7 @@ func TestUninstallSaysWhatTheGlobalVersionIsWhenItCannotBeRestored(t *testing.T)
 		link      string
 	}{
 		{"the config, with a fallback", []Version{"1.0.0"}, false, "1.0.0", "the global version is test-sdk@1.0.0 now", "1.0.0"},
-		{"the config, without a fallback", nil, false, "", "there is no global version now", "2.0.0"},
+		{"the config, without a fallback", nil, false, "", "there is no global version now", ""},
 		{"the links, with a fallback", []Version{"1.0.0"}, true, "1.0.0", "the global version is test-sdk@1.0.0 now", "1.0.0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -441,8 +442,158 @@ func TestUninstallSaysWhatTheGlobalVersionIsWhenItCannotBeRestored(t *testing.T)
 				t.Error("2.0.0 is gone")
 			}
 			target, err := env.ReadDirSymlink(filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "test-sdk"))
-			if err != nil || !strings.Contains(target, tc.link) {
+			if tc.link == "" {
+				if !os.IsNotExist(err) {
+					t.Errorf("the link points at %q (%v), want no link", target, err)
+				}
+			} else if err != nil || !strings.Contains(target, tc.link) {
 				t.Errorf("the link points at %q (%v), want %s", target, err, tc.link)
+			}
+		})
+	}
+}
+
+// The global entry comes back with its attributes when the version stays
+// installed, and the links of the scope are those from before: the ones the
+// fallback replaced, and none of the ones only the fallback has. What another SDK
+// does to its links stays.
+func TestUninstallRestoresTheAttributesAndTheLinks(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		fallbacks []Version
+	}{
+		{"with a fallback", []Version{"1.0.0"}},
+		{"without a fallback", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			moved := t.TempDir()
+			var s *impl
+			p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error {
+				// Another SDK moves its link in the meantime.
+				if err := env.CreateDirSymlink(moved, filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "another")); err != nil {
+					t.Error(err)
+				}
+				return errors.New("PreUninstall refused")
+			}}
+			s = newTestSDK(t, p)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "1.0.0")
+			mustInstall(t, s, "2.0.0")
+			for _, addition := range []string{"v-1.0.0/only-old-1.0.0", "v-1.0.0/both-1.0.0", "v-1.0.0/other-1.0.0", "v-2.0.0/both-2.0.0", "v-2.0.0/only-new-2.0.0"} {
+				if err := os.MkdirAll(filepath.Join(s.InstallPath, filepath.FromSlash(addition)), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mustUseGlobal(t, s, "2.0.0")
+			linkDir := s.envContext.PathMeta.Working.GlobalSdkDir
+			elsewhere := t.TempDir()
+			for _, name := range []string{"other", "another"} { // "other" is also an addition of the fallback
+				if err := env.CreateDirSymlink(elsewhere, filepath.Join(linkDir, name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			config := filepath.Join(s.envContext.PathMeta.User.Home, ".vfox.toml")
+			if err := os.WriteFile(config, []byte("[tools]\ntest-sdk = { version = \"2.0.0\", vendor = \"openjdk\" }\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			links, err := s.linksOfScope(env.Global)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(links) != 5 {
+				t.Fatalf("the links are %v, want test-sdk, both, only-new, other and another", links)
+			}
+			links["another"] = moved
+
+			if err := s.Uninstall("2.0.0", tc.fallbacks...); err == nil || !strings.Contains(err.Error(), "PreUninstall refused") {
+				t.Fatalf("Uninstall(2.0.0) = %v, want the PreUninstall error", err)
+			}
+			global, err := s.envContext.LoadVfoxTomlByScope(env.Global)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if entry, ok := global.GetToolConfig("test-sdk"); !ok || entry.Version != "2.0.0" || entry.Attr["vendor"] != "openjdk" {
+				t.Errorf("the global entry is %+v, want 2.0.0 with its vendor", entry)
+			}
+			after, err := s.linksOfScope(env.Global)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(after, links) {
+				t.Errorf("the links are\n%v\nwant\n%v", after, links)
+			}
+		})
+	}
+}
+
+// The global version is linked and its target is gone, so it has no runtime
+// package to make links from. Its global link comes back all the same when the
+// version cannot be removed, when the fallback cannot be written to the config, and
+// when a use cannot be.
+func TestTheLinkOfABrokenVersionIsRestored(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop the write")
+	}
+	for _, tc := range []struct {
+		name string
+		lock func(s *impl) []string
+		run  func(s *impl) error
+	}{
+		{
+			"the removal fails",
+			func(s *impl) []string { return []string{s.InstallPath} },
+			func(s *impl) error { return s.Uninstall("sys", "1.0.0") },
+		},
+		{
+			"the switch fails",
+			func(s *impl) []string {
+				return []string{filepath.Join(s.envContext.PathMeta.User.Home, ".vfox.toml"), s.envContext.PathMeta.User.Home}
+			},
+			func(s *impl) error { return s.Uninstall("sys", "1.0.0") },
+		},
+		{
+			"a use fails",
+			func(s *impl) []string {
+				return []string{filepath.Join(s.envContext.PathMeta.User.Home, ".vfox.toml"), s.envContext.PathMeta.User.Home}
+			},
+			func(s *impl) error { return s.UseWithConfig("1.0.0", env.Global, false) },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _, external := newLinkTestSDK(t)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "1.0.0")
+			mustLink(t, s, "sys", external)
+			mustUseGlobal(t, s, "sys")
+			link := filepath.Join(s.envContext.PathMeta.Working.GlobalSdkDir, "test-sdk")
+			before, err := env.ReadDirSymlink(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.RemoveAll(external); err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range tc.lock(s) {
+				if err := os.Chmod(path, 0555); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.Chmod(path, 0755) })
+			}
+
+			err = tc.run(s)
+			if err == nil {
+				t.Fatal("it succeeded, want an error")
+			}
+			if strings.Contains(err.Error(), "restore") || strings.Contains(err.Error(), "could not be set back") {
+				t.Errorf("the error says the old state did not come back: %v", err)
+			}
+			if got := s.globalVersion(); got != "sys" {
+				t.Errorf("global version = %q, want sys", got)
+			}
+			if after, err := env.ReadDirSymlink(link); err != nil || after != before {
+				t.Errorf("the link points at %q (%v), want %q", after, err, before)
 			}
 		})
 	}

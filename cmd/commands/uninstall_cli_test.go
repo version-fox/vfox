@@ -255,20 +255,72 @@ func TestLeftoverFilesDoNotChangeALeadingV(t *testing.T) {
 	}
 }
 
-// Files that an earlier uninstall left do not get in the way of the same version.
-func TestUninstallWhileFilesOfAnEarlierOneAreLeft(t *testing.T) {
+// Files that an earlier uninstall left go with the next one of the same version,
+// whether another version is installed or not. Those of another version stay.
+func TestUninstallDeletesTheFilesOfAnEarlierOne(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		installed []string
+	}{
+		{"another version is left", []string{"1.0.0", "2.0.0"}},
+		{"no other version is left", []string{"2.0.0"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newCLIFixture(t, false)
+			for _, v := range tc.installed {
+				f.installOnDisk(t, "alpha", v)
+			}
+			keepRegistry(t)
+			installs := filepath.Join(f.shared, "cache", "alpha")
+			for _, name := range []string{".v-2.0.0.removing", ".v-2.0.0.removing.1", ".v-2.0.0-rc1.removing"} {
+				must(t, os.MkdirAll(filepath.Join(installs, name), 0755))
+				must(t, os.WriteFile(filepath.Join(installs, name, "file"), nil, 0644))
+			}
+
+			out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
+			mustContain(t, "uninstall", out, "Uninstalled alpha@2.0.0 successfully!")
+			for _, name := range []string{"v-2.0.0", ".v-2.0.0.removing", ".v-2.0.0.removing.1", ".v-2.0.0.removing.2"} {
+				if _, err := os.Lstat(filepath.Join(installs, name)); !os.IsNotExist(err) {
+					t.Errorf("%s is still there: %v", name, err)
+				}
+			}
+			if len(tc.installed) > 1 {
+				if _, err := os.Lstat(filepath.Join(installs, ".v-2.0.0-rc1.removing", "file")); err != nil {
+					t.Errorf("the files of another version are gone: %v", err)
+				}
+			}
+			out = f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0 again").output()
+			mustContain(t, "uninstall again", out, "not installed")
+		})
+	}
+}
+
+// Files that an earlier uninstall left and that still cannot be deleted are
+// reported, and the version is gone all the same.
+func TestUninstallReportsTheFilesOfAnEarlierOne(t *testing.T) {
+	skipUnlessPermissionsHold(t)
 	f := newCLIFixture(t, false)
 	f.installOnDisk(t, "alpha", "1.0.0")
 	f.installOnDisk(t, "alpha", "2.0.0")
-	keepRegistry(t)
-	left := filepath.Join(f.shared, "cache", "alpha", ".v-2.0.0.removing")
+	installs := filepath.Join(f.shared, "cache", "alpha")
+	left := filepath.Join(installs, ".v-2.0.0.removing")
 	must(t, os.MkdirAll(left, 0755))
+	must(t, os.WriteFile(filepath.Join(left, "file"), nil, 0644))
+	must(t, os.Chmod(left, 0555))
+	t.Cleanup(func() { _ = os.Chmod(left, 0755) })
 
-	f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0")
-	if _, err := os.Lstat(filepath.Join(f.shared, "cache", "alpha", "v-2.0.0")); !os.IsNotExist(err) {
-		t.Errorf("alpha@2.0.0 is still there: %v", err)
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "alpha@2.0.0 is no longer installed", "could not delete all files of alpha@2.0.0", left)
+	mustNotContain(t, "uninstall", out, "successfully")
+	for _, name := range []string{"v-2.0.0", ".v-2.0.0.removing.1"} {
+		if _, err := os.Lstat(filepath.Join(installs, name)); !os.IsNotExist(err) {
+			t.Errorf("%s is still there: %v", name, err)
+		}
 	}
-	f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0 again")
+
+	must(t, os.Chmod(left, 0755))
+	out = f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0 again").output()
+	mustContain(t, "uninstall again", out, "Deleted the files that were left of alpha@2.0.0")
 	if _, err := os.Lstat(left); !os.IsNotExist(err) {
 		t.Errorf("%s is still there: %v", left, err)
 	}
@@ -389,11 +441,12 @@ function PLUGIN:EnvKeys(ctx)
 end
 `
 
-// When the newest version left cannot be used, the next one takes over.
+// When the newest version left cannot be used, the next one takes over, and the
+// command says which one it skipped and why. One it did not get to is not named.
 func TestUninstallTriesTheNextVersionWhenTheSwitchFails(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.writePlugin(t, "zeta", zetaPlugin)
-	for _, v := range []string{"1.0.0", "2.0.0", "3.0.0"} {
+	for _, v := range []string{"0.9.0", "1.0.0", "2.0.0", "3.0.0"} {
 		f.installOnDisk(t, "zeta", v)
 	}
 	globalConfig := filepath.Join(f.userHome, ".vfox.toml")
@@ -401,7 +454,8 @@ func TestUninstallTriesTheNextVersionWhenTheSwitchFails(t *testing.T) {
 	keepRegistry(t)
 
 	out := f.run(t, "uninstall", "zeta@3.0.0").mustSucceed(t, "uninstall zeta@3.0.0").output()
-	mustContain(t, "uninstall", out, "Auto switch", "zeta@1.0.0")
+	mustContain(t, "uninstall", out, "Auto switch", "zeta@1.0.0", "Could not switch to zeta@2.0.0", "EnvKeys exploded")
+	mustNotContain(t, "uninstall", out, "zeta@0.9.0")
 	mustContain(t, "global config", readFile(t, globalConfig), `zeta = "1.0.0"`)
 	if _, err := os.Stat(filepath.Join(f.shared, "cache", "zeta", "v-3.0.0")); !os.IsNotExist(err) {
 		t.Errorf("zeta@3.0.0 is still there: %v", err)
