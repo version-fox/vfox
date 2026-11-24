@@ -32,7 +32,7 @@ vfox add [options] <plugin-name> [<plugin-name2>...]
 
 
 ::: warning
-`--alias` and `--source` are not supported when adding multiple plugins.
+`--alias` and `--source` are not supported when adding multiple plugins. Passing multiple plugin names exits non-zero if any plugin fails to add.
 :::
 
 **Examples**

@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -59,11 +60,26 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 
 	// multiple plugins
 	if args.Len() > 1 {
+		seen := make(map[string]struct{}, args.Len())
+		uniqueArgs := make([]string, 0, args.Len())
+		for _, sdkName := range args.Slice() {
+			if _, ok := seen[sdkName]; ok {
+				continue
+			}
+			seen[sdkName] = struct{}{}
+			uniqueArgs = append(uniqueArgs, sdkName)
+		}
+
+		errOut := cmd.ErrWriter
+		if errOut == nil {
+			errOut = os.Stderr
+		}
+
 		var failed []string
-		for index, sdkName := range args.Slice() {
-			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), args.Len(), pterm.Green(sdkName))
+		for index, sdkName := range uniqueArgs {
+			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), len(uniqueArgs), pterm.Green(sdkName))
 			if err := manager.Add(sdkName, "", ""); err != nil {
-				pterm.Println(fmt.Sprintf("Add plugin(%s) failed: %s", pterm.Red(sdkName), err.Error()))
+				fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", pterm.Red(sdkName), err.Error())
 				failed = append(failed, sdkName)
 			}
 		}
