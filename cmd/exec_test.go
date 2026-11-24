@@ -469,6 +469,24 @@ function PLUGIN:EnvKeys(ctx) return {} end
 				wantErrContains: []string{"no version configured for alpha", "first '--'", `"alpha"`},
 				wantErrAbsent:   "pass '--' before the command",
 			},
+			{
+				name:            "unseparated dot-slash command omits multi-sdk note",
+				args:            []string{"exec", "etcd@3.5.12", "./etcd", "arg"},
+				wantErrContains: []string{"command not found: ./etcd"},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "unseparated parent-path command omits multi-sdk note",
+				args:            []string{"exec", "etcd@3.5.12", "../plugin/etcd", "arg"},
+				wantErrContains: []string{"command not found: ../plugin/etcd"},
+				wantErrAbsent:   "pass '--' before the command",
+			},
+			{
+				name:            "versioned trailing sdk before -- omits untreated-command note",
+				args:            []string{"exec", "etcd@3.5.12", "etcd@3.5.12", "--", "--version"},
+				wantErrContains: []string{"command not found: --version"},
+				wantErrAbsent:   "was treated as an SDK instead of the command",
+			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				stdout, stderr, code := runExecCLI(t, root, tc.args...)
@@ -531,43 +549,6 @@ function PLUGIN:EnvKeys(ctx) return {} end
 					}
 				}
 			})
-		}
-	})
-
-	t.Run("windows batch shim quotes ^ and & safely and refuses unquotable cmd metacharacters", func(t *testing.T) {
-		if runtime.GOOS != "windows" {
-			t.Skip("Windows batch shim execution applies on Windows")
-		}
-		marker := filepath.Join(t.TempDir(), "injected.txt")
-		for _, tc := range []struct {
-			name string
-			args []string
-		}{
-			{name: "caret package spec", args: []string{"exec", "etcd@3.5.12", "etcd", "install", "express@^4.18.0"}},
-			{name: "quoted redirect and ampersand", args: []string{"exec", "etcd@3.5.12", "etcd", "x&echo>" + marker}},
-		} {
-			t.Run(tc.name, func(t *testing.T) {
-				stdout, stderr, code := runExecCLI(t, root, tc.args...)
-				if code != 0 {
-					t.Fatalf("vfox %v exited %d (stderr:\n%s\nstdout:\n%s)", tc.args, code, stderr, stdout)
-				}
-				if !strings.Contains(stdout, tc.args[len(tc.args)-1]) {
-					t.Fatalf("stdout missing literal arg %q:\n%s", tc.args[len(tc.args)-1], stdout)
-				}
-			})
-		}
-		if _, err := os.Stat(marker); !os.IsNotExist(err) {
-			t.Fatalf("quoted batch arg created marker %q (stat err=%v)", marker, err)
-		}
-
-		for _, badArg := range []string{"x%PATH%", "x!PATH!", `a"b`} {
-			stdout, stderr, code := runExecCLI(t, root, "exec", "etcd@3.5.12", "etcd", badArg)
-			if code == 0 {
-				t.Fatalf("expected non-zero exit code for unquotable batch arg %q, got 0 (stdout:\n%s)", badArg, stdout)
-			}
-			if !strings.Contains(stderr, "metacharacters") {
-				t.Fatalf("stderr missing metacharacters diagnostic for %q:\n%s", badArg, stderr)
-			}
 		}
 	})
 

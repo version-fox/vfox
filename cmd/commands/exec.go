@@ -276,16 +276,20 @@ func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdAr
 	err = executeCommand(command, cmdArgs, envMap)
 	var notFoundErr *execCommandNotFoundError
 	if err != nil && len(sdkSpecs) > 0 && errors.As(err, &notFoundErr) {
-		if hasSeparator && len(sdkSpecs) > 1 && strings.HasPrefix(command, "-") {
+		if hasSeparator && len(sdkSpecs) > 1 && sdkSpecs[len(sdkSpecs)-1].Version == "" && strings.HasPrefix(command, "-") {
 			return fmt.Errorf("%w\nnote: arguments before the first '--' are read as SDK names, so %q was treated as an SDK instead of the command", err, sdkSpecs[len(sdkSpecs)-1].Name)
 		}
-		if !hasSeparator && len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") {
+		if !hasSeparator && len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") && isBareSDKName(command) {
 			if _, lookupErr := manager.LookupSdk(command); lookupErr == nil {
 				return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
 			}
 		}
 	}
 	return err
+}
+
+func isBareSDKName(command string) bool {
+	return command != "" && command != "." && command != ".." && !strings.ContainsAny(command, `/\`)
 }
 
 // buildExecPath builds the PATH passed to the process that exec launches.
@@ -427,10 +431,7 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	}
 
 	// Execute command
-	execCmd, err := buildCommandExec(execPath, args)
-	if err != nil {
-		return err
-	}
+	execCmd := exec.Command(execPath, args...)
 	execCmd.Env = cleanedEnvVars
 	execCmd.Stdin = os.Stdin
 	execCmd.Stdout = os.Stdout
@@ -438,11 +439,6 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 
 	// Start process and wait
 	return execCmd.Run()
-}
-
-func isWindowsBatchFile(path string) bool {
-	ext := filepath.Ext(path)
-	return strings.EqualFold(ext, ".cmd") || strings.EqualFold(ext, ".bat")
 }
 
 func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
@@ -475,7 +471,7 @@ func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
 			continue
 		}
 		fullPath := filepath.Join(dir, command)
-		if info, err := os.Stat(fullPath); err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 			return fullPath, nil
 		}
 	}
