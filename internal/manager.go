@@ -82,6 +82,10 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 
 	// Normalize the name for cache lookup
 	normalizedName := strings.ToLower(name)
+	if !plugin.IsValidName(normalizedName) {
+		logger.Debugf("Invalid SDK name: %q\n", name)
+		return nil, fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", name)
+	}
 
 	// Check cache with read lock
 	m.mu.RLock()
