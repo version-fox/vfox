@@ -38,6 +38,10 @@ type cmd struct {
 }
 
 func (c *cmd) Execute(args []string) {
+	if c.app.Metadata == nil {
+		c.app.Metadata = make(map[string]any, 1)
+	}
+	c.app.Metadata["rawArgs"] = args
 	if err := c.app.Run(context.Background(), args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -71,7 +75,11 @@ func newCmd() *cmd {
 		Name:  "debug",
 		Usage: "show debug information",
 		Action: func(ctx context.Context, cmd *cli.Command, b bool) error {
-			logger.SetLevel(logger.DebugLevel)
+			if b {
+				logger.SetLevel(logger.DebugLevel)
+			} else {
+				logger.SetLevel(logger.InfoLevel)
+			}
 			return nil
 		},
 	}

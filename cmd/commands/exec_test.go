@@ -95,6 +95,27 @@ func TestParseExecInvocationPreservesCommandFlagsWithoutSeparator(t *testing.T) 
 				wantCommand: "python",
 				wantArgs:    []string{"--help", "--version"},
 			},
+			{
+				name:        "single sdk without -- and slash path containing @",
+				args:        []string{"etcd@3.5.12", "./node_modules/@foo/bin/run", "arg"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "./node_modules/@foo/bin/run",
+				wantArgs:    []string{"arg"},
+			},
+			{
+				name:        "single sdk without -- and backslash path containing @",
+				args:        []string{"etcd@3.5.12", `.\node_modules\@foo\bin\run.cmd`, "arg"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: `.\node_modules\@foo\bin\run.cmd`,
+				wantArgs:    []string{"arg"},
+			},
+			{
+				name:        "single sdk without -- and dash command",
+				args:        []string{"etcd@3.5.12", "-", "arg"},
+				wantSpecs:   []execSDKSpec{{Name: "etcd", Version: "3.5.12"}},
+				wantCommand: "-",
+				wantArgs:    []string{"arg"},
+			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				specs, cmdName, cmdArgs, err := parseExecInvocation(tc.args)
@@ -129,6 +150,7 @@ func TestParseExecInvocationPreservesCommandFlagsWithoutSeparator(t *testing.T) 
 			{name: "flag in sdk list before --", args: []string{"etcd@3.5.12", "-v", "--", "etcd"}, wantErrContains: "-v"},
 			{name: "separator with no sdk", args: []string{"--", "etcd"}, wantErrContains: "usage: vfox exec"},
 			{name: "separator with no command", args: []string{"etcd@3.5.12", "--"}, wantErrContains: "usage: vfox exec"},
+			{name: "two sdk specs without separator", args: []string{"etcd@3.5.12", "golang@1.25.6", "etcd"}, wantErrContains: "multiple SDKs require '--'"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				_, _, _, err := parseExecInvocation(tc.args)

@@ -21,6 +21,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/version-fox/vfox/internal/env"
@@ -53,5 +54,26 @@ func TestBuildExecPathIsNativeOnWindowsWithBashHook(t *testing.T) {
 				t.Fatalf("found %q, want %q", got, tool)
 			}
 		})
+	}
+}
+
+func TestLookPathInEnvResolvesPATHEXT(t *testing.T) {
+	binDir := t.TempDir()
+	otherDir := t.TempDir()
+	sdkCmd := filepath.Join(binDir, "etcd.CMD")
+	otherCmd := filepath.Join(otherDir, "etcd.CMD")
+	for _, p := range []string{sdkCmd, otherCmd} {
+		if err := os.WriteFile(p, []byte("@echo off\r\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pathValue := binDir + string(os.PathListSeparator) + otherDir
+	got, err := lookPathInEnvWithExt("etcd", pathValue, ".COM;.EXE;.BAT;.CMD")
+	if err != nil {
+		t.Fatalf("lookPathInEnvWithExt returned error: %v", err)
+	}
+	if !strings.EqualFold(got, sdkCmd) {
+		t.Fatalf("found %q, want SDK entry %q", got, sdkCmd)
 	}
 }

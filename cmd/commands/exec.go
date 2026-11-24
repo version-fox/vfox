@@ -18,9 +18,12 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -59,7 +62,8 @@ var Exec = &cli.Command{
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	args, opts, err := parseExecLeadingArgs(cmd.Args().Slice())
+	rawArgs := restoreExecTrailingCompletionArg(cmd, cmd.Args().Slice())
+	args, opts, err := parseExecLeadingArgs(rawArgs)
 	if err != nil {
 		return err
 	}
@@ -79,6 +83,24 @@ func execCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	hasSeparator := slices.Index(args, "--") >= 0
 	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, hasSeparator)
+}
+
+func restoreExecTrailingCompletionArg(cmd *cli.Command, args []string) []string {
+	root := cmd.Root()
+	if root == nil || !root.EnableShellCompletion || !slices.Contains(args, "--") {
+		return args
+	}
+	raw := os.Args
+	if root.Metadata != nil {
+		if metaArgs, ok := root.Metadata["rawArgs"].([]string); ok && len(metaArgs) > 0 {
+			raw = metaArgs
+		}
+	}
+	const completionFlag = "--generate-shell-completion"
+	if len(raw) > 0 && raw[len(raw)-1] == completionFlag {
+		return append(slices.Clone(args), completionFlag)
+	}
+	return args
 }
 
 func showExecHelp(cmd *cli.Command) error {
@@ -155,7 +177,7 @@ func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error)
 		return sdkSpecs, commandArgs[0], commandArgs[1:], nil
 	}
 
-	if len(args) > 2 && strings.Contains(args[1], "@") {
+	if len(args) > 2 && looksLikeExecSDKSpec(args[1]) {
 		return nil, "", nil, fmt.Errorf("multiple SDKs require '--' before the command\n%s", execUsageLine())
 	}
 
@@ -163,10 +185,18 @@ func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	if strings.HasPrefix(args[1], "-") {
+	if args[1] != "-" && strings.HasPrefix(args[1], "-") {
 		return nil, "", nil, fmt.Errorf("unexpected flag %q instead of command\n%s", args[1], execUsageLine())
 	}
 	return []execSDKSpec{spec}, args[1], args[2:], nil
+}
+
+func looksLikeExecSDKSpec(arg string) bool {
+	if strings.HasPrefix(arg, "-") || strings.ContainsAny(arg, "/\\") {
+		return false
+	}
+	name, _, hasAt := strings.Cut(arg, "@")
+	return hasAt && strings.TrimSpace(name) != ""
 }
 
 func parseExecSDKSpec(arg string) (execSDKSpec, error) {
@@ -201,9 +231,26 @@ func execUsageError() error {
 	return fmt.Errorf("%s", execUsageLine())
 }
 
-// executeInVfoxEnv executes a command in vfox managed environment
-func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) error {
-	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, len(sdkSpecs) > 1)
+type execCommandNotFoundError struct {
+	command string
+	err     error
+}
+
+func (e *execCommandNotFoundError) Error() string {
+	return fmt.Sprintf("command not found: %s: %v", e.command, e.err)
+}
+
+func (e *execCommandNotFoundError) Unwrap() error {
+	return e.err
+}
+
+func hasDoubleDashOptionAfterSeparator(command string, cmdArgs []string) bool {
+	if strings.HasPrefix(command, "--") {
+		return true
+	}
+	return slices.ContainsFunc(cmdArgs, func(arg string) bool {
+		return strings.HasPrefix(arg, "--")
+	})
 }
 
 func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdArgs []string, hasSeparator bool) error {
@@ -217,7 +264,7 @@ func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdAr
 	for i, sdkSpec := range sdkSpecs {
 		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
-			if len(sdkSpecs) > 1 && i > 0 && sdkSpec.Version == "" {
+			if len(sdkSpecs) > 1 && i > 0 && sdkSpec.Version == "" && hasDoubleDashOptionAfterSeparator(command, cmdArgs) {
 				return fmt.Errorf("%w\nnote: arguments before the first '--' (including %q) are parsed as SDKs; pass '--' before the command when it also uses '--'", err, sdkSpec.Name)
 			}
 			return err
@@ -236,19 +283,16 @@ func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdAr
 	}
 	envMap["PATH"] = buildExecPath(mergedEnvs.Paths)
 	err = executeCommand(command, cmdArgs, envMap)
-	if err != nil && len(sdkSpecs) > 0 && isExecCommandNotFound(err) {
-		if hasSeparator && strings.HasPrefix(command, "-") {
+	var notFoundErr *execCommandNotFoundError
+	if err != nil && len(sdkSpecs) > 0 && errors.As(err, &notFoundErr) {
+		if hasSeparator && len(sdkSpecs) > 1 && strings.HasPrefix(command, "-") {
 			return fmt.Errorf("%w\nnote: arguments before the first '--' (including %q) are parsed as SDKs; pass '--' before the command", err, sdkSpecs[len(sdkSpecs)-1].Name)
 		}
-		if !hasSeparator {
+		if !hasSeparator && len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") {
 			return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
 		}
 	}
 	return err
-}
-
-func isExecCommandNotFound(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "command not found: ")
 }
 
 // buildExecPath builds the PATH passed to the process that exec launches.
@@ -380,9 +424,13 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	}
 
 	// Find executable - first search in new PATH
-	execPath, err := lookPathInEnv(command, tmpEnv["PATH"])
+	pathExtEnv := tmpEnv["PATHEXT"]
+	if pathExtEnv == "" {
+		pathExtEnv = os.Getenv("PATHEXT")
+	}
+	execPath, err := lookPathInEnvWithExt(command, tmpEnv["PATH"], pathExtEnv)
 	if err != nil {
-		return fmt.Errorf("command not found: %s: %w", command, err)
+		return &execCommandNotFoundError{command: command, err: err}
 	}
 
 	// Execute command
@@ -398,30 +446,80 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 
 // lookPathInEnv searches for executable file in specified PATH environment variable
 func lookPathInEnv(command, pathEnv string) (string, error) {
+	return lookPathInEnvWithExt(command, pathEnv, os.Getenv("PATHEXT"))
+}
+
+func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
 	if pathEnv == "" {
 		return exec.LookPath(command)
 	}
 
 	// If command contains path separator, check directly
 	if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+		if runtime.GOOS == "windows" {
+			command = filepath.FromSlash(command)
+		}
 		return exec.LookPath(command)
 	}
 
 	// Search in PATH
-	paths := strings.Split(pathEnv, string(os.PathListSeparator))
+	paths := filepath.SplitList(pathEnv)
+	var exts []string
+	if runtime.GOOS == "windows" {
+		exts = windowsPathExts(pathExtEnv)
+	}
 	for _, dir := range paths {
 		if dir == "" {
 			continue
 		}
-		fullPath := dir + string(os.PathSeparator) + command
-		// Check if file is executable
+		if runtime.GOOS == "windows" {
+			if found, ok := findWindowsExecutable(dir, command, exts); ok {
+				return found, nil
+			}
+			continue
+		}
+		fullPath := filepath.Join(dir, command)
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-			// On Unix systems, check executable permissions
-			// On Windows, .exe/.bat extensions are handled by exec.LookPath
 			return fullPath, nil
 		}
 	}
 
 	// If not found in custom PATH, fallback to exec.LookPath
 	return exec.LookPath(command)
+}
+
+func windowsPathExts(pathExtEnv string) []string {
+	if pathExtEnv == "" {
+		return []string{".COM", ".EXE", ".BAT", ".CMD"}
+	}
+	var exts []string
+	for _, ext := range strings.Split(pathExtEnv, ";") {
+		if ext == "" {
+			continue
+		}
+		if ext[0] != '.' {
+			ext = "." + ext
+		}
+		exts = append(exts, ext)
+	}
+	if len(exts) == 0 {
+		return []string{".COM", ".EXE", ".BAT", ".CMD"}
+	}
+	return exts
+}
+
+func findWindowsExecutable(dir, command string, exts []string) (string, bool) {
+	if filepath.Ext(command) != "" {
+		fullPath := filepath.Join(dir, command)
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			return fullPath, true
+		}
+	}
+	for _, ext := range exts {
+		fullPath := filepath.Join(dir, command+ext)
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			return fullPath, true
+		}
+	}
+	return "", false
 }
