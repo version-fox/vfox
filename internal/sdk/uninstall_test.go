@@ -651,60 +651,63 @@ func TestUninstallGivesPreUninstallTheAdditions(t *testing.T) {
 	}
 }
 
+// dependentSetups make x depend on the directory of 2.0.0 in different ways.
+var dependentSetups = []struct {
+	name  string
+	setup func(t *testing.T, s *impl)
+}{
+	{"linked to the main runtime", func(t *testing.T, s *impl) {
+		writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
+		mustLink(t, s, "x", s.mainRuntimePath("2.0.0"))
+	}},
+	{"linked through a link that leads out again", func(t *testing.T, s *impl) {
+		out := newExternalSDK(t, "tool")
+		through := filepath.Join(s.packagePath("2.0.0"), "out")
+		if err := env.CreateDirSymlink(out, through); err != nil {
+			t.Fatal(err)
+		}
+		mustLink(t, s, "x", through)
+	}},
+	{"linked over another link", func(t *testing.T, s *impl) {
+		writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
+		first := filepath.Join(t.TempDir(), "first")
+		if err := env.CreateDirSymlink(s.mainRuntimePath("2.0.0"), first); err != nil {
+			t.Fatal(err)
+		}
+		mustLink(t, s, "x", first)
+	}},
+	{"linked below another link", func(t *testing.T, s *impl) {
+		writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
+		first := filepath.Join(t.TempDir(), "first")
+		if err := env.CreateDirSymlink(s.InstallPath, first); err != nil {
+			t.Fatal(err)
+		}
+		mustLink(t, s, "x", filepath.Join(first, "v-2.0.0", "test-sdk-2.0.0"))
+	}},
+	{"linked over a relative link", func(t *testing.T, s *impl) {
+		if runtime.GOOS == "windows" {
+			t.Skip("a junction cannot be relative")
+		}
+		writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
+		first := filepath.Join(filepath.Dir(s.InstallPath), "first")
+		if err := os.Symlink(filepath.Join("test-sdk", "v-2.0.0", "test-sdk-2.0.0"), first); err != nil {
+			t.Fatal(err)
+		}
+		mustLink(t, s, "x", first)
+	}},
+	{"an addition is in there", func(t *testing.T, s *impl) {
+		mustInstall(t, s, "x")
+		if err := env.CreateDirSymlink(s.mainRuntimePath("2.0.0"), filepath.Join(s.packagePath("x"), "extra-x")); err != nil {
+			t.Fatal(err)
+		}
+	}},
+}
+
 // A fallback that is reached through the directory of the removed version breaks
 // when that directory is moved, so it cannot take over. It does not matter whether
 // it ends in there or only passes through.
 func TestUninstallRefusesAFallbackInTheRemovedDirectory(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		setup func(t *testing.T, s *impl)
-	}{
-		{"linked to the main runtime", func(t *testing.T, s *impl) {
-			writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
-			mustLink(t, s, "x", s.mainRuntimePath("2.0.0"))
-		}},
-		{"linked through a link that leads out again", func(t *testing.T, s *impl) {
-			out := newExternalSDK(t, "tool")
-			through := filepath.Join(s.packagePath("2.0.0"), "out")
-			if err := env.CreateDirSymlink(out, through); err != nil {
-				t.Fatal(err)
-			}
-			mustLink(t, s, "x", through)
-		}},
-		{"linked over another link", func(t *testing.T, s *impl) {
-			writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
-			first := filepath.Join(t.TempDir(), "first")
-			if err := env.CreateDirSymlink(s.mainRuntimePath("2.0.0"), first); err != nil {
-				t.Fatal(err)
-			}
-			mustLink(t, s, "x", first)
-		}},
-		{"linked below another link", func(t *testing.T, s *impl) {
-			writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
-			first := filepath.Join(t.TempDir(), "first")
-			if err := env.CreateDirSymlink(s.InstallPath, first); err != nil {
-				t.Fatal(err)
-			}
-			mustLink(t, s, "x", filepath.Join(first, "v-2.0.0", "test-sdk-2.0.0"))
-		}},
-		{"linked over a relative link", func(t *testing.T, s *impl) {
-			if runtime.GOOS == "windows" {
-				t.Skip("a junction cannot be relative")
-			}
-			writeTestCommand(t, filepath.Join(s.mainRuntimePath("2.0.0"), "bin"), "tool")
-			first := filepath.Join(filepath.Dir(s.InstallPath), "first")
-			if err := os.Symlink(filepath.Join("test-sdk", "v-2.0.0", "test-sdk-2.0.0"), first); err != nil {
-				t.Fatal(err)
-			}
-			mustLink(t, s, "x", first)
-		}},
-		{"an addition is in there", func(t *testing.T, s *impl) {
-			mustInstall(t, s, "x")
-			if err := env.CreateDirSymlink(s.mainRuntimePath("2.0.0"), filepath.Join(s.packagePath("x"), "extra-x")); err != nil {
-				t.Fatal(err)
-			}
-		}},
-	} {
+	for _, tc := range dependentSetups {
 		for _, next := range []bool{false, true} {
 			t.Run(tc.name+map[bool]string{true: ", another one is left"}[next], func(t *testing.T) {
 				p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil }}
@@ -738,6 +741,76 @@ func TestUninstallRefusesAFallbackInTheRemovedDirectory(t *testing.T) {
 				}
 				if !s.CheckRuntimeExist("2.0.0") || s.globalVersion() != "2.0.0" {
 					t.Errorf("2.0.0 installed = %v, global version = %q, want it untouched", s.CheckRuntimeExist("2.0.0"), s.globalVersion())
+				}
+			})
+		}
+	}
+}
+
+// The global version must not break because another version is uninstalled.
+func TestUninstallRefusesAVersionTheGlobalOneDependsOn(t *testing.T) {
+	for _, tc := range dependentSetups {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &testPlugin{preUninstall: func(*plugin.PreUninstallHookCtx) error { return nil }}
+			s := newTestSDK(t, p)
+			stubShellAndRegistry(t)
+			capturePterm(t)
+			mustInstall(t, s, "2.0.0")
+			mustInstall(t, s, "1.0.0")
+			tc.setup(t, s)
+			mustMakeGlobal(t, s, "x")
+			links, err := s.linksOfScope(env.Global)
+			if err != nil || len(links) == 0 {
+				t.Fatalf("links = %v, %v", links, err)
+			}
+
+			err = s.Uninstall("2.0.0", "x", "1.0.0")
+			if err == nil || !strings.Contains(err.Error(), "the global version test-sdk@x is linked into the directory of") ||
+				!strings.Contains(err.Error(), "nothing was removed") {
+				t.Fatalf("Uninstall(2.0.0) = %v, want it refused for the global version", err)
+			}
+			if p.preUninstallCall != 0 {
+				t.Errorf("PreUninstall ran %d times for a version that stays installed", p.preUninstallCall)
+			}
+			if !s.CheckRuntimeExist("2.0.0") || !s.CheckRuntimeExist("x") || s.globalVersion() != "x" {
+				t.Errorf("2.0.0 installed = %v, x installed = %v, global version = %q, want it untouched",
+					s.CheckRuntimeExist("2.0.0"), s.CheckRuntimeExist("x"), s.globalVersion())
+			}
+			if got, err := s.linksOfScope(env.Global); err != nil || !reflect.DeepEqual(got, links) {
+				t.Errorf("global links = %v, %v, want %v", got, err, links)
+			}
+
+			// It can go once the global version is another one.
+			mustMakeGlobal(t, s, "1.0.0")
+			if err := s.Uninstall("2.0.0", "1.0.0"); err != nil || s.CheckRuntimeExist("2.0.0") {
+				t.Errorf("Uninstall(2.0.0) after the switch: %v, installed = %v", err, s.CheckRuntimeExist("2.0.0"))
+			}
+		})
+	}
+}
+
+// A version that is not global does not stop the uninstall, but it does not break
+// silently either.
+func TestUninstallWarnsOfTheVersionsThatBreak(t *testing.T) {
+	for _, tc := range dependentSetups {
+		for _, global := range []Version{"", "1.0.0", "2.0.0"} {
+			t.Run(tc.name+", global version "+string(global), func(t *testing.T) {
+				s := newTestSDK(t, &testPlugin{})
+				stubShellAndRegistry(t)
+				out := capturePterm(t)
+				mustInstall(t, s, "2.0.0")
+				mustInstall(t, s, "1.0.0")
+				mustLink(t, s, "y", newExternalSDK(t, "tool"))
+				tc.setup(t, s)
+				if global != "" {
+					mustMakeGlobal(t, s, global)
+				}
+
+				if err := s.Uninstall("2.0.0", "1.0.0"); err != nil {
+					t.Fatalf("Uninstall(2.0.0): %v", err)
+				}
+				if got := strings.Count(out.String(), "no longer works"); got != 1 || !strings.Contains(out.String(), "test-sdk@x no longer works") {
+					t.Errorf("output = %q, want one warning, for x", out.String())
 				}
 			})
 		}

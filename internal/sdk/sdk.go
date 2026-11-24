@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -578,8 +579,12 @@ func (b *impl) preInstallSdk(info *plugin.PreInstallPackageItem, sdkDestPath str
 
 // Uninstall removes version. If it is the global version, the first of
 // fallbacks that can be used takes over, or with no fallbacks the global setting
-// is removed. That happens first, so a version that PreUninstall has run for is
-// never one the global setting cannot be moved away from.
+// is removed. The global switch runs before PreUninstall, so the hook never runs
+// for a version the global setting cannot leave.
+//
+// If the global version is another one that is linked into the directory of
+// version, nothing is removed. Other versions linked into it stop working, and a
+// warning names each.
 //
 // The removal takes effect in one step, by renaming the directory of the
 // version. If anything fails up to and including that step, the version stays
@@ -635,6 +640,15 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 		if err != nil {
 			logger.Debugf("Failed to get runtime package for %s: %v\n", label, err)
 			return
+		}
+	}
+
+	// Versions linked into the directory of this one break when it goes. The global
+	// version must not.
+	dependents := b.dependents(version)
+	if globalEntry != nil {
+		if global := Version(globalEntry.Version); slices.Contains(dependents, global) {
+			return fmt.Errorf("the global version %s is linked into the directory of %s, so nothing was removed: switch the global version to another one first", b.Label(global), label)
 		}
 	}
 
@@ -719,6 +733,9 @@ func (b *impl) Uninstall(version Version, fallbacks ...Version) (err error) {
 		pterm.Printf("Unlinked %s successfully! %s was left untouched.\n", label, linkedTo)
 	default:
 		pterm.Printf("Uninstalled %s successfully!\n", label)
+	}
+	for _, dependent := range dependents {
+		pterm.Warning.Printf("%s no longer works: it is linked into the directory of %s.\n", b.Label(dependent), label)
 	}
 	if takesOver != "" {
 		pterm.Printf("Auto switch to the other version: %s.\n", b.Label(takesOver))
@@ -885,8 +902,9 @@ func (b *impl) deleteLeftovers(version Version, paths []string) error {
 }
 
 // linksLeft reports whether an uninstall of version left global links that point
-// into it. A version the global config, whose entry is entry, still names was not
-// uninstalled: its directory went some other way.
+// into it. Such links are reported only when the directory of the version is gone
+// and the global config, whose entry is entry, does not name the version. A version
+// it does name was not uninstalled: its directory went some other way.
 func (b *impl) linksLeft(version Version, entry *pathmeta.ToolConfig) (bool, error) {
 	path := b.packagePath(version)
 	if _, err := os.Lstat(path); !os.IsNotExist(err) || entry != nil && Version(entry.Version) == version {
@@ -959,6 +977,18 @@ func (b *impl) switchGlobal(removed Version, candidates []Version) (Version, err
 		return v, nil
 	}
 	return "", noSwitchError(errs)
+}
+
+// dependents returns the other installed versions that break when the directory of
+// version is moved.
+func (b *impl) dependents(version Version) []Version {
+	var dependents []Version
+	for _, v := range b.InstalledList() {
+		if v != version && b.dependsOn(v, version) {
+			dependents = append(dependents, v)
+		}
+	}
+	return dependents
 }
 
 // dependsOn reports whether the main runtime or an addition of version is reached

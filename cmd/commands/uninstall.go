@@ -87,7 +87,7 @@ func uninstallCmd(ctx context.Context, cmd *cli.Command) error {
 	return uninstallErr
 }
 
-// otherVersions returns versions without version.
+// otherVersions returns the versions other than version.
 func otherVersions(versions []sdk.Version, version sdk.Version) []sdk.Version {
 	var others []sdk.Version
 	for _, v := range versions {

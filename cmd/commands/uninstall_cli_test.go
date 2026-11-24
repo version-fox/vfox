@@ -643,6 +643,38 @@ func TestUninstallDoesNotSwitchToAVersionLinkedIntoTheRemovedOne(t *testing.T) {
 	}
 }
 
+// The global version must not break because the version it is linked into is
+// uninstalled.
+func TestUninstallRefusesAVersionTheGlobalOneIsLinkedInto(t *testing.T) {
+	f := newCLIFixture(t, false)
+	main := f.installOnDisk(t, "alpha", "2.0.0", "alpha")
+	keepRegistry(t)
+	f.run(t, "link", "alpha@x", main).mustSucceed(t, "link alpha@x")
+	f.run(t, "use", "-g", "alpha@x").mustSucceed(t, "use -g alpha@x")
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustFail(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "the global version alpha@x is linked into the directory of alpha@2.0.0", "nothing was removed")
+	mustNotContain(t, "uninstall", out, "Uninstalled")
+	mustContain(t, "global config", readFile(t, filepath.Join(f.userHome, ".vfox.toml")), `alpha = "x"`)
+	mustContain(t, "list", f.run(t, "list", "alpha").output(), "2.0.0", "x")
+	if _, err := os.Stat(filepath.Join(f.userHome, "sdks", "alpha")); err != nil {
+		t.Errorf("the link of alpha is broken: %v", err)
+	}
+}
+
+// A version that is not global, and is linked into the one that goes, is named.
+func TestUninstallWarnsOfAVersionLinkedIntoTheRemovedOne(t *testing.T) {
+	f := newCLIFixture(t, false)
+	main := f.installOnDisk(t, "alpha", "2.0.0", "alpha")
+	f.installOnDisk(t, "alpha", "1.0.0", "alpha")
+	keepRegistry(t)
+	f.run(t, "link", "alpha@x", main).mustSucceed(t, "link alpha@x")
+	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+
+	out := f.run(t, "uninstall", "alpha@2.0.0").mustSucceed(t, "uninstall alpha@2.0.0").output()
+	mustContain(t, "uninstall", out, "Uninstalled alpha@2.0.0 successfully!", "alpha@x no longer works")
+}
+
 // When the global setting cannot be changed, nothing is removed, and a retry
 // works once it can.
 func TestUninstallChangesNothingWhenTheConfigCannotBeWritten(t *testing.T) {
