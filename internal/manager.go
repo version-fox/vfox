@@ -468,7 +468,8 @@ func isWindowsReservedDeviceName(base string) bool {
 	}
 }
 
-// downloadPlugin download plugin from downloadUrl to plugin home directory.
+// downloadPlugin downloads a plugin archive from downloadUrl into a private
+// vfox-dl-* subdirectory under User.Temp.
 func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	logger.Debugf("Downloading plugin from: %s\n", util.RedactSourceURL(downloadUrl))
 
@@ -524,6 +525,9 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	keepFile := false
 	defer func() {
 		if !keepFile {
+			// Best-effort cleanup of the partial download dir; any leftover
+			// vfox-dl-* entry stays under User.Temp until CleanTmp sweeps
+			// directories older than 24 hours.
 			_ = os.RemoveAll(dlDir)
 		}
 	}()
@@ -725,6 +729,9 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 		}
 		localPath = pluginPath
 		defer func() {
+			// Best-effort cleanup of the vfox-dl-* staging dir; if removal
+			// fails, the archive stays in User.Temp until CleanTmp sweeps
+			// entries older than 24 hours.
 			_ = os.RemoveAll(filepath.Dir(localPath))
 		}()
 	}
@@ -831,6 +838,8 @@ func (m *Manager) CleanTmp() {
 			}
 			if strings.HasPrefix(file.Name(), dlTmpPrefix) {
 				if info, infoErr := file.Info(); infoErr == nil && info.ModTime().Before(cutoff) {
+					// Best-effort sweep of stale download staging dirs; entries locked
+					// by another process stay under User.Temp for the next daily CleanTmp pass.
 					_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
 				}
 				continue

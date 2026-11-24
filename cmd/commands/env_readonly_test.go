@@ -17,10 +17,8 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -262,29 +260,36 @@ func runInProcessCaptured(t *testing.T, f *cliFixture, level logger.LoggerLevel,
 			t.Setenv(k, v)
 		}
 	}
+	t.Chdir(f.work)
 	logger.SetLevel(level)
 	t.Cleanup(func() { logger.SetLevel(logger.InfoLevel) })
 
+	tempDir := t.TempDir()
+	outFile, err := os.CreateTemp(tempDir, "stdout")
+	must(t, err)
+	errFile, err := os.CreateTemp(tempDir, "stderr")
+	must(t, err)
+
 	origStdout, origStderr := os.Stdout, os.Stderr
-	rOut, wOut, err := os.Pipe()
-	must(t, err)
-	rErr, wErr, err := os.Pipe()
-	must(t, err)
-	os.Stdout, os.Stderr = wOut, wErr
+	t.Cleanup(func() {
+		os.Stdout, os.Stderr = origStdout, origStderr
+		_ = outFile.Close()
+		_ = errFile.Close()
+	})
+	os.Stdout, os.Stderr = outFile, errFile
 
 	runErr := newTestApp().Run(context.Background(), append([]string{"vfox"}, args...))
-	_ = wOut.Close()
-	_ = wErr.Close()
 	os.Stdout, os.Stderr = origStdout, origStderr
+	must(t, outFile.Close())
+	must(t, errFile.Close())
 
-	var out, errBuf bytes.Buffer
-	_, _ = io.Copy(&out, rOut)
-	_, _ = io.Copy(&errBuf, rErr)
-	_ = rOut.Close()
-	_ = rErr.Close()
+	outBytes, err := os.ReadFile(outFile.Name())
+	must(t, err)
+	errBytes, err := os.ReadFile(errFile.Name())
+	must(t, err)
 
 	if runErr != nil {
 		t.Fatalf("vfox %v (level=%v) returned unexpected error: %v", args, level, runErr)
 	}
-	return out.String(), errBuf.String()
+	return string(outBytes), string(errBytes)
 }
