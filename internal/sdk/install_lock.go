@@ -19,6 +19,7 @@ package sdk
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -43,7 +44,15 @@ func openInstallLock(path string) (*os.File, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, fmt.Errorf("create installation root: %w", err)
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	// The file is created writable by the group as far as the umask allows, so that
+	// members of a group sharing VFOX_HOME can open it. One that this user cannot
+	// write, as another user may have created it, is opened for reading: flock and
+	// LockFileEx lock a descriptor that is open for reading too, and nothing is
+	// written to the file.
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
+	if errors.Is(err, fs.ErrPermission) {
+		file, err = os.Open(path)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("open installation lock: %w", err)
 	}

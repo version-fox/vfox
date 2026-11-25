@@ -243,6 +243,14 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 	if reinstall && name == "" {
 		if receipt := b.copyReceipt(version); receipt != nil {
 			version, name, exact = Version(receipt.Requested), version, Version(receipt.Resolved)
+		} else if b.isCopy(version) {
+			// Marked as a copy, but the receipt that says what it is a copy of
+			// cannot be read, so it cannot be reinstalled as one or as a version.
+			_, err := readReceipt(b.packagePath(version))
+			if err == nil {
+				err = errors.New("its receipt does not say what it is a copy of")
+			}
+			return "", fmt.Errorf("cannot reinstall %s, a copy made with `vfox install --as`: %w; fix the permissions of %s or remove it", b.Label(version), err, b.packagePath(version))
 		}
 	}
 	named := name != ""
@@ -385,7 +393,9 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 			return "", fmt.Errorf("cannot install %s: %w", label, err)
 		}
 		if listed {
-			if now, _ := b.preInstallList(); !sameVersions(installedSdks, now) {
+			// A version that went from installed to being reinstalled keeps its
+			// key, so the versions being installed are compared as well.
+			if now, nowInstalling := b.preInstallList(); !sameVersions(installedSdks, now) || !sameInstalling(installing, nowInstalling) {
 				logger.Debugf("Installed versions changed during PreInstall of %s; asking again\n", requestLabel)
 				if err := releaseSDKLock(); err != nil {
 					return "", err
@@ -396,7 +406,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		// The list given to PreInstall leaves copies out, but a plugin can return any
 		// name. A copy is selected only by its own name, so it cannot stand for the
 		// version asked for.
-		if !named && b.isCopy(sdkVersion) {
+		if !named && (b.isCopy(sdkVersion) || b.copyBeingMade(sdkVersion)) {
 			return "", fmt.Errorf("plugin [PreInstall] method error: %s was resolved to %s, but %s is a copy made with `vfox install --as` and is selected only by its own name", b.Label(version), label, label)
 		}
 		if err := b.inspectError(key); err != nil {
@@ -596,6 +606,31 @@ func sameVersions(a, b map[string]*plugin.InstalledPackageItem) bool {
 		}
 	}
 	return true
+}
+
+// sameInstalling reports whether two sets of versions being installed, from
+// preInstallList, are the same.
+func sameInstalling(a, b map[Version]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for version := range a {
+		if !b[version] {
+			return false
+		}
+	}
+	return true
+}
+
+// copyBeingMade reports whether another vfox is making a copy under version with
+// `install --as` now. isCopy does not count it yet, and installingVersions leaves it
+// out, so a plain install resolved to its name is refused as it is once the copy is
+// made, rather than failing on the lock of the copy.
+func (b *impl) copyBeingMade(version Version) bool {
+	if _, err := os.Lstat(b.copyMarkerPath(version)); err != nil {
+		return false
+	}
+	return b.hasPendingInstall(version) && b.installationRunning(version)
 }
 
 // copyMarkerPath is the mark InstallAs leaves beside the directory of a copy.
