@@ -37,6 +37,7 @@ type testPlugin struct {
 	preInstall   func(*plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error)
 	postInstall  func(*plugin.PostInstallHookCtx) error
 	preUninstall func(*plugin.PreUninstallHookCtx) error
+	preUse       func(*plugin.PreUseHookCtx) (*plugin.PreUseHookResult, error)
 	envKeys      func(*plugin.EnvKeysHookCtx) ([]*plugin.EnvKeysHookResultItem, error)
 	fingerprint  func(*plugin.FingerprintHookCtx) (*plugin.FingerprintHookResult, error)
 	detect       func(*plugin.DetectHookCtx) ([]*plugin.DetectHookResultItem, error)
@@ -51,6 +52,8 @@ func (p *testPlugin) HasFunction(name string) bool {
 		return p.postInstall != nil
 	case "PreUninstall":
 		return p.preUninstall != nil
+	case "PreUse":
+		return p.preUse != nil
 	case "Fingerprint":
 		return p.fingerprint != nil
 	case "Detect":
@@ -72,6 +75,10 @@ func (p *testPlugin) PostInstall(ctx *plugin.PostInstallHookCtx) error { return 
 func (p *testPlugin) PreUninstall(ctx *plugin.PreUninstallHookCtx) error {
 	p.preUninstallCall++
 	return p.preUninstall(ctx)
+}
+
+func (p *testPlugin) PreUse(ctx *plugin.PreUseHookCtx) (*plugin.PreUseHookResult, error) {
+	return p.preUse(ctx)
 }
 
 func (p *testPlugin) EnvKeys(ctx *plugin.EnvKeysHookCtx) ([]*plugin.EnvKeysHookResultItem, error) {

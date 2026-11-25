@@ -197,7 +197,7 @@ Directory structure after setting `VFOX_HOME=/opt/vfox`:
 │   └── nodejs/
 │       └── v-20.9.0/
 │           └── nodejs-20.9.0/      # Node.js actual files
-└── plugins/                        # Plugin definitions
+└── plugin/                         # Plugin definitions
     ├── java/
     └── nodejs/
 
@@ -241,9 +241,9 @@ sudo chgrp vfox /opt/vfox
 sudo chmod 2775 /opt/vfox
 
 # 2. Move existing SDK installations and plugins
-mkdir -p /opt/vfox/cache /opt/vfox/plugins
+mkdir -p /opt/vfox/cache /opt/vfox/plugin
 mv ~/.vfox/cache/* /opt/vfox/cache/
-mv ~/.vfox/plugins/* /opt/vfox/plugins/
+mv ~/.vfox/plugin/* /opt/vfox/plugin/
 
 # 3. Set VFOX_HOME
 export VFOX_HOME=/opt/vfox
@@ -272,9 +272,9 @@ Set-Acl $vfoxPath $acl
 
 # 2. Move existing SDK installations and plugins
 New-Item -ItemType Directory -Path "$vfoxPath\cache\" -Force
-New-Item -ItemType Directory -Path "$vfoxPath\plugins\" -Force
+New-Item -ItemType Directory -Path "$vfoxPath\plugin\" -Force
 Move-Item -Path "$env:USERPROFILE\.vfox\cache\*" -Destination "$vfoxPath\cache\" -Force
-Move-Item -Path "$env:USERPROFILE\.vfox\plugins\*" -Destination "$vfoxPath\plugins\" -Force
+Move-Item -Path "$env:USERPROFILE\.vfox\plugin\*" -Destination "$vfoxPath\plugin\" -Force
 
 # 3. Set VFOX_HOME environment variable
 [System.Environment]::SetEnvironmentVariable('VFOX_HOME', $vfoxPath, 'User')

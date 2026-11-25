@@ -170,6 +170,10 @@ vfox un <sdk-name>@<version>
 
 `version`: The specific version number
 
+If the version is the global version, the newest other installed version becomes the global version. Copies made with `install --as` are used only when nothing else is left. A version the plugin cannot set up is skipped with a warning, and if no version can take over, nothing is removed. When it was the only installed version, the global version is unset. A version that is linked into the directory of the one being uninstalled cannot take over either: it stops working, and a warning names it. If it is the global version, nothing is removed until the global version is switched or unset. The entry of a version that stops working is kept, and [`vfox doctor`](#doctor) reports it. If some files of the version, or global links to it, cannot be deleted, the version is uninstalled all the same, the command fails and says what is left, and the next uninstall of that version deletes the rest, whether it was installed again or not.
+
+If the global config (`.vfox.toml` in the user root, which is `~/.version-fox` if that directory exists, otherwise `~/.vfox`) cannot be read, for example because of a syntax error, no version of any SDK is uninstalled, as the file may name that version or one linked into it. Correct the file, or delete it, and try again.
+
 ::: tip Linked versions
 Uninstalling a version registered with [`vfox link`](#link) removes the link only. The SDK it points to is left untouched.
 :::
@@ -292,6 +296,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | :------------------------ | :------ | :----------------------------------------------------------------------------------------------------------------------- |
 | `path.shadowed`           | warn    | A command of the SDK is not the one that runs, because another executable sits earlier in `PATH` (a pnpm-installed `node`, a system JDK …) |
 | `path.not-activated`      | error   | `vfox activate` is not set up in this shell                                                                              |
+| `path.unusable`           | error   | A directory `vfox` needs (`~/.vfox/tmp`, `~/.vfox/sdks`, or the working directory) cannot be used or created             |
 | `sdk.drift`               | warn    | The SDK was modified in place since it was installed (for example `flutter upgrade`). Fix: `vfox install --reinstall <sdk>@<version>` |
 | `sdk.link-dangling`       | error   | The directory a linked version points to is gone                                                                         |
 | `sdk.payload-empty`       | error   | The directories the plugin puts on `PATH` do not exist or hold no command                                                |
@@ -356,14 +361,20 @@ Execute a command in a vfox managed environment.
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK name
 
 `version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
 
-You can specify multiple SDKs before `--`. They are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
+For a single SDK, `--` is optional unless `<command>` or its arguments contain `--`: flags after `<command>` (such as `--version` or `--help`) are passed directly to `<command>`, except a trailing `--generate-shell-completion` probe. Any `vfox` flags for `exec` itself (`--help`/`-h`/`-help` and `--debug`/`-debug`) must come before `<sdk-name>` (`--debug`/`-debug` are also accepted right after the SDK specs and before `<command>` or `--`); `-v`, `-V`, and `--version` are root flags—use `vfox --version` to print the `vfox` version. In both the `--` and non-`--` forms, `vfox` intercepts a trailing `--generate-shell-completion` with empty output instead of running `<command>`, so the `--` form no longer lets `<command>` answer completion probes. A tool that itself needs the `--generate-shell-completion` flag can be invoked through a shell, for example `vfox exec <sdk> sh -c '<tool> --generate-shell-completion'`.
+
+The first `--` always separates SDK specs from `<command>`, so anything before the first `--` is read as an SDK spec. Multiple SDKs require `--` before `<command>`, and if `<command>` itself takes `--`, place `--` before `<command>` (for example, `vfox exec nodejs@24.14.0 -- npm run build -- --watch`). Multiple SDKs are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
 
 `command`: The command to execute
 
@@ -387,6 +398,12 @@ For Docker, CI/CD, and other non-interactive shells, prefer `vfox exec` instead 
 vfox exec nodejs@24.14.0 -- npm install -g pnpm
 vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 ```
+
+:::
+
+::: warning Windows Batch Shims (`.cmd` / `.bat`)
+
+On Windows, when the resolved target is a batch file (`.cmd` or `.bat`, such as `npm.cmd`), `vfox exec` quotes paths and arguments for `cmd.exe` so characters like `&`, `|`, `<`, `>`, `(`, `)`, `^`, and spaces pass through safely. Paths or arguments containing characters that `cmd.exe` quoting cannot protect (`%`, `!`, `"`, `CR`, `LF`, `NUL`) are refused before launching. To pass those characters, invoke the underlying `.exe` directly (for example `node`), run the script through `powershell` or `sh`, or call the underlying CLI entry script directly.
 
 :::
 

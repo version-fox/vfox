@@ -129,11 +129,12 @@ func NewLuaPlugin(pluginDirPath string, ctx *env.RuntimeEnvContext) (*Wrapper, e
 	return source, nil
 }
 
-func isValidName(name string) bool {
-	// The regular expression means: start with a letter,
-	// followed by any number of letters, digits, underscores, or hyphens.
-	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]*$`)
-	return re.MatchString(name)
+var validNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-]*$`)
+
+// IsValidName reports whether name is a valid single plugin/alias identifier.
+func IsValidName(name string) bool {
+	// Start with a letter, followed by any number of letters, digits, underscores, or hyphens.
+	return validNamePattern.MatchString(name)
 }
 
 func isLuaPluginDir(pluginDirPath string) bool {
