@@ -29,7 +29,7 @@ vfox add [options] <plugin-name> [<plugin-name2>...]
 - `-s, --source`: 安装指定路径下的插件（可以是远程文件也可以是本地文件）
 
 ::: warning 注意
-`--alias` 和 `--source` 不支持在安装多个插件时使用。
+`--alias` 和 `--source` 不支持在安装多个插件时使用。同时添加多个插件时，若有任意插件添加失败，命令会返回非零退出码。
 :::
 
 **例子**

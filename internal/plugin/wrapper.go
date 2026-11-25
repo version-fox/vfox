@@ -35,7 +35,7 @@ func (l *Wrapper) validate() error {
 		return fmt.Errorf("no plugin name provided")
 	}
 
-	if !isValidName(l.Name) {
+	if !IsValidName(l.Name) {
 		return fmt.Errorf("invalid plugin name [%s]", l.Name)
 	}
 

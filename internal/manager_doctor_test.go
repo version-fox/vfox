@@ -17,6 +17,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,10 +55,7 @@ func newManagerFixture(t *testing.T) *managerFixture {
 			t.Fatal(err)
 		}
 	}
-	meta, err := pathmeta.NewPathMeta(filepath.Join(root, "home"), shared, work, 4242)
-	if err != nil {
-		t.Fatal(err)
-	}
+	meta := pathmeta.NewPathMeta(filepath.Join(root, "home"), shared, work, 4242)
 	m := &Manager{
 		RuntimeEnvContext: &env.RuntimeEnvContext{
 			UserConfig:        &config.Config{},
@@ -374,5 +372,63 @@ func TestOrphanedInstallFindings(t *testing.T) {
 	}
 	if got := f.orphanedInstallFindings(); got != nil {
 		t.Errorf("findings = %+v, want none without an installation directory", got)
+	}
+}
+
+func TestDiagnoseReportsUnusablePathsAndWorkingDirectory(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	userVfox := filepath.Join(home, ".vfox")
+	shared := filepath.Join(root, "shared")
+	if err := os.MkdirAll(userVfox, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(shared, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Block ~/.vfox/tmp with a regular file so temp dir initialization fails.
+	if err := os.WriteFile(filepath.Join(userVfox, "tmp"), []byte("file"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(pathmeta.HookCurTmpPath, filepath.Join(userVfox, "tmp", "session-1"))
+	t.Setenv(env.HookFlag, "bash")
+
+	meta := pathmeta.NewPathMeta(home, shared, root, 4242)
+	m := &Manager{
+		RuntimeEnvContext: &env.RuntimeEnvContext{
+			UserConfig:        &config.Config{},
+			CurrentWorkingDir: "",
+			PathMeta:          meta,
+			RuntimeVersion:    RuntimeVersion,
+		},
+		openSdks:      make(map[string]sdk.Sdk),
+		workingDirErr: errors.New("getwd failed"),
+	}
+	t.Cleanup(m.Close)
+
+	findings, err := m.Diagnose("", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unusable []*sdk.Finding
+	for i := range findings {
+		if findings[i].ID == sdk.FindingPathUnusable {
+			unusable = append(unusable, &findings[i])
+		}
+	}
+	if len(unusable) < 2 {
+		t.Fatalf("expected temp dir and working dir path.unusable findings, got %+v", findings)
+	}
+	var sawTemp, sawWD bool
+	for _, f := range unusable {
+		if strings.Contains(f.Message, "temp directory") {
+			sawTemp = true
+		}
+		if strings.Contains(f.Message, "current working directory") {
+			sawWD = true
+		}
+	}
+	if !sawTemp || !sawWD {
+		t.Fatalf("missing expected messages in %+v (sawTemp=%v sawWD=%v)", unusable, sawTemp, sawWD)
 	}
 }

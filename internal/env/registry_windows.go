@@ -16,9 +16,9 @@ const (
 	registryPathName       = "Path"
 )
 
-// ApplyEnvsToRegistry writes the provided environment variables and PATH segments
+// applyEnvsToRegistry writes the provided environment variables and PATH segments
 // to HKEY_CURRENT_USER\Environment, mimicking the Windows behavior from v0.x.
-func ApplyEnvsToRegistry(envs *Envs) error {
+func applyEnvsToRegistry(envs *Envs) error {
 	if envs == nil {
 		return nil
 	}
@@ -37,8 +37,8 @@ func ApplyEnvsToRegistry(envs *Envs) error {
 	return broadcastEnvironmentChange()
 }
 
-// RemoveEnvsFromRegistry removes the provided env vars and PATH segments from the registry.
-func RemoveEnvsFromRegistry(envs *Envs) error {
+// removeEnvsFromRegistry removes the provided env vars and PATH segments from the registry.
+func removeEnvsFromRegistry(envs *Envs) error {
 	if envs == nil {
 		return nil
 	}

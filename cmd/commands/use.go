@@ -82,6 +82,10 @@ func useCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	defer manager.Close()
 
+	if manager.DiagnosticsOnUse() {
+		sdk.PrintFindings(manager.PathFindings(), sdk.SeverityWarn)
+	}
+
 	// Lookup SDK
 	sdkSource, err := manager.LookupSdk(name)
 	if err != nil {

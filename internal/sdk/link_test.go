@@ -624,11 +624,15 @@ func TestHasVersion(t *testing.T) {
 	if err := os.RemoveAll(external); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Mkdir(s.leftoverPath("gone", 0), 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	for version, want := range map[Version]bool{
 		"1.2.3": true,  // installed
 		"sys":   true,  // linked, and its target is gone: it can no longer be used, but it is there
 		"half":  true,  // an interrupted installation
+		"gone":  false, // only files that an uninstall could not delete
 		"9.9.9": false, // nothing
 		"":      false,
 	} {
@@ -638,5 +642,17 @@ func TestHasVersion(t *testing.T) {
 	}
 	if s.CheckRuntimeExist("sys") || s.CheckRuntimeExist("half") {
 		t.Error("CheckRuntimeExist must stay the stricter question")
+	}
+	for version, want := range map[Version]bool{"gone": true, "1.2.3": false, "": false} {
+		if got := s.HasLeftovers(version); got != want {
+			t.Errorf("HasLeftovers(%q) = %v, want %v", version, got, want)
+		}
+	}
+	// Leftovers do not change how a leading "v" is read.
+	if err := os.Mkdir(s.leftoverPath("v1.2.3", 0), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if got := StripVersionPrefix(s, "v1.2.3"); got != "1.2.3" {
+		t.Errorf("StripVersionPrefix(v1.2.3) = %q, want 1.2.3", got)
 	}
 }

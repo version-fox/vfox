@@ -55,6 +55,7 @@ func (s Severity) AtLeast(min Severity) bool {
 const (
 	FindingPathShadowed       = "path.shadowed"
 	FindingPathNotActivated   = "path.not-activated"
+	FindingPathUnusable       = "path.unusable"
 	FindingDrift              = "sdk.drift"
 	FindingFingerprintFailed  = "sdk.fingerprint-failed"
 	FindingLinkDangling       = "sdk.link-dangling"
