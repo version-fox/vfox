@@ -172,4 +172,4 @@ jobs:
       - name: Check shell formatting
         run: |
           shfmt --version
-          shfmt -d install.sh scripts/*.sh
+          shfmt -d install.sh scripts/*.sh completions/bash_autocomplete
