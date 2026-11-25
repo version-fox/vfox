@@ -51,7 +51,7 @@ func findShadows(provided []Executable, prefixDirs []string, policy pathPolicy) 
 	for _, exe := range provided {
 		wanted[lookupKey(exe.Name)] = exe
 	}
-	exts := PathExts()
+	exts := pathExts()
 	var shadows []Shadow
 	for _, dir := range prefixDirs {
 		entries, err := os.ReadDir(dir)

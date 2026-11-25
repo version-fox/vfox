@@ -36,7 +36,7 @@ type Executable struct {
 func ListExecutables(dirs []string) []Executable {
 	var found []Executable
 	seen := make(map[string]struct{})
-	exts := PathExts()
+	exts := pathExts()
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
@@ -91,14 +91,13 @@ func windowsCommandName(file string, exts []string) (string, bool) {
 	return "", false
 }
 
-// PathExts returns the extensions Windows treats as runnable, in the order of
-// PATHEXT, and nil elsewhere. PowerShell scripts are included because SDKs ship
-// launchers such as npm.ps1.
-func PathExts() []string {
+// pathExts returns the extensions Windows treats as runnable. PowerShell
+// scripts are included because SDKs ship launchers such as npm.ps1.
+func pathExts() []string {
 	if runtime.GOOS != "windows" {
 		return nil
 	}
-	var exts []string
+	exts := []string{".ps1"}
 	value := os.Getenv("PATHEXT")
 	if value == "" {
 		value = ".COM;.EXE;.BAT;.CMD"
@@ -108,5 +107,5 @@ func PathExts() []string {
 			exts = append(exts, ext)
 		}
 	}
-	return append(exts, ".ps1")
+	return exts
 }
