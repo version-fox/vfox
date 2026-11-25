@@ -70,6 +70,19 @@ func TestSearchStillShowsItsHelp(t *testing.T) {
 	}
 }
 
+func TestSearchRejectsAnEmptySDKName(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.writePlugin(t, "echo", echoPlugin)
+
+	for _, args := range [][]string{{"", "echo", "x"}, {"", "--no-cache"}} {
+		r := f.runHere(t, append([]string{"search"}, args...)...).mustFail(t, "search with an empty sdk name")
+		if r.code != 1 {
+			t.Errorf("search %q: exit code %d, want 1", args, r.code)
+		}
+		mustContain(t, "search error", r.output(), "sdk name is required")
+	}
+}
+
 func TestSearchPassesHelpAndDebugAfterADoubleDashToThePlugin(t *testing.T) {
 	f := newCLIFixture(t, false)
 	f.writePlugin(t, "echo", echoPlugin)
@@ -110,6 +123,7 @@ func TestSearchArgs(t *testing.T) {
 		{args: []string{"--version"}, error: true},
 		{args: []string{"--no-cache", "clang"}, error: true},
 		{args: []string{"--", "--version"}, error: true},
+		{args: []string{"", "echo"}, want: searchCall{pluginArgs: []string{"echo"}}},
 	} {
 		got, err := searchArgs(tc.args)
 		if tc.error {

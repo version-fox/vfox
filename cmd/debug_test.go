@@ -55,3 +55,29 @@ func TestDebugFlagCLI(t *testing.T) {
 		}
 	}
 }
+
+// TestSearchHelpLeavesOutTheVersionFlag runs vfox search --help with the real
+// root flags. -v, -V and --version after the SDK name go to the plugin, so the
+// search help must not list them as global options.
+func TestSearchHelpLeavesOutTheVersionFlag(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	command := exec.Command(executable, "-test.run=^TestPluginCLIProcess$", "--", "search", "--help")
+	command.Dir = root
+	command.Env = append(os.Environ(), "VFOX_PLUGIN_CLI_PROCESS=1",
+		"HOME="+filepath.Join(root, "user"), "USERPROFILE="+filepath.Join(root, "user"),
+		"VFOX_HOME="+filepath.Join(root, "shared"))
+	out, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("vfox search --help: %v: %q", err, out)
+	}
+	if !strings.Contains(string(out), "Search a version of the target SDK") || !strings.Contains(string(out), "--debug") {
+		t.Fatalf("vfox search --help did not print the search help: %q", out)
+	}
+	if strings.Contains(string(out), "print version") {
+		t.Errorf("vfox search --help lists the version flag: %q", out)
+	}
+}
