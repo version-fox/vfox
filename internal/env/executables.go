@@ -98,7 +98,7 @@ func PathExts() []string {
 	if runtime.GOOS != "windows" {
 		return nil
 	}
-	exts := []string{".ps1"}
+	var exts []string
 	value := os.Getenv("PATHEXT")
 	if value == "" {
 		value = ".COM;.EXE;.BAT;.CMD"
@@ -108,5 +108,5 @@ func PathExts() []string {
 			exts = append(exts, ext)
 		}
 	}
-	return exts
+	return append(exts, ".ps1")
 }

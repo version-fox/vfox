@@ -65,7 +65,8 @@ func (z zsh) Activate(config ActivateConfig) (string, error) {
 }
 
 func (z zsh) Export(envs env.Vars) (out string) {
-	for key, value := range envs {
+	for _, key := range sortedEnvKeys(envs) {
+		value := envs[key]
 		if value == nil {
 			out += z.unset(key)
 		} else {

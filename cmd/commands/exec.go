@@ -18,22 +18,36 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/pterm/pterm"
 	"github.com/urfave/cli/v3"
+
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/env"
+	"github.com/version-fox/vfox/internal/plugin"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/logger"
 )
 
 type execSDKSpec struct {
 	Name    string
 	Version sdk.Version
+}
+
+type execOptions struct {
+	ShowHelp bool
+	Debug    bool
+	DebugSet bool
 }
 
 const (
@@ -42,29 +56,202 @@ const (
 )
 
 var Exec = &cli.Command{
-	Name:    execCommandName,
-	Aliases: []string{execCommandAlias},
-	Usage:   "Execute a command in vfox managed environment",
-	Action:  execCmd,
+	Name:            execCommandName,
+	Aliases:         []string{execCommandAlias},
+	Usage:           "Execute a command in vfox managed environment",
+	ArgsUsage:       "<sdk>[@<version>]... -- <command> [args...] | <sdk>[@<version>] <command> [args...]",
+	Description:     "The first '--' always separates SDK specs from the command. If <command> itself takes '--', pass '--' before <command>, for example: vfox exec nodejs@24.14.0 -- npm run build -- --watch",
+	SkipFlagParsing: true,
+	ShellComplete:   completeExec,
+	Action:          execCmd,
+}
+
+func execRawArgs(cmd *cli.Command) []string {
+	root := cmd.Root()
+	raw := os.Args
+	if root != nil && root.Metadata != nil {
+		if metaArgs, ok := root.Metadata["rawArgs"].([]string); ok && len(metaArgs) > 0 {
+			raw = metaArgs
+		}
+	}
+	return raw
+}
+
+func hasExecSDKSpecBeforeCompletion(raw []string) bool {
+	const completionFlag = "--generate-shell-completion"
+	end := len(raw)
+	if end > 0 && raw[end-1] == completionFlag {
+		end--
+	}
+	cmdIdx := -1
+	for i := 1; i < end; i++ {
+		if strings.HasPrefix(raw[i], "-") {
+			continue
+		}
+		if raw[i] == execCommandName || raw[i] == execCommandAlias {
+			cmdIdx = i + 1
+		}
+		break
+	}
+	if cmdIdx < 0 || cmdIdx >= end {
+		return false
+	}
+	for _, tok := range raw[cmdIdx:end] {
+		if tok == "--" || !strings.HasPrefix(tok, "-") {
+			return true
+		}
+	}
+	return false
+}
+
+func completeExec(ctx context.Context, cmd *cli.Command) {
+	if hasExecSDKSpecBeforeCompletion(execRawArgs(cmd)) {
+		return
+	}
+	root := cmd.Root()
+	if root == nil {
+		return
+	}
+	completion := &cli.Command{
+		Flags:  cmd.Flags,
+		Writer: root.Writer,
+	}
+	cli.DefaultCompleteWithFlags(ctx, completion)
 }
 
 func execCmd(ctx context.Context, cmd *cli.Command) error {
-	sdkSpecs, command, cmdArgs, err := parseExecInvocation(cmd.Args().Slice(), os.Args)
+	if hasTrailingCompletionFlag(cmd) {
+		return nil
+	}
+	sdkSpecs, command, cmdArgs, opts, hasSeparator, err := parseExecArgs(cmd.Args().Slice())
+	if opts.DebugSet {
+		if opts.Debug {
+			logger.SetLevel(logger.DebugLevel)
+		} else {
+			logger.SetLevel(logger.InfoLevel)
+		}
+	}
 	if err != nil {
 		return err
 	}
-	return executeInVfoxEnv(sdkSpecs, command, cmdArgs)
+	if opts.ShowHelp {
+		return showExecHelp(cmd)
+	}
+	return executeInVfoxEnvWithSeparator(sdkSpecs, command, cmdArgs, hasSeparator)
 }
 
-func parseExecInvocation(parsedArgs, rawArgs []string) ([]execSDKSpec, string, []string, error) {
-	if len(parsedArgs) < 2 {
+func hasTrailingCompletionFlag(cmd *cli.Command) bool {
+	root := cmd.Root()
+	if root == nil || !root.EnableShellCompletion {
+		return false
+	}
+	raw := execRawArgs(cmd)
+	const completionFlag = "--generate-shell-completion"
+	return len(raw) > 0 && raw[len(raw)-1] == completionFlag
+}
+
+func showExecHelp(cmd *cli.Command) error {
+	tmpl := cmd.CustomHelpTemplate
+	if tmpl == "" {
+		tmpl = cli.CommandHelpTemplate
+	}
+	cli.HelpPrinter(cmd.Root().Writer, tmpl, cmd)
+	return nil
+}
+
+func parseExecDebugFlag(arg string) (bool, bool) {
+	switch arg {
+	case "--debug", "-debug":
+		return true, true
+	}
+	var raw string
+	switch {
+	case strings.HasPrefix(arg, "--debug="):
+		raw = strings.TrimPrefix(arg, "--debug=")
+	case strings.HasPrefix(arg, "-debug="):
+		raw = strings.TrimPrefix(arg, "-debug=")
+	default:
+		return false, false
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, false
+	}
+	return parsed, true
+}
+
+func parseExecLeadingArgs(args []string) ([]string, execOptions, error) {
+	var opts execOptions
+	for i, arg := range args {
+		if !strings.HasPrefix(arg, "-") || arg == "-" || arg == "--" {
+			return args[i:], opts, nil
+		}
+		switch arg {
+		case "--help", "-help", "-h":
+			opts.ShowHelp = true
+		case "-v", "-V", "--version":
+			return nil, opts, fmt.Errorf("unexpected flag %q before SDK (use 'vfox --version' to print the vfox version)\n%s", arg, execUsageLine())
+		default:
+			if debug, ok := parseExecDebugFlag(arg); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				continue
+			}
+			return nil, opts, fmt.Errorf("unexpected flag %q before SDK\n%s", arg, execUsageLine())
+		}
+	}
+	return nil, opts, nil
+}
+
+func parseExecArgs(raw []string) ([]execSDKSpec, string, []string, execOptions, bool, error) {
+	args, opts, err := parseExecLeadingArgs(raw)
+	if err != nil || opts.ShowHelp {
+		return nil, "", nil, opts, false, err
+	}
+
+	sepIdx := slices.Index(args, "--")
+	hasSeparator := sepIdx >= 0
+	if hasSeparator {
+		filtered := make([]string, 0, len(args))
+		for _, tok := range args[:sepIdx] {
+			if debug, ok := parseExecDebugFlag(tok); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				continue
+			}
+			filtered = append(filtered, tok)
+		}
+		filtered = append(filtered, args[sepIdx:]...)
+		args = filtered
+	} else if len(args) > 1 {
+		restIdx := 1
+		for restIdx < len(args) {
+			if debug, ok := parseExecDebugFlag(args[restIdx]); ok {
+				opts.Debug = debug
+				opts.DebugSet = true
+				restIdx++
+				continue
+			}
+			break
+		}
+		filtered := make([]string, 0, len(args)-(restIdx-1))
+		filtered = append(filtered, args[0])
+		filtered = append(filtered, args[restIdx:]...)
+		args = filtered
+	}
+
+	sdkSpecs, command, cmdArgs, err := parseExecInvocation(args)
+	return sdkSpecs, command, cmdArgs, opts, hasSeparator, err
+}
+
+func parseExecInvocation(args []string) ([]execSDKSpec, string, []string, error) {
+	if len(args) < 2 {
 		return nil, "", nil, execUsageError()
 	}
 
-	rawExecArgs := rawExecArgs(rawArgs)
-	if separatorIndex := slices.Index(rawExecArgs, "--"); separatorIndex >= 0 {
-		sdkArgs := rawExecArgs[:separatorIndex]
-		commandArgs := rawExecArgs[separatorIndex+1:]
+	if separatorIndex := slices.Index(args, "--"); separatorIndex >= 0 {
+		sdkArgs := args[:separatorIndex]
+		commandArgs := args[separatorIndex+1:]
 		if len(sdkArgs) == 0 || len(commandArgs) == 0 {
 			return nil, "", nil, execUsageError()
 		}
@@ -80,30 +267,35 @@ func parseExecInvocation(parsedArgs, rawArgs []string) ([]execSDKSpec, string, [
 		return sdkSpecs, commandArgs[0], commandArgs[1:], nil
 	}
 
-	if len(parsedArgs) > 2 && strings.Contains(parsedArgs[1], "@") {
+	if len(args) > 2 && looksLikeExecSDKSpec(args[1]) {
 		return nil, "", nil, fmt.Errorf("multiple SDKs require '--' before the command\n%s", execUsageLine())
 	}
 
-	spec, err := parseExecSDKSpec(parsedArgs[0])
+	spec, err := parseExecSDKSpec(args[0])
 	if err != nil {
 		return nil, "", nil, err
 	}
-	return []execSDKSpec{spec}, parsedArgs[1], parsedArgs[2:], nil
+	if args[1] != "-" && strings.HasPrefix(args[1], "-") {
+		return nil, "", nil, fmt.Errorf("unexpected flag %q instead of command\n%s", args[1], execUsageLine())
+	}
+	return []execSDKSpec{spec}, args[1], args[2:], nil
 }
 
-func rawExecArgs(rawArgs []string) []string {
-	for i := 1; i < len(rawArgs); i++ {
-		if rawArgs[i] == execCommandName || rawArgs[i] == execCommandAlias {
-			return rawArgs[i+1:]
-		}
+func looksLikeExecSDKSpec(arg string) bool {
+	if strings.HasPrefix(arg, "-") || strings.ContainsAny(arg, "/\\") {
+		return false
 	}
-	return nil
+	name, _, hasAt := strings.Cut(arg, "@")
+	return hasAt && strings.TrimSpace(name) != ""
 }
 
 func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 	arg = strings.TrimSpace(arg)
 	if arg == "" {
 		return execSDKSpec{}, execUsageError()
+	}
+	if strings.HasPrefix(arg, "-") {
+		return execSDKSpec{}, fmt.Errorf("unexpected flag %q in SDK spec\n%s", arg, execUsageLine())
 	}
 
 	parts := strings.SplitN(arg, "@", 2)
@@ -119,26 +311,55 @@ func parseExecSDKSpec(arg string) (execSDKSpec, error) {
 }
 
 func execUsageLine() string {
-	return "usage: vfox exec <sdk>[@<version>]... -- <command> [args...]\nExample: vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g pnpm"
+	return "usage: vfox exec <sdk>[@<version>]... -- <command> [args...]\n" +
+		"       vfox exec <sdk>[@<version>] <command> [args...]\n" +
+		"The first '--' always separates SDK specs from the command. If <command> itself takes '--', pass '--' before <command> (for example: vfox exec nodejs@24.14.0 -- npm run build -- --watch).\n" +
+		"Example: vfox exec nodejs@24.14.0 golang@1.25.6 -- npm install -g pnpm"
 }
 
 func execUsageError() error {
 	return fmt.Errorf("%s", execUsageLine())
 }
 
-// executeInVfoxEnv executes a command in vfox managed environment
-func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) error {
-	manager, err := internal.NewSdkManager()
-	if err != nil {
-		return fmt.Errorf("failed to create sdk manager: %w", err)
+// redirectStdoutToStderr routes setup, auto-install, and plugin output to
+// stderr and restores the caller's stdout before running the target command.
+func redirectStdoutToStderr() func() {
+	origStdout := os.Stdout
+	os.Stdout = os.Stderr
+	pterm.SetDefaultOutput(os.Stderr)
+	restorePlugin := plugin.RedirectStdIO(func() io.Writer { return os.Stderr })
+	return func() {
+		restorePlugin()
+		os.Stdout = origStdout
+		pterm.SetDefaultOutput(origStdout)
 	}
-	defer manager.Close()
+}
+
+type execCommandNotFoundError struct {
+	command string
+	err     error
+}
+
+func (e *execCommandNotFoundError) Error() string {
+	return fmt.Sprintf("command not found: %s: %v", e.command, e.err)
+}
+
+func (e *execCommandNotFoundError) Unwrap() error {
+	return e.err
+}
+
+func resolveExecCommandEnv(manager *internal.Manager, sdkSpecs []execSDKSpec, hasSeparator bool) (map[string]string, error) {
+	restore := redirectStdoutToStderr()
+	defer restore()
 
 	sdkEnvs := make([]*env.Envs, 0, len(sdkSpecs))
-	for _, sdkSpec := range sdkSpecs {
+	for i, sdkSpec := range sdkSpecs {
 		specEnvs, err := resolveExecSDKEnv(manager, sdkSpec)
 		if err != nil {
-			return err
+			if hasSeparator && len(sdkSpecs) > 1 && i > 0 && sdkSpec.Version == "" {
+				return nil, fmt.Errorf("%w\nnote: arguments before the first '--' are read as SDK names, so %q was treated as an SDK", err, sdkSpec.Name)
+			}
+			return nil, err
 		}
 		sdkEnvs = append(sdkEnvs, specEnvs)
 	}
@@ -152,11 +373,53 @@ func executeInVfoxEnv(sdkSpecs []execSDKSpec, command string, cmdArgs []string) 
 			envMap[key] = *value
 		}
 	}
-	envMap["PATH"] = mergedEnvs.Paths.String()
-	return executeCommand(command, cmdArgs, envMap)
+	envMap["PATH"] = buildExecPath(mergedEnvs.Paths)
+	return envMap, nil
+}
+
+func executeInVfoxEnvWithSeparator(sdkSpecs []execSDKSpec, command string, cmdArgs []string, hasSeparator bool) error {
+	manager, err := internal.NewSdkManager()
+	if err != nil {
+		return fmt.Errorf("failed to create sdk manager: %w", err)
+	}
+	defer manager.Close()
+
+	envMap, err := resolveExecCommandEnv(manager, sdkSpecs, hasSeparator)
+	if err != nil {
+		return err
+	}
+
+	err = executeCommand(command, cmdArgs, envMap)
+	var notFoundErr *execCommandNotFoundError
+	if err != nil && len(sdkSpecs) > 0 && errors.As(err, &notFoundErr) {
+		if hasSeparator && len(sdkSpecs) > 1 && sdkSpecs[len(sdkSpecs)-1].Version == "" && strings.HasPrefix(command, "-") {
+			return fmt.Errorf("%w\nnote: arguments before the first '--' are read as SDK names, so %q was treated as an SDK instead of the command", err, sdkSpecs[len(sdkSpecs)-1].Name)
+		}
+		if !hasSeparator && len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") && isBareSDKName(command) {
+			if _, lookupErr := manager.LookupSdk(command); lookupErr == nil {
+				return fmt.Errorf("%w\nnote: without '--', %q is parsed as a single SDK and %q as the command; pass '--' before the command to use multiple SDKs", err, sdkSpecs[0].Name, command)
+			}
+		}
+	}
+	return err
+}
+
+func isBareSDKName(command string) bool {
+	return command != "" && command != "." && command != ".." && !strings.ContainsAny(command, `/\`)
+}
+
+// buildExecPath builds the PATH passed to the process that exec launches.
+// Paths.String() is shell-facing and uses a POSIX ":" separator in bash/zsh
+// sessions on Windows, which a native child process cannot split (it uses ";").
+// Join with the platform separator so exec can locate SDK tools in every shell.
+func buildExecPath(paths *env.Paths) string {
+	return strings.Join(paths.Slice(), string(os.PathListSeparator))
 }
 
 func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Envs, error) {
+	restore := redirectStdoutToStderr()
+	defer restore()
+
 	sdkSource, err := manager.LookupSdk(sdkSpec.Name)
 	if err != nil {
 		return nil, fmt.Errorf("%s not supported, error: %w", sdkSpec.Name, err)
@@ -167,8 +430,8 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 		return nil, err
 	}
 	if sdkSpec.Version != "" && !sdkSource.CheckRuntimeExist(resolvedVersion) {
-		fmt.Printf("SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
-		installedVersion, err := sdkSource.InstallResolved(resolvedVersion, false)
+		fmt.Fprintf(os.Stderr, "SDK %s@%s not found, installing...\n", sdkSpec.Name, resolvedVersion)
+		installedVersion, err := sdkSource.InstallResolvedWithOptions(resolvedVersion, sdk.InstallOptions{NoClipboard: true})
 		if err != nil {
 			return nil, fmt.Errorf("failed to install %s@%s: %w", sdkSpec.Name, resolvedVersion, err)
 		}
@@ -190,7 +453,21 @@ func resolveExecSDKEnv(manager *internal.Manager, sdkSpec execSDKSpec) (*env.Env
 func resolveExecSDKVersion(manager *internal.Manager, sdkSpec execSDKSpec) (sdk.Version, error) {
 	if sdkSpec.Version != "" {
 		source, _ := manager.LookupSdk(sdkSpec.Name)
-		return manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version), nil
+		version := manager.ResolveVersionName(sdkSpec.Name, source, sdkSpec.Version)
+		if source == nil || source.CheckRuntimeExist(version) {
+			return version, nil
+		}
+		// A partial version stands for the installed version it extends (4.5 for an
+		// installed 4.5.0), as it does for `vfox use`, rather than for a version to
+		// install. Only a version nothing installed matches is left to be installed.
+		installed, err := source.ResolveInstalledVersion(version)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve %s@%s: %w", sdkSpec.Name, version, err)
+		}
+		if source.CheckRuntimeExist(installed) {
+			return installed, nil
+		}
+		return version, nil
 	}
 
 	chain, err := manager.RuntimeEnvContext.LoadVfoxTomlChainByScopes(env.Global, env.Session, env.Project)
@@ -263,13 +540,18 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	}
 
 	// Find executable - first search in new PATH
-	execPath, err := lookPathInEnv(command, tmpEnv["PATH"])
-	if err != nil {
-		return fmt.Errorf("command not found: %s: %w", command, err)
+	pathExtEnv := tmpEnv["PATHEXT"]
+	if pathExtEnv == "" {
+		pathExtEnv = os.Getenv("PATHEXT")
 	}
-
-	// Execute command
-	execCmd := exec.Command(execPath, args...)
+	execPath, err := lookPathInEnvWithExt(command, tmpEnv["PATH"], pathExtEnv)
+	if err != nil {
+		return &execCommandNotFoundError{command: command, err: err}
+	}
+	execCmd, err := prepareExecCommand(execPath, args)
+	if err != nil {
+		return err
+	}
 	execCmd.Env = cleanedEnvVars
 	execCmd.Stdin = os.Stdin
 	execCmd.Stdout = os.Stdout
@@ -279,29 +561,42 @@ func executeCommand(command string, args []string, envMap map[string]string) err
 	return execCmd.Run()
 }
 
-// lookPathInEnv searches for executable file in specified PATH environment variable
-func lookPathInEnv(command, pathEnv string) (string, error) {
+func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
 	if pathEnv == "" {
 		return exec.LookPath(command)
 	}
 
-	// If command contains path separator, check directly
-	if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+	if runtime.GOOS != "windows" {
+		// Keep main's exact Unix lookup (including '.' entries formatted as './<command>').
+		if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+			return exec.LookPath(command)
+		}
+		for _, dir := range strings.Split(pathEnv, string(os.PathListSeparator)) {
+			if dir == "" {
+				continue
+			}
+			fullPath := dir + string(os.PathSeparator) + command
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+				return fullPath, nil
+			}
+		}
 		return exec.LookPath(command)
 	}
 
-	// Search in PATH
-	names := executableNames(command)
-	paths := strings.Split(pathEnv, string(os.PathListSeparator))
+	// If command contains path separator, check directly.
+	if strings.Contains(command, "/") || strings.Contains(command, "\\") {
+		return exec.LookPath(filepath.FromSlash(command))
+	}
+
+	// Search in PATH with PATHEXT on Windows.
+	paths := filepath.SplitList(pathEnv)
+	exts := windowsPathExts(pathExtEnv)
 	for _, dir := range paths {
 		if dir == "" {
 			continue
 		}
-		for _, name := range names {
-			fullPath := dir + string(os.PathSeparator) + name
-			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
-				return fullPath, nil
-			}
+		if found, ok := findWindowsExecutable(dir, command, exts); ok {
+			return found, nil
 		}
 	}
 
@@ -309,29 +604,51 @@ func lookPathInEnv(command, pathEnv string) (string, error) {
 	return exec.LookPath(command)
 }
 
-// executableNames lists the files a command typed without a path may stand for.
-// On Windows a bare name such as "npm" is run as npm.cmd or npm.exe, so the name
-// gets each PATHEXT extension in turn, the way a shell resolves it; a name that
-// already carries one of those extensions is taken as it is. PowerShell scripts
-// are left out because the process can not start one directly. Elsewhere the
-// name is the file.
-func executableNames(command string) []string {
-	exts := env.PathExts()
-	if len(exts) == 0 {
-		return []string{command}
+func windowsPathExts(pathExtEnv string) []string {
+	if pathExtEnv == "" {
+		return []string{".COM", ".EXE", ".BAT", ".CMD"}
 	}
-	ext := filepath.Ext(command)
-	for _, candidate := range exts {
-		if ext != "" && strings.EqualFold(ext, candidate) {
-			return []string{command}
-		}
-	}
-	names := make([]string, 0, len(exts))
-	for _, candidate := range exts {
-		if strings.EqualFold(candidate, ".ps1") {
+	var exts []string
+	for _, ext := range strings.Split(pathExtEnv, ";") {
+		if ext == "" {
 			continue
 		}
-		names = append(names, command+candidate)
+		if ext[0] != '.' {
+			ext = "." + ext
+		}
+		// A PowerShell script cannot be started as a process, so a bare name
+		// never stands for one even when PATHEXT lists .PS1.
+		if strings.EqualFold(ext, ".ps1") {
+			continue
+		}
+		exts = append(exts, ext)
 	}
-	return names
+	if len(exts) == 0 {
+		return []string{".COM", ".EXE", ".BAT", ".CMD"}
+	}
+	return exts
+}
+
+func joinRelativeExecutable(dir, name string) string {
+	fullPath := filepath.Join(dir, name)
+	if !filepath.IsAbs(fullPath) && !strings.ContainsAny(fullPath, `/\`) {
+		return "." + string(filepath.Separator) + fullPath
+	}
+	return fullPath
+}
+
+func findWindowsExecutable(dir, command string, exts []string) (string, bool) {
+	if filepath.Ext(command) != "" {
+		fullPath := joinRelativeExecutable(dir, command)
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			return fullPath, true
+		}
+	}
+	for _, ext := range exts {
+		fullPath := joinRelativeExecutable(dir, command+ext)
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			return fullPath, true
+		}
+	}
+	return "", false
 }

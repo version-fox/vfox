@@ -78,6 +78,10 @@ func linkCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("%s not supported, error: %w (add its plugin first: vfox add %s)", name, err, name)
 	}
+	// An alias of the same name would stop working once the link is there.
+	if err := manager.CheckNotAlias(name, version); err != nil {
+		return err
+	}
 	return source.Link(version, cmd.Args().Get(1), sdk.LinkOptions{Force: cmd.Bool("force")})
 }
 
@@ -114,7 +118,7 @@ func linkDetected(cmd *cli.Command) error {
 		return err
 	}
 
-	candidates, skipped := detectCandidates(source, found)
+	candidates, skipped := detectCandidates(source, found, manager.AliasesFor(name))
 	for _, line := range skipped {
 		pterm.Println(pterm.LightYellow("Skipping " + line))
 	}
@@ -155,9 +159,10 @@ func linkDetected(cmd *cli.Command) error {
 	return nil
 }
 
-// detectCandidates drops what is already registered: a name that is taken, or a
-// directory some version already links to. It explains each omission.
-func detectCandidates(s sdk.Sdk, found []sdk.DetectedRuntime) (candidates []sdk.DetectedRuntime, skipped []string) {
+// detectCandidates drops what is already registered: a name that is taken, a name
+// that is an alias of the SDK, or a directory some version already links to. It
+// explains each omission. aliases maps the SDK's aliases to the versions they name.
+func detectCandidates(s sdk.Sdk, found []sdk.DetectedRuntime, aliases map[string]string) (candidates []sdk.DetectedRuntime, skipped []string) {
 	linkedTargets := make(map[string]sdk.Version)
 	for _, version := range s.InstalledList() {
 		if installation, err := s.Installation(version); err == nil && installation.Target != "" {
@@ -167,6 +172,10 @@ func detectCandidates(s sdk.Sdk, found []sdk.DetectedRuntime) (candidates []sdk.
 	for _, candidate := range found {
 		if s.CheckRuntimeExist(candidate.Version) {
 			skipped = append(skipped, fmt.Sprintf("%s: a version of that name is already installed", candidate.Version))
+			continue
+		}
+		if target, isAlias := aliases[string(candidate.Version)]; isAlias {
+			skipped = append(skipped, fmt.Sprintf("%s: an alias of that name already points to %s", candidate.Version, target))
 			continue
 		}
 		if version, linked := linkedTargets[filepath.Clean(candidate.Path)]; linked {

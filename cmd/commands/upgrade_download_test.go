@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/version-fox/vfox/internal/config"
 )
 
 func TestDownloadFileRejectsUnexpectedStatus(t *testing.T) {
@@ -79,8 +81,147 @@ func TestFetchLatestVersionNamesTheStatus(t *testing.T) {
 		}, nil
 	})}
 
-	_, err := fetchLatestVersion(client)
+	_, err := fetchLatestVersion(client, nil)
 	if err == nil || !strings.Contains(err.Error(), "unexpected HTTP status 429 Too Many Requests") {
 		t.Fatalf("fetchLatestVersion() error = %v, want unexpected HTTP status 429 Too Many Requests", err)
+	}
+}
+
+func TestUpgradeWithGitHubMirror(t *testing.T) {
+	for _, body := range []string{`{"tag_name":"v1.2.3"}`, "invalid", "{}"} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/https://api.github.com/repos/version-fox/vfox/releases/latest" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = io.WriteString(w, body)
+		}))
+		mirror := &config.GitHub{BaseURL: srv.URL + "/https://github.com/"}
+		tag, err := fetchLatestVersion(srv.Client(), mirror)
+		srv.Close()
+		if body == "invalid" || body == "{}" {
+			if err == nil {
+				t.Fatalf("accepted release %s", body)
+			}
+			continue
+		}
+		if err != nil || tag != "v1.2.3" {
+			t.Fatalf("tag = %q, err = %v", tag, err)
+		}
+		archive, diff := generateUrls("v1", tag, mirror)
+		base := srv.URL + "/https://github.com/version-fox/vfox/"
+		if archive != base+"releases/download/"+tag+"/"+constructBinaryName(tag) || diff != base+"compare/v1..."+tag {
+			t.Fatalf("unexpected URLs %q, %q", archive, diff)
+		}
+	}
+}
+
+type endlessReleaseReader struct {
+	prefix string
+	read   int64
+}
+
+func (r *endlessReleaseReader) Read(p []byte) (int, error) {
+	n := 0
+	if int(r.read) < len(r.prefix) {
+		n = copy(p, r.prefix[r.read:])
+		r.read += int64(n)
+	}
+	for i := n; i < len(p); i++ {
+		p[i] = 'a'
+	}
+	r.read += int64(len(p) - n)
+	return len(p), nil
+}
+
+func TestFetchLatestVersionBoundsOversizedResponse(t *testing.T) {
+	stream := &endlessReleaseReader{prefix: `{"tag_name":"v9.9.9","body":"`}
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(stream),
+		}, nil
+	})}
+
+	mirror := &config.GitHub{BaseURL: "https://mirror.example.com"}
+	if tag, err := fetchLatestVersion(client, mirror); err == nil {
+		t.Fatalf("fetchLatestVersion() = %q, nil; want error for oversized response", tag)
+	}
+	if stream.read != maxReleaseResponseBytes {
+		t.Fatalf("bytes read = %d, want %d", stream.read, maxReleaseResponseBytes)
+	}
+}
+
+func TestFetchLatestVersionSendsTokenToDefaultAPIBase(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	var gotURL, gotAuth string
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		gotURL = req.URL.String()
+		gotAuth = req.Header.Get("Authorization")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v1.0.14"}`)),
+		}, nil
+	})}
+
+	tag, err := fetchLatestVersion(client, &config.GitHub{})
+	if err != nil || tag != "v1.0.14" {
+		t.Fatalf("fetchLatestVersion() = %q, %v; want v1.0.14, nil", tag, err)
+	}
+	if gotURL != "https://api.github.com/repos/version-fox/vfox/releases/latest" {
+		t.Fatalf("request URL = %q", gotURL)
+	}
+	if gotAuth != "Bearer secret-token" {
+		t.Fatalf("Authorization = %q, want %q", gotAuth, "Bearer secret-token")
+	}
+}
+
+func TestFetchLatestVersionOmitsTokenForMirrorBase(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret-token")
+
+	var gotURL string
+	var gotAuth []string
+	client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		gotURL = req.URL.String()
+		gotAuth = req.Header.Values("Authorization")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v1.0.14"}`)),
+		}, nil
+	})}
+
+	mirror := &config.GitHub{BaseURL: "https://gh-proxy.org/https://github.com"}
+	tag, err := fetchLatestVersion(client, mirror)
+	if err != nil || tag != "v1.0.14" {
+		t.Fatalf("fetchLatestVersion() = %q, %v; want v1.0.14, nil", tag, err)
+	}
+	if gotURL != "https://gh-proxy.org/https://api.github.com/repos/version-fox/vfox/releases/latest" {
+		t.Fatalf("request URL = %q", gotURL)
+	}
+	if len(gotAuth) != 0 {
+		t.Fatalf("Authorization = %v, want none", gotAuth)
+	}
+}
+
+func TestFetchLatestVersionRejectsInvalidTag(t *testing.T) {
+	for _, rawTag := range []string{"1.0.14", "v", "v1.0.14-rc1", "../v1.0.14"} {
+		client := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"tag_name":"` + rawTag + `"}`)),
+			}, nil
+		})}
+		if tag, err := fetchLatestVersion(client, nil); err == nil {
+			t.Fatalf("fetchLatestVersion(%q) = %q, nil; want error", rawTag, tag)
+		}
 	}
 }

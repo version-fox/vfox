@@ -55,7 +55,22 @@ vfox i <sdk-name>@<version>
 - `-a, --all`: 安装 .vfox.toml 中记录的所有 SDK 版本
 - `-y, --yes`: 直接安装，跳过确认提示
 - `-u, --use`: 安装完成后在当前 shell 会话中使用该版本，等同于 `vfox use`，因此同样需要已激活的 shell（`vfox activate`）。不能与 `--all` 同时使用，必须指定版本（不会进入选择器），每个 SDK 只能指定一个版本。
-- `--reinstall`: 用全新的副本替换已安装的版本，例如 SDK 在原地改动过自己之后（见 [Doctor](#doctor)）。版本号需与已安装的完全一致。通过 [`vfox link`](#link) 登记的版本不能重装。
+- `--reinstall`: 用全新的副本替换已安装的版本，例如 SDK 在原地改动过自己之后（见 [Doctor](#doctor)）。版本号需与已安装的完全一致。通过 [`vfox link`](#link) 登记的版本不能重装。用 `--as` 做出的副本会按它当初请求的版本、以原来的名字重装，而且只有当该请求仍解析到它当初安装的版本时才会重装。
+- `--as <name>`: 把该版本安装为同一版本的第二份副本，并使用这个名字，这样同一个版本可以安装多次。名字不能只由数字和点组成（例如 `3.12`、`3.12.7`），因为那会被当作版本号；也不能是该 SDK 的[别名](#alias)。不能与 `--all`、`--reinstall` 同时使用，且只能指定一个版本。下方的“命名副本”说明了具体用法。
+
+::: tip 命名副本
+`--as` 用于在已有某个版本的情况下再安装一份，例如一份 Python 3.12 用于 CUDA 开发，另一份用于数据库开发：
+
+```shell
+vfox install python@3.12
+vfox install python@3.12 --as 3.12-db
+vfox use python@3.12-db
+```
+
+`python@3.12` 仍然指原来的安装，`vfox list python` 会把副本显示在它所复制的版本旁边，形如 `3.12-db (3.12.7)`。副本按自己的名字使用、列出、设置别名和卸载，卸载副本不会影响它所复制的版本。名字的规则与 [`vfox link`](#link) 相同，但不能只由数字和点组成，也不能是该 SDK 的[别名](#alias)，并且不能已经被安装或链接。卸载正在使用的版本时，`vfox` 会切换到另一个版本的安装；只有在没有其他安装时才会切换到副本。
+
+名字只在创建它的那台机器上存在，因此使用了该名字的 `.vfox.toml`，在每台机器上都需要执行相同的 `vfox install ... --as`。
+:::
 
 ::: tip 自动安装
 你可以一次性安装多个 SDK，通过空格分隔。
@@ -148,6 +163,10 @@ vfox un <sdk-name>@<version>
 
 `version`: 具体版本号
 
+如果卸载的是全局版本，其余已安装版本中最新的一个会成为全局版本。只有没有其他版本时，才会使用 `install --as` 创建的副本。插件无法设置的版本会被跳过并给出警告；如果没有任何版本可以接替，则不会删除任何内容。如果它是唯一已安装的版本，则会取消全局版本设置。链接到被卸载版本目录中的版本也不能接替：它会失效，并会给出指明该版本的警告。如果它就是全局版本，则在切换或取消全局版本之前不会删除任何内容。失效版本的条目会保留，并由 [`vfox doctor`](#doctor) 报告。如果该版本的某些文件或指向它的全局链接无法删除，该版本仍视为已卸载，命令会失败并说明剩余的内容，下次卸载该版本时（无论它是否被重新安装过）会删除剩余的部分。
+
+如果无法读取全局配置（用户目录下的 `.vfox.toml`；如果 `~/.version-fox` 目录存在，用户目录就是它，否则是 `~/.vfox`），例如存在语法错误，则不会卸载任何 SDK 的任何版本，因为该文件可能指定了这个版本或链接到它目录中的版本。请修正或删除该文件后重试。
+
 ::: tip 通过 link 登记的版本
 卸载用 [`vfox link`](#link) 登记的版本，只会删除链接，它指向的 SDK 不会被动。
 :::
@@ -192,7 +211,7 @@ vfox link --detect [-y] <sdk-name>
 
 `sdk-name`: SDK 名称。需要已经添加了它的插件。
 
-`version`: 给这个 SDK 起的名字，原样使用，例如 `17.0.9`、`17-system`、`brew`。可以使用字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`。
+`version`: 给这个 SDK 起的名字，原样使用，例如 `17.0.9`、`17-system`、`brew`。可以使用字母、数字、`.`、`_`、`+` 和 `-`，不能是 `latest`，也不能是该 SDK 的[别名](#alias)。
 
 `path`: SDK 所在的目录，即包含 `bin` 的那一层。
 
@@ -245,7 +264,7 @@ vfox use java@j17
 别名保存在你的 `config.yaml` 中，只在命令行输入时解析：`use`、`uninstall`、`info`、`exec` 和 `doctor`。`vfox use -p java@j17` 写进 `.vfox.toml` 的是真实版本，所以没有这个别名的同事也能正常使用这个文件。
 :::
 
-已安装的同名版本永远优先于别名，因此 `alias set` 会拒绝这样的名字。卸载一个版本时，指向它的别名会一并删除。
+已安装的同名版本永远优先于别名，因此 `alias set` 会拒绝这样的名字。`vfox link` 和 `vfox install --as` 也会拒绝这样的名字，避免任何安装无声地遮住别名。卸载一个版本时，指向它的别名会一并删除。
 
 你输入的版本号开头的 `v`（`v20.1.0` 即 `20.1.0`）只有在没有任何已安装版本、也没有任何别名叫这个名字时才会被去掉。所以别名和用 [`vfox link`](#link) 登记的版本都可以以 `v` 开头。
 
@@ -270,6 +289,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | :------------------------ | :---- | :---------------------------------------------------------------------------------------------------------------- |
 | `path.shadowed`           | warn  | SDK 的某个命令没有被运行，因为 `PATH` 中更靠前的位置有同名的可执行文件（pnpm 装的 `node`、系统 JDK……）                |
 | `path.not-activated`      | error | 当前 shell 没有设置 `vfox activate`                                                                               |
+| `path.unusable`           | error | `vfox` 需要的目录（`~/.vfox/tmp`、`~/.vfox/sdks` 或当前工作目录）无法使用或创建                                   |
 | `sdk.drift`               | warn  | SDK 在安装之后被就地改动过（例如 `flutter upgrade`）。处理：`vfox install --reinstall <sdk>@<version>`               |
 | `sdk.link-dangling`       | error | 链接版本指向的目录不见了                                                                                          |
 | `sdk.payload-empty`       | error | 插件放进 `PATH` 的目录不存在，或里面没有命令                                                                      |
@@ -335,14 +355,20 @@ vfox upgrade
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK 名称
 
 `version`[可选]: 指定使用的版本。如不传，则使用当前作用域配置的版本。
 
-可以在 `--` 之前连续指定多个 SDK。它们会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
+只指定单个 SDK 且 `<command>` 及其参数中不包含 `--` 时可以省略 `--`，跟在 `<command>` 之后的标志（如 `--version`、`--help`）会直接透传给 `<command>`。`exec` 自身的前置标志（`--help`/`-h`/`-help` 与 `--debug`/`-debug`）必须放在 `<sdk-name>` 之前（`--debug`/`-debug` 也可放在 SDK 与 `<command>` 或 `--` 之间）；`-v`、`-V` 和 `--version` 属于根命令选项，如需查看 `vfox` 版本请运行 `vfox --version`。但无论是带 `--` 还是不带 `--` 的调用，末尾用于 Shell 补全探测的 `--generate-shell-completion` 都会由 `vfox` 拦截并返回空输出，不会运行 `<command>`；使用 `--` 的形式也不再将该探测参数交给目标命令响应。如果目标工具自身需要接收 `--generate-shell-completion` 参数，可通过 Shell 包装调用，例如：`vfox exec <sdk> sh -c '<tool> --generate-shell-completion'`。
+
+第一个 `--` 始终作为 SDK 列表与 `<command>` 之间的分隔符，其前方的所有参数都会按 SDK 解析。同时指定多个 SDK 时必须使用 `--` 分隔；如果 `<command>` 自身需要接收 `--`，请将 `--` 放在 `<command>` 之前（例如 `vfox exec nodejs@24.14.0 -- npm run build -- --watch`）。多个 SDK 会按从左到右的顺序合并；如果 PATH 或环境变量发生重叠，左边的 SDK 优先级更高。
 
 `command`: 要执行的命令
 
@@ -366,6 +392,12 @@ vfox x <sdk-name>[@<version>]... -- <command> [args...]
 vfox exec nodejs@24.14.0 -- npm install -g pnpm
 vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 ```
+
+:::
+
+::: warning Windows 批处理脚本（`.cmd` / `.bat`）
+
+在 Windows 上，当解析到的目标是批处理脚本（`.cmd` 或 `.bat`，例如 `npm.cmd`）时，`vfox exec` 会按 `cmd.exe` 规则为可执行文件路径及参数加引号，从而安全透传 `&`、`|`、`<`、`>`、`(`、`)`、`^` 和空格。但对于引号也无法阻止 `cmd.exe` 解析的字符（`%`、`!`、`"`、回车 `CR`、换行 `LF`、`NUL`），若出现在批处理路径或参数中会被拒绝执行。如需传递这些字符，可直接调用对应的 `.exe` 主程序（如 `node`）、直接执行入口脚本，或通过 `powershell` / `sh` 包装运行。
 
 :::
 

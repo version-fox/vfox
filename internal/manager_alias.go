@@ -76,6 +76,17 @@ func (m *Manager) ResolveVersionName(sdkName string, s sdk.Sdk, typed sdk.Versio
 	return m.ResolveAlias(sdkName, s, stripped)
 }
 
+// CheckNotAlias refuses a name the SDK has an alias for, when an installation is made
+// under a name of its own: a copy from install --as, or a link. An installed name wins
+// over an alias, so the alias would stop working without a word.
+func (m *Manager) CheckNotAlias(sdkName string, name sdk.Version) error {
+	sdkName = strings.ToLower(sdkName)
+	if target, ok := m.AliasesFor(sdkName)[string(name)]; ok {
+		return fmt.Errorf("%s is an alias of %s@%s: choose another name, or `vfox alias unset %s %s` removes the alias first", name, sdkName, target, sdkName, name)
+	}
+	return nil
+}
+
 // SetAlias names an installed version. The alias is stored in the user config.
 func (m *Manager) SetAlias(sdkName, alias string, version sdk.Version) error {
 	sdkName = strings.ToLower(sdkName)

@@ -34,6 +34,7 @@ type Config struct {
 	Cache             *Cache             `yaml:"cache"`
 	Gitignore         *Gitignore         `yaml:"gitignore"`
 	Diagnostics       *Diagnostics       `yaml:"diagnostics"`
+	GitHub            *GitHub            `yaml:"github"`
 	Path              *Path              `yaml:"path"`
 	// Aliases maps an SDK name to user-defined names for installed versions:
 	// aliases[sdk][alias] = version. They are resolved for command-line input
@@ -53,6 +54,7 @@ var (
 		Cache:             EmptyCache,
 		Gitignore:         EmptyGitignore,
 		Diagnostics:       EmptyDiagnostics,
+		GitHub:            emptyGitHub,
 		Path:              EmptyPath,
 	}
 )
@@ -87,7 +89,7 @@ func cloneAliases(aliases map[string]map[string]string) map[string]map[string]st
 // that vfox creates must not declare these with their defaults: the first run
 // would otherwise pin them for good and a shared VFOX_HOME could no longer
 // decide them. A new section of this kind belongs in this list.
-var setOnDemand = map[string]bool{"diagnostics": true, "path": true, "aliases": true}
+var setOnDemand = map[string]bool{"diagnostics": true, "path": true, "aliases": true, "github": true}
 
 // newFileContent is what a config file vfox creates holds: the defaults of every
 // section but the ones in setOnDemand.
@@ -146,6 +148,9 @@ func NewConfigWithPath(p string) (*Config, error) {
 	}
 	if config.Diagnostics == nil {
 		config.Diagnostics = EmptyDiagnostics
+	}
+	if config.GitHub == nil {
+		config.GitHub = emptyGitHub
 	}
 	if config.Path == nil {
 		config.Path = EmptyPath
@@ -225,6 +230,10 @@ func Merge(sharedConfig, userConfig *Config) *Config {
 
 	// Merge Diagnostics and Path: user overrides shared
 	result.Diagnostics = mergeDiagnostics(sharedConfig.Diagnostics, userConfig.Diagnostics)
+	result.GitHub = sharedConfig.GitHub
+	if userConfig.GitHub != nil && userConfig.GitHub != emptyGitHub {
+		result.GitHub = userConfig.GitHub
+	}
 	result.Path = mergePath(sharedConfig.Path, userConfig.Path)
 
 	// Merge Aliases: entries of both are kept, the user wins on a clash
@@ -262,6 +271,9 @@ func ensureDefaults(c *Config) *Config {
 	}
 	if c.Diagnostics == nil {
 		c.Diagnostics = EmptyDiagnostics
+	}
+	if c.GitHub == nil {
+		c.GitHub = emptyGitHub
 	}
 	if c.Path == nil {
 		c.Path = EmptyPath

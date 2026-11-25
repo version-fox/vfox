@@ -67,6 +67,7 @@ type Receipt struct {
 	SDK         string            `json:"sdk"`
 	Version     string            `json:"version"`
 	Requested   string            `json:"requested,omitempty"` // what the user asked for, e.g. "21" or "stable"
+	Resolved    string            `json:"resolved,omitempty"`  // a copy made under another name: the version the request resolved to
 	Origin      Origin            `json:"origin"`
 	Target      string            `json:"target,omitempty"` // linked: the directory the version points to
 	InstalledAt time.Time         `json:"installedAt"`
@@ -74,6 +75,12 @@ type Receipt struct {
 	Plugin      ReceiptPlugin     `json:"plugin"`
 	Sources     []ReceiptSource   `json:"sources,omitempty"`
 	Facts       map[string]string `json:"facts,omitempty"` // from the Fingerprint hook
+}
+
+// IsCopy reports whether the receipt is that of a copy made under another name:
+// only a copy records the version its request resolved to. A nil receipt is not.
+func (r *Receipt) IsCopy() bool {
+	return r != nil && r.Resolved != "" && r.Requested != ""
 }
 
 func receiptPath(packagePath string) string {

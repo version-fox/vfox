@@ -91,8 +91,23 @@ registry:
 
 - https://gitee.com/version-fox/vfox-plugins/raw/main/plugins
 - https://cdn.jsdelivr.net/gh/version-fox/vfox-plugins/plugins
-- https://rawcdn.githack.com/version-fox/vfox-plugins/plugins
+- https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
   :::
+
+插件清单由注册表提供。升级和下载清单中的 GitHub 归档时使用 GitHub 镜像。
+
+```sh
+vfox config registry.address https://rawcdn.githack.com/version-fox/vfox-plugins/main/plugins
+vfox config github.baseUrl https://gh-proxy.org/https://github.com
+```
+
+只有 `https://github.com`、`http://github.com`，以及以 `/https://github.com` 或 `/http://github.com` 结尾的路径代理地址会将发布 API 重写为 `api.github.com`；仅替换域名的镜像（如 `https://kkgithub.com`）会原样用于发布 API，因此必须在自身域名下提供 GitHub API。
+
+如果 sudo 使用 root 的主目录，请为 root 配置镜像：`sudo vfox config github.baseUrl https://gh-proxy.org/https://github.com`。
+
+::: warning
+`github.baseUrl` 决定了 `vfox upgrade` 下载新版本二进制文件以及下载插件的地址。下载的归档文件不会验证校验和或签名，且同时支持 `http://` 和 `https://`，因此请只将其设置为你信任的镜像源；如果在共享的 `config.yaml` 中设置了该值，它会对该 `VFOX_HOME` 的所有用户生效。
+:::
 
 ## 缓存
 

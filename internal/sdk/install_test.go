@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,10 +30,14 @@ import (
 
 type installTestPlugin struct {
 	plugin.Plugin
+	preInstall  func(*plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error)
 	postInstall func(*plugin.PostInstallHookCtx) error
 }
 
 func (p *installTestPlugin) PreInstall(ctx *plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+	if p.preInstall != nil {
+		return p.preInstall(ctx)
+	}
 	return &plugin.PreInstallHookResult{PreInstallPackageItem: &plugin.PreInstallPackageItem{Version: ctx.Version}}, nil
 }
 
@@ -91,6 +96,30 @@ func TestInstallRejectsIncompleteRuntimes(t *testing.T) {
 				t.Errorf("GetRuntimePackage error = %v, want installed %v", err, tc.want)
 			}
 		})
+	}
+}
+
+// A PreInstall result without a version (`return {}`) is a plugin error: the
+// install must fail before anything is written, not succeed as version "".
+func TestInstallRejectsAPreInstallResultWithoutAVersion(t *testing.T) {
+	s := newInstallTestSDK(t.TempDir(), nil)
+	s.plugin.Plugin = &installTestPlugin{preInstall: func(*plugin.PreInstallHookCtx) (*plugin.PreInstallHookResult, error) {
+		return &plugin.PreInstallHookResult{PreInstallPackageItem: &plugin.PreInstallPackageItem{}}, nil
+	}}
+
+	err := s.Install("1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "no version number provided") {
+		t.Fatalf("Install = %v, want the missing version reported", err)
+	}
+	entries, readErr := os.ReadDir(s.InstallPath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	for _, entry := range entries {
+		t.Errorf("a failed install left %s behind", entry.Name())
+	}
+	if installed := s.InstalledList(); len(installed) != 0 {
+		t.Errorf("InstalledList = %v, want nothing", installed)
 	}
 }
 

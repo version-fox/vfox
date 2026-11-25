@@ -53,7 +53,22 @@ vfox i <sdk-name>@<version>
 - `-a, --all`: Install all SDK versions recorded in .vfox.toml
 - `-y, --yes`: Quick installation, skip interactive prompts​
 - `-u, --use`: Use the installed version in the current shell session, as `vfox use` would, so it needs an activated shell (`vfox activate`) the same way. Cannot be combined with `--all`, takes a version (no picker) and one version per SDK.
-- `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled.
+- `--reinstall`: Replace an installed version with a fresh copy, for example after the SDK modified itself in place (see [Doctor](#doctor)). Give the version exactly as it is installed. A version registered with [`vfox link`](#link) cannot be reinstalled. A copy made with `--as` is reinstalled from the version it was asked for, under its own name, and only if that still resolves to the version it was installed as.
+- `--as <name>`: Install the version as a second copy under this name, so that the same version can be installed more than once. The name cannot be only digits and dots, such as `3.12` or `3.12.7`, since that reads as a version number, and it cannot be an [alias](#alias) of the SDK. Cannot be combined with `--all` or `--reinstall`, and takes one version. The note on named copies below explains it.
+
+::: tip Named copies
+`--as` gives a second installation of a version you already have, for example one Python 3.12 for CUDA work and another for database work:
+
+```shell
+vfox install python@3.12
+vfox install python@3.12 --as 3.12-db
+vfox use python@3.12-db
+```
+
+`python@3.12` still means the plain installation, and `vfox list python` shows the copy next to the version it copies, as `3.12-db (3.12.7)`. A copy is used, listed, aliased and uninstalled by its own name, and uninstalling it leaves the version it was copied from alone. The name follows the rules of [`vfox link`](#link), with one addition: it cannot be only digits and dots. It must not be installed or linked already, and it cannot be an alias of the SDK. When the version in use is uninstalled, `vfox` switches to another installation of a version, and to a copy only when no other installation is left.
+
+A name exists only on the machine that made it, so a `.vfox.toml` that uses it needs the same `vfox install ... --as` on each machine.
+:::
 
 ::: tip
 You can install multiple SDKs at the same time by separating them with space.
@@ -147,6 +162,10 @@ vfox un <sdk-name>@<version>
 
 `version`: The specific version number
 
+If the version is the global version, the newest other installed version becomes the global version. Copies made with `install --as` are used only when nothing else is left. A version the plugin cannot set up is skipped with a warning, and if no version can take over, nothing is removed. When it was the only installed version, the global version is unset. A version that is linked into the directory of the one being uninstalled cannot take over either: it stops working, and a warning names it. If it is the global version, nothing is removed until the global version is switched or unset. The entry of a version that stops working is kept, and [`vfox doctor`](#doctor) reports it. If some files of the version, or global links to it, cannot be deleted, the version is uninstalled all the same, the command fails and says what is left, and the next uninstall of that version deletes the rest, whether it was installed again or not.
+
+If the global config (`.vfox.toml` in the user root, which is `~/.version-fox` if that directory exists, otherwise `~/.vfox`) cannot be read, for example because of a syntax error, no version of any SDK is uninstalled, as the file may name that version or one linked into it. Correct the file, or delete it, and try again.
+
 ::: tip Linked versions
 Uninstalling a version registered with [`vfox link`](#link) removes the link only. The SDK it points to is left untouched.
 :::
@@ -191,7 +210,7 @@ vfox link --detect [-y] <sdk-name>
 
 `sdk-name`: SDK name. Its plugin must be added already.
 
-`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed.
+`version`: The name to give the SDK. It is used exactly as written, for example `17.0.9`, `17-system` or `brew`. Use letters, digits, `.`, `_`, `+` and `-`; `latest` is not allowed, and neither is the name of an [alias](#alias) of the SDK.
 
 `path`: The directory of the SDK, the one that holds `bin`.
 
@@ -244,7 +263,7 @@ vfox use java@j17
 Aliases are stored in your `config.yaml` and are resolved only for what you type on the command line: `use`, `uninstall`, `info`, `exec` and `doctor`. `vfox use -p java@j17` writes the real version into `.vfox.toml`, so the file keeps working for teammates who do not have the alias.
 :::
 
-A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. Uninstalling a version removes the aliases that name it.
+A version that is installed under the same name always wins over an alias, so `alias set` refuses such a name. `vfox link` and `vfox install --as` refuse such a name too, so that no installation hides an alias without a word. Uninstalling a version removes the aliases that name it.
 
 A leading `v` in a version you type (`v20.1.0` for `20.1.0`) is dropped only when no installed version and no alias is called what you typed. So an alias, like a [linked](#link) version, may start with a `v`.
 
@@ -269,6 +288,7 @@ vfox doctor [options] [<sdk-name>[@<version>]]
 | :------------------------ | :------ | :----------------------------------------------------------------------------------------------------------------------- |
 | `path.shadowed`           | warn    | A command of the SDK is not the one that runs, because another executable sits earlier in `PATH` (a pnpm-installed `node`, a system JDK …) |
 | `path.not-activated`      | error   | `vfox activate` is not set up in this shell                                                                              |
+| `path.unusable`           | error   | A directory `vfox` needs (`~/.vfox/tmp`, `~/.vfox/sdks`, or the working directory) cannot be used or created             |
 | `sdk.drift`               | warn    | The SDK was modified in place since it was installed (for example `flutter upgrade`). Fix: `vfox install --reinstall <sdk>@<version>` |
 | `sdk.link-dangling`       | error   | The directory a linked version points to is gone                                                                         |
 | `sdk.payload-empty`       | error   | The directories the plugin puts on `PATH` do not exist or hold no command                                                |
@@ -333,14 +353,20 @@ Execute a command in a vfox managed environment.
 ```shell
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]
 
+vfox exec <sdk-name>[@<version>] <command> [args...]
+
 vfox x <sdk-name>[@<version>]... -- <command> [args...]
+
+vfox x <sdk-name>[@<version>] <command> [args...]
 ```
 
 `sdk-name`: SDK name
 
 `version`[optional]: Specify the version to use. If not provided, uses the version configured in the current scope.
 
-You can specify multiple SDKs before `--`. They are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
+For a single SDK, `--` is optional unless `<command>` or its arguments contain `--`: flags after `<command>` (such as `--version` or `--help`) are passed directly to `<command>`, except a trailing `--generate-shell-completion` probe. Any `vfox` flags for `exec` itself (`--help`/`-h`/`-help` and `--debug`/`-debug`) must come before `<sdk-name>` (`--debug`/`-debug` are also accepted right after the SDK specs and before `<command>` or `--`); `-v`, `-V`, and `--version` are root flags—use `vfox --version` to print the `vfox` version. In both the `--` and non-`--` forms, `vfox` intercepts a trailing `--generate-shell-completion` with empty output instead of running `<command>`, so the `--` form no longer lets `<command>` answer completion probes. A tool that itself needs the `--generate-shell-completion` flag can be invoked through a shell, for example `vfox exec <sdk> sh -c '<tool> --generate-shell-completion'`.
+
+The first `--` always separates SDK specs from `<command>`, so anything before the first `--` is read as an SDK spec. Multiple SDKs require `--` before `<command>`, and if `<command>` itself takes `--`, place `--` before `<command>` (for example, `vfox exec nodejs@24.14.0 -- npm run build -- --watch`). Multiple SDKs are merged from left to right, and the leftmost SDK has higher priority when PATH or environment variables overlap.
 
 `command`: The command to execute
 
@@ -364,6 +390,12 @@ For Docker, CI/CD, and other non-interactive shells, prefer `vfox exec` instead 
 vfox exec nodejs@24.14.0 -- npm install -g pnpm
 vfox exec nodejs@24.14.0 -- bash -lc 'node -v && npm -v'
 ```
+
+:::
+
+::: warning Windows Batch Shims (`.cmd` / `.bat`)
+
+On Windows, when the resolved target is a batch file (`.cmd` or `.bat`, such as `npm.cmd`), `vfox exec` quotes paths and arguments for `cmd.exe` so characters like `&`, `|`, `<`, `>`, `(`, `)`, `^`, and spaces pass through safely. Paths or arguments containing characters that `cmd.exe` quoting cannot protect (`%`, `!`, `"`, `CR`, `LF`, `NUL`) are refused before launching. To pass those characters, invoke the underlying `.exe` directly (for example `node`), run the script through `powershell` or `sh`, or call the underlying CLI entry script directly.
 
 :::
 

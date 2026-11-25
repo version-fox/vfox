@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	stdpath "path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -70,6 +72,7 @@ type Manager struct {
 	RuntimeEnvContext *env.RuntimeEnvContext // runtime environment context
 	openSdks          map[string]sdk.Sdk
 	mu                sync.RWMutex // protects openSdks map
+	workingDirErr     error
 }
 
 // LookupSdk lookup sdk by name
@@ -79,6 +82,10 @@ func (m *Manager) LookupSdk(name string) (sdk.Sdk, error) {
 
 	// Normalize the name for cache lookup
 	normalizedName := strings.ToLower(name)
+	if !plugin.IsValidName(normalizedName) {
+		logger.Debugf("Invalid SDK name: %q\n", name)
+		return nil, fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", name)
+	}
 
 	// Check cache with read lock
 	m.mu.RLock()
@@ -422,27 +429,73 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 		logger.Debugf("Plugin requires vfox >= %s, current version: %s\n", plugin.MinRuntimeVersion, RuntimeVersion)
 		return nil, fmt.Errorf("check failed: this plugin is not compatible with current vfox (>= %s), please upgrade vfox version to latest", pterm.LightRed(plugin.MinRuntimeVersion))
 	}
+	plugin.DownloadUrl = m.RuntimeEnvContext.UserConfig.GitHub.DownloadURL(plugin.DownloadUrl)
 	return &plugin, nil
+}
+
+// pluginSourceExt returns the .lua or .zip extension from an HTTP(S) URL's
+// parsed path when present (so query parameters like ?raw=true do not break
+// installs), and otherwise falls back to filepath.Ext to preserve existing
+// query-encoded filename handling.
+func pluginSourceExt(source string) string {
+	if strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "http://") {
+		if u, err := url.Parse(source); err == nil {
+			normalized := strings.ReplaceAll(u.Path, "\\", "/")
+			if ext := stdpath.Ext(normalized); ext == ".lua" || ext == ".zip" {
+				return ext
+			}
+		}
+	}
+	return filepath.Ext(source)
 }
 
 // pluginFileName derives the local file name of a downloaded plugin from the
 // path of its URL, so a query is never printed or written to disk. The last
-// element of the URL path is used only when it ends with the extension the
-// whole URL was accepted by; otherwise the name falls back to "plugin" plus
-// that extension, so NewDecompressor always sees the extension it needs.
-// filepath.Base splits at the OS separator, so a backslash in the URL path
-// cannot move the download out of the plugin directory on Windows.
+// element of the URL path is used only when it ends with the resolved source
+// extension and contains no characters unsafe for filenames; otherwise the name
+// falls back to "plugin" plus a safe extension.
 func pluginFileName(downloadUrl string) string {
-	ext := filepath.Ext(downloadUrl)
+	ext := pluginSourceExt(downloadUrl)
 	if u, err := url.Parse(downloadUrl); err == nil {
-		if name := filepath.Base(u.Path); name != "." && name != "/" && strings.HasSuffix(name, ext) {
+		normalized := strings.ReplaceAll(u.Path, "\\", "/")
+		if name := stdpath.Base(normalized); isSafePluginFileName(name) && strings.HasSuffix(name, ext) {
 			return name
 		}
+	}
+	if !isSafePluginFileName("plugin" + ext) {
+		return "plugin"
 	}
 	return "plugin" + ext
 }
 
-// downloadPlugin download plugin from downloadUrl to plugin home directory.
+func isSafePluginFileName(name string) bool {
+	if name == "" || name == "." || name == ".." || name == "/" || filepath.VolumeName(name) != "" {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f || strings.ContainsRune(`<>:"|?*`, r) {
+			return false
+		}
+	}
+	base, _, _ := strings.Cut(name, ".")
+	return !isWindowsReservedDeviceName(base)
+}
+
+func isWindowsReservedDeviceName(base string) bool {
+	switch strings.ToUpper(base) {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"COM\u00b9", "COM\u00b2", "COM\u00b3",
+		"LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+		"LPT\u00b9", "LPT\u00b2", "LPT\u00b3":
+		return true
+	default:
+		return false
+	}
+}
+
+// downloadPlugin downloads a plugin archive from downloadUrl into a private
+// vfox-dl-* subdirectory under User.Temp.
 func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	logger.Debugf("Downloading plugin from: %s\n", util.RedactSourceURL(downloadUrl))
 
@@ -484,22 +537,97 @@ func (m *Manager) downloadPlugin(downloadUrl string) (string, error) {
 	}
 
 	fileName := pluginFileName(downloadUrl)
-	path := filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, fileName)
+	tempRoot := m.RuntimeEnvContext.PathMeta.User.Temp
+	if tempRoot == "" {
+		tempRoot = os.TempDir()
+	}
+	if err := os.MkdirAll(tempRoot, pathmeta.ReadWriteAuth); err != nil {
+		return "", err
+	}
+	dlDir, err := os.MkdirTemp(tempRoot, "vfox-dl-")
+	if err != nil {
+		return "", err
+	}
+	keepFile := false
+	defer func() {
+		if !keepFile {
+			// Best-effort cleanup of the partial download dir; any leftover
+			// vfox-dl-* entry stays under User.Temp until CleanTmp sweeps
+			// directories older than 24 hours.
+			_ = os.RemoveAll(dlDir)
+		}
+	}()
+	path := filepath.Join(dlDir, fileName)
 	logger.Debugf("Saving plugin to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Debugf("Failed to create file: %v\n", err)
 		return "", err
 	}
-	defer f.Close()
 	fmt.Printf("Downloading %s... \n", fileName)
 	_, err = io.Copy(f, resp.Body)
+	closeErr := f.Close()
 	if err != nil {
 		logger.Debugf("Failed to write plugin file: %v\n", err)
 		return "", err
 	}
+	if closeErr != nil {
+		logger.Debugf("Failed to close plugin file: %v\n", closeErr)
+		return "", closeErr
+	}
+	keepFile = true
 	logger.Debugf("Plugin downloaded successfully: %s\n", path)
 	return path, nil
+}
+
+// NormalizePluginName returns the installed plugin name for an add argument,
+// stripping any legacy "<category>/" prefix.
+func NormalizePluginName(name string) string {
+	if strings.Contains(name, "/") {
+		return strings.Split(name, "/")[1]
+	}
+	return name
+}
+
+func ensureWritableDir(dir string) error {
+	if err := os.MkdirAll(dir, pathmeta.ReadWriteAuth); err != nil {
+		return err
+	}
+	probe, err := os.CreateTemp(dir, ".vfox-write-check-*")
+	if err != nil {
+		return err
+	}
+	probePath := probe.Name()
+	if err := probe.Close(); err != nil {
+		if removeErr := os.Remove(probePath); removeErr != nil && !os.IsNotExist(removeErr) {
+			logger.Debugf("remove plugin directory probe %s failed: %v\n", probePath, removeErr)
+		}
+		return err
+	}
+	if err := os.Remove(probePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func unwrapPathError(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
+	}
+	return err
+}
+
+func preparePluginDirError(pluginsDir string, err error) error {
+	reason := unwrapPathError(err)
+	verb := "failed"
+	if errors.Is(err, fs.ErrPermission) {
+		verb = "is not writable"
+	}
+	if vfoxHome := env.GetVfoxHome(); vfoxHome != "" {
+		return fmt.Errorf("prepare plugin directory %s (%s=%s) %s: %w", pluginsDir, env.HomeFromEnv, vfoxHome, verb, reason)
+	}
+	return fmt.Errorf("prepare plugin directory %s %s: %w", pluginsDir, verb, reason)
 }
 
 // Add a plugin to plugin home directory
@@ -516,24 +644,40 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	logger.Debugf("Adding plugin: name=%s, url=%s, alias=%s\n", pluginName, util.RedactSourceURL(url), alias)
 
 	// For compatibility with older versions of plugin names <category>/<plugin-name>
-	if strings.Contains(pluginName, "/") {
-		pluginName = strings.Split(pluginName, "/")[1]
+	if normalized := NormalizePluginName(pluginName); normalized != pluginName {
+		if normalized == "" {
+			return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pluginName)
+		}
+		pluginName = normalized
 		logger.Debugf("Normalized plugin name to: %s\n", pluginName)
 	}
 	pluginPath := url
 	pname := pluginName
 	if len(alias) > 0 {
+		if !plugin.IsValidName(alias) {
+			return fmt.Errorf("invalid plugin alias %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", alias)
+		}
 		pname = alias
 		logger.Debugf("Using alias: %s\n", alias)
+	} else if pname != "" && !plugin.IsValidName(pname) {
+		return fmt.Errorf("invalid plugin name %q: name must start with a letter and contain only letters, digits, underscores, or hyphens", pname)
 	}
 	var installPath string
-	// first quick check.
+	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
+	// When the target plugin name is known up front, check existence and plugin/
+	// writability before downloading. Unnamed sources download into User.Temp first
+	// so existing-plugin errors take precedence over read-only plugin/ probes.
+	dirChecked := false
 	if pname != "" {
-		installPath = filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, pname)
+		installPath = filepath.Join(pluginsDir, pname)
 		if util.FileExists(installPath) {
 			logger.Debugf("Plugin %s already exists at: %s\n", pname, installPath)
 			return fmt.Errorf("plugin named %s already exists", pname)
 		}
+		if err := ensureWritableDir(pluginsDir); err != nil {
+			return preparePluginDirError(pluginsDir, err)
+		}
+		dirChecked = true
 	}
 	// official plugin
 	if len(url) == 0 {
@@ -559,10 +703,20 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 	// check plugin exist again as the plugin may be from custom source without plugin name and alias.
 	if pname == "" {
 		pname = tempPlugin.Name
-		installPath = filepath.Join(m.RuntimeEnvContext.PathMeta.Shared.Plugins, pname)
+		installPath = filepath.Join(pluginsDir, pname)
 		logger.Debugf("No plugin name provided, use %s as plugin name, installPath: %s\n", pname, installPath)
 		if util.FileExists(installPath) {
 			return fmt.Errorf("plugin named %s already exists", pname)
+		}
+	}
+	if !dirChecked {
+		if err := ensureWritableDir(pluginsDir); err != nil {
+			return preparePluginDirError(pluginsDir, err)
+		}
+	}
+	if info, statErr := os.Stat(pluginsDir); statErr == nil {
+		if chmodErr := os.Chmod(tempPlugin.InstalledPath, info.Mode().Perm()); chmodErr != nil {
+			logger.Debugf("Failed to set directory permissions %v on %s: %v\n", info.Mode().Perm(), tempPlugin.InstalledPath, chmodErr)
 		}
 	}
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
@@ -605,11 +759,11 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 	logger.Debugf("Installing plugin to temp from: %s\n", util.RedactSourceURL(path))
 
-	ext := filepath.Ext(path)
+	ext := pluginSourceExt(path)
 	if ext != ".lua" && ext != ".zip" {
 		// Print the extension of the redacted path: a source URL can carry
 		// credentials or a query token that the message must not echo.
-		shown := filepath.Ext(util.RedactSourceURL(path))
+		shown := pluginSourceExt(util.RedactSourceURL(path))
 		logger.Debugf("Unsupported plugin type: %s\n", shown)
 		return nil, fmt.Errorf("unsupported %s type wrapper to install, only support .lua or .zip", shown)
 	}
@@ -623,7 +777,10 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 		}
 		localPath = pluginPath
 		defer func() {
-			_ = os.Remove(localPath)
+			// Best-effort cleanup of the vfox-dl-* staging dir; if removal
+			// fails, the archive stays in User.Temp until CleanTmp sweeps
+			// entries older than 24 hours.
+			_ = os.RemoveAll(filepath.Dir(localPath))
 		}()
 	}
 	success := false
@@ -638,11 +795,11 @@ func (m *Manager) installPluginToTemp(path string) (*plugin.Wrapper, error) {
 			_ = os.RemoveAll(tempInstallPath)
 		}
 	}()
-	// make a directory to store the wrapper and rename the wrapper file to main.lua
+	// make a directory to store the wrapper and copy the wrapper file to main.lua
 	if ext == ".lua" {
-		logger.Debugf("Moving wrapper %s to %s \n", localPath, tempInstallPath)
-		if err = os.Rename(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
-			logger.Debugf("Failed to move lua plugin: %v\n", err)
+		logger.Debugf("Copying wrapper %s to %s \n", localPath, tempInstallPath)
+		if err = util.CopyFile(localPath, filepath.Join(tempInstallPath, "main.lua")); err != nil {
+			logger.Debugf("Failed to copy lua plugin: %v\n", err)
 			return nil, fmt.Errorf("install wrapper error: %w", err)
 		}
 	} else {
@@ -721,8 +878,18 @@ func (m *Manager) CleanTmp() {
 
 	dir, err := os.ReadDir(m.RuntimeEnvContext.PathMeta.User.Temp)
 	if err == nil {
+		const dlTmpPrefix = "vfox-dl-"
+		cutoff := time.Now().Add(-24 * time.Hour)
 		for _, file := range dir {
 			if !file.IsDir() {
+				continue
+			}
+			if strings.HasPrefix(file.Name(), dlTmpPrefix) {
+				if info, infoErr := file.Info(); infoErr == nil && info.ModTime().Before(cutoff) {
+					// Best-effort sweep of stale download staging dirs; entries locked
+					// by another process stay under User.Temp for the next daily CleanTmp pass.
+					_ = os.RemoveAll(filepath.Join(m.RuntimeEnvContext.PathMeta.User.Temp, file.Name()))
+				}
 				continue
 			}
 			dateStr, pid, ok := strings.Cut(file.Name(), "-")
@@ -823,11 +990,8 @@ func NewSdkManager() (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user home dir error: %w", err)
 	}
-	currentDir := getWorkingDirectory()
-	meta, err := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
-	if err != nil {
-		return nil, fmt.Errorf("init path meta failed: %w", err)
-	}
+	currentDir, wdErr := getWorkingDirectory()
+	meta := pathmeta.NewPathMeta(userHomeDir, vfoxHomeDir, currentDir, env.GetPid())
 
 	// Load config with hierarchy: SharedRoot (VFOX_HOME) > User Home
 	// Shared config has higher priority and overrides user config
@@ -853,16 +1017,20 @@ func NewSdkManager() (*Manager, error) {
 			PathMeta:          meta,
 			RuntimeVersion:    RuntimeVersion,
 		},
-		openSdks: make(map[string]sdk.Sdk),
+		openSdks:      make(map[string]sdk.Sdk),
+		workingDirErr: wdErr,
 		// mu is intentionally zero-initialized (Go's zero-value mutex is ready to use)
 	}, nil
 }
 
-func getWorkingDirectory() string {
-	wd, err := os.Getwd()
+// Getwd resolves the working directory; tests override it to simulate lookup failures.
+var Getwd = os.Getwd
+
+func getWorkingDirectory() (string, error) {
+	wd, err := Getwd()
 	if err != nil {
-		logger.Errorf("get current working directory failed: %v", err)
-		return ""
+		logger.Debugf("get current working directory failed: %v\n", err)
+		return "", err
 	}
-	return wd
+	return wd, nil
 }

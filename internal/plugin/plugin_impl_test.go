@@ -1,6 +1,10 @@
 package plugin_test
 
 import (
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -461,6 +465,97 @@ func testHookFunc(t *testing.T, factory func() (*internal.Manager, *plugin.Wrapp
 					t.Errorf("expected sdk sort %v", sdks)
 				}
 			}
+		}
+	})
+}
+
+type errWriter struct{ err error }
+
+func (w errWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestExecRedirectStdioCloseRefusalErrorsAndWriteFailures(t *testing.T) {
+	runPreInstall := func(t *testing.T, dir, luaSrc string, writer func() io.Writer) error {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, "main.lua"), []byte(luaSrc), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if writer != nil {
+			restore := plugin.RedirectStdIO(writer)
+			defer restore()
+		}
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		t.Setenv("VFOX_HOME", home)
+		m, err := internal.NewSdkManager()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer m.Close()
+
+		plug, err := plugin.NewLuaPlugin(dir, m.RuntimeEnvContext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = plug.PreInstall(&plugin.PreInstallHookCtx{Version: "1.0.0"})
+		return err
+	}
+
+	t.Run("ordinary closed file error matches unredirected VM", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "out.txt")
+		escapedPath := strings.ReplaceAll(target, `\`, `\\`)
+		luaSrc := `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:PreInstall(ctx)
+  local f = assert(io.open("` + escapedPath + `", "w"))
+  f:close()
+  f:write("x")
+  return {version=ctx.version}
+end
+`
+		baselineErr := runPreInstall(t, dir, luaSrc, nil)
+		if baselineErr == nil {
+			t.Fatal("expected baseline PreInstall error on closed file, got nil")
+		}
+		redirectedErr := runPreInstall(t, dir, luaSrc, func() io.Writer { return io.Discard })
+		if redirectedErr == nil {
+			t.Fatal("expected redirected PreInstall error on closed file, got nil")
+		}
+		if redirectedErr.Error() != baselineErr.Error() {
+			t.Fatalf("redirected error mismatch:\ngot:\n%s\nwant:\n%s", redirectedErr.Error(), baselineErr.Error())
+		}
+		if strings.Contains(redirectedErr.Error(), "(anonymous)") {
+			t.Fatalf("redirected error lost method name: %s", redirectedErr.Error())
+		}
+		if count := strings.Count(redirectedErr.Error(), "stack traceback:"); count != 1 {
+			t.Fatalf("expected 1 stack traceback, got %d:\n%s", count, redirectedErr.Error())
+		}
+	})
+
+	t.Run("write failure returns nil msg 1 without raising and close reports stream name", func(t *testing.T) {
+		luaSrc := `PLUGIN = {name="alpha", version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:PreInstall(ctx)
+  local ok1, msg1, code1 = io.write("a")
+  assert(ok1 == nil and type(msg1) == "string" and string.find(msg1, "disk full") ~= nil and code1 == 1)
+  local ok2, msg2, code2 = io.stderr:write("b")
+  assert(ok2 == nil and type(msg2) == "string" and string.find(msg2, "disk full") ~= nil and code2 == 1)
+  print("should not raise")
+  local cin, min = io.stdin:close()
+  assert(cin == nil and min == "cannot close standard input")
+  local cout, mout = io.stdout:close()
+  assert(cout == nil and mout == "cannot close standard output")
+  local cerr, merr = io.stderr:close()
+  assert(cerr == nil and merr == "cannot close standard error")
+  local cdef, mdef = io.close()
+  assert(cdef == nil and mdef == "cannot close standard output")
+  local cout2, mout2 = io.output():close()
+  assert(cout2 == nil and mout2 == "cannot close standard output")
+  return {version=ctx.version}
+end
+`
+		err := runPreInstall(t, t.TempDir(), luaSrc, func() io.Writer { return errWriter{err: errors.New("disk full")} })
+		if err != nil {
+			t.Fatalf("PreInstall failed: %v", err)
 		}
 	})
 }

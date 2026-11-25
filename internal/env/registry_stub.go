@@ -2,12 +2,12 @@
 
 package env
 
-// ApplyEnvsToRegistry is a no-op outside Windows.
-func ApplyEnvsToRegistry(envs *Envs) error {
+// applyEnvsToRegistry is a no-op outside Windows.
+func applyEnvsToRegistry(envs *Envs) error {
 	return nil
 }
 
-// RemoveEnvsFromRegistry is a no-op outside Windows.
-func RemoveEnvsFromRegistry(envs *Envs) error {
+// removeEnvsFromRegistry is a no-op outside Windows.
+func removeEnvsFromRegistry(envs *Envs) error {
 	return nil
 }
