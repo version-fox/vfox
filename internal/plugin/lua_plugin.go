@@ -264,6 +264,9 @@ func CreateLuaPlugin(pluginDirPath string, envCtx *env.RuntimeEnvContext) (*LuaP
 		vm.Close()
 		return nil, nil, err
 	}
+	if writer := currentExecStdioWriter(); writer != nil {
+		redirectLuaIO(vm.Instance, writer, false)
+	}
 	p, metadata, err := loadLuaPlugin(vm, pluginDirPath, RuntimeInfo{
 		OsType: string(util.GetOSType()), ArchType: string(util.GetArchType()),
 		Version: envCtx.RuntimeVersion, PluginDirPath: pluginDirPath,

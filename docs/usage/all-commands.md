@@ -3,7 +3,7 @@
 ```shell
 vfox - vfox is a tool for runtime version management.
 vfox available List all available plugins
-vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from official repository or custom source, --alias` and `--source` are not supported when adding multiple plugins.
+vfox add [--alias <sdk-name> --source <url/path> ] <plugin-name>  Add a plugin or plugins from official repository or custom source; `--alias` and `--source` are not supported when adding multiple plugins, and `add` exits non-zero when any plugin fails.
 vfox remove <sdk-name>          Remove a plugin
 vfox update [<sdk-name> | --all] Update a specified or all plugin(s)
 vfox info <sdk-name>[@<version>] [options]  Show plugin info or SDK path with optional formatting
@@ -16,6 +16,7 @@ vfox doctor [<sdk-name>[@<version>]] Check vfox and the installed SDKs for probl
 vfox use [--global --project --session] <sdk-name>[@<version>]   Use the specified version of SDK for different scope
 vfox unuse [--global --project --session] <sdk-name>   Unset the version of SDK from specified scope
 vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command in vfox managed environment
+vfox exec <sdk-name>[@<version>] <command> [args...]         Execute a command in vfox managed environment for a single SDK
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox include-path <sdk-name>[@<version>]  Show the include directory of an SDK version, as its plugin reports it

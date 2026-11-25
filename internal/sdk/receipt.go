@@ -77,6 +77,12 @@ type Receipt struct {
 	Facts       map[string]string `json:"facts,omitempty"` // from the Fingerprint hook
 }
 
+// IsCopy reports whether the receipt is that of a copy made under another name:
+// only a copy records the version its request resolved to. A nil receipt is not.
+func (r *Receipt) IsCopy() bool {
+	return r != nil && r.Resolved != "" && r.Requested != ""
+}
+
 func receiptPath(packagePath string) string {
 	return filepath.Join(packagePath, receiptFilename)
 }

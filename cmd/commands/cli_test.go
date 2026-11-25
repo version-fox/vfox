@@ -45,6 +45,17 @@ func TestCLIProcess(t *testing.T) {
 	if os.Getenv("VFOX_TEST_CLI") != "1" {
 		return
 	}
+	if goneDir := os.Getenv("VFOX_TEST_DELETED_CWD"); goneDir != "" {
+		_ = os.Unsetenv("PWD")
+		if err := os.Chdir(goneDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := os.Remove(goneDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	separator := slices.Index(os.Args, "--")
 	if separator < 0 {
 		os.Exit(2)
@@ -66,7 +77,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Alias, Config, Current, Doctor, Env, IncludePath, Info, Install, LibPath, Link, List, Uninstall, Use,
+	Activate, Add, Alias, Config, Current, Doctor, Env, Exec, IncludePath, Info, Install, LibPath, Link, List, Uninstall, Unuse, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -141,6 +152,15 @@ func newCLIFixture(t *testing.T, splitShared bool) *cliFixture {
 	if runtime.GOOS == "windows" && os.Getenv("VFOX_TEST_WINDOWS_REGISTRY") != "1" {
 		t.Skip("these tests change the user PATH in the Windows registry: set VFOX_TEST_WINDOWS_REGISTRY=1 on a runner or VM that is thrown away (CI does)")
 	}
+	return newCLIFixtureWithoutRegistryGuard(t, splitShared)
+}
+
+// newCLIFixtureWithoutRegistryGuard sets up a vfox home inside t.TempDir() for
+// commands (such as add, env, and activate) that never touch global machine
+// state such as the Windows registry; callers that change global SDK state must
+// use newCLIFixture so Windows runs guard the registry.
+func newCLIFixtureWithoutRegistryGuard(t *testing.T, splitShared bool) *cliFixture {
+	t.Helper()
 	root := t.TempDir()
 	if runtime.GOOS == "windows" {
 		// TEMP can name the user's directory by its short name (RUNNER~1) while
