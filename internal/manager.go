@@ -352,11 +352,11 @@ func (m *Manager) Update(pluginName string) error {
 			_ = os.Rename(backupPath, sdkMetadata.PluginInstalledPath)
 		}
 	}()
-	m.matchPluginsDirMode(tempPlugin.InstalledPath)
 	logger.Debugf("Moving updated plugin from %s to %s\n", tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath)
 	if err = util.MovePath(tempPlugin.InstalledPath, sdkMetadata.PluginInstalledPath); err != nil {
 		return fmt.Errorf("update %s plugin failed, err: %w", pluginName, err)
 	}
+	m.matchPluginsDirMode(sdkMetadata.PluginInstalledPath)
 
 	// update legacy filenames
 	if len(tempPlugin.LegacyFilenames) != len(pluginMetadata.LegacyFilenames) {
@@ -618,10 +618,11 @@ func preparePluginDirError(pluginsDir string, err error) error {
 	return fmt.Errorf("prepare plugin directory %s %s: %w", pluginsDir, verb, reason)
 }
 
-// matchPluginsDirMode gives a staged plugin directory the plugin home's
+// matchPluginsDirMode gives an installed plugin directory the plugin home's
 // permission bits. The staging directory comes from os.MkdirTemp, whose mode
 // is 0700: moved into place as is, it locks out every other user sharing the
-// VFOX_HOME.
+// VFOX_HOME. Applied after the move, because a cross-filesystem move copies
+// the tree through os.MkdirAll, whose mode the umask masks back down.
 func (m *Manager) matchPluginsDirMode(path string) {
 	pluginsDir := m.RuntimeEnvContext.PathMeta.Shared.Plugins
 	if info, err := os.Stat(pluginsDir); err == nil {
@@ -716,12 +717,12 @@ func (m *Manager) Add(pluginName, url, alias string) error {
 			return preparePluginDirError(pluginsDir, err)
 		}
 	}
-	m.matchPluginsDirMode(tempPlugin.InstalledPath)
 	logger.Debugf("Moving plugin from %s to %s\n", tempPlugin.InstalledPath, installPath)
 	if err = util.MovePath(tempPlugin.InstalledPath, installPath); err != nil {
 		logger.Debugf("Failed to move plugin: %v\n", err)
 		return fmt.Errorf("install plugin error: %w", err)
 	}
+	m.matchPluginsDirMode(installPath)
 
 	// set legacy filenames
 	if len(tempPlugin.LegacyFilenames) > 0 {
