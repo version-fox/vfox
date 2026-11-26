@@ -75,9 +75,9 @@ func TestPreInstallPackageItem_Checksum(t *testing.T) {
 
 	t.Run("Returns NoneChecksum when CheckSumItem has no checksums", func(t *testing.T) {
 		item := &PreInstallPackageItem{
-			Name:    "test-sdk",
-			Version: "1.0.0",
-			Path:    "https://example.com/test.tar.gz",
+			Name:         "test-sdk",
+			Version:      "1.0.0",
+			Path:         "https://example.com/test.tar.gz",
 			CheckSumItem: &CheckSumItem{
 				// All fields empty
 			},

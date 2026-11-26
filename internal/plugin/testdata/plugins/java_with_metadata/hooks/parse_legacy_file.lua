@@ -9,18 +9,17 @@ function PLUGIN:ParseLegacyFile(ctx)
     if #installed > 0 then
         print("Installed: " .. installed[1])
         return {
-            version = "check-installed"
+            version = "check-installed",
         }
     end
 
     if filename == ".node-version" then
         return {
-            version = "14.17.0"
+            version = "14.17.0",
         }
     else
         return {
-            version = "0.0.1"
+            version = "0.0.1",
         }
     end
-
 end

@@ -29,8 +29,8 @@ PLUGIN = {
     minRuntimeVersion = "0.2.2",
     legacyFilenames = {
         ".node-version",
-        ".nvmrc"
-    }
+        ".nvmrc",
+    },
 }
 
 --- Returns some pre-installed information, such as version number, download address, local files, etc.
@@ -69,8 +69,8 @@ function PLUGIN:PreInstall(ctx)
                 sha1 = "xxx",
                 --- sha512 checksum [optional]
                 sha512 = "xx",
-            }
-        }
+            },
+        },
     }
 end
 
@@ -80,7 +80,7 @@ end
 function PLUGIN:PostInstall(ctx)
     --- ctx.rootPath SDK installation directory
     local rootPath = ctx.rootPath
-    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local sdkInfo = ctx.sdkInfo["sdk-name"]
     local path = sdkInfo.path
     local version = sdkInfo.version
     local name = sdkInfo.name
@@ -100,9 +100,9 @@ function PLUGIN:Available(ctx)
                 {
                     name = "npm",
                     version = "8.8.8",
-                }
-            }
-        }
+                },
+            },
+        },
     }
 end
 
@@ -113,7 +113,7 @@ function PLUGIN:PreUse(ctx)
     --- user input version
     local version = ctx.version
     --- installed sdks - now keyed by version string
-    local sdkInfo = ctx.installedSdks['1.0.0']
+    local sdkInfo = ctx.installedSdks["1.0.0"]
     if sdkInfo then
         local path = sdkInfo.path
         local name = sdkInfo.name
@@ -128,14 +128,14 @@ function PLUGIN:PreUse(ctx)
     --- user input scope
     local scope = ctx.scope
 
-    if (scope == "global") then
+    if scope == "global" then
         print("return 9.9.9")
         return {
             version = "9.9.9",
         }
     end
 
-    if (scope == "project") then
+    if scope == "project" then
         print("return 10.0.0")
         return {
             version = "10.0.0",
@@ -145,7 +145,7 @@ function PLUGIN:PreUse(ctx)
     print("return 1.0.0")
 
     return {
-        version = "1.0.0"
+        version = "1.0.0",
     }
 end
 
@@ -158,20 +158,19 @@ function PLUGIN:ParseLegacyFile(ctx)
     if #installed > 0 then
         print("Installed: " .. installed[1])
         return {
-            version = "check-installed"
+            version = "check-installed",
         }
     end
 
     if filename == ".node-version" then
         return {
-            version = "14.17.0"
+            version = "14.17.0",
         }
     else
         return {
-            version = "0.0.1"
+            version = "0.0.1",
         }
     end
-
 end
 
 function PLUGIN:PreUninstall(ctx)
@@ -180,7 +179,7 @@ function PLUGIN:PreUninstall(ctx)
     local mpath = mainSdkInfo.path
     local mversion = mainSdkInfo.version
     local mname = mainSdkInfo.name
-    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local sdkInfo = ctx.sdkInfo["sdk-name"]
     local path = sdkInfo.path
     local version = sdkInfo.version
     local name = sdkInfo.name

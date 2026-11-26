@@ -23,5 +23,5 @@ PLUGIN.manifestUrl = "manifest.json"
 
 PLUGIN.legacyFilenames = {
     ".node-version",
-    ".nvmrc"
+    ".nvmrc",
 }

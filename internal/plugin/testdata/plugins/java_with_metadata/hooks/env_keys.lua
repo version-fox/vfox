@@ -10,24 +10,22 @@ function PLUGIN:EnvKeys(ctx)
     local mpath = mainSdkInfo.path
     local mversion = mainSdkInfo.version
     local mname = mainSdkInfo.name
-    local sdkInfo = ctx.sdkInfo['sdk-name']
+    local sdkInfo = ctx.sdkInfo["sdk-name"]
     local path = sdkInfo.path
     local version = sdkInfo.version
     local name = sdkInfo.name
     return {
         {
             key = "JAVA_HOME",
-            value = mainPath
+            value = mainPath,
         },
         {
             key = "PATH",
-            value = mainPath .. "/bin"
+            value = mainPath .. "/bin",
         },
         {
             key = "PATH",
-            value = mainPath .. "/bin2"
+            value = mainPath .. "/bin2",
         },
-
     }
-
 end

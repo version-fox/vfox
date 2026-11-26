@@ -35,6 +35,7 @@ We use GitHub issues to track public bugs. Report a bug by [opening a new issue]
 
 * We follow the coding style suggested by the Go community. That's [Effective Go](https://golang.org/doc/effective_go.html) and the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
 * You can try running `go fmt` and `go vet` for style unification
+* CI checks the formatting of Go (`gofmt -l .`), Lua (`stylua --check .`, settings in `stylua.toml`) and shell scripts (`shfmt -d install.sh scripts/*.sh completions/bash_autocomplete`, settings in `.editorconfig`)
 
 ## License
 

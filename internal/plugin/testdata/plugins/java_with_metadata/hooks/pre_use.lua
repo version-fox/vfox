@@ -5,7 +5,7 @@ function PLUGIN:PreUse(ctx)
     --- user input version
     local version = ctx.version
     --- installed sdks - now keyed by version string
-    local sdkInfo = ctx.installedSdks['1.0.0']
+    local sdkInfo = ctx.installedSdks["1.0.0"]
     if sdkInfo then
         local path = sdkInfo.path
         local name = sdkInfo.name
@@ -20,14 +20,14 @@ function PLUGIN:PreUse(ctx)
     --- user input scope
     local scope = ctx.scope
 
-    if (scope == "global") then
+    if scope == "global" then
         print("return 9.9.9")
         return {
             version = "9.9.9",
         }
     end
 
-    if (scope == "project") then
+    if scope == "project" then
         print("return 10.0.0")
         return {
             version = "10.0.0",
@@ -37,6 +37,6 @@ function PLUGIN:PreUse(ctx)
     print("return 1.0.0")
 
     return {
-        version = "1.0.0"
+        version = "1.0.0",
     }
 end
