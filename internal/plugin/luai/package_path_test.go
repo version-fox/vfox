@@ -170,3 +170,110 @@ func TestLimitPackagePathReportsAStatErrorThatIsNotNotFound(t *testing.T) {
 		t.Errorf("error %q calls a file that is there missing", err)
 	}
 }
+
+// Plugin code may read package.path, for example to find its own directory
+// (vfox-nodejs's UTIL.plugin_dir), so it keeps the templates for dirs.
+func TestLimitPackagePathKeepsTheTemplatesInPackagePath(t *testing.T) {
+	root := t.TempDir()
+	hooks, lib := filepath.Join(root, "hooks"), filepath.Join(root, "lib")
+	vm := NewLuaVM()
+	defer vm.Instance.Close()
+	vm.LimitPackagePath(hooks, lib)
+
+	got := lua.LVAsString(vm.Instance.GetGlobal("package").(*lua.LTable).RawGetString("path"))
+	want := filepath.Join(hooks, "?.lua") + ";" + filepath.Join(lib, "?.lua")
+	if got != want {
+		t.Errorf("package.path = %q, want %q", got, want)
+	}
+}
+
+// newVendorVM returns a VM limited to an own directory and a vendor template,
+// each with a util module, the vendor one also with vendored_helper.
+func newVendorVM(t *testing.T) *LuaVM {
+	t.Helper()
+	root := t.TempDir()
+	own := filepath.Join(root, "hooks")
+	vendor := filepath.Join(root, "vendor")
+	for _, dir := range []string{own, vendor} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for path, body := range map[string]string{
+		filepath.Join(vendor, "vendored_helper.lua"): "return 'vendored'",
+		filepath.Join(vendor, "util.lua"):            "return 'vendor util'",
+		filepath.Join(own, "util.lua"):               "return 'own util'",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	vm := NewLuaVM()
+	t.Cleanup(vm.Instance.Close)
+	vm.LimitPackagePath(own)
+	vm.Instance.SetGlobal("vendor_template", lua.LString(filepath.Join(vendor, "?.lua")))
+	return vm
+}
+
+// A template a plugin puts in front of package.path wins over the plugin's own
+// directories, in Lua's order, as it did when the search went through
+// package.path.
+func TestLimitPackagePathKeepsLuaOrderForPrependedTemplates(t *testing.T) {
+	vm := newVendorVM(t)
+	err := vm.Instance.DoString(`
+		package.path = vendor_template .. ";" .. package.path
+		util = require("util")
+	`)
+	if err != nil {
+		t.Fatalf("require after prepending to package.path: %v", err)
+	}
+	if got := vm.Instance.GetGlobal("util"); got != lua.LString("vendor util") {
+		t.Errorf("util = %v, want %q", got, "vendor util")
+	}
+}
+
+// A plugin that replaces package.path still finds its own modules first, and
+// then those of its templates.
+func TestLimitPackagePathSearchesItsDirectoriesFirstWhenPackagePathIsReplaced(t *testing.T) {
+	vm := newVendorVM(t)
+	err := vm.Instance.DoString(`
+		package.path = vendor_template
+		util = require("util")
+		helper = require("vendored_helper")
+	`)
+	if err != nil {
+		t.Fatalf("require after replacing package.path: %v", err)
+	}
+	if got := vm.Instance.GetGlobal("util"); got != lua.LString("own util") {
+		t.Errorf("util = %v, want %q", got, "own util")
+	}
+	if got := vm.Instance.GetGlobal("helper"); got != lua.LString("vendored") {
+		t.Errorf("vendored_helper = %v, want %q", got, "vendored")
+	}
+}
+
+// As with Lua's own loader, a directory with a module's file name is an error,
+// not skipped in favour of the next directory.
+func TestLimitPackagePathRejectsADirectoryNamedLikeAModule(t *testing.T) {
+	root := t.TempDir()
+	hooks, lib := filepath.Join(root, "hooks"), filepath.Join(root, "lib")
+	for _, dir := range []string{filepath.Join(hooks, "foo.lua"), lib} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(lib, "foo.lua"), []byte("return 'lib'"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vm := NewLuaVM()
+	defer vm.Instance.Close()
+	vm.LimitPackagePath(hooks, lib)
+
+	err := vm.Instance.DoString("result = require('foo')")
+	if err == nil {
+		t.Fatalf("require('foo') = %v, want an error for the directory %s", vm.Instance.GetGlobal("result"), filepath.Join(hooks, "foo.lua"))
+	}
+	if !strings.Contains(err.Error(), filepath.Join(hooks, "foo.lua")) {
+		t.Errorf("error %q does not name the directory", err)
+	}
+}
