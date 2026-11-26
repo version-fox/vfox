@@ -258,15 +258,13 @@ func loadLuaPlugin(vm *luai.LuaVM, pluginDirPath string, runtime RuntimeInfo) (*
 	mainPath := filepath.Join(pluginDirPath, "main.lua")
 	// main.lua first
 	if util.FileExists(mainPath) {
-		vm.LimitPackagePath(filepath.Join(pluginDirPath, "?.lua"))
+		vm.LimitPackagePath(pluginDirPath)
 		if err := vm.Instance.DoFile(mainPath); err != nil {
 			return nil, nil, err
 		}
 	} else {
 		// Limit package search scope, hooks directory search priority is higher than lib directory
-		hookPath := filepath.Join(pluginDirPath, "hooks", "?.lua")
-		libPath := filepath.Join(pluginDirPath, "lib", "?.lua")
-		vm.LimitPackagePath(hookPath, libPath)
+		vm.LimitPackagePath(filepath.Join(pluginDirPath, "hooks"), filepath.Join(pluginDirPath, "lib"))
 
 		// load metadata file
 		metadataPath := filepath.Join(pluginDirPath, "metadata.lua")
