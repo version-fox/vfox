@@ -170,6 +170,41 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("read .tool-versions lines the way asdf writes them", func(t *testing.T) {
+		testDir := t.TempDir()
+		content := "# managed by asdf\n" +
+			"nodejs 21.5.0\n" +
+			"java\t21\n" +
+			"erlang  26.2.1\n" +
+			"elixir 1.16.0 # pinned for CI\n" +
+			"python 3.11.0 2.7.18\n"
+		if err := os.WriteFile(filepath.Join(testDir, ".tool-versions"), []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create .tool-versions: %v", err)
+		}
+
+		config, err := LoadConfig(testDir)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+
+		expected := map[string]string{
+			"nodejs": "21.5.0",
+			"java":   "21",
+			"erlang": "26.2.1",
+			"elixir": "1.16.0",
+			"python": "3.11.0",
+		}
+		for name, want := range expected {
+			version, ok := config.Tools.GetVersion(name)
+			if !ok || version != want {
+				t.Errorf("Expected %s %s, got %q (found: %v)", name, want, version, ok)
+			}
+		}
+		if config.Tools.Len() != len(expected) {
+			t.Errorf("Expected %d tools, got %v", len(expected), config.Tools.List())
+		}
+	})
+
 	t.Run("save new config", func(t *testing.T) {
 		emptyDir := t.TempDir()
 		config, err := LoadConfig(emptyDir)
