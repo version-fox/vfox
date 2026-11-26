@@ -24,6 +24,7 @@ import (
 
 	"github.com/version-fox/vfox/internal/config"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/archiver"
+	"github.com/version-fox/vfox/internal/plugin/luai/module/cache"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/fs"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/html"
 	"github.com/version-fox/vfox/internal/plugin/luai/module/http"
@@ -50,5 +51,6 @@ func Preload(L *lua.LState, options *PreloadOptions) {
 	html.Preload(L)
 	string.Preload(L)
 	archiver.Preload(L)
+	cache.Preload(L)
 	fs.Preload(L, "")
 }
