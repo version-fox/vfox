@@ -211,11 +211,13 @@ func TestReinstallOfACopyThatCannotBeEnteredNamesTheDirectory(t *testing.T) {
 // A PostInstall that installs a version its plugin's PreInstall maps onto the
 // version being installed fails at once instead of waiting for the installation
 // that runs it, and the commands PostInstall starts are told which one that is.
-// That holds when the installation root contains the path list separator.
+// That holds when the installation root contains the path list separator, or a
+// byte that is not valid UTF-8.
 func TestAnInstallInPostInstallMappedOntoItsOwnVersionFailsAtOnce(t *testing.T) {
 	for _, tc := range []struct{ name, dir string }{
 		{"plain root", "installs"},
 		{"root with the path list separator", "in" + string(os.PathListSeparator) + "stalls"},
+		{"root that is not valid UTF-8", "in\xffstalls"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wait := installLockWait
@@ -224,6 +226,10 @@ func TestAnInstallInPostInstallMappedOntoItsOwnVersionFailsAtOnce(t *testing.T) 
 			p := (&testPlugin{}).withCommand(t, "erl")
 			s := newTestSDK(t, p)
 			s.InstallPath = filepath.Join(t.TempDir(), tc.dir, "test-sdk")
+			// Some file systems refuse names that are not valid UTF-8.
+			if err := os.MkdirAll(s.InstallPath, 0o755); err != nil {
+				t.Skipf("cannot create %q here: %v", s.InstallPath, err)
+			}
 			p.preInstall = renamedRelease
 			postInstall := p.postInstall
 			var nested error
@@ -267,7 +273,7 @@ func TestPostInstallLocksAddUp(t *testing.T) {
 		t.Errorf("postInstallLocks() = %q for a value vfox did not set; want none", locks)
 	}
 	outer := filepath.Join(t.TempDir(), "a"+string(os.PathListSeparator)+"b", ".v-1.lock")
-	inner := filepath.Join(t.TempDir(), ".v-2.lock")
+	inner := filepath.Join(t.TempDir(), "c\xffd", ".v-2.lock")
 	t.Setenv(postInstallLocksEnv, "")
 	_ = withPostInstallLock(outer, func() error {
 		return withPostInstallLock(inner, func() error {

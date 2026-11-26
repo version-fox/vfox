@@ -112,7 +112,9 @@ const sdkInstallLockName = ".install.lock"
 // JSON array. An install that would wait for one of them runs inside that
 // PostInstall, and the wait could only end when it times out. The list is JSON
 // rather than a path list because a lock path can contain the path list separator,
-// a ':' in VFOX_HOME on Unix or a ';' on Windows.
+// a ':' in VFOX_HOME on Unix or a ';' on Windows. Each path is stored as bytes,
+// which encoding/json writes as base64, because it would replace bytes that are
+// not valid UTF-8 in a string, and the path would no longer match.
 const postInstallLocksEnv = "__VFOX_POST_INSTALL_LOCKS"
 
 // versionLockPath is the lock held while version is being installed.
@@ -124,8 +126,12 @@ func (b *impl) versionLockPath(version Version) string {
 // so the commands it starts inherit it, and restores the variable afterwards.
 func withPostInstallLock(lockPath string, postInstall func() error) error {
 	old, had := os.LookupEnv(postInstallLocksEnv)
-	// A list of strings always encodes.
-	value, _ := json.Marshal(append(postInstallLocks(), lockPath))
+	var paths [][]byte
+	for _, path := range append(postInstallLocks(), lockPath) {
+		paths = append(paths, []byte(path))
+	}
+	// A list of byte slices always encodes.
+	value, _ := json.Marshal(paths)
 	if err := os.Setenv(postInstallLocksEnv, string(value)); err != nil {
 		return fmt.Errorf("set %s: %w", postInstallLocksEnv, err)
 	}
@@ -140,11 +146,15 @@ func withPostInstallLock(lockPath string, postInstall func() error) error {
 }
 
 // postInstallLocks returns the locks listed in postInstallLocksEnv. A value that is
-// not a JSON array of strings was not set by vfox and lists none.
+// not a JSON array of base64 strings was not set by vfox and lists none.
 func postInstallLocks() []string {
-	var locks []string
-	if err := json.Unmarshal([]byte(os.Getenv(postInstallLocksEnv)), &locks); err != nil {
+	var paths [][]byte
+	if err := json.Unmarshal([]byte(os.Getenv(postInstallLocksEnv)), &paths); err != nil {
 		return nil
+	}
+	var locks []string
+	for _, path := range paths {
+		locks = append(locks, string(path))
 	}
 	return locks
 }
