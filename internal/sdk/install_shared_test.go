@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,14 @@ func TestLockFilesThatCannotBeWrittenStillLock(t *testing.T) {
 	}
 }
 
+// asSeparateProcess is called by a PostInstall that blocks to stand for another
+// vfox. The test runs that vfox in a goroutine, which shares the environment, so
+// this drops what its installation passes on to the commands PostInstall runs: a
+// separate vfox would not inherit it.
+func asSeparateProcess() {
+	_ = os.Unsetenv(postInstallLocksEnv)
+}
+
 // A plain install mapped to a version whose reinstall starts during its PreInstall
 // waits for the reinstall, and then finds the version installed.
 func TestAMappedInstallWaitsForAReinstallThatStartedDuringPreInstall(t *testing.T) {
@@ -89,6 +98,7 @@ func TestAMappedInstallWaitsForAReinstallThatStartedDuringPreInstall(t *testing.
 	inPostInstall, release := make(chan struct{}), make(chan struct{})
 	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
 		if filepath.Base(ctx.RootPath) == "v-OTP-29.1.2" {
+			asSeparateProcess()
 			close(inPostInstall)
 			<-release
 		}
@@ -195,5 +205,48 @@ func TestReinstallOfACopyThatCannotBeEnteredNamesTheDirectory(t *testing.T) {
 	}
 	if called {
 		t.Error("PreInstall was called for a copy whose receipt cannot be read")
+	}
+}
+
+// A PostInstall that installs a version its plugin's PreInstall maps onto the
+// version being installed fails at once instead of waiting for the installation
+// that runs it, and the commands PostInstall starts are told which one that is.
+func TestAnInstallInPostInstallMappedOntoItsOwnVersionFailsAtOnce(t *testing.T) {
+	wait := installLockWait
+	installLockWait = 5 * time.Second
+	t.Cleanup(func() { installLockWait = wait })
+	p := (&testPlugin{}).withCommand(t, "erl")
+	s := newTestSDK(t, p)
+	p.preInstall = renamedRelease
+	postInstall := p.postInstall
+	var nested error
+	var took time.Duration
+	var inherited string
+	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+		if filepath.Base(ctx.RootPath) == "v-OTP-29.1.2" {
+			inherited = os.Getenv(postInstallLocksEnv)
+			start := time.Now()
+			nested = s.Install("29.1.2")
+			took = time.Since(start)
+		}
+		return postInstall(ctx)
+	}
+	if err := s.Install("OTP-29.1.2"); err != nil {
+		t.Fatalf("Install(OTP-29.1.2): %v", err)
+	}
+	if nested == nil || !strings.Contains(nested.Error(), "runs in the PostInstall of") {
+		t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2: %v; want the PostInstall error", nested)
+	}
+	if took >= installLockWait {
+		t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2 took %s; want it to fail at once", took)
+	}
+	if lock := s.versionLockPath("OTP-29.1.2"); !slices.Contains(filepath.SplitList(inherited), lock) {
+		t.Errorf("%s in PostInstall = %q; want it to list %s", postInstallLocksEnv, inherited, lock)
+	}
+	if value, set := os.LookupEnv(postInstallLocksEnv); set {
+		t.Errorf("%s = %q after the installation; want it unset again", postInstallLocksEnv, value)
+	}
+	if exists(s.packagePath("29.1.2")) {
+		t.Error("29.1.2 was installed beside OTP-29.1.2")
 	}
 }

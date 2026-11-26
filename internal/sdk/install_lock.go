@@ -105,3 +105,46 @@ func waitForInstallLock(path string, waiting func()) (*os.File, error) {
 // installation of the SDK run at a time. Like the lock of each version, it stays
 // in place after the installation.
 const sdkInstallLockName = ".install.lock"
+
+// postInstallLocksEnv lists the version locks of the installations whose
+// PostInstall is running, in this process and in the vfox that started it,
+// separated by os.PathListSeparator. An install that would wait for one of them
+// runs inside that PostInstall, and the wait could only end when it times out.
+const postInstallLocksEnv = "__VFOX_POST_INSTALL_LOCKS"
+
+// versionLockPath is the lock held while version is being installed.
+func (b *impl) versionLockPath(version Version) string {
+	return filepath.Join(b.InstallPath, ".v-"+string(version)+".lock")
+}
+
+// withPostInstallLock runs postInstall with lockPath added to postInstallLocksEnv,
+// so the commands it starts inherit it, and restores the variable afterwards.
+func withPostInstallLock(lockPath string, postInstall func() error) error {
+	old, had := os.LookupEnv(postInstallLocksEnv)
+	value := lockPath
+	if old != "" {
+		value = old + string(os.PathListSeparator) + lockPath
+	}
+	if err := os.Setenv(postInstallLocksEnv, value); err != nil {
+		return fmt.Errorf("set %s: %w", postInstallLocksEnv, err)
+	}
+	defer func() {
+		if had {
+			_ = os.Setenv(postInstallLocksEnv, old)
+		} else {
+			_ = os.Unsetenv(postInstallLocksEnv)
+		}
+	}()
+	return postInstall()
+}
+
+// inPostInstallOf reports whether lockPath belongs to an installation whose
+// PostInstall is running this one.
+func inPostInstallOf(lockPath string) bool {
+	for _, path := range filepath.SplitList(os.Getenv(postInstallLocksEnv)) {
+		if filepath.Clean(path) == lockPath {
+			return true
+		}
+	}
+	return false
+}

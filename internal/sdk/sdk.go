@@ -284,7 +284,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		typed = name
 	}
 	if b.hasPendingInstall(typed) {
-		lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(typed)+".lock"))
+		lock, err := acquireInstallLock(b.versionLockPath(typed))
 		if err != nil {
 			return "", fmt.Errorf("cannot install %s: %w", label, err)
 		}
@@ -424,7 +424,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 			}
 			continue
 		}
-		lock, err = acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(key)+".lock"))
+		lock, err = acquireInstallLock(b.versionLockPath(key))
 		if err != nil {
 			return "", fmt.Errorf("cannot install %s: %w", label, err)
 		}
@@ -520,7 +520,9 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 	}
 	if b.plugin.HasFunction("PostInstall") {
 		logger.Debugf("Running post-installation steps...\n")
-		err = b.plugin.PostInstall(postCtx)
+		err = withPostInstallLock(b.versionLockPath(key), func() error {
+			return b.plugin.PostInstall(postCtx)
+		})
 		if err != nil {
 			return "", fmt.Errorf("plugin [PostInstall] method error: %w", err)
 		}
@@ -667,7 +669,7 @@ func (b *impl) installingVersions() map[Version]bool {
 // installationRunning reports whether another installation holds the lock of
 // version. A marker whose lock is free was left by an interrupted installation.
 func (b *impl) installationRunning(version Version) bool {
-	file, err := openInstallLock(filepath.Join(b.InstallPath, ".v-"+string(version)+".lock"))
+	file, err := openInstallLock(b.versionLockPath(version))
 	if err != nil {
 		return false
 	}
@@ -680,7 +682,11 @@ func (b *impl) installationRunning(version Version) bool {
 // that another vfox is running. requested names the install that waits.
 func (b *impl) waitForInstallation(requested string, version Version) error {
 	label := b.Label(version)
-	lock, err := waitForInstallLock(filepath.Join(b.InstallPath, ".v-"+string(version)+".lock"), func() {
+	path := b.versionLockPath(version)
+	if inPostInstallOf(path) {
+		return fmt.Errorf("cannot install %s: it resolves to %s, and this install runs in the PostInstall of %s, so it would wait for itself", requested, label, label)
+	}
+	lock, err := waitForInstallLock(path, func() {
 		pterm.Printf("Waiting for the installation of %s to finish...\n", label)
 	})
 	if errors.Is(err, errInstallLockStillHeld) {

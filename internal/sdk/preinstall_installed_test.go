@@ -282,6 +282,7 @@ func TestInstallWaitsWhileTheSDKIsBeingInstalled(t *testing.T) {
 	postInstall := p.postInstall
 	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
 		if ctx.SdkInfo["test-sdk"].Version == "OTP-29.1.2" {
+			asSeparateProcess()
 			close(installing)
 			<-finish
 		}
@@ -500,6 +501,7 @@ func blockPostInstall(p *testPlugin, version string) (installing, finish chan st
 	postInstall := p.postInstall
 	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
 		if ctx.SdkInfo["test-sdk"].Version == version {
+			asSeparateProcess()
 			close(installing)
 			<-finish
 		}
