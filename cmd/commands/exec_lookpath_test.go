@@ -46,7 +46,9 @@ func TestWindowsPathExtsFollowPathextAndSkipPowerShell(t *testing.T) {
 
 // A bare name takes the first extension in PATHEXT order that exists in the
 // directory, a typed extension is taken as it is, and a directory that carries
-// the name is not an executable. Nothing here runs a file, so the rules are
+// the name is not an executable. The extensions are spelled as the files are,
+// so the case-sensitive file systems of the Linux and macOS runners agree with
+// Windows. Nothing here runs a file, so the rules are
 // checked on every runner.
 func TestFindWindowsExecutableOrderAndTypedExtension(t *testing.T) {
 	bin := t.TempDir()
@@ -59,12 +61,12 @@ func TestFindWindowsExecutableOrderAndTypedExtension(t *testing.T) {
 	exeFile := touch("alphatool.exe")
 	must(t, os.MkdirAll(filepath.Join(bin, "betatool"), 0755))
 	must(t, os.MkdirAll(filepath.Join(bin, "gammatool.exe"), 0755))
-	exts := []string{".CMD", ".EXE"}
+	exts := []string{".cmd", ".exe"}
 
-	if got, ok := findWindowsExecutable(bin, "alphatool", exts); !ok || got != filepath.Join(bin, "alphatool.CMD") {
+	if got, ok := findWindowsExecutable(bin, "alphatool", exts); !ok || got != cmdFile {
 		t.Errorf("bare name = (%q, %v), want %q in PATHEXT order", got, ok, cmdFile)
 	}
-	if got, ok := findWindowsExecutable(bin, "alphatool", []string{".EXE", ".CMD"}); !ok || got != filepath.Join(bin, "alphatool.EXE") {
+	if got, ok := findWindowsExecutable(bin, "alphatool", []string{".exe", ".cmd"}); !ok || got != exeFile {
 		t.Errorf("bare name with .EXE first = (%q, %v), want %q", got, ok, exeFile)
 	}
 	if got, ok := findWindowsExecutable(bin, "alphatool.exe", exts); !ok || got != exeFile {
