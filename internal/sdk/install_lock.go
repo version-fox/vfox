@@ -17,6 +17,7 @@
 package sdk
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -107,9 +108,11 @@ func waitForInstallLock(path string, waiting func()) (*os.File, error) {
 const sdkInstallLockName = ".install.lock"
 
 // postInstallLocksEnv lists the version locks of the installations whose
-// PostInstall is running, in this process and in the vfox that started it,
-// separated by os.PathListSeparator. An install that would wait for one of them
-// runs inside that PostInstall, and the wait could only end when it times out.
+// PostInstall is running, in this process and in the vfox that started it, as a
+// JSON array. An install that would wait for one of them runs inside that
+// PostInstall, and the wait could only end when it times out. The list is JSON
+// rather than a path list because a lock path can contain the path list separator,
+// a ':' in VFOX_HOME on Unix or a ';' on Windows.
 const postInstallLocksEnv = "__VFOX_POST_INSTALL_LOCKS"
 
 // versionLockPath is the lock held while version is being installed.
@@ -121,11 +124,9 @@ func (b *impl) versionLockPath(version Version) string {
 // so the commands it starts inherit it, and restores the variable afterwards.
 func withPostInstallLock(lockPath string, postInstall func() error) error {
 	old, had := os.LookupEnv(postInstallLocksEnv)
-	value := lockPath
-	if old != "" {
-		value = old + string(os.PathListSeparator) + lockPath
-	}
-	if err := os.Setenv(postInstallLocksEnv, value); err != nil {
+	// A list of strings always encodes.
+	value, _ := json.Marshal(append(postInstallLocks(), lockPath))
+	if err := os.Setenv(postInstallLocksEnv, string(value)); err != nil {
 		return fmt.Errorf("set %s: %w", postInstallLocksEnv, err)
 	}
 	defer func() {
@@ -138,10 +139,20 @@ func withPostInstallLock(lockPath string, postInstall func() error) error {
 	return postInstall()
 }
 
+// postInstallLocks returns the locks listed in postInstallLocksEnv. A value that is
+// not a JSON array of strings was not set by vfox and lists none.
+func postInstallLocks() []string {
+	var locks []string
+	if err := json.Unmarshal([]byte(os.Getenv(postInstallLocksEnv)), &locks); err != nil {
+		return nil
+	}
+	return locks
+}
+
 // inPostInstallOf reports whether lockPath belongs to an installation whose
 // PostInstall is running this one.
 func inPostInstallOf(lockPath string) bool {
-	for _, path := range filepath.SplitList(os.Getenv(postInstallLocksEnv)) {
+	for _, path := range postInstallLocks() {
 		if filepath.Clean(path) == lockPath {
 			return true
 		}

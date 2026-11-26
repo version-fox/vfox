@@ -308,6 +308,7 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		sdkVersion  Version
 		key         Version
 		lock        *os.File
+		keyExists   bool
 	)
 	releaseSDKLock := func() error {
 		if sdkLock == nil {
@@ -402,6 +403,9 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 				}
 				continue
 			}
+			if afterInstallListRecheck != nil {
+				afterInstallListRecheck()
+			}
 		}
 		// The list given to PreInstall leaves copies out, but a plugin can return any
 		// name. A copy is selected only by its own name, so it cannot stand for the
@@ -428,6 +432,20 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		if err != nil {
 			return "", fmt.Errorf("cannot install %s: %w", label, err)
 		}
+		keyExists = !named && !reinstall && b.CheckRuntimeExist(key)
+		// Uninstall takes neither lock, so a version PreInstall was told is installed
+		// can be gone by now. The plugin may have answered with no more than its name,
+		// so it is asked again rather than installing that answer.
+		if _, given := installedSdks[string(key)]; listed && given && !keyExists {
+			logger.Debugf("%s was uninstalled during the install of %s; asking again\n", label, requestLabel)
+			if err := lock.Close(); err != nil {
+				return "", fmt.Errorf("close installation lock: %w", err)
+			}
+			if err := releaseSDKLock(); err != nil {
+				return "", err
+			}
+			continue
+		}
 		break
 	}
 	defer func() {
@@ -436,12 +454,13 @@ func (b *impl) install(version, name Version, opts InstallOptions) (installed Ve
 		}
 	}()
 	newDirPath := b.packagePath(key)
-	// Recheck while holding the lock, before cleaning an interrupted attempt.
+	// Rechecked while holding the lock, before cleaning an interrupted attempt; a
+	// plain install did so in the loop above.
 	if named {
 		if !reinstall && b.nameTaken(key) {
 			return "", b.nameTakenError(key)
 		}
-	} else if !reinstall && b.CheckRuntimeExist(key) {
+	} else if keyExists {
 		fmt.Printf("%s is already installed\n", label)
 		logger.Debugf("SDK %s already exists after version resolution\n", label)
 		return key, nil
@@ -677,6 +696,10 @@ func (b *impl) installationRunning(version Version) bool {
 	err = lockInstallFile(file)
 	return err != nil && installLockHeld(err)
 }
+
+// afterInstallListRecheck, when set by a test, runs right after an install has found
+// the list it gave PreInstall unchanged, with the SDK lock held.
+var afterInstallListRecheck func()
 
 // waitForInstallation waits, up to installLockWait, for the installation of version
 // that another vfox is running. requested names the install that waits.

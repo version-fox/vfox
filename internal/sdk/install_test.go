@@ -115,11 +115,9 @@ func TestInstallRejectsAPreInstallResultWithoutAVersion(t *testing.T) {
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
+	// It fails before any lock is taken, so not even a lock file is left.
 	for _, entry := range entries {
-		// The SDK's installation lock stays, as the lock of each version does.
-		if entry.Name() != sdkInstallLockName {
-			t.Errorf("a failed install left %s behind", entry.Name())
-		}
+		t.Errorf("a failed install left %s behind", entry.Name())
 	}
 	if installed := s.InstalledList(); len(installed) != 0 {
 		t.Errorf("InstalledList = %v, want nothing", installed)

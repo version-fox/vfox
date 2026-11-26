@@ -211,42 +211,142 @@ func TestReinstallOfACopyThatCannotBeEnteredNamesTheDirectory(t *testing.T) {
 // A PostInstall that installs a version its plugin's PreInstall maps onto the
 // version being installed fails at once instead of waiting for the installation
 // that runs it, and the commands PostInstall starts are told which one that is.
+// That holds when the installation root contains the path list separator.
 func TestAnInstallInPostInstallMappedOntoItsOwnVersionFailsAtOnce(t *testing.T) {
-	wait := installLockWait
-	installLockWait = 5 * time.Second
-	t.Cleanup(func() { installLockWait = wait })
+	for _, tc := range []struct{ name, dir string }{
+		{"plain root", "installs"},
+		{"root with the path list separator", "in" + string(os.PathListSeparator) + "stalls"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wait := installLockWait
+			installLockWait = 5 * time.Second
+			t.Cleanup(func() { installLockWait = wait })
+			p := (&testPlugin{}).withCommand(t, "erl")
+			s := newTestSDK(t, p)
+			s.InstallPath = filepath.Join(t.TempDir(), tc.dir, "test-sdk")
+			p.preInstall = renamedRelease
+			postInstall := p.postInstall
+			var nested error
+			var took time.Duration
+			var inherited []string
+			p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
+				if filepath.Base(ctx.RootPath) == "v-OTP-29.1.2" {
+					inherited = postInstallLocks()
+					start := time.Now()
+					nested = s.Install("29.1.2")
+					took = time.Since(start)
+				}
+				return postInstall(ctx)
+			}
+			if err := s.Install("OTP-29.1.2"); err != nil {
+				t.Fatalf("Install(OTP-29.1.2): %v", err)
+			}
+			if nested == nil || !strings.Contains(nested.Error(), "runs in the PostInstall of") {
+				t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2: %v; want the PostInstall error", nested)
+			}
+			if took >= installLockWait {
+				t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2 took %s; want it to fail at once", took)
+			}
+			if lock := s.versionLockPath("OTP-29.1.2"); !slices.Equal(inherited, []string{lock}) {
+				t.Errorf("%s in PostInstall lists %q; want %q", postInstallLocksEnv, inherited, lock)
+			}
+			if value, set := os.LookupEnv(postInstallLocksEnv); set {
+				t.Errorf("%s = %q after the installation; want it unset again", postInstallLocksEnv, value)
+			}
+			if exists(s.packagePath("29.1.2")) {
+				t.Error("29.1.2 was installed beside OTP-29.1.2")
+			}
+		})
+	}
+}
+
+// The locks of nested PostInstalls add up, and a value vfox did not set lists none.
+func TestPostInstallLocksAddUp(t *testing.T) {
+	t.Setenv(postInstallLocksEnv, "not a list")
+	if locks := postInstallLocks(); locks != nil {
+		t.Errorf("postInstallLocks() = %q for a value vfox did not set; want none", locks)
+	}
+	outer := filepath.Join(t.TempDir(), "a"+string(os.PathListSeparator)+"b", ".v-1.lock")
+	inner := filepath.Join(t.TempDir(), ".v-2.lock")
+	t.Setenv(postInstallLocksEnv, "")
+	_ = withPostInstallLock(outer, func() error {
+		return withPostInstallLock(inner, func() error {
+			if locks := postInstallLocks(); !slices.Equal(locks, []string{outer, inner}) {
+				t.Errorf("postInstallLocks() = %q; want %q", locks, []string{outer, inner})
+			}
+			if !inPostInstallOf(outer) || !inPostInstallOf(inner) {
+				t.Error("inPostInstallOf does not find both locks")
+			}
+			return nil
+		})
+	})
+	if value := os.Getenv(postInstallLocksEnv); value != "" {
+		t.Errorf("%s = %q after both PostInstalls; want it as it was", postInstallLocksEnv, value)
+	}
+}
+
+// A plain install mapped onto a version that is uninstalled after the list given
+// to PreInstall was checked again asks PreInstall again, instead of installing the
+// answer, which names the version it was mapped onto and nothing else.
+func TestAnInstallMappedOntoAVersionUninstalledMeanwhileAsksAgain(t *testing.T) {
 	p := (&testPlugin{}).withCommand(t, "erl")
 	s := newTestSDK(t, p)
+	mustInstall(t, s, "OTP-29.1.2")
 	p.preInstall = renamedRelease
-	postInstall := p.postInstall
-	var nested error
-	var took time.Duration
-	var inherited string
-	p.postInstall = func(ctx *plugin.PostInstallHookCtx) error {
-		if filepath.Base(ctx.RootPath) == "v-OTP-29.1.2" {
-			inherited = os.Getenv(postInstallLocksEnv)
-			start := time.Now()
-			nested = s.Install("29.1.2")
-			took = time.Since(start)
+	t.Cleanup(func() { afterInstallListRecheck = nil })
+	afterInstallListRecheck = func() {
+		afterInstallListRecheck = nil
+		if err := s.Uninstall("OTP-29.1.2"); err != nil {
+			t.Errorf("Uninstall(OTP-29.1.2): %v", err)
 		}
-		return postInstall(ctx)
 	}
-	if err := s.Install("OTP-29.1.2"); err != nil {
-		t.Fatalf("Install(OTP-29.1.2): %v", err)
+	p.preInstallCalls = 0
+	if err := s.Install("29.1.2"); err != nil {
+		t.Fatalf("Install(29.1.2): %v", err)
 	}
-	if nested == nil || !strings.Contains(nested.Error(), "runs in the PostInstall of") {
-		t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2: %v; want the PostInstall error", nested)
+	if p.preInstallCalls != 2 {
+		t.Errorf("PreInstall was called %d times; want it asked again after the uninstall", p.preInstallCalls)
 	}
-	if took >= installLockWait {
-		t.Errorf("Install(29.1.2) in the PostInstall of OTP-29.1.2 took %s; want it to fail at once", took)
+	if !s.CheckRuntimeExist("29.1.2") {
+		t.Error("29.1.2 is not installed")
 	}
-	if lock := s.versionLockPath("OTP-29.1.2"); !slices.Contains(filepath.SplitList(inherited), lock) {
-		t.Errorf("%s in PostInstall = %q; want it to list %s", postInstallLocksEnv, inherited, lock)
+	if exists(s.packagePath("OTP-29.1.2")) {
+		t.Error("the uninstalled OTP-29.1.2 was installed again from the answer given for it")
 	}
-	if value, set := os.LookupEnv(postInstallLocksEnv); set {
-		t.Errorf("%s = %q after the installation; want it unset again", postInstallLocksEnv, value)
+}
+
+// Lists of the same size are told apart by their versions.
+func TestInstallListsOfTheSameSizeDiffer(t *testing.T) {
+	item := &plugin.InstalledPackageItem{}
+	if sameVersions(map[string]*plugin.InstalledPackageItem{"1.0": item}, map[string]*plugin.InstalledPackageItem{"2.0": item}) {
+		t.Error("sameVersions takes 1.0 and 2.0 for the same list")
 	}
-	if exists(s.packagePath("29.1.2")) {
-		t.Error("29.1.2 was installed beside OTP-29.1.2")
+	if !sameVersions(map[string]*plugin.InstalledPackageItem{"1.0": item}, map[string]*plugin.InstalledPackageItem{"1.0": {}}) {
+		t.Error("sameVersions tells two lists of 1.0 apart")
+	}
+	if sameInstalling(map[Version]bool{"1.0": true}, map[Version]bool{"2.0": true}) {
+		t.Error("sameInstalling takes 1.0 and 2.0 for the same set")
+	}
+	if !sameInstalling(map[Version]bool{"1.0": true}, map[Version]bool{"1.0": true}) {
+		t.Error("sameInstalling tells two sets of 1.0 apart")
+	}
+}
+
+// A version whose lock cannot be opened is not taken for one being installed, and
+// waiting for it reports why the lock could not be opened.
+func TestALockThatCannotBeOpened(t *testing.T) {
+	s := newTestSDK(t, &testPlugin{})
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	// The installation root is under a file, so its lock files cannot be created.
+	s.InstallPath = filepath.Join(file, "test-sdk")
+	if s.installationRunning("1.0") {
+		t.Error("installationRunning(1.0) = true for a lock that cannot be opened")
+	}
+	err := s.waitForInstallation("1", "1.0")
+	if err == nil || !strings.Contains(err.Error(), "cannot install 1: create installation root") {
+		t.Errorf("waitForInstallation = %v; want the error that kept the lock from opening", err)
 	}
 }
