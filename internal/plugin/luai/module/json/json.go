@@ -19,6 +19,7 @@ package json
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"unicode/utf8"
 
 	lua "github.com/yuin/gopher-lua"
@@ -81,6 +82,7 @@ var (
 	errTooLarge       = errors.New("cannot encode more than 64 MiB of JSON")
 	errTooDeep        = errors.New("cannot encode tables nested more than 256 levels deep to JSON")
 	errNotUTF8        = errors.New("cannot encode a string that is not valid UTF-8 to JSON")
+	errNotFinite      = errors.New("cannot encode a number that is not finite (NaN or infinity) to JSON")
 )
 
 // maxRepeatValues caps the values written for tables that were already encoded once
@@ -115,7 +117,8 @@ func Encode(value lua.LValue) ([]byte, error) {
 
 // EncodeStrict is Encode for data that is stored and read back. It also returns an
 // error for any string or table key that is not valid UTF-8, for tables nested more
-// than 256 levels deep, and for output larger than 64 MiB.
+// than 256 levels deep, for NaN and infinity, and for output larger than 64 MiB. Its
+// errors carry the encoder's own message, without encoding/json's wrapping.
 func EncodeStrict(value lua.LValue) ([]byte, error) {
 	return encode(value, true)
 }
@@ -126,7 +129,16 @@ func encode(value lua.LValue, strict bool) ([]byte, error) {
 		done:    make(map[*lua.LTable]bool),
 		strict:  strict,
 	}
-	return json.Marshal(jsonValue{LValue: value, enc: e})
+	data, err := json.Marshal(jsonValue{LValue: value, enc: e})
+	if err != nil && strict {
+		// encoding/json wraps an error from a nested MarshalJSON once per level. Strict
+		// callers get the original message, without those prefixes.
+		var wrapped *json.MarshalerError
+		for errors.As(err, &wrapped) && wrapped.Err != nil {
+			err = wrapped.Err
+		}
+	}
+	return data, err
 }
 
 // encoder holds the state shared by every value of one encode call.
@@ -178,6 +190,9 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 			err = e.add(len(data), j.repeat)
 		}
 	case lua.LNumber:
+		if e.strict && (math.IsNaN(float64(converted)) || math.IsInf(float64(converted), 0)) {
+			return nil, errNotFinite
+		}
 		data, err = json.Marshal(float64(converted))
 		if err == nil {
 			err = e.add(len(data), j.repeat)

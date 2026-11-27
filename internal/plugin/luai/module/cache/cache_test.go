@@ -345,3 +345,108 @@ func TestEscapedOutputCountsAgainstSizeLimit(t *testing.T) {
 		t.Fatalf("cache file is %d bytes", info.Size())
 	}
 }
+
+// TestDocumentedRefusals pins every refusal the cache docs list for set, with the
+// message a plugin sees. The messages carry no "json: error calling MarshalJSON" prefix.
+func TestDocumentedRefusals(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local function refused(v, want)
+		local ok, err = c.set("k", v, -1)
+		assert(ok == nil, "stored")
+		assert(err:find(want, 1, true), err)
+		assert(not err:find("MarshalJSON", 1, true), err)
+	end
+	refused(0/0, "not finite")
+	refused(1/0, "not finite")
+	refused(-1/0, "not finite")
+	refused({ 1/0 }, "not finite")
+	refused({ x = 0/0 }, "not finite")
+	refused(print, "cannot encode function")
+	refused(coroutine.create(function() end), "cannot encode thread")
+	refused(io.stdout, "cannot encode userdata")
+	refused({ 1, nil, 3 }, "sparse")
+	refused({ 1, a = 2 }, "mixed or invalid key")
+	local self = {}
+	self[1] = self
+	refused(self, "recursively nested")
+	local deep = {}
+	for i = 1, 257 do deep = { deep } end
+	refused(deep, "256 levels")
+	refused("\255", "UTF-8")
+	local ok, err = c.set("\255", 1, -1)
+	assert(ok == nil and err:find("UTF-8", 1, true), err)
+	-- the repeated-reference cap applies to set as well: 1,048,576 values
+	local shared = { 1, 2 }
+	local list = {}
+	for i = 1, 524290 do list[i] = shared end
+	refused(list, "referenced too many times")
+	list[524290] = nil
+	assert(c.set("k", list, -1) == true)
+	assert(c.get("k")[524289][2] == 2)
+	`, file)
+}
+
+func TestTTLErrorNamesBothBounds(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	limit := maxTTL(time.Now())
+	if limit < 7_000_000_000 || limit > 7_500_000_000 {
+		t.Fatalf("unexpected ttl limit %d", limit)
+	}
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	assert(c.set("a", 1, 7.4e9))
+	for _, bad in ipairs({ 7.5e9, 1/0, 0/0, -0.5, -2 }) do
+		local ok, err = pcall(c.set, "b", 1, bad)
+		assert(not ok)
+		assert(err:find("-1 (never expires)", 1, true) and err:find("from 0 up to 7", 1, true), err)
+	end
+	`, file)
+}
+
+func TestReadErrorsAreDescribed(t *testing.T) {
+	dir := t.TempDir()
+	corrupt := filepath.Join(dir, "corrupt.bin")
+	empty := filepath.Join(dir, "empty.bin")
+	if err := os.WriteFile(corrupt, []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	eval(t, `
+	local c, err = require("vfox.cache").new(arg2)
+	assert(c == nil and err:find("read cache", 1, true) and err:find("EOF", 1, true), err)
+	local c, err = require("vfox.cache").new(arg1)
+	assert(c == nil and err:find("read cache", 1, true), err)
+	`, corrupt, empty)
+	// a file that goes bad after new: get, set and remove report it and leave it alone
+	good := filepath.Join(dir, "good.bin")
+	s := lua.NewState()
+	defer s.Close()
+	Preload(s)
+	s.SetGlobal("arg1", lua.LString(good))
+	if err := s.DoString(`
+	c = require("vfox.cache").new(arg1)
+	assert(c.set("x", 1))
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(good, []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DoString(`
+	local v, err = c.get("x")
+	assert(v == nil and err:find("read cache", 1, true) and err:find("EOF", 1, true), err)
+	local ok, err = c.set("x", 2)
+	assert(ok == nil and err:find("read cache", 1, true), err)
+	local ok, err = c.remove("x")
+	assert(ok == false and err:find("read cache", 1, true), err)
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(good); string(data) != "garbage" {
+		t.Fatalf("file was overwritten: %q", data)
+	}
+}

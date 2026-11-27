@@ -43,11 +43,17 @@ const expireMargin = int64(time.Second)
 // stores (until the year 2262). The caller reads the clock once and passes it in, so
 // the bound and the result always use the same reading.
 func expireAt(now time.Time, seconds float64) (int64, bool) {
-	left := math.MaxInt64 - now.UnixNano() - expireMargin
-	if left < 0 || seconds < 0 || math.IsNaN(seconds) || seconds >= float64(left/int64(time.Second)) {
+	limit := maxTTL(now)
+	if limit <= 0 || seconds < 0 || math.IsNaN(seconds) || seconds >= float64(limit) {
 		return 0, false
 	}
 	return now.UnixNano() + int64(seconds*float64(time.Second)), true
+}
+
+// maxTTL is the number of whole seconds a ttl must stay below at the given time. It is
+// about 7.4 billion (roughly 235 years) today and shrinks as the year 2262 gets closer.
+func maxTTL(now time.Time) int64 {
+	return (math.MaxInt64 - now.UnixNano() - expireMargin) / int64(time.Second)
 }
 
 // writeMu serializes read-modify-write cycles inside this process. Other processes
@@ -82,11 +88,11 @@ func load(path string) (map[string]cache.Item, error) {
 		if os.IsNotExist(err) {
 			return items, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("read cache %q: %w", path, err)
 	}
 	defer file.Close()
 	if err := gob.NewDecoder(file).Decode(&items); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read cache %q: %w", path, err)
 	}
 	return items, nil
 }
@@ -163,7 +169,7 @@ func apiNew(L *lua.LState) int {
 	path := L.CheckString(1)
 	if _, err := loadLocked(path); err != nil {
 		L.Push(lua.LNil)
-		L.Push(lua.LString(fmt.Sprintf("open cache %q: %s", path, err)))
+		L.Push(lua.LString(err.Error()))
 		return 2
 	}
 
@@ -174,7 +180,7 @@ func apiNew(L *lua.LState) int {
 		seconds := L.OptNumber(3, -1)
 		if seconds != -1 {
 			if _, ok := expireAt(time.Now(), float64(seconds)); !ok {
-				L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
+				L.ArgError(3, fmt.Sprintf("expire time must be -1 (never expires) or a number of seconds from 0 up to %d", maxTTL(time.Now())))
 			}
 		}
 		if !utf8.ValidString(key) {
