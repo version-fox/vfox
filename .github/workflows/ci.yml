@@ -137,12 +137,18 @@ jobs:
       GOLANGCI_LINT_SHA256: 9b7fe6a6bf6334b98decf8d86b11415ea7889afdabdd1959fdce23af2a9ebcea
       ACTIONLINT_VERSION: 1.7.12
       ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      SHELLCHECK_VERSION: 0.11.0
+      SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+      LUA_LS_VERSION: 3.19.2
+      LUA_LS_SHA256: 93ad326b10f6c00911dd8c450fa098332dbd8f9f45d1052f5636a2d54479b947
+      PSSCRIPTANALYZER_VERSION: 1.25.0
+      PSSCRIPTANALYZER_SHA256: 14e634c828eb98efb9f40b2918ba90f139ed5eccdf663a2a747736d996995d60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install golangci-lint and actionlint
+      - name: Install golangci-lint, actionlint, ShellCheck, lua-language-server and PSScriptAnalyzer
         run: |
           mkdir "${RUNNER_TEMP}/bin"
           archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
@@ -157,7 +163,26 @@ jobs:
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check --strict -
           tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}/bin" actionlint
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/shellcheck.tar.gz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
+          echo "${SHELLCHECK_SHA256}  ${RUNNER_TEMP}/shellcheck.tar.gz" | sha256sum --check --strict -
+          tar --extract --gzip --file "${RUNNER_TEMP}/shellcheck.tar.gz" --directory "${RUNNER_TEMP}/bin" \
+            --strip-components 1 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/lua-language-server.tar.gz" \
+            "https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz"
+          echo "${LUA_LS_SHA256}  ${RUNNER_TEMP}/lua-language-server.tar.gz" | sha256sum --check --strict -
+          mkdir "${RUNNER_TEMP}/lua-language-server"
+          tar --extract --gzip --file "${RUNNER_TEMP}/lua-language-server.tar.gz" \
+            --directory "${RUNNER_TEMP}/lua-language-server"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/PSScriptAnalyzer.nupkg" \
+            "https://github.com/PowerShell/PSScriptAnalyzer/releases/download/${PSSCRIPTANALYZER_VERSION}/PSScriptAnalyzer.${PSSCRIPTANALYZER_VERSION}.nupkg"
+          echo "${PSSCRIPTANALYZER_SHA256}  ${RUNNER_TEMP}/PSScriptAnalyzer.nupkg" | sha256sum --check --strict -
+          unzip -q "${RUNNER_TEMP}/PSScriptAnalyzer.nupkg" -d "${RUNNER_TEMP}/PSScriptAnalyzer"
           echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+          echo "${RUNNER_TEMP}/lua-language-server/bin" >> "${GITHUB_PATH}"
       - name: Lint Go
         # Each GOOS builds its own files (registry, junctions and shims are Windows
         # only, PTY tests are Unix only), so each one is linted.
@@ -171,11 +196,27 @@ jobs:
           done
           exit "${status}"
       - name: Lint workflows
-        # The shell in run steps isn't linted yet: shellcheck comes with the
-        # shell script linting.
+        # actionlint also runs the ShellCheck installed above on each run step.
         run: |
           actionlint -version
-          actionlint -shellcheck= -pyflakes=
+          actionlint -pyflakes=
+      - name: Lint shell scripts
+        run: |
+          shellcheck --version
+          shellcheck install.sh scripts/*.sh completions/bash_autocomplete
+      - name: Lint PowerShell
+        shell: pwsh
+        run: |
+          Import-Module "$env:RUNNER_TEMP/PSScriptAnalyzer/PSScriptAnalyzer.psd1"
+          "PSScriptAnalyzer $((Get-Module PSScriptAnalyzer).Version)"
+          $findings = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+          $findings | Format-List ScriptPath, Line, Severity, RuleName, Message
+          if ($findings) { exit 1 }
+      - name: Lint Lua
+        # Settings in .luarc.json. The check exits non-zero when it finds a problem.
+        run: |
+          lua-language-server --version
+          lua-language-server --check . --checklevel=Warning
 
   format:
     if: github.repository == 'version-fox/vfox'
