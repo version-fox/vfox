@@ -285,3 +285,41 @@ func TestExpireAtUsesOneClockReading(t *testing.T) {
 		}
 	}
 }
+
+func TestCyclicFanOutIsRejected(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local t = {}
+	t.a = t
+	t.b = t
+	local ok, err = c.set("k", t, -1)
+	assert(ok == nil and type(err) == "string")
+	`, file)
+}
+
+func TestDeepInvalidStringIsRejected(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local t = {"\255"}
+	for i = 1, 250 do t = { t } end
+	local ok, err = c.set("k", t, -1)
+	assert(ok == nil and type(err) == "string")
+	`, file)
+}
+
+func TestSharedSubtableFanOutIsCapped(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	start := time.Now()
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local t = {1}
+	for i = 1, 40 do t = { a = t, b = t } end
+	local ok, err = c.set("k", t, -1)
+	assert(ok == nil and type(err) == "string")
+	`, file)
+	if time.Since(start) > 10*time.Second {
+		t.Fatal("encoding a shared subtable chain took too long")
+	}
+}

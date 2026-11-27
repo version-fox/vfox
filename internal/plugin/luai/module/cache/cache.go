@@ -19,7 +19,6 @@ package cache
 
 import (
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -48,32 +47,6 @@ func expireAt(now time.Time, seconds float64) (int64, bool) {
 		return 0, false
 	}
 	return now.UnixNano() + int64(seconds*float64(time.Second)), true
-}
-
-// checkStrings reports an error for any string, table key or value that is not valid
-// UTF-8. The JSON encoding would otherwise replace the bad bytes without an error.
-func checkStrings(v lua.LValue, depth int) error {
-	switch x := v.(type) {
-	case lua.LString:
-		if !utf8.ValidString(string(x)) {
-			return errors.New("string is not valid UTF-8")
-		}
-	case *lua.LTable:
-		if depth > 200 {
-			return nil // json.Encode reports nesting that deep
-		}
-		var err error
-		x.ForEach(func(k, val lua.LValue) {
-			if err != nil {
-				return
-			}
-			if err = checkStrings(k, depth+1); err == nil {
-				err = checkStrings(val, depth+1)
-			}
-		})
-		return err
-	}
-	return nil
 }
 
 // writeMu serializes read-modify-write cycles inside this process. Other processes
@@ -202,17 +175,12 @@ func apiNew(L *lua.LState) int {
 				L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
 			}
 		}
-		if err := checkStrings(lua.LString(key), 0); err != nil {
+		if !utf8.ValidString(key) {
 			L.Push(lua.LNil)
-			L.Push(lua.LString("key: " + err.Error()))
+			L.Push(lua.LString("key is not valid UTF-8"))
 			return 2
 		}
-		if err := checkStrings(value, 0); err != nil {
-			L.Push(lua.LNil)
-			L.Push(lua.LString("value: " + err.Error()))
-			return 2
-		}
-		data, err := json.Encode(value)
+		data, err := json.EncodeStrict(value)
 		if err != nil {
 			L.Push(lua.LNil)
 			L.Push(lua.LString(err.Error()))

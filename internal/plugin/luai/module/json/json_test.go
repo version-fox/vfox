@@ -18,7 +18,9 @@ package json
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -162,5 +164,123 @@ func TestEncodeSharedSubtableIsNotRecursion(t *testing.T) {
 	s.PreloadModule("JSON", loader)
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestEncodeSharedSubtableFanOutIsCapped(t *testing.T) {
+	old := maxValues
+	maxValues = 10000
+	defer func() { maxValues = old }()
+	const str = `
+	local json = require("JSON")
+	local t = {1}
+	for i = 1, 40 do t = { a = t, b = t } end
+	local out, err = json.encode(t)
+	assert(out == nil and string.find(err, "more than"), "expected a size error, got: " .. tostring(err))
+	-- a large but ordinary list still encodes
+	local list = {}
+	for i = 1, 5000 do list[i] = i end
+	assert(json.encode(list) ~= nil)
+	`
+	s := lua.NewState()
+	defer s.Close()
+	s.PreloadModule("JSON", loader)
+	if err := s.DoString(str); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestEncodeLimits(t *testing.T) {
+	const str = `
+	local json = require("JSON")
+	local function nest(n)
+		local t = {1}
+		for i = 2, n do t = { t } end
+		return t
+	end
+	-- 256 nested tables encode and decode; 257 are refused at once
+	local out = assert(json.encode(nest(256)))
+	assert(json.decode(out) ~= nil)
+	local out2, err = json.encode(nest(257))
+	assert(out2 == nil and string.find(err, "256 levels"), tostring(err))
+	-- an acyclic chain far deeper than any real data fails fast, not slowly
+	local out3, err3 = json.encode(nest(200000))
+	assert(out3 == nil and string.find(err3, "levels"), tostring(err3))
+	-- a cycle is still reported as a cycle, including a fan-out of self references
+	local loop = {}
+	loop.a = loop
+	loop.b = loop
+	local _, err5 = json.encode(loop)
+	assert(string.find(err5, "recursively nested"), tostring(err5))
+	-- non-strict encode keeps replacing bad bytes, as before
+	assert(json.encode({"\255"}) == '["\\ufffd"]')
+	`
+	s := lua.NewState()
+	defer s.Close()
+	s.PreloadModule("JSON", loader)
+	start := time.Now()
+	if err := s.DoString(str); err != nil {
+		t.Error(err)
+	}
+	if time.Since(start) > 20*time.Second {
+		t.Errorf("limits test took %v", time.Since(start))
+	}
+}
+
+func TestEncodeStrictRejectsInvalidUTF8(t *testing.T) {
+	s := lua.NewState()
+	defer s.Close()
+	for name, v := range map[string]lua.LValue{
+		"string": lua.LString("a\xffb"),
+		"nested": func() lua.LValue { t := s.NewTable(); t.Append(lua.LString("\xff")); return t }(),
+		"key": func() lua.LValue {
+			t := s.NewTable()
+			t.RawSetString("\xff", lua.LNumber(1))
+			return t
+		}(),
+	} {
+		if _, err := EncodeStrict(v); err == nil || !strings.Contains(err.Error(), "UTF-8") {
+			t.Errorf("%s: expected a UTF-8 error, got %v", name, err)
+		}
+		if _, err := Encode(v); err != nil {
+			t.Errorf("%s: Encode must keep accepting it, got %v", name, err)
+		}
+	}
+	if out, err := EncodeStrict(lua.LString("€")); err != nil || string(out) != `"€"` {
+		t.Errorf("valid UTF-8 must pass: %s %v", out, err)
+	}
+}
+
+func TestEncodeValueBudgetBoundary(t *testing.T) {
+	old := maxValues
+	maxValues = 100
+	defer func() { maxValues = old }()
+	s := lua.NewState()
+	defer s.Close()
+	list := func(n int) lua.LValue {
+		l := s.NewTable()
+		for i := 0; i < n; i++ {
+			l.Append(lua.LNumber(1))
+		}
+		return l
+	}
+	// the table itself counts as a value, so 99 items fit and 100 do not
+	if _, err := Encode(list(99)); err != nil {
+		t.Fatalf("99 items must fit: %v", err)
+	}
+	if _, err := Encode(list(100)); err == nil || !strings.Contains(err.Error(), "more than") {
+		t.Fatalf("100 items must be refused, got %v", err)
+	}
+	// a shared subtable counts once per reference
+	shared := list(40)
+	outer := s.NewTable()
+	outer.Append(shared)
+	outer.Append(shared)
+	if _, err := Encode(outer); err != nil {
+		t.Fatalf("two references of 40 items fit in 100: %v", err)
+	}
+	outer.Append(shared)
+	if _, err := Encode(outer); err == nil {
+		t.Fatal("three references of 40 items must exceed 100")
 	}
 }

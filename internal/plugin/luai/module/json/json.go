@@ -19,6 +19,7 @@ package json
 import (
 	"encoding/json"
 	"errors"
+	"unicode/utf8"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -76,6 +77,21 @@ var (
 	errNested      = errors.New("cannot encode recursively nested tables to JSON")
 	errSparseArray = errors.New("cannot encode sparse array")
 	errInvalidKeys = errors.New("cannot encode mixed or invalid key types")
+	errTooLarge    = errors.New("cannot encode more than 1048576 values to JSON")
+	errTooDeep     = errors.New("cannot encode tables nested more than 256 levels deep to JSON")
+	errNotUTF8     = errors.New("cannot encode a string that is not valid UTF-8 to JSON")
+)
+
+// maxValues caps the values one Encode call may produce. A table that is referenced
+// several times is encoded once per reference, so a few levels of sharing can expand
+// into a tree with exponentially many values. It is a variable only so tests can
+// lower it.
+var maxValues = 1 << 20
+
+const (
+	// maxDepth caps table nesting. Each level re-validates the output of the level
+	// below it, so the cost grows with depth, and the Go stack grows with it too.
+	maxDepth = 256
 )
 
 type invalidTypeError lua.LValueType
@@ -84,20 +100,45 @@ func (i invalidTypeError) Error() string {
 	return `cannot encode ` + lua.LValueType(i).String() + ` to JSON`
 }
 
-// Encode returns the JSON encoding of value.
+// Encode returns the JSON encoding of value. A string that is not valid UTF-8 is
+// written with each bad byte replaced by U+FFFD, as encoding/json does.
 func Encode(value lua.LValue) ([]byte, error) {
+	return encode(value, false)
+}
+
+// EncodeStrict is Encode, but it returns an error for any string or table key that
+// is not valid UTF-8, so the encoding always decodes back to the same bytes.
+func EncodeStrict(value lua.LValue) ([]byte, error) {
+	return encode(value, true)
+}
+
+func encode(value lua.LValue, strict bool) ([]byte, error) {
 	return json.Marshal(jsonValue{
 		LValue:  value,
 		visited: make(map[*lua.LTable]bool),
+		count:   new(int),
+		strict:  strict,
 	})
 }
 
 type jsonValue struct {
 	lua.LValue
 	visited map[*lua.LTable]bool
+	count   *int
+	depth   int
+	strict  bool
+}
+
+func (j jsonValue) child(v lua.LValue) jsonValue {
+	j.LValue = v
+	j.depth++
+	return j
 }
 
 func (j jsonValue) MarshalJSON() (data []byte, err error) {
+	if *j.count++; *j.count > maxValues {
+		return nil, errTooLarge
+	}
 	switch converted := j.LValue.(type) {
 	case lua.LBool:
 		data, err = json.Marshal(bool(converted))
@@ -106,10 +147,16 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 	case *lua.LNilType:
 		data = []byte(`null`)
 	case lua.LString:
+		if j.strict && !utf8.ValidString(string(converted)) {
+			return nil, errNotUTF8
+		}
 		data, err = json.Marshal(string(converted))
 	case *lua.LTable:
 		if j.visited[converted] {
 			return nil, errNested
+		}
+		if j.depth >= maxDepth {
+			return nil, errTooDeep
 		}
 		j.visited[converted] = true
 		// only a table that contains itself is recursive; the same table twice is not
@@ -132,7 +179,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errSparseArray
 					return
 				}
-				arr = append(arr, jsonValue{value, j.visited})
+				arr = append(arr, j.child(value))
 				expectedKey++
 				key, value = converted.Next(key)
 			}
@@ -144,7 +191,11 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errInvalidKeys
 					return
 				}
-				obj[key.String()] = jsonValue{value, j.visited}
+				if j.strict && !utf8.ValidString(key.String()) {
+					err = errNotUTF8
+					return
+				}
+				obj[key.String()] = j.child(value)
 				key, value = converted.Next(key)
 			}
 			data, err = json.Marshal(obj)
