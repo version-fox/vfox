@@ -138,9 +138,11 @@ type encoder struct {
 	strict  bool
 }
 
-// add charges n bytes against the strict output budget.
-func (e *encoder) add(n int) error {
-	if !e.strict {
+// add charges n bytes of output against the budget. EncodeStrict charges every
+// value. Plain Encode charges only values written inside a repeat reference, so
+// ordinary data is never limited but a shared table cannot expand without bound.
+func (e *encoder) add(n int, repeat bool) error {
+	if !e.strict && !repeat {
 		return nil
 	}
 	if e.bytes += n; e.bytes > maxBytes {
@@ -173,23 +175,23 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 	case lua.LBool:
 		data, err = json.Marshal(bool(converted))
 		if err == nil {
-			err = e.add(len(data))
+			err = e.add(len(data), j.repeat)
 		}
 	case lua.LNumber:
 		data, err = json.Marshal(float64(converted))
 		if err == nil {
-			err = e.add(len(data))
+			err = e.add(len(data), j.repeat)
 		}
 	case *lua.LNilType:
 		data = []byte(`null`)
-		err = e.add(len(data))
+		err = e.add(len(data), j.repeat)
 	case lua.LString:
-		if e.strict {
-			if !utf8.ValidString(string(converted)) {
-				return nil, errNotUTF8
-			}
-			// charged before encoding, so a huge string is refused without copying it
-			if err = e.add(len(converted) + 2); err != nil {
+		if e.strict && !utf8.ValidString(string(converted)) {
+			return nil, errNotUTF8
+		}
+		// charged before encoding, so a huge string is refused without copying it
+		if e.strict || j.repeat {
+			if err = e.add(quotedLen(string(converted)), j.repeat); err != nil {
 				return nil, err
 			}
 		}
@@ -210,7 +212,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 		if e.done[converted] {
 			j.repeat = true
 		}
-		if err = e.add(2); err != nil {
+		if err = e.add(2, j.repeat); err != nil {
 			return nil, err
 		}
 
@@ -231,7 +233,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errSparseArray
 					return
 				}
-				if err = e.add(1); err != nil {
+				if err = e.add(1, j.repeat); err != nil {
 					return nil, err
 				}
 				arr = append(arr, j.child(value))
@@ -250,7 +252,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errNotUTF8
 					return
 				}
-				if err = e.add(len(key.String()) + 4); err != nil {
+				if err = e.add(quotedLen(key.String())+2, j.repeat); err != nil {
 					return nil, err
 				}
 				obj[key.String()] = j.child(value)
@@ -264,6 +266,37 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 		err = invalidTypeError(j.LValue.Type())
 	}
 	return
+}
+
+// quotedLen returns an upper bound for the size of s once it is written as a JSON
+// string: the quotes, plus six bytes for every character that encoding/json
+// escapes as \\uXXXX (<, >, &, U+2028, U+2029, control bytes and invalid UTF-8),
+// two for a quote, a backslash or a short escape, and the raw length otherwise.
+func quotedLen(s string) int {
+	n := 2
+	for i := 0; i < len(s); {
+		b := s[i]
+		if b < utf8.RuneSelf {
+			switch {
+			case b == '"' || b == '\\' || b == '\n' || b == '\r' || b == '\t':
+				n += 2
+			case b < 0x20 || b == '<' || b == '>' || b == '&':
+				n += 6
+			default:
+				n++
+			}
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 || r == '\u2028' || r == '\u2029' {
+			n += 6
+		} else {
+			n += size
+		}
+		i += size
+	}
+	return n
 }
 
 // Decode converts the JSON encoded data to Lua values.

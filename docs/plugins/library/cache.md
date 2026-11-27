@@ -29,3 +29,13 @@ c.remove("key")
 | `c.set(key, value, ttl)` | Stores `value`. `ttl` is in seconds (fractions allowed), `-1` never expires. Returns `true`, or `nil` and an error.     |
 | `c.get(key)`             | Returns the value, or `nil` when the key is missing or expired.                                     |
 | `c.remove(key)`          | Removes the key. Returns `true`, or `false` and an error.                                           |
+
+**Limits**
+
+`c.set` returns `nil` and an error message instead of storing the value when it is too big or too deep:
+
+- A table nested more than 256 levels deep is refused.
+- The JSON written for one value is limited to 64 MiB. The size is estimated conservatively from the encoded form, never below what is written: escaped characters such as `<`, `>` and `&` (six bytes each) and long keys count at their escaped size, and a table that is referenced several times counts once per reference. The estimate can be slightly above the real size (about one byte per array element, and some control characters), so a value just under 64 MiB can be refused.
+- Strings and table keys must be valid UTF-8.
+
+`json.encode` has no depth or size limit for ordinary data. The only limit on it is for tables that are referenced more than once: the values written for the repeated references are capped (about one million values or 64 MiB), so a small shared table cannot expand into an enormous output.

@@ -322,3 +322,26 @@ func TestSharedSubtableFanOutIsCapped(t *testing.T) {
 		t.Fatal("encoding a shared subtable chain took too long")
 	}
 }
+
+// Go writes <, > and & as six-byte escapes, so the size limit has to count the
+// escaped length. Two 10 MiB strings of "<" would otherwise write a 120 MB file.
+func TestEscapedOutputCountsAgainstSizeLimit(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local s = string.rep("<", 10 * 1024 * 1024)
+	local ok, err = c.set("k", { s, s }, -1)
+	assert(ok == nil and string.find(err, "64 MiB"), tostring(err))
+	assert(c.get("k") == nil)
+	-- the same data without escapes (20 MiB written) is accepted
+	local plain = string.rep("a", 10 * 1024 * 1024)
+	assert(c.set("k", { plain, plain }, -1) == true)
+	-- keys are charged by their escaped size too
+	local key = string.rep("&", 11 * 1024 * 1024)
+	local ok2, err2 = c.set("k2", { [key] = 1 }, -1)
+	assert(ok2 == nil and string.find(err2, "64 MiB"), tostring(err2))
+	`, file)
+	if info, err := os.Stat(file); err == nil && info.Size() > 64<<20 {
+		t.Fatalf("cache file is %d bytes", info.Size())
+	}
+}
