@@ -138,12 +138,9 @@ func TestLookupSdk_ConcurrentCacheHits(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			// Try to lookup the cached SDK
-			_, err := manager.LookupSdk("test")
-			if err != nil {
-				// Error is expected since we stored nil
-				// But we should not panic or race
-			}
+			// Try to lookup the cached SDK. An error is expected since we
+			// stored nil, but it must not panic or race.
+			_, _ = manager.LookupSdk("test")
 		}(i)
 	}
 

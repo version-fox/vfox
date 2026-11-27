@@ -191,7 +191,7 @@ func TestVfoxTomlChain(t *testing.T) {
 			t.Errorf("Expected scope project, got %s", scope.String())
 		}
 		// Empty map is acceptable for no attributes
-		if config.Attr != nil && len(config.Attr) != 0 {
+		if len(config.Attr) != 0 {
 			t.Errorf("Expected empty attributes, got %v", config.Attr)
 		}
 	})

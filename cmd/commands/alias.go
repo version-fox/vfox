@@ -126,12 +126,12 @@ func aliasListCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 		sort.Strings(keys)
 		for _, alias := range keys {
-			fmt.Fprintf(cmd.Writer, "%s@%s -> %s@%s\n", name, alias, name, aliases[alias])
+			_, _ = fmt.Fprintf(cmd.Writer, "%s@%s -> %s@%s\n", name, alias, name, aliases[alias])
 			printed = true
 		}
 	}
 	if !printed {
-		fmt.Fprintln(cmd.Writer, "No aliases defined. Create one with: vfox alias set <sdk> <alias> <version>")
+		_, _ = fmt.Fprintln(cmd.Writer, "No aliases defined. Create one with: vfox alias set <sdk> <alias> <version>")
 	}
 	return nil
 }

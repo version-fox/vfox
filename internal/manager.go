@@ -52,7 +52,7 @@ const (
 )
 
 var (
-	ManifestNotFound = errors.New("manifest not found")
+	ErrManifestNotFound = errors.New("manifest not found")
 )
 
 type NotFoundError struct {
@@ -166,7 +166,7 @@ func (m *Manager) LookupSdkWithInstall(name string, autoConfirm bool) (sdk.Sdk, 
 			logger.Debugf("Fetching plugin manifest for: %s\n", name)
 			manifest, err := m.fetchPluginManifest(m.GetRegistryAddress(name + ".json"))
 			if err != nil {
-				if errors.Is(err, ManifestNotFound) {
+				if errors.Is(err, ErrManifestNotFound) {
 					return nil, fmt.Errorf("[%s] not found in remote registry, please check the name", pterm.LightRed(name))
 				}
 				return nil, err
@@ -308,7 +308,7 @@ func (m *Manager) Update(pluginName string) error {
 		address := m.GetRegistryAddress(pluginMetadata.Name + ".json")
 		logger.Debugf("Fetching plugin %s from %s...\n", pluginName, util.RedactSourceURL(address))
 		registryManifest, err := m.fetchPluginManifest(address)
-		if errors.Is(err, ManifestNotFound) {
+		if errors.Is(err, ErrManifestNotFound) {
 			if pluginMetadata.ManifestUrl == "" {
 				return fmt.Errorf("%s plugin not support update", pluginName)
 			}
@@ -407,7 +407,7 @@ func (m *Manager) fetchPluginManifest(url string) (*RegistryPluginManifest, erro
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		logger.Debugf("Manifest not found (404): %s\n", util.RedactSourceURL(url))
-		return nil, ManifestNotFound
+		return nil, ErrManifestNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
 		logger.Debugf("Unexpected status code %d when fetching manifest\n", resp.StatusCode)
@@ -978,7 +978,7 @@ func (m *Manager) ParseLegacyFile(dirPath string, output func(sdkname, version s
 
 	// There are some legacy files to be parsed.
 	if len(legacyFileRecord.Record) > 0 {
-		for sdkName, _ := range legacyFileRecord.Record {
+		for sdkName := range legacyFileRecord.Record {
 			if s, err := m.LookupSdk(sdkName); err == nil {
 				//The .tool-version in the current directory has the highest priority,
 				//checking to see if the version information in the legacy file exists in the former,

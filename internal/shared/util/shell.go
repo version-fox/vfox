@@ -70,7 +70,7 @@ func powershellArgs(script string) []string {
 // windowsShellCommand (in shell_windows.go) passes its result to the OS via
 // SysProcAttr.CmdLine, bypassing Go's EscapeArg mangling entirely.
 func windowsCmdLine(comSpec, command string) string {
-	if strings.Contains(comSpec, " ") && !(strings.HasPrefix(comSpec, `"`) && strings.HasSuffix(comSpec, `"`)) {
+	if strings.Contains(comSpec, " ") && (!strings.HasPrefix(comSpec, `"`) || !strings.HasSuffix(comSpec, `"`)) {
 		comSpec = `"` + comSpec + `"`
 	}
 	return comSpec + " /d /c " + command

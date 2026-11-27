@@ -83,7 +83,7 @@ func addCmd(ctx context.Context, cmd *cli.Command) error {
 		for index, sdkName := range uniqueArgs {
 			pterm.Printf("[%s/%d]: Adding %s plugin...\n", pterm.Green(index+1), len(uniqueArgs), pterm.Green(sdkName))
 			if err := manager.Add(sdkName, "", ""); err != nil {
-				fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", sdkName, err.Error())
+				_, _ = fmt.Fprintf(errOut, "Add plugin(%s) failed: %s\n", sdkName, err.Error())
 				failed = append(failed, sdkName)
 			}
 		}

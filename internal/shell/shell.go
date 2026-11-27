@@ -118,7 +118,7 @@ func Open(pid int) error {
 
 	// dev case
 	if len(cmdSlice) > 1 && cmdSlice[0] == "go" && cmdSlice[1] == "run" {
-		return fmt.Errorf("You are running the command in development mode, please use the binary file instead")
+		return fmt.Errorf("you are running the command in development mode, please use the binary file instead")
 	}
 
 	logger.Debugf("open a new shell: %s\n", cmdSlice[0])
@@ -130,9 +130,7 @@ func Open(pid int) error {
 		// quoting when the shell is installed under a path with spaces.
 		shellName = executable
 	}
-	if strings.HasPrefix(shellName, "-") {
-		shellName = shellName[1:]
-	}
+	shellName = strings.TrimPrefix(shellName, "-")
 
 	// Look for the shell in PATH
 	shellPath, err := exec.LookPath(shellName)

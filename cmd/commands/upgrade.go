@@ -129,10 +129,11 @@ func downloadFile(c *http.Client, filepath string, url string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	return err
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
@@ -216,7 +217,9 @@ func upgradeCmd(ctx context.Context, cmd *cli.Command) error {
 			return cli.Exit("Failed to backup: "+err.Error(), 1)
 		}
 		if err := os.Rename(tempExePath, exePath); err != nil {
-			os.Rename(backupExePath, exePath)
+			if restoreErr := os.Rename(backupExePath, exePath); restoreErr != nil {
+				return cli.Exit(fmt.Sprintf("Failed to replace executable: %v; restoring it from %s also failed: %v", err, backupExePath, restoreErr), 1)
+			}
 			return cli.Exit("Failed to replace executable: "+err.Error(), 1)
 		}
 		batchContent := fmt.Sprintf(":Repeat\n"+

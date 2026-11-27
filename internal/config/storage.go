@@ -46,7 +46,8 @@ func (s *Storage) Validate() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	defer os.Remove(tmpfn)
-	return nil
+	closeErr := f.Close()
+	// Best effort: the file only probes that the directory is writable.
+	_ = os.Remove(tmpfn)
+	return closeErr
 }

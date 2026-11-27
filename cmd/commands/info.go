@@ -195,7 +195,7 @@ func infoVersion(cmd *cli.Command, manager *internal.Manager, name string, versi
 	data := versionData{Name: name, Version: string(version), Path: notFound, Home: notFound}
 	if err == nil {
 		data.Path = installation.PackagePath
-		data.Home = installation.Runtime.Path
+		data.Home = installation.Path
 		data.Origin = string(installation.Origin)
 		data.Target = installation.Target
 	}
@@ -214,7 +214,7 @@ func describeVersion(s sdk.Sdk, name string, version sdk.Version, installation *
 	out.Installed = true
 	out.Origin = string(installation.Origin)
 	out.Target = installation.Target
-	out.Home = installation.Runtime.Path
+	out.Home = installation.Path
 	out.PackagePath = installation.PackagePath
 	out.Receipt = installation.Receipt
 	for _, addition := range installation.Additions {

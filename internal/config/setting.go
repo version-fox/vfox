@@ -95,7 +95,7 @@ func sectionField(t reflect.Type, name string) (reflect.StructField, bool) {
 }
 
 func deref(t reflect.Type) reflect.Type {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t
