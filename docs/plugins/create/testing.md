@@ -66,11 +66,14 @@ vfox plugin run . PreInstall --input '{"version":"latest"}' --json
 vfox plugin run . EnvKeys --input-file tests/env-keys.json --offline --json
 vfox plugin run . PreInstall --input '{"version":"1.2.3"}' --os windows --arch amd64
 vfox plugin run . ParseLegacyFile --input '{"filename":".example-version","filepath":"tests/fixtures/version","strategy":"latest_installed","installedVersions":["1.2.3"]}' --json
+vfox plugin run . PreInstall --input '{"version":"29.1.2","installedSdks":{"OTP-29.1.2":{"name":"erlang","version":"OTP-29.1.2","path":"/home/me/.vfox/cache/erlang/v-OTP-29.1.2"}}}' --json
 ```
 
 On shells with different JSON quoting rules, prefer `--input-file`. `--input` and `--input-file` are mutually exclusive; omitted input is `{}`.
 
 Hook names are case-sensitive: `Available`, `PreInstall`, `EnvKeys`, `PostInstall`, `PreUse`, `ParseLegacyFile`, `PreUninstall`, `Fingerprint`, `Detect`. Supply the normal hook context, including paths and installed SDK information when needed. For `ParseLegacyFile`, supply an `installedVersions` array; the adapter provides the hook's `getInstalledVersions()` callback. No installation, scope switching or SDK lookup happens automatically. Invoking an unimplemented optional hook is an error.
+
+`PreInstall` and `PreUse` therefore see only the `installedSdks` the input supplies, and an empty table when it is left out, while `vfox use` and a plain `vfox install` pass the installed versions (`vfox install --reinstall` and `--as` pass an empty table). A hook that maps a version to an installed one answers differently in `run` unless the input lists them, as in the last `PreInstall` example above.
 
 `run` allows real HTTP and retains the real environment by default; `--offline` rejects HTTP. `--json` writes only the typed result to stdout. Void hooks and hooks that provide no result produce `null`. Unknown result fields are discarded by the normal codec. Lua prints, standard output writes, download progress and `os.execute` output go to stderr. Errors go to stderr and cause a nonzero exit. Without `--json`, the result is indented and prefixed with the hook name.
 

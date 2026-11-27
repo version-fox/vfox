@@ -115,6 +115,7 @@ func TestInstallRejectsAPreInstallResultWithoutAVersion(t *testing.T) {
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
+	// It fails before any lock is taken, so not even a lock file is left.
 	for _, entry := range entries {
 		t.Errorf("a failed install left %s behind", entry.Name())
 	}
