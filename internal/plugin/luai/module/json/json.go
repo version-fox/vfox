@@ -112,6 +112,8 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 			return nil, errNested
 		}
 		j.visited[converted] = true
+		// only a table that contains itself is recursive; the same table twice is not
+		defer delete(j.visited, converted)
 
 		key, value := converted.Next(lua.LNil)
 

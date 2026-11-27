@@ -212,3 +212,34 @@ func TestLuaValueRoundTrips(t *testing.T) {
 	assert(c.get("nilval") == nil) -- stored as JSON null, same as a missing key
 	`, file)
 }
+
+func TestTTLBeyondTheStorableRangeIsRejected(t *testing.T) {
+	s := lua.NewState()
+	defer s.Close()
+	Preload(s)
+	s.SetGlobal("arg1", lua.LString(filepath.Join(t.TempDir(), "cache.bin")))
+	err := s.DoString(`require("vfox.cache").new(arg1).set("far", "v", 8000000000)`)
+	if err == nil || !strings.Contains(err.Error(), "expire time") {
+		t.Fatalf("expected an expire time error, got %v", err)
+	}
+	// a long ttl that fits stays readable
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	assert(c.set("far", "v", 3000000000) == true)
+	assert(c.get("far") == "v")
+	`, filepath.Join(t.TempDir(), "cache.bin"))
+}
+
+func TestSharedSubtableIsStoredAndCycleIsRejected(t *testing.T) {
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local shared = { 1, 2 }
+	assert(c.set("k", { a = shared, b = shared }, -1) == true)
+	local v = c.get("k")
+	assert(v.a[2] == 2 and v.b[2] == 2)
+	local loop = {}
+	loop.self = loop
+	local ok, err = c.set("loop", loop)
+	assert(ok == nil and type(err) == "string")
+	`, filepath.Join(t.TempDir(), "cache.bin"))
+}

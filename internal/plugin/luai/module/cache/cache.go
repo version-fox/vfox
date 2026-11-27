@@ -32,8 +32,11 @@ import (
 	"github.com/version-fox/vfox/internal/shared/cache"
 )
 
-// maxSeconds is the largest expire time that still fits in a time.Duration.
-const maxSeconds = int64(math.MaxInt64 / int64(time.Second))
+// maxSeconds is the largest ttl, in seconds from now, whose absolute expire time still
+// fits in the int64 UnixNano the file stores (until the year 2262).
+func maxSeconds() int64 {
+	return (math.MaxInt64 - time.Now().UnixNano()) / int64(time.Second)
+}
 
 // writeMu serializes read-modify-write cycles inside this process. Other processes
 // are not locked out: the last writer of two overlapping writes wins.
@@ -145,7 +148,7 @@ func apiNew(L *lua.LState) int {
 		key := L.CheckString(1)
 		value := L.CheckAny(2)
 		seconds := L.OptNumber(3, -1)
-		if seconds != -1 && (math.IsNaN(float64(seconds)) || seconds < 0 || seconds > lua.LNumber(maxSeconds)) {
+		if seconds != -1 && (math.IsNaN(float64(seconds)) || seconds < 0 || seconds > lua.LNumber(maxSeconds())) {
 			L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
 		}
 		data, err := json.Encode(value)

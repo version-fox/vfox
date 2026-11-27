@@ -146,3 +146,21 @@ func TestDecodeValue_jsonNumber(t *testing.T) {
 		t.Fatalf("expecting LString, got %T", v)
 	}
 }
+
+func TestEncodeSharedSubtableIsNotRecursion(t *testing.T) {
+	const str = `
+	local json = require("JSON")
+	local shared = {1, 2}
+	assert(json.encode({a = shared, b = shared}) == '{"a":[1,2],"b":[1,2]}')
+	local loop = {}
+	loop.self = loop
+	local _, err = json.encode(loop)
+	assert(string.find(err, "recursively nested"), "expected recursion error, got: " .. (err or "nil"))
+	`
+	s := lua.NewState()
+	defer s.Close()
+	s.PreloadModule("JSON", loader)
+	if err := s.DoString(str); err != nil {
+		t.Error(err)
+	}
+}
