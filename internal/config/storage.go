@@ -19,7 +19,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 type Storage struct {
@@ -41,12 +40,16 @@ func (s *Storage) Validate() error {
 	if !stat.IsDir() {
 		return fmt.Errorf("%s is not a directory", s.SdkPath)
 	}
-	tmpfn := filepath.Join(s.SdkPath, ".tmpfile")
-	f, err := os.OpenFile(tmpfn, os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	// Probe write access with a uniquely named file so an existing file in
+	// SdkPath is never opened or removed.
+	f, err := os.CreateTemp(s.SdkPath, ".vfox-write-check-*")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	defer os.Remove(tmpfn)
-	return nil
+	name := f.Name()
+	closeErr := f.Close()
+	if err := os.Remove(name); err != nil {
+		return err
+	}
+	return closeErr
 }
