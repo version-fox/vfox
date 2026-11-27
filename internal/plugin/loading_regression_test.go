@@ -19,6 +19,7 @@ package plugin
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -62,6 +63,51 @@ func TestLoadingRejectsMalformedPlugin(t *testing.T) {
 				t.Fatalf("error = %v, want %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// The plugin directory lies under HOME, and a HOME containing ';' or '?' split
+// Lua's package.path or had the module name spliced into it, so a plugin's own
+// require failed (#821). The reported failures came from hook files, so both
+// layouts are covered: main.lua, and metadata.lua with hooks/ and lib/.
+func TestPluginRequiresItsModulesFromAnyDirectoryName(t *testing.T) {
+	names := []string{"home;semi"}
+	if runtime.GOOS != "windows" { // '?' is not allowed in a Windows file name
+		names = append(names, "home?question", "home;both?")
+	}
+	available := `local util = require("util")
+local version = require("version")
+function PLUGIN:Available(ctx) return {{version = util.prefix .. version}} end
+`
+	for _, name := range names {
+		for _, layout := range []string{"main", "metadata"} {
+			t.Run(name+"/"+layout, func(t *testing.T) {
+				dir := filepath.Join(t.TempDir(), name, "plugin")
+				if layout == "main" {
+					writePluginFile(t, dir, "util.lua", `return {prefix = "main-"}`)
+					writePluginFile(t, dir, "version.lua", `return "1.2.3"`)
+					writePluginFile(t, dir, "main.lua", minimalPlugin+available)
+				} else {
+					writePluginFile(t, dir, "metadata.lua", `PLUGIN = {name = "example", version = "0.0.1"}`)
+					writePluginFile(t, dir, "hooks/available.lua", available)
+					writePluginFile(t, dir, "hooks/pre_install.lua", `function PLUGIN:PreInstall(ctx) return {version = ctx.version} end`)
+					writePluginFile(t, dir, "hooks/env_keys.lua", `function PLUGIN:EnvKeys(ctx) return {} end`)
+					writePluginFile(t, dir, "hooks/util.lua", `return {prefix = "metadata-"}`)
+					writePluginFile(t, dir, "lib/version.lua", `return "1.2.3"`)
+				}
+				p, err := CreatePlugin(dir, &env.RuntimeEnvContext{UserConfig: config.DefaultConfig})
+				if p != nil {
+					defer p.Close()
+				}
+				if err != nil {
+					t.Fatalf("loading a plugin under %q: %v", name, err)
+				}
+				versions, err := p.Available(&AvailableHookCtx{})
+				if want := layout + "-1.2.3"; err != nil || len(versions) != 1 || versions[0].Version != want {
+					t.Fatalf("Available() = %v, %v, want version %q", versions, err, want)
+				}
+			})
+		}
 	}
 }
 

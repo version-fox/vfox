@@ -29,7 +29,9 @@ assert(archive.url == "https://example.com/sample-1.2.3-linux-amd64.zip")
 assert(requests == 2)
 
 status = 503
-local ok, err = pcall(function() plugin:Available({}) end)
+local ok, err = pcall(function()
+    plugin:Available({})
+end)
 assert(not ok and tostring(err):find("HTTP 503", 1, true))
 
 status = 200

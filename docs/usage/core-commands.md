@@ -11,11 +11,19 @@ vfox search <sdk-name> [...optionArgs]
 ```
 
 `sdk-name`: SDK name, such as `nodejs`, `custom-node`.
-`optionArgs`: Additional arguments for the search command. NOTE: Whether it is supported or not depends on the plugin.
+`optionArgs`: Arguments for the plugin's `Available` hook, such as `--no-cache`. Whether they do anything depends on the plugin.
+
+Before a `--`, vfox reads `-h`, `-help` and `-debug` as its own options wherever they are. Each one also works with two dashes and with a value, such as `--debug=false`. The first other argument is the SDK name. Apart from `-h`, `-help` and `-debug`, every argument after the SDK name goes to the plugin, `-v` and `--version` included. After a `--`, every argument goes to the plugin, except the SDK name when it comes after the `--`. The SDK name cannot start with a dash.
+
+```shell
+vfox search clang --no-cache
+vfox search clang -- --help   # --help goes to the plugin
+vfox search -- clang --help   # clang is the SDK name, --help goes to the plugin
+```
 
 ::: warning Cache
 
-`vfox` will cache the results of the `search` command to reduce the number of network requests. The default cache time is `12h`.
+`vfox` will cache the results of the `search` command to reduce the number of network requests. The default cache time is `12h`. A search with plugin arguments is not cached, so the plugin runs every time. A plugin that refreshes its list on a flag such as `--no-cache` should also delete `.available.cache` in its directory, so that the next search without arguments is fresh too.
 
 You can disable it through the following command.
 ```shell

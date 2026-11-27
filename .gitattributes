@@ -29,3 +29,7 @@ go.sum text eol=lf
 # CR as part of the file name and then cannot find "shim.exe".
 *.sha256 text eol=lf
 *.sha512 text eol=lf
+
+# Lua sources. StyLua (stylua.toml) writes LF, so a CRLF working tree would fail
+# `stylua --check`.
+*.lua text eol=lf

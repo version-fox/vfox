@@ -66,11 +66,14 @@ vfox plugin run . PreInstall --input '{"version":"latest"}' --json
 vfox plugin run . EnvKeys --input-file tests/env-keys.json --offline --json
 vfox plugin run . PreInstall --input '{"version":"1.2.3"}' --os windows --arch amd64
 vfox plugin run . ParseLegacyFile --input '{"filename":".example-version","filepath":"tests/fixtures/version","strategy":"latest_installed","installedVersions":["1.2.3"]}' --json
+vfox plugin run . PreInstall --input '{"version":"29.1.2","installedSdks":{"OTP-29.1.2":{"name":"erlang","version":"OTP-29.1.2","path":"/home/me/.vfox/cache/erlang/v-OTP-29.1.2"}}}' --json
 ```
 
 如果 shell 的 JSON 引号规则不同，优先使用 `--input-file`。`--input` 与 `--input-file` 互斥，省略输入时使用 `{}`。
 
 hook 名称区分大小写：`Available`、`PreInstall`、`EnvKeys`、`PostInstall`、`PreUse`、`ParseLegacyFile`、`PreUninstall`、`Fingerprint`、`Detect`、`Paths`。输入沿用正式 hook 上下文，所需路径、已安装 SDK 等信息由调用方提供。`ParseLegacyFile` 接收 `installedVersions` 数组，由适配层生成正式的 `getInstalledVersions()` 回调。命令不会自动安装、切换版本或查询已安装 SDK；调用未实现的可选 hook 会报错。
+
+因此 `PreInstall` 和 `PreUse` 只能看到输入中提供的 `installedSdks`，未提供时为空表；而 `vfox use` 和普通的 `vfox install` 会传入已安装的版本（`vfox install --reinstall` 和 `--as` 传入空表）。按已安装版本做映射的 hook，在 `run` 中的结果会与正式命令不同，除非像上面最后一个 `PreInstall` 示例那样在输入中列出它们。
 
 `run` 默认联网并保留真实环境，`--offline` 拒绝 HTTP 请求。`--json` 的 stdout 只包含强类型结果；无返回值或未提供结果时输出 `null`，协议以外的字段由正式 codec 丢弃。Lua 打印、标准输出写入、下载进度和 `os.execute` 输出进入 stderr；错误也写 stderr 并非零退出。不使用 `--json` 时，结果带 hook 名称并缩进显示。
 

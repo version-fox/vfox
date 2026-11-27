@@ -32,7 +32,7 @@ local function add(slot, item)
     if getmetatable(item) == Link then
         slot.links[item.word] = item.matcher
         table.insert(slot.items, item.word)
-    elseif type(item) == 'table' then
+    elseif type(item) == "table" then
         slot.onadvance = item.onadvance or slot.onadvance
         for _, v in ipairs(item) do
             add(slot, v)
@@ -70,7 +70,7 @@ function Matcher:setdelayinit(fn)
 end
 
 function Matcher.__concat(lhs, rhs)
-    assert(type(lhs) == 'string' and getmetatable(rhs) == Matcher, 'only "word" .. argmatcher is supported')
+    assert(type(lhs) == "string" and getmetatable(rhs) == Matcher, 'only "word" .. argmatcher is supported')
     return setmetatable({ word = lhs, matcher = rhs }, Link)
 end
 
@@ -100,7 +100,7 @@ end
 -- Unlike Clink, which reports errors from coroutines and carries on, errors are
 -- raised so that a failing script fails the test.
 function clink.runcoroutineuntilcomplete(co)
-    while coroutine.status(co) ~= 'dead' do
+    while coroutine.status(co) ~= "dead" do
         local ok, err = coroutine.resume(co)
         if not ok then
             error(err, 0)
@@ -110,16 +110,26 @@ end
 
 local function new_line_state(line, words)
     return {
-        getline = function() return line end,
-        getwordcount = function() return #words end,
-        getword = function(_, index) return words[index] end,
-        getendword = function() return words[#words] end,
-        getcursor = function() return #line + 1 end,
+        getline = function()
+            return line
+        end,
+        getwordcount = function()
+            return #words
+        end,
+        getword = function(_, index)
+            return words[index]
+        end,
+        getendword = function()
+            return words[#words]
+        end,
+        getcursor = function()
+            return #line + 1
+        end,
     }
 end
 
 local function is_flag(matcher, word)
-    return matcher.flags ~= nil and word:sub(1, 1) == '-'
+    return matcher.flags ~= nil and word:sub(1, 1) == "-"
 end
 
 -- The control surface used by the Go tests.
@@ -133,17 +143,17 @@ fakeclink = {}
 -- the first time the matcher is used in every edit line, not just once.
 function fakeclink.complete(line)
     local words = {}
-    for word in line:gmatch('%S+') do
+    for word in line:gmatch("%S+") do
         table.insert(words, word)
     end
-    if #words == 0 or line:find('%s$') then
-        table.insert(words, '') -- the word under the cursor
+    if #words == 0 or line:find("%s$") then
+        table.insert(words, "") -- the word under the cursor
     end
 
     local command = words[1]
     local root = matchers[command]
     if not root then
-        error('no argmatcher for ' .. command, 2)
+        error("no argmatcher for " .. command, 2)
     end
     if root.delayinit then
         root.delayinit(root, command)
@@ -166,7 +176,7 @@ function fakeclink.complete(line)
             if advance == nil then
                 arg_index = arg_index + 1
             elseif advance ~= 0 then
-                error('unsupported onadvance result: ' .. tostring(advance), 2)
+                error("unsupported onadvance result: " .. tostring(advance), 2)
             end
         end
     end
@@ -183,16 +193,16 @@ function fakeclink.complete(line)
     local matches = {}
     for _, item in ipairs(slot and slot.items or {}) do
         local offered = { item }
-        if type(item) == 'function' then
+        if type(item) == "function" then
             -- Same arguments as Clink: word, word_index, line_state, match_builder, user_data.
             offered = item(word, #words, state, {}, user_data)
-            if type(offered) ~= 'table' then
+            if type(offered) ~= "table" then
                 offered = {}
             end
         end
         -- Only the array part of a returned table is read, as Clink does.
         for _, match in ipairs(offered) do
-            if type(match) == 'table' then
+            if type(match) == "table" then
                 match = match.match
             end
             if match:sub(1, #word) == word then
@@ -209,7 +219,7 @@ end
 function fakeclink.filter_prompt()
     for _, filter in ipairs(prompt_filters) do
         if filter.filter then
-            filter:filter('prompt> ')
+            filter:filter("prompt> ")
         end
     end
     local queued = prompt_coroutines

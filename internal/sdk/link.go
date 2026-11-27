@@ -101,7 +101,7 @@ func (b *impl) Link(version Version, target string, opts LinkOptions) (linkErr e
 		return err
 	}
 
-	lock, err := acquireInstallLock(filepath.Join(b.InstallPath, ".v-"+string(version)+".lock"))
+	lock, err := acquireInstallLock(b.versionLockPath(version))
 	if err != nil {
 		return fmt.Errorf("cannot link %s: %w", label, err)
 	}

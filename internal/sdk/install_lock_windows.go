@@ -19,6 +19,7 @@
 package sdk
 
 import (
+	"errors"
 	"os"
 
 	"golang.org/x/sys/windows"
@@ -26,4 +27,10 @@ import (
 
 func lockInstallFile(file *os.File) error {
 	return windows.LockFileEx(windows.Handle(file.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &windows.Overlapped{})
+}
+
+// installLockHeld reports whether lockInstallFile failed because another
+// handle holds the lock.
+func installLockHeld(err error) bool {
+	return errors.Is(err, windows.ERROR_LOCK_VIOLATION)
 }

@@ -77,7 +77,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Add, Alias, Config, Current, Doctor, Env, Exec, IncludePath, Info, Install, LibPath, Link, List, Uninstall, Unuse, Use,
+	Activate, Add, Alias, Config, Current, Doctor, Env, Exec, IncludePath, Info, Install, LibPath, Link, List, Search, Uninstall, Unuse, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.

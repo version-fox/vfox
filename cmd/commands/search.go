@@ -21,21 +21,27 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"github.com/version-fox/vfox/internal"
 	"github.com/version-fox/vfox/internal/sdk"
+	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 var Search = &cli.Command{
-	Name:     "search",
-	Usage:    "Search a version of the target SDK",
-	Action:   searchCmd,
-	Category: CategorySDK,
+	Name:  "search",
+	Usage: "Search a version of the target SDK",
+	// The arguments after the SDK name belong to the plugin's Available hook,
+	// also the ones that start with a dash: vfox search clang --no-cache.
+	// searchArgs reads vfox's own options.
+	SkipFlagParsing: true,
+	Action:          searchCmd,
+	Category:        CategorySDK,
 }
 
 func RunSearch(sdkName string, availableArgs []string) error {
@@ -148,10 +154,86 @@ func installChosen(installer versionInstaller, prompt printer.Prompt, options []
 	return installer.Install(sdk.Version(selected.Key))
 }
 
+// searchHelpTemplate is the command help without the version flag under GLOBAL
+// OPTIONS, because -v, -V and --version after the SDK name go to the plugin.
+var searchHelpTemplate = strings.Replace(cli.CommandHelpTemplate,
+	`{{template "visiblePersistentFlagTemplate" .}}`,
+	`{{range .VisiblePersistentFlags}}{{if ne (index .Names 0) "version"}}
+   {{wrap .String 6}}{{end}}{{end}}`, 1)
+
+// searchCall is the search arguments split between vfox and the plugin.
+type searchCall struct {
+	sdkName    string
+	pluginArgs []string
+	help       bool
+	debug      bool
+}
+
+// searchArgs splits the search arguments. Before a "--", vfox reads its own
+// options wherever they are: -h, -help and -debug, each with one or two dashes
+// and an optional =value, as the flag parser read them. The first other argument
+// is the SDK name, and the rest go to the plugin in their order. After a "--",
+// every argument goes to the plugin, except the SDK name if it is not given yet.
+// -v, -V and --version are not vfox options here: after the SDK name they go
+// to the plugin like any other argument. An SDK name that starts with a dash is
+// an error. An empty SDK name stays empty, so the call fails with "sdk name is
+// required" instead of taking the next argument as the SDK name.
+func searchArgs(args []string) (searchCall, error) {
+	var opts searchCall
+	own := true
+	sdkSeen := false
+	for _, arg := range args {
+		if own {
+			if arg == "--" {
+				own = false
+				continue
+			}
+			if strings.HasPrefix(arg, "-") {
+				name, value, hasValue := strings.Cut(strings.TrimPrefix(arg[1:], "-"), "=")
+				if name == "h" || name == "help" || name == "debug" {
+					on := true
+					if hasValue {
+						var err error
+						if on, err = strconv.ParseBool(value); err != nil {
+							return opts, fmt.Errorf("invalid value %q for flag -%s: parse error", value, name)
+						}
+					}
+					if name == "debug" {
+						opts.debug = on
+					} else {
+						opts.help = on
+					}
+					continue
+				}
+			}
+		}
+		if !sdkSeen {
+			if strings.HasPrefix(arg, "-") {
+				return opts, fmt.Errorf("the sdk name cannot start with a dash: %s (vfox --version prints the vfox version)", arg)
+			}
+			opts.sdkName = arg
+			sdkSeen = true
+			continue
+		}
+		opts.pluginArgs = append(opts.pluginArgs, arg)
+	}
+	return opts, nil
+}
+
 func searchCmd(ctx context.Context, cmd *cli.Command) error {
-	sdkName := cmd.Args().First()
-	if sdkName == "" {
+	opts, err := searchArgs(cmd.Args().Slice())
+	if err != nil {
+		return cli.Exit(err.Error(), 1)
+	}
+	if opts.help {
+		cli.HelpPrinter(cmd.Root().Writer, searchHelpTemplate, cmd)
+		return nil
+	}
+	if opts.debug {
+		logger.SetLevel(logger.DebugLevel)
+	}
+	if opts.sdkName == "" {
 		return cli.Exit("sdk name is required", 1)
 	}
-	return RunSearch(sdkName, cmd.Args().Tail())
+	return RunSearch(opts.sdkName, opts.pluginArgs)
 }

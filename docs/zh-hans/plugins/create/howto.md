@@ -59,12 +59,18 @@
 
 如果版本的返回值为空，表示未找到版本，`vfox`会询问用户是否进行搜索操作。
 
+`ctx.installedSdks` 列出已安装的版本，以版本号为键，结构与 `PreUse` 中相同（用 `vfox install --as` 做出的副本不在其中）。另一个 `vfox` 此时正在安装或重新安装的版本也在其中；如果返回的是这样的版本，`vfox` 会等那次安装结束后再次调用 `PreInstall`。如果 `PreInstall` 运行期间另一次安装改变了这个列表，`vfox` 也会再次调用它，所以一次安装中 `PreInstall` 可能被调用不止一次。不要在其中做不能重复的事，例如下载或向用户提问：`vfox` 会下载它返回的内容。`PostInstall` 不能安装一个会被本插件的 `PreInstall` 映射到正在安装的版本上的版本：那次安装会等待运行它的这次安装，所以会立即失败并说明原因。在普通的 `vfox install` 中，如果返回的版本已经安装，`vfox` 会提示已安装，不再下载。插件更改了版本命名时，可以借此返回已有安装所用的名字，避免同一个版本以两个名字安装两次。`vfox install --as` 和 `vfox install --reinstall` 时该表为空，版本按输入的写法解析，副本或重新安装的版本的内容来自 `PreInstall` 为它返回的结果，与没有这个表时相同。插件不能返回副本的名字，`vfox` 会拒绝；`vfox install --as` 仍在制作该副本时也是如此。
+
 **位置**: `hooks/pre_install.lua`
 
 ```lua
 function PLUGIN:PreInstall(ctx)
     --- 用户输入
     local version = ctx.version
+    --- 已安装的版本（以版本号为键），与 PreUse 相同
+    --- 例如已安装 "OTP-29.1.2"：
+    --- local sdkInfo = ctx.installedSdks['OTP-29.1.2']
+    local installedSdks = ctx.installedSdks
     return {
         --- 版本号
         version = "xxx",
@@ -124,6 +130,8 @@ end
 ::: warning 缓存
 
 `vfox`会缓存`Available`返回的结果, 默认缓存时间为`12h`。请查看[配置#缓存](../../guides/configuration.md#%E7%BC%93%E5%AD%98)。
+
+带插件参数的搜索（例如 `vfox search <sdk-name> --no-cache`）不使用缓存，每次都会调用该钩子。如果插件通过这类参数刷新列表，也应删除插件目录下的 `.available.cache`，这样之后不带参数的搜索也能得到新结果。
 
 :::
 

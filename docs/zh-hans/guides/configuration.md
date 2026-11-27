@@ -111,7 +111,7 @@ vfox config github.baseUrl https://gh-proxy.org/https://github.com
 
 ## 缓存
 
-`vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。
+`vfox` 默认会缓存`search`命令的结果, 以减少网络请求次数。默认缓存时间为`12h`。带插件参数的`search`不使用缓存。
 
 ::: warning 特殊值
 
