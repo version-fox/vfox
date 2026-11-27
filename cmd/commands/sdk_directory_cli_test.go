@@ -53,6 +53,20 @@ func TestIncludePathOfTheCurrentVersion(t *testing.T) {
 	}
 }
 
+func TestIncludePathOfALinkedVersion(t *testing.T) {
+	f := newCLIFixture(t, false)
+	external := f.external(t, "alphatool")
+	must(t, os.MkdirAll(filepath.Join(external, "include"), 0755))
+	f.run(t, "link", "alpha@sys", external).mustSucceed(t, "link")
+
+	// The plugin reports the directory under the version's own path, which is a
+	// link to the linked SDK, so the path printed leads into that SDK.
+	home := filepath.Join(f.shared, "cache", "alpha", "v-sys", "alpha-sys")
+	if out := strings.TrimSpace(f.run(t, "include-path", "alpha@sys").mustSucceed(t, "include-path of a linked version").stdout); out != filepath.Join(home, "include") {
+		t.Errorf("include-path alpha@sys = %q, want %q", out, filepath.Join(home, "include"))
+	}
+}
+
 func TestPathCommandsUnderstandAliasesAndTheConventionalV(t *testing.T) {
 	f := newCLIFixture(t, false)
 	home := f.installOnDisk(t, "alpha", "21.0.2+13", "alphatool")
