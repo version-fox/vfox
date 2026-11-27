@@ -1,0 +1,16 @@
+version: "2"
+
+# The default linters: errcheck, govet, ineffassign, staticcheck and unused.
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        # Response bodies and other read-only streams: closing them can't lose data.
+        - (io.ReadCloser).Close
+  exclusions:
+    # Report an exclusion that no longer matches anything, so it can be removed.
+    warn-unused: true
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
