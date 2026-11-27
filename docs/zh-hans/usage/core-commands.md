@@ -341,6 +341,21 @@ vfox cd [options] [<sdk-name>]
 
 - `-p, --plugin`: 在插件目录下启动 shell。
 
+## Migrate
+
+把当前安装根目录里的 SDK 搬到一个新目录，并把该目录记为 `storage.sdkPath`。
+
+**用法**
+
+```shell
+vfox migrate <path>
+```
+
+`path`：新的安装根目录。目录不存在时 `vfox` 会创建它。
+
+当前安装根目录在设置了 `storage.sdkPath` 时就是该路径，否则是 `$VFOX_HOME/cache`。`vfox migrate` 只搬这个目录里的内容。插件、`config.yaml` 和 `sdks` 链接目录留在原地。指向旧根目录的目录链接会改指向新位置。用 [`vfox link`](#link) 登记的版本仍然是指向原来那个目录的链接。
+
+`vfox migrate <path>` 会把当前的安装根目录搬过去，并设置 `storage.sdkPath`。`vfox config storage.sdkPath` 只修改这项配置。
 
 ## Upgrade
 

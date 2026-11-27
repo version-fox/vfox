@@ -169,6 +169,7 @@ clink.argmatcher("vfox"):nofiles():setdelayinit(function(vfox)
                     return res
                 end)
                 :addflags("--list", "-l", "--unset", "-un", "--help", "-h"),
+        "migrate" .. clink.argmatcher():addflags("--help", "-h"),
         "cd" .. clink.argmatcher():nofiles():addarg(vfox_sdk_func):addflags("--plugin", "-p", "--help", "-h"),
         "exec" .. vfox_exec,
         "x" .. vfox_exec,

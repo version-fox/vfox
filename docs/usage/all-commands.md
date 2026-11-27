@@ -20,6 +20,7 @@ vfox exec <sdk-name>[@<version>] <command> [args...]         Execute a command i
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
 vfox config [<key>] [<value>]       Setup, view config
+vfox migrate <path>                 Move the SDK install root and set storage.sdkPath
 vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
 vfox upgrade                    Upgrade vfox to the latest version
 vfox --version                  Show the installed vfox version

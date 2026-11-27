@@ -340,6 +340,22 @@ vfox cd [options] [<sdk-name>]
 
 - `-p, --plugin`: Launch a shell in the plugin directory.
 
+## Migrate
+
+Move the SDKs in the current install root to a new directory and record that directory as `storage.sdkPath`.
+
+**Usage**
+
+```shell
+vfox migrate <path>
+```
+
+`path`: Directory that becomes the install root. `vfox` creates it when it does not exist.
+
+The current install root is `storage.sdkPath` when that is set, and `$VFOX_HOME/cache` otherwise. `vfox migrate` moves the entries in that directory. Plugins, `config.yaml`, and the `sdks` link directory stay where they are. A directory link that points into the old root is pointed at the new location. A version added with [`vfox link`](#link) stays a link to the directory it was linked from.
+
+`vfox migrate <path>` moves the current install root and sets `storage.sdkPath`. `vfox config storage.sdkPath` only changes the setting.
+
 ## Upgrade
 
 Upgrade `vfox` to the latest version.
