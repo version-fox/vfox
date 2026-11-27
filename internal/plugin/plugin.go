@@ -145,9 +145,5 @@ func isLuaPluginDir(pluginDirPath string) bool {
 
 	// legacy lua plugin
 	hookPath := filepath.Join(pluginDirPath, "main.lua")
-	if util.FileExists(hookPath) {
-		return true
-	}
-
-	return false
+	return util.FileExists(hookPath)
 }

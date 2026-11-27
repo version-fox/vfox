@@ -760,7 +760,7 @@ func (b *impl) recordInstall(requested, version Version, info *plugin.PreInstall
 	receipt := b.newReceipt(version, OriginInstalled)
 	receipt.Requested = string(requested)
 	// A copy kept under a name records the version the request resolved to.
-	if resolved := Version(info.PreInstallPackageItem.Version); resolved != version {
+	if resolved := Version(info.Version); resolved != version {
 		receipt.Resolved = string(resolved)
 	}
 	receipt.Sources = append(receipt.Sources, receiptSource(info.PreInstallPackageItem))
@@ -1940,7 +1940,7 @@ func (b *impl) Current() Version {
 // ParseLegacyFile tries to parse legacy version files to get the Runtime version.
 // It returns the first valid version found.
 func (b *impl) ParseLegacyFile(path string) (Version, error) {
-	legacyFilenames := b.plugin.Metadata.LegacyFilenames
+	legacyFilenames := b.plugin.LegacyFilenames
 	if len(legacyFilenames) == 0 {
 		return "", nil
 	}
@@ -2293,7 +2293,8 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 		return "", err
 	}
 
-	defer f.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = f.Close() }()
 
 	bar := progressbar.NewOptions64(
 		resp.ContentLength,
@@ -2313,9 +2314,13 @@ func (b *impl) Download(u *url.URL, headers map[string]string) (string, error) {
 			BarEnd:        "]",
 		}),
 	)
-	defer bar.Close()
+	// The bar only draws on the terminal.
+	defer func() { _ = bar.Close() }()
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -2434,7 +2439,8 @@ func ensureVfoxInGitignore(projectDir string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to open .gitignore: %w", err)
 	}
-	defer f.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = f.Close() }()
 
 	// Add newline if the file doesn't end with one
 	if len(contentStr) > 0 && !strings.HasSuffix(contentStr, "\n") {
@@ -2444,6 +2450,9 @@ func ensureVfoxInGitignore(projectDir string) (bool, error) {
 	}
 
 	if _, err := f.WriteString(".vfox/\n"); err != nil {
+		return false, fmt.Errorf("failed to write to .gitignore: %w", err)
+	}
+	if err := f.Close(); err != nil {
 		return false, fmt.Errorf("failed to write to .gitignore: %w", err)
 	}
 

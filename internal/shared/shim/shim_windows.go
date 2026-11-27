@@ -87,12 +87,13 @@ func (s *Shim) Generate() error {
 	// single quotes (double them). This handles paths with spaces,
 	// double quotes, and backslashes safely.
 	ps1Path := strings.ReplaceAll(s.BinaryPath, "'", "''")
-	if ext == ".cmd" {
+	switch ext {
+	case ".cmd":
 		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(cmdShimContent, s.BinaryPath)), stat.Mode()); err != nil {
 			return fmt.Errorf("failed to generate shim: %w", err)
 		}
 		return nil
-	} else if ext == ".ps1" {
+	case ".ps1":
 		if err = os.WriteFile(targetPath, []byte(fmt.Sprintf(ps1ShimContent, ps1Path)), stat.Mode()); err != nil {
 			return fmt.Errorf("failed to generate shim: %w", err)
 		}

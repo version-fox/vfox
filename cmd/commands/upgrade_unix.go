@@ -56,6 +56,9 @@ func checkUpgradeDirWritable(dir, exePath string) error {
 		}
 		return cli.Exit(msg, 1)
 	}
-	probe.Close()
+	if err := probe.Close(); err != nil {
+		_ = os.Remove(probe.Name())
+		return err
+	}
 	return os.Remove(probe.Name())
 }

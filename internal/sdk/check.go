@@ -214,7 +214,7 @@ func (b *impl) driftFindings(version Version, inst *Installation, opts DiagnoseO
 		return nil
 	}
 	label := b.Label(version)
-	current, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Runtime.Path)
+	current, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Path)
 	if err != nil {
 		if opts.Fast {
 			return nil

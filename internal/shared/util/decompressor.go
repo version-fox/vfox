@@ -51,12 +51,12 @@ func (g *GzipTarDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return err
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	tr := tar.NewReader(gzr)
 	var symlinks []symlink
@@ -99,10 +99,12 @@ loop:
 			}
 
 			if _, err := io.Copy(f, tr); err != nil {
+				_ = f.Close()
 				return err
 			}
-
-			f.Close()
+			if err := f.Close(); err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
@@ -130,7 +132,7 @@ func (g *XZTarDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	xzr, err := xz.NewReader(bufio.NewReader(file))
 	if err != nil {
 		return err
@@ -177,10 +179,12 @@ loop:
 			}
 
 			if _, err := io.Copy(f, tr); err != nil {
+				_ = f.Close()
 				return err
 			}
-
-			f.Close()
+			if err := f.Close(); err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
@@ -208,7 +212,7 @@ func (b *Bzip2TarDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	bzr := bzip2.NewReader(file)
 	tr := tar.NewReader(bzr)
@@ -251,9 +255,12 @@ loop:
 				return err
 			}
 			if _, err := io.Copy(f, tr); err != nil {
+				_ = f.Close()
 				return err
 			}
-			f.Close()
+			if err := f.Close(); err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			symlinks = append(symlinks, symlink{header.Linkname, target})
 		}
@@ -283,7 +290,7 @@ func (z *ZstdTarDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	zr, err := zstd.NewReader(file)
 	if err != nil {
@@ -357,7 +364,7 @@ func findRootFolderInZstdTar(tarFilePath string) string {
 	if err != nil {
 		return ""
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	zr, err := zstd.NewReader(file)
 	if err != nil {
@@ -452,7 +459,7 @@ func (z *ZipDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	for _, f := range r.File {
 		err := z.processZipFile(f, dest, rootFolderInZip)
 		if err != nil {
@@ -467,7 +474,7 @@ func findRootFolderInZip(zipFilePath string) string {
 	if err != nil {
 		return ""
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	var firstElement string
 
@@ -531,7 +538,7 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 		buf := new(bytes.Buffer)
 		_, err := io.Copy(buf, rc)
 		if err != nil {
-			return fmt.Errorf("%s: reading symlink target: %v", f.FileHeader.Name, err)
+			return fmt.Errorf("%s: reading symlink target: %v", f.Name, err)
 		}
 		return writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
 	} else {
@@ -544,12 +551,11 @@ func (z *ZipDecompressor) processZipFile(f *zip.File, dest string, rootFolderInZ
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-
-		_, err = io.Copy(f, rc)
-		if err != nil {
+		if _, err := io.Copy(f, rc); err != nil {
+			_ = f.Close()
 			return err
 		}
+		return f.Close()
 	}
 	return nil
 }
@@ -588,7 +594,7 @@ func findRootFolderIn7Zip(zipFilePath string) string {
 	if err != nil {
 		return ""
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	var firstElement string
 
@@ -619,7 +625,7 @@ func (s *SevenZipDecompressor) Decompress(dest string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
 		if err = s.extractFile(f, dest, rootFolderInZip); err != nil {
@@ -666,7 +672,7 @@ func (s *SevenZipDecompressor) extractFile(f *sevenzip.File, dest string, rootFo
 		buf := new(bytes.Buffer)
 		_, err := io.Copy(buf, rc)
 		if err != nil {
-			return fmt.Errorf("%s: reading symlink target: %v", f.FileHeader.Name, err)
+			return fmt.Errorf("%s: reading symlink target: %v", f.Name, err)
 		}
 		return writeNewSymbolicLink(fpath, strings.TrimSpace(buf.String()))
 	} else {
@@ -684,12 +690,11 @@ func (s *SevenZipDecompressor) extractFile(f *sevenzip.File, dest string, rootFo
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-
-		_, err = io.Copy(f, rc)
-		if err != nil {
+		if _, err := io.Copy(f, rc); err != nil {
+			_ = f.Close()
 			return err
 		}
+		return f.Close()
 	}
 	return nil
 }

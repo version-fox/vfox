@@ -221,11 +221,11 @@ func TestDiagnoseShadowedCommand(t *testing.T) {
 	}
 
 	t.Run("the plugin explains what it knows", func(t *testing.T) {
-		s.plugin.Metadata.ShadowHints = []plugin.ShadowHint{
+		s.plugin.ShadowHints = []plugin.ShadowHint{
 			{Match: "PNPM", Message: "pnpm installed its own tool.", URL: "https://example.com/pnpm.md"},
 			{Match: "volta", Message: "never shown"},
 		}
-		t.Cleanup(func() { s.plugin.Metadata.ShadowHints = nil })
+		t.Cleanup(func() { s.plugin.ShadowHints = nil })
 		hints := findingByID(s.Diagnose(DiagnoseOptions{Version: "1.0.0", Fast: true}), FindingPathShadowed).Hints
 		if len(hints) != 2 || hints[0] != "pnpm installed its own tool. See https://example.com/pnpm.md" {
 			t.Errorf("hints = %q", hints)

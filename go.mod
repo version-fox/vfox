@@ -17,7 +17,6 @@ require (
 	github.com/ulikunitz/xz v0.5.15
 	github.com/urfave/cli/v3 v3.4.1
 	github.com/yuin/gopher-lua v1.1.1
-	golang.org/x/crypto v0.52.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0
 	golang.org/x/term v0.43.0

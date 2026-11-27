@@ -79,14 +79,14 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 func configList(prefix string, v reflect.Value) {
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
 	for i := 0; i < v.NumField(); i++ {
 		key := v.Type().Field(i).Tag.Get("yaml")
 		value := v.Field(i)
-		if (value.Kind() == reflect.Ptr && value.Elem().Kind() == reflect.Struct) || value.Kind() == reflect.Struct {
+		if (value.Kind() == reflect.Pointer && value.Elem().Kind() == reflect.Struct) || value.Kind() == reflect.Struct {
 			configList(prefix+key+".", value)
 		} else {
 			fmt.Printf(prefix+key+" = %v\n", value.Interface())
@@ -97,7 +97,7 @@ func configList(prefix string, v reflect.Value) {
 func configGet(v reflect.Value, keys []string) {
 	var foundCount int
 	for _, key := range keys {
-		if v.Kind() == reflect.Ptr {
+		if v.Kind() == reflect.Pointer {
 			v = v.Elem()
 		}
 		for i := 0; i < v.NumField(); i++ {
@@ -109,7 +109,7 @@ func configGet(v reflect.Value, keys []string) {
 		}
 	}
 	if foundCount == len(keys) {
-		if (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct) || v.Kind() == reflect.Struct {
+		if (v.Kind() == reflect.Pointer && v.Elem().Kind() == reflect.Struct) || v.Kind() == reflect.Struct {
 			configList(strings.Join(keys, ".")+".", v)
 		} else {
 			fmt.Printf("%v\n", v.Interface())

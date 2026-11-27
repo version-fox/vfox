@@ -59,7 +59,8 @@ func (d *Downloader) Download(url *url.URL) (string, error) {
 		return "", err
 	}
 
-	defer f.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = f.Close() }()
 
 	bar := progressbar.DefaultBytes(
 		resp.ContentLength,
@@ -67,6 +68,9 @@ func (d *Downloader) Download(url *url.URL) (string, error) {
 	)
 	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
 	if err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
 		return "", err
 	}
 	return path, nil

@@ -63,7 +63,7 @@ func TestLinkRegistersAnExistingDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pkg.Runtime.Path != main || pkg.Runtime.Name != "test-sdk" || pkg.PackagePath != s.packagePath("17-system") {
+	if pkg.Path != main || pkg.Name != "test-sdk" || pkg.PackagePath != s.packagePath("17-system") {
 		t.Errorf("runtime package = %+v", pkg.Runtime)
 	}
 

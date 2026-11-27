@@ -240,7 +240,8 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 		L.Push(lua.LString(err.Error()))
 		return 1
 	}
-	defer out.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = out.Close() }()
 
 	desc := "Downloading..."
 	if name := path.Base(req.URL.Path); filepath.Ext(name) != "" {
@@ -254,7 +255,7 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 		progressbar.OptionShowBytes(true),
 		progressbar.OptionFullWidth(),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Fprintln(m.output)
+			_, _ = fmt.Fprintln(m.output)
 		}),
 		progressbar.OptionSetDescription(desc),
 		progressbar.OptionSetTheme(progressbar.Theme{
@@ -265,9 +266,14 @@ func (m *Module) DownloadFile(L *lua.LState) int {
 			BarEnd:        "]",
 		}),
 	)
-	defer bar.Close()
+	// The bar only draws on the terminal.
+	defer func() { _ = bar.Close() }()
 	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
 	if err != nil {
+		L.Push(lua.LString(err.Error()))
+		return 1
+	}
+	if err := out.Close(); err != nil {
 		L.Push(lua.LString(err.Error()))
 		return 1
 	}

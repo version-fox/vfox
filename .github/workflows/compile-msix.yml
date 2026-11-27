@@ -21,9 +21,9 @@ jobs:
       - name: Checkout version-fox
         uses: actions/checkout@v7
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.24'
+          go-version-file: go.mod
           cache: true
       - name: Decode signing certificate
         env:

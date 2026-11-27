@@ -150,7 +150,7 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 			err = errInvalidKeys
 		}
 	default:
-		err = invalidTypeError(j.LValue.Type())
+		err = invalidTypeError(j.Type())
 	}
 	return
 }

@@ -78,7 +78,7 @@ func (m *RuntimeEnvContext) LoadVfoxTomlChainByScopes(scopes ...UseScope) (VfoxT
 // Its requests carry the vfox User-Agent unless they set one themselves.
 // It returns an error when the proxy is enabled and its URL does not parse.
 func (m *RuntimeEnvContext) HttpClient() (*http.Client, error) {
-	var transport http.RoundTripper = http.DefaultTransport
+	transport := http.DefaultTransport
 	if m.UserConfig.Proxy.Enable {
 		uri, err := url.Parse(m.UserConfig.Proxy.Url)
 		if err != nil {

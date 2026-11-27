@@ -28,18 +28,6 @@ import (
 	"github.com/version-fox/vfox/internal/plugin"
 )
 
-// waitUntil fails the test if cond is not true within a few seconds.
-func waitUntil(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting until %s", what)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 // In a VFOX_HOME shared by a group, the lock files another member created may not
 // be writable. They are still opened for reading and locked, as flock and
 // LockFileEx allow, so every version of the SDK can still be installed.

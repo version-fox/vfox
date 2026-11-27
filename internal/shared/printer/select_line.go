@@ -64,7 +64,7 @@ func (s *LineSelect) Show() (*KV, error) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			if readErr == io.EOF || filter == "" {
-				fmt.Fprintln(s.Out)
+				_, _ = fmt.Fprintln(s.Out)
 				return nil, nil
 			}
 			filter = ""
@@ -77,7 +77,7 @@ func (s *LineSelect) Show() (*KV, error) {
 			continue
 		}
 		if isDisabledIn(s.DisabledOptions, chosen.Key) {
-			fmt.Fprintf(s.Out, "%s is already installed, choose another version.\n", chosen.Key)
+			_, _ = fmt.Fprintf(s.Out, "%s is already installed, choose another version.\n", chosen.Key)
 			continue
 		}
 		return chosen, nil
@@ -124,26 +124,26 @@ func (s *LineSelect) choose(line string, listed []*KV) *KV {
 // render writes the title, the listed matches numbered, and the prompt.
 func (s *LineSelect) render(filter string, matches, listed []*KV) {
 	if filter == "" {
-		fmt.Fprintf(s.Out, "%s:\n", s.TopText)
+		_, _ = fmt.Fprintf(s.Out, "%s:\n", s.TopText)
 	} else {
-		fmt.Fprintf(s.Out, "%s [filter: %s]:\n", s.TopText, filter)
+		_, _ = fmt.Fprintf(s.Out, "%s [filter: %s]:\n", s.TopText, filter)
 	}
 	if len(matches) == 0 {
-		fmt.Fprintln(s.Out, "  No version matches the filter.")
+		_, _ = fmt.Fprintln(s.Out, "  No version matches the filter.")
 	}
 	for i, option := range listed {
 		label := option.Value
 		if isDisabledIn(s.DisabledOptions, option.Key) {
 			label += " (installed)"
 		}
-		fmt.Fprintf(s.Out, "  %d) %s\n", i+1, label)
+		_, _ = fmt.Fprintf(s.Out, "  %d) %s\n", i+1, label)
 	}
 	if more := len(matches) - len(listed); more > 0 {
-		fmt.Fprintf(s.Out, "  ... %d more, type part of a version to narrow the list\n", more)
+		_, _ = fmt.Fprintf(s.Out, "  ... %d more, type part of a version to narrow the list\n", more)
 	}
 	action := "cancel"
 	if filter != "" {
 		action = "clear the filter"
 	}
-	fmt.Fprintf(s.Out, "Type a number or a version to choose it, or text to filter the list (Enter to %s): ", action)
+	_, _ = fmt.Fprintf(s.Out, "Type a number or a version to choose it, or text to filter the list (Enter to %s): ", action)
 }

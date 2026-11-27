@@ -67,8 +67,8 @@ func CreateDirSymlink(target, link string) error {
 	success := false
 	defer func() {
 		if !success {
-			// Clean up on failure
-			os.Remove(link)
+			// Clean up on failure, best effort: the error above is the one to report.
+			_ = os.Remove(link)
 		}
 	}()
 
@@ -91,7 +91,8 @@ func CreateDirSymlink(target, link string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open directory: %w", err)
 	}
-	defer windows.CloseHandle(handle)
+	// Closing only releases the handle: the reparse point is set or the error returned.
+	defer func() { _ = windows.CloseHandle(handle) }()
 
 	// Create reparse point data
 	rp := winio.ReparsePoint{
