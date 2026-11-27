@@ -335,7 +335,7 @@ vfox include-path <sdk-name>[@<version>]
 vfox lib-path <sdk-name>[@<version>]
 ```
 
-Without `@<version>`, the current version of the SDK is used. The command fails if the version is not installed, if the plugin reports no such directory, or if the directory is not on disk. See [Paths](../plugins/create/howto.md#paths) for how a plugin reports them.
+Without `@<version>`, the version that `vfox env` puts on PATH in the current directory is used: the highest-priority version set for the SDK that is installed. The command fails if no installed version is set there, if the version named is not installed, if the plugin reports no such directory, or if the directory is not on disk. See [Paths](../plugins/create/howto.md#paths) for how a plugin reports them.
 
 ```shell
 CFLAGS="-I$(vfox include-path python)"

@@ -32,7 +32,7 @@ var IncludePath = &cli.Command{
 	Name:      "include-path",
 	Usage:     "Show the include directory of an SDK version",
 	ArgsUsage: "<sdk>[@<version>]",
-	UsageText: "Without @<version>, the current version of the SDK is used. The directory is the one the plugin reports.",
+	UsageText: "Without @<version>, the version that `vfox env` puts on PATH here is used. The directory is the one the plugin reports.",
 	Action:    sdkDirectoryCmd("include"),
 	Category:  CategorySDK,
 }
@@ -42,7 +42,7 @@ var LibPath = &cli.Command{
 	Name:      "lib-path",
 	Usage:     "Show the lib directory of an SDK version",
 	ArgsUsage: "<sdk>[@<version>]",
-	UsageText: "Without @<version>, the current version of the SDK is used. The directory is the one the plugin reports.",
+	UsageText: "Without @<version>, the version that `vfox env` puts on PATH here is used. The directory is the one the plugin reports.",
 	Action:    sdkDirectoryCmd("lib"),
 	Category:  CategorySDK,
 }
@@ -70,9 +70,12 @@ func sdkDirectoryCmd(name string) cli.ActionFunc {
 		if pinned {
 			version = manager.ResolveVersionName(sdkName, s, version)
 		} else {
-			version = s.Current()
+			version, err = installedVersionInEffect(manager, s)
+			if err != nil {
+				return fmt.Errorf("cannot tell which version applies here: %w", err)
+			}
 			if version == "" {
-				return fmt.Errorf("no current version of %s; name one as %s@<version>", sdkName, sdkName)
+				return fmt.Errorf("no installed version of %s is set here; name one as %s@<version>", sdkName, sdkName)
 			}
 		}
 		if !s.CheckRuntimeExist(version) {

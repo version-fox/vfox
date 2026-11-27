@@ -39,18 +39,70 @@ func TestIncludeAndLibPathOfAnInstalledVersion(t *testing.T) {
 	}
 }
 
-func TestIncludePathOfTheCurrentVersion(t *testing.T) {
+func TestIncludePathOfTheVersionInEffect(t *testing.T) {
 	f := newCLIFixture(t, false)
 	home := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
 	must(t, os.MkdirAll(filepath.Join(home, "include"), 0755))
 
-	r := f.run(t, "include-path", "alpha").mustFail(t, "include-path with no current version")
-	mustContain(t, "stderr", r.stderr, "no current version of alpha")
+	r := f.run(t, "include-path", "alpha").mustFail(t, "include-path with no version in effect")
+	mustContain(t, "stderr", r.stderr, "no installed version of alpha is set here")
 
 	f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
 	if out := strings.TrimSpace(f.run(t, "include-path", "alpha").mustSucceed(t, "include-path alpha").stdout); out != filepath.Join(home, "include") {
-		t.Errorf("include-path alpha = %q, want the directory of the current version", out)
+		t.Errorf("include-path alpha = %q, want the directory of the version in effect", out)
 	}
+}
+
+// Without a version, include-path names the version that `vfox env` puts on
+// PATH, so that build tools get the headers of the commands the shell runs.
+// Sdk.Current would find nothing when the project asks for a version it has not
+// installed, while the shell still runs the installed one.
+func TestIncludePathFollowsTheVersionTheShellUses(t *testing.T) {
+	t.Run("the installed global version when the project asks for a missing one", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		home := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+		must(t, os.MkdirAll(filepath.Join(home, "include"), 0755))
+		f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644)) // not installed
+
+		if out := strings.TrimSpace(f.run(t, "include-path", "alpha").mustSucceed(t, "include-path alpha").stdout); out != filepath.Join(home, "include") {
+			t.Errorf("include-path alpha = %q, want the installed version the shell uses", out)
+		}
+	})
+
+	t.Run("the installed project version over the global one", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		global := f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+		project := f.installOnDisk(t, "alpha", "2.0.0", "alphatool")
+		must(t, os.MkdirAll(filepath.Join(global, "include"), 0755))
+		must(t, os.MkdirAll(filepath.Join(project, "include"), 0755))
+		f.run(t, "use", "-g", "alpha@1.0.0").mustSucceed(t, "use -g alpha@1.0.0")
+		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644))
+
+		if out := strings.TrimSpace(f.run(t, "include-path", "alpha").mustSucceed(t, "include-path alpha").stdout); out != filepath.Join(project, "include") {
+			t.Errorf("include-path alpha = %q, want the project's version", out)
+		}
+	})
+
+	t.Run("nothing installed for the directory", func(t *testing.T) {
+		f := newCLIFixture(t, false)
+		f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nalpha = \"2.0.0\"\n"), 0644)) // not installed
+
+		r := f.run(t, "include-path", "alpha").mustFail(t, "include-path when the only version asked for is missing")
+		mustContain(t, "stderr", r.stderr, "no installed version of alpha is set here")
+	})
+}
+
+// A version file that cannot be read is reported as such, not as a missing
+// version.
+func TestIncludePathReportsVersionFilesItCannotRead(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+	must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools\n"), 0644))
+
+	r := f.run(t, "include-path", "alpha").mustFail(t, "include-path with a broken .vfox.toml")
+	mustContain(t, "stderr", r.stderr, "cannot tell which version applies here")
 }
 
 func TestIncludePathOfALinkedVersion(t *testing.T) {
