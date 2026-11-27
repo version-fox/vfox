@@ -50,7 +50,7 @@ mise 第一次需要插件时会从 GitHub 安装它。`mise use` 会把工具�
 | 列出可用版本 | `vfox search` | `mise ls-remote` |
 | 删除版本 | `vfox uninstall` | `mise uninstall` |
 | 作用域 | 全局、项目、会话 | 全局、项目，以及 `MISE_ENV` 环境；没有会话作用域 |
-| 版本文件 | `.vfox.toml`、`vfox.toml` | `mise.toml`、`.tool-versions` |
+| 版本文件 | `.vfox.toml`、`vfox.toml`；两者都没有时读取 `.tool-versions`，并将其保存为 `.vfox.toml` | `mise.toml`、`.tool-versions` |
 | 安装位置 | `$HOME/.vfox/cache/<sdk>/`，或 `storage.sdkPath` 下 | `~/.local/share/mise/installs/`（`$MISE_DATA_DIR/installs`） |
 | 插件位置 | `$HOME/.vfox/plugin/<name>/` | `~/.local/share/mise/plugins/`（`$MISE_DATA_DIR/plugins`） |
 | `PATH` 设置 | `vfox activate <shell>` | `mise activate <shell>`、shims 或 `mise exec` |
@@ -66,7 +66,7 @@ mise 第一次需要插件时会从 GitHub 安装它。`mise use` 会把工具�
 ## 环境变量
 
 mise 不读取 vfox 自己的任何变量。`VFOX_HOME` 不会改变 mise 的安装位置，`vfox activate`
-设置的 `__VFOX_*` 变量（`__VFOX_SHELL`、`__VFOX_PID`、`__VFOX_ORIG_PATH`、`__VFOX_CURTMPPATH`）
+设置的 `__VFOX_*` 变量（`__VFOX_SHELL`、`__VFOX_PID`、`__VFOX_ORIG_PATH`、`__VFOX_CURTMPPATH`，以及 PowerShell 中的 `__VFOX_INITIALIZED`）
 对 mise 没有作用。插件用 `os.getenv` 读取它们时，只有在同一个 shell 中也运行了
 `vfox activate` 才能读到。
 
@@ -77,8 +77,8 @@ mise 不读取 vfox 自己的任何变量。`VFOX_HOME` 不会改变 mise 的安
 
 在 mise 下有作用的变量：
 
-- `MISE_DATA_DIR`：mise 插件和安装的根目录。查找 mise 所装版本的插件会读取它，例如
-  [vfox-deno](https://github.com/version-fox/vfox-deno/blob/main/docs/link.md) 的 `Detect` 钩子。
+- `MISE_DATA_DIR`：mise 插件和安装的根目录。mise 会运行的钩子（例如 `PreInstall` 或 `EnvKeys`）
+  可以读取它来找到 mise 的目录。
 - `MISE_GITHUB_TOKEN`、`GITHUB_API_TOKEN` 或 `GITHUB_TOKEN`：mise 会把第一个已设置的值加到插件发往
   GitHub API（`api.github.com`）的 `http` 请求中，以提高速率限制。下载 Release 文件时不会带上它。
 - `MISE_TOOL_OPTS__<KEY>`：`mise.toml` 中的每个工具选项，插件运行的命令可以读取。
@@ -92,6 +92,7 @@ mise 不读取 `$HOME/.vfox/config.yaml`、`.vfox.toml` 或 `vfox.toml`。请在
 |---|---|
 | `legacyVersionFile` | 默认关闭。用 mise 的 [`idiomatic_version_file_enable_tools`](https://mise.jdx.dev/configuration/settings.html#idiomatic_version_file_enable_tools) 按工具开启，之后 mise 会运行插件的 `ParseLegacyFile` 钩子。没有 `strategy` 设置。 |
 | `proxy` | 不读取。请在运行 mise 的环境中设置 `HTTPS_PROXY` / `HTTP_PROXY`。 |
+| `plugin.http.timeout`、`plugin.http.downloadTimeout` | 不读取，mise 也没有对应的设置：它的 vfox 运行时不会给插件的 `http` 请求设置超时。mise 用 [`fetch_remote_versions_timeout`](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_timeout) 限制整个 `Available` 钩子的运行时间。 |
 | `storage.sdkPath` | 不读取。安装位于 `$MISE_DATA_DIR/installs` 下。 |
 | `registry.address`、`github.baseUrl` | 不读取：mise 从你写出的仓库安装插件，而不是从 vfox 注册表。要使用镜像，请设置 mise 的 [`url_replacements`](https://mise.jdx.dev/url-replacements.html)。 |
 | `cache.availableHookDuration` | 不读取。mise 的 [`fetch_remote_versions_cache`](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_cache) 决定 `Available` 返回的版本列表保留多久。 |
@@ -124,10 +125,13 @@ mise 不读取 `$HOME/.vfox/config.yaml`、`.vfox.toml` 或 `vfox.toml`。请在
 - 不依赖 `PreUse` 也要让插件的结果正确。如果插件用 `PreUse` 把 `21` 这样的部分版本补全为完整版本，
   也应在 `Available` 中返回完整版本，这样 mise 能自己解析 `21`。
 - `Fingerprint` 和 `Detect` 只是在 vfox 下增加功能，所以实现了它们的插件在 mise 下照样可以安装。
-- mise 还会运行 vfox 不认识的钩子：用于一个插件管理多个工具的 `Backend*` 钩子，以及 `MiseEnv`、
-  `MisePath` 和 `MiseInstallSatisfied`。它们在 mise 的
-  [工具插件](https://mise.jdx.dev/tool-plugin-development.html)和
-  [后端插件](https://mise.jdx.dev/backend-plugin-development.html)文档中有说明。vfox 会忽略它们。
+- mise 还会运行 vfox 不认识的钩子：用于一个插件管理多个工具的 `Backend*` 钩子；包管理器插件的
+  `PackageInstalled`、`PackageInstall`、`PackageUpgrade` 和 `PackageUninstall`；设置插件的
+  `SettingsRead` 和 `SettingsWrite`；以及 `MiseEnv`、`MisePath` 和 `MiseInstallSatisfied`。它们在 mise 的
+  [工具插件](https://mise.jdx.dev/tool-plugin-development.html)、
+  [后端插件](https://mise.jdx.dev/backend-plugin-development.html)、
+  [包插件](https://mise.jdx.dev/package-plugin-development.html)和
+  [设置插件](https://mise.jdx.dev/settings-plugin-development.html)文档中有说明。vfox 会忽略它们。
 - 要在 mise 下检查插件，可以用 `mise plugins link <name> <path>` 从本地目录安装，再运行
   `mise install <name>@<version>`。
 
@@ -144,7 +148,10 @@ shell 中的 `go` 可能来自一个安装，而 `GOROOT` 来自另一个。
 
 ### 安装位置与删除方法
 
-mise 和 vfox 从不共享安装。vfox 安装的版本 mise 看不到，反之亦然。
+mise 和 vfox 把安装放在不同的目录中，mise 看不到 vfox 安装的版本。但 vfox 可以使用 mise 安装的版本：
+`vfox link` 可以指向它的目录，插件在 mise 的目录中查找时，`vfox link --detect` 也能找到它，
+[vfox-deno](https://github.com/version-fox/vfox-deno/blob/main/docs/link.md) 就是这样做的。
+如果之后用 `mise uninstall` 删除了这个版本，vfox 的链接会指向一个不存在的目录；请用 `vfox uninstall` 删除该链接。
 
 - 用 `mise uninstall vfox:<owner>/<repo>@<version>` 从 mise 删除一个版本。
 - 用 `mise plugins uninstall <name>` 从 mise 删除插件；运行 `mise plugins ls` 查看插件名称。

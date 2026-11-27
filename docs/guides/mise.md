@@ -55,7 +55,7 @@ a vfox plugin, write its `vfox:` identifier.
 | List available versions | `vfox search` | `mise ls-remote` |
 | Remove a version | `vfox uninstall` | `mise uninstall` |
 | Scopes | global, project, session | global, project, plus `MISE_ENV` environments; no session scope |
-| Version files | `.vfox.toml`, `vfox.toml` | `mise.toml`, `.tool-versions` |
+| Version files | `.vfox.toml`, `vfox.toml`; without either, `.tool-versions`, which vfox then saves as `.vfox.toml` | `mise.toml`, `.tool-versions` |
 | Installs | `$HOME/.vfox/cache/<sdk>/`, or under `storage.sdkPath` | `~/.local/share/mise/installs/` (`$MISE_DATA_DIR/installs`) |
 | Plugins | `$HOME/.vfox/plugin/<name>/` | `~/.local/share/mise/plugins/` (`$MISE_DATA_DIR/plugins`) |
 | `PATH` setup | `vfox activate <shell>` | `mise activate <shell>`, shims, or `mise exec` |
@@ -74,7 +74,8 @@ Some features exist in only one of them:
 
 mise reads none of vfox's own variables. `VFOX_HOME` does not move mise's
 installs, and the `__VFOX_*` variables that `vfox activate` sets
-(`__VFOX_SHELL`, `__VFOX_PID`, `__VFOX_ORIG_PATH`, `__VFOX_CURTMPPATH`) have no
+(`__VFOX_SHELL`, `__VFOX_PID`, `__VFOX_ORIG_PATH`, `__VFOX_CURTMPPATH`, and
+`__VFOX_INITIALIZED` in PowerShell) have no
 effect on mise. A plugin that reads them with `os.getenv` sees them only if
 `vfox activate` also runs in the same shell.
 
@@ -86,10 +87,9 @@ over environment variables to find out where the plugin runs.
 
 Variables that matter under mise:
 
-- `MISE_DATA_DIR`: the root of mise's plugins and installs. A plugin that
-  looks for installs made by mise, such as the `Detect` hook of
-  [vfox-deno](https://github.com/version-fox/vfox-deno/blob/main/docs/link.md),
-  reads it.
+- `MISE_DATA_DIR`: the root of mise's plugins and installs. A hook that mise
+  runs, such as `PreInstall` or `EnvKeys`, can read it to find mise's
+  directories.
 - `MISE_GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `GITHUB_TOKEN`: mise adds the
   first one that is set to the plugin's `http` requests to the GitHub API
   (`api.github.com`), which raises the rate limit. Release downloads are sent
@@ -106,6 +106,7 @@ each `config.yaml` section in mise instead:
 |---|---|
 | `legacyVersionFile` | Off by default. Turn it on per tool with mise's [`idiomatic_version_file_enable_tools`](https://mise.jdx.dev/configuration/settings.html#idiomatic_version_file_enable_tools); mise then runs the plugin's `ParseLegacyFile` hook. There is no `strategy` setting. |
 | `proxy` | Not read. Set `HTTPS_PROXY` / `HTTP_PROXY` in the environment that runs mise. |
+| `plugin.http.timeout`, `plugin.http.downloadTimeout` | Not read, and mise has no setting that replaces them: its vfox runtime sets no timeout on the plugin's `http` requests. mise limits the whole `Available` hook with [`fetch_remote_versions_timeout`](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_timeout). |
 | `storage.sdkPath` | Not read. Installs go under `$MISE_DATA_DIR/installs`. |
 | `registry.address`, `github.baseUrl` | Not read: mise installs plugins from the repository you name, not from the vfox registry. To use a mirror, set mise's [`url_replacements`](https://mise.jdx.dev/url-replacements.html). |
 | `cache.availableHookDuration` | Not read. mise's [`fetch_remote_versions_cache`](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_cache) sets how long the version list from `Available` is kept. |
@@ -142,10 +143,14 @@ For plugin authors:
 - `Fingerprint` and `Detect` only add to what the plugin does under vfox, so a
   plugin that has them still installs under mise.
 - mise also runs hooks of its own that vfox does not know about: `Backend*`
-  hooks for one plugin that manages several tools, and `MiseEnv`, `MisePath`
-  and `MiseInstallSatisfied`. They are documented in mise's
-  [tool plugin](https://mise.jdx.dev/tool-plugin-development.html) and
-  [backend plugin](https://mise.jdx.dev/backend-plugin-development.html)
+  hooks for one plugin that manages several tools; `PackageInstalled`,
+  `PackageInstall`, `PackageUpgrade` and `PackageUninstall` for package
+  manager plugins; `SettingsRead` and `SettingsWrite` for settings plugins; and
+  `MiseEnv`, `MisePath` and `MiseInstallSatisfied`. They are documented in
+  mise's [tool plugin](https://mise.jdx.dev/tool-plugin-development.html),
+  [backend plugin](https://mise.jdx.dev/backend-plugin-development.html),
+  [package plugin](https://mise.jdx.dev/package-plugin-development.html) and
+  [settings plugin](https://mise.jdx.dev/settings-plugin-development.html)
   guides. vfox ignores them.
 - To check a plugin under mise, install it from a local directory with
   `mise plugins link <name> <path>` and run `mise install <name>@<version>`.
@@ -166,8 +171,13 @@ explains this case.
 
 ### Where installs are and how to remove them
 
-mise and vfox never share installs. A version that vfox installed is not seen
-by mise, and the other way around.
+mise and vfox keep their installs in separate directories, and mise does not
+see the versions that vfox installed. vfox can use a version that mise
+installed, though: `vfox link` points at its directory, and
+`vfox link --detect` finds it when the plugin looks in mise's directories, as
+[vfox-deno](https://github.com/version-fox/vfox-deno/blob/main/docs/link.md)
+does. If you then remove that version with `mise uninstall`, the vfox link
+points at a directory that no longer exists; remove it with `vfox uninstall`.
 
 - Remove one version from mise with
   `mise uninstall vfox:<owner>/<repo>@<version>`.
