@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -388,19 +389,25 @@ func TestDocumentedRefusals(t *testing.T) {
 	`, file)
 }
 
+// fixClock makes the module read the given instant for the rest of the test, so the
+// ttl tests do not depend on today's date or on a second boundary passing mid-test.
+func fixClock(t *testing.T, at time.Time) {
+	t.Helper()
+	old := clock
+	clock = func() time.Time { return at }
+	t.Cleanup(func() { clock = old })
+}
+
 func TestTTLErrorNamesBothBounds(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "cache.bin")
-	limit := maxTTL(time.Now())
-	if limit < 7_000_000_000 || limit > 7_500_000_000 {
-		t.Fatalf("unexpected ttl limit %d", limit)
-	}
+	fixClock(t, time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC))
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
-	assert(c.set("a", 1, 7.4e9))
-	for _, bad in ipairs({ 7.5e9, 1/0, 0/0, -0.5, -2 }) do
+	assert(c.set("a", 1, 3e9))
+	for _, bad in ipairs({ 1e10, 1/0, 0/0, -0.5, -2 }) do
 		local ok, err = pcall(c.set, "b", 1, bad)
 		assert(not ok)
-		assert(err:find("-1 (never expires)", 1, true) and err:find("from 0 up to 7", 1, true), err)
+		assert(err:find("-1 (never expires)", 1, true) and err:find("from 0 up to ", 1, true), err)
 	end
 	`, file)
 }
@@ -452,18 +459,125 @@ func TestReadErrorsAreDescribed(t *testing.T) {
 }
 
 // TestTTLBoundInTheErrorIsAccepted keeps the bound printed in the error and the bound
-// the check enforces from drifting apart: the printed value is accepted, one more is not.
+// the check enforces from drifting apart: the printed value is accepted, one more is
+// not. The clock is fixed, so no second boundary can fall between the calls.
 func TestTTLBoundInTheErrorIsAccepted(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "cache.bin")
+	at := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	fixClock(t, at)
+	want := maxTTL(at)
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
 	local _, err = pcall(c.set, "probe", 1, 1e10)
 	local bound = tonumber(err:match("up to (%d+)"))
-	assert(bound and bound > 7e9 and bound < 7.5e9, err)
+	assert(bound == tonumber(arg2), err)
 	assert(c.set("at", 1, bound) == true, "the printed bound must be accepted")
 	assert(c.set("below", 1, bound - 1) == true)
 	local ok = pcall(c.set, "above", 1, bound + 1)
 	assert(not ok, "one second above the printed bound must be refused")
 	assert(c.get("at") == 1)
-	`, file)
+	`, file, strconv.FormatInt(want, 10))
+}
+
+// TestTTLIsCheckedAtOneClockReading advances the clock on every read, so a ttl that
+// is exactly at the bound at the first reading is past it at the second. Whatever
+// reading the check uses, the caller must get either success or the raised argument
+// error that names the bound at that reading; never a returned (nil, error), which is
+// what two separate checks on two readings produced.
+func TestTTLIsCheckedAtOneClockReading(t *testing.T) {
+	at := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	fixClock(t, at)
+	bound := maxTTL(at)
+	reads := 0
+	clock = func() time.Time {
+		reads++
+		return at.Add(time.Duration(reads-1) * 2 * time.Second)
+	}
+	s := lua.NewState()
+	defer s.Close()
+	Preload(s)
+	s.SetGlobal("f", lua.LString(filepath.Join(t.TempDir(), "cache.bin")))
+	s.SetGlobal("b", lua.LNumber(bound))
+	err := s.DoString(`
+	local c = require("vfox.cache").new(f)
+	for i = 1, 3 do
+		local ok, r1, r2 = pcall(c.set, "k", 1, b)
+		if ok then
+			assert(r1 == true and r2 == nil, "a refused ttl must raise, not return nil and an error: " .. tostring(r2))
+		else
+			assert(r1:find("from 0 up to ", 1, true), r1)
+		end
+	end
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTTLBoundPastTheClockRaises sets the clock past the bound before the call.
+func TestTTLBoundPastTheClockRaises(t *testing.T) {
+	at := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	fixClock(t, at)
+	bound := maxTTL(at)
+	clock = func() time.Time { return at.Add(2 * time.Second) }
+	s := lua.NewState()
+	defer s.Close()
+	Preload(s)
+	s.SetGlobal("f", lua.LString(filepath.Join(t.TempDir(), "cache.bin")))
+	s.SetGlobal("b", lua.LNumber(bound))
+	err := s.DoString(`
+	local c = require("vfox.cache").new(f)
+	local ok, err = pcall(c.set, "k", 1, b)
+	assert(not ok, "expected the raised argument error")
+	assert(err:find("from 0 up to " .. string.format("%d", b - 2), 1, true), err)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTTLBoundAtTheEdgesOfTheClock(t *testing.T) {
+	for _, at := range []time.Time{
+		time.Date(1969, 12, 31, 0, 0, 0, 0, time.UTC),
+		time.Date(2262, 4, 11, 23, 47, 17, 0, time.UTC),
+		time.Date(2400, 1, 1, 0, 0, 0, 0, time.UTC),
+	} {
+		if got := maxTTL(at); got != -1 {
+			t.Errorf("maxTTL(%v) = %d, want -1", at, got)
+		}
+		for _, ttl := range []float64{0, 1} {
+			if _, ok := expireAt(at, ttl); ok {
+				t.Errorf("expireAt(%v, %v) accepted a ttl with an unsupported clock", at, ttl)
+			}
+		}
+		if msg := (ttlRangeError{maxTTL(at)}).Error(); !strings.Contains(msg, "clock") || strings.Contains(msg, "up to -1") {
+			t.Errorf("unhelpful message for an unsupported clock: %s", msg)
+		}
+	}
+	at := time.Date(2262, 4, 1, 0, 0, 0, 0, time.UTC)
+	limit := maxTTL(at)
+	if limit <= 0 {
+		t.Fatalf("maxTTL near 2262 = %d", limit)
+	}
+	if e, ok := expireAt(at, float64(limit)); !ok || e <= at.UnixNano() {
+		t.Errorf("the largest ttl near 2262 overflowed: %d %v", e, ok)
+	}
+	if _, ok := expireAt(at, float64(limit)+1); ok {
+		t.Error("a ttl above the bound was accepted near 2262")
+	}
+}
+
+// Within the last second of the bound the limit is 0: a ttl of 0 is accepted and the
+// error, if any, says "from 0 up to 0" truthfully.
+func TestTTLBoundOfZeroNearTheLimit(t *testing.T) {
+	at := time.Unix(0, math.MaxInt64-expireMargin-500_000_000)
+	if got := maxTTL(at); got != 0 {
+		t.Fatalf("maxTTL = %d, want 0", got)
+	}
+	if _, ok := expireAt(at, 0); !ok {
+		t.Error("ttl 0 refused although the bound is 0")
+	}
+	if _, ok := expireAt(at, 1); ok {
+		t.Error("ttl 1 accepted above a bound of 0")
+	}
 }

@@ -44,16 +44,37 @@ const expireMargin = int64(time.Second)
 // the bound and the result always use the same reading.
 func expireAt(now time.Time, seconds float64) (int64, bool) {
 	limit := maxTTL(now)
-	if limit <= 0 || seconds < 0 || math.IsNaN(seconds) || seconds > float64(limit) {
+	if limit < 0 || seconds < 0 || math.IsNaN(seconds) || seconds > float64(limit) {
 		return 0, false
 	}
 	return now.UnixNano() + int64(seconds*float64(time.Second)), true
 }
 
-// maxTTL is the largest ttl, in whole seconds, that is accepted at the given time. It is
-// about 7.4 billion (roughly 235 years) today and shrinks as the year 2262 gets closer.
+// maxTTL is the largest ttl, in whole seconds, that is accepted at the given time. It
+// shrinks by one second every second, because the expire time must stay below the
+// int64 UnixNano limit (April 2262). It is -1 when the clock itself is outside the range
+// this code supports (before 1970, or too close to that limit), so that not even a ttl
+// of 0 can be stored.
 func maxTTL(now time.Time) int64 {
+	if now.Before(time.Unix(0, 0)) || now.After(time.Unix(0, math.MaxInt64-expireMargin)) {
+		return -1
+	}
 	return (math.MaxInt64 - now.UnixNano() - expireMargin) / int64(time.Second)
+}
+
+// clock is the time source of the module. Tests replace it to get a fixed instant.
+var clock = time.Now
+
+// ttlRangeError reports a ttl outside what the file can store at the moment it was
+// checked. limit is the largest ttl accepted at that same moment, so the number in the
+// message always agrees with the check that refused the value.
+type ttlRangeError struct{ limit int64 }
+
+func (e ttlRangeError) Error() string {
+	if e.limit < 0 {
+		return "expire time cannot be stored: the system clock is outside the supported range (1970 up to April 2262)"
+	}
+	return fmt.Sprintf("expire time must be -1 (never expires) or a number of seconds from 0 up to %d", e.limit)
 }
 
 // writeMu serializes read-modify-write cycles inside this process. Other processes
@@ -150,7 +171,7 @@ func update(path string, fn func(items map[string]cache.Item, now time.Time) err
 	}
 	// The clock is read here, after the lock is held, so a ttl counts from the moment
 	// the entry is written and not from before a slow encode or a wait for the lock.
-	now := time.Now()
+	now := clock()
 	for k, item := range items {
 		if expired(item, now.UnixNano()) {
 			delete(items, k)
@@ -178,10 +199,10 @@ func apiNew(L *lua.LState) int {
 		key := L.CheckString(1)
 		value := L.CheckAny(2)
 		seconds := L.OptNumber(3, -1)
-		if seconds != -1 {
-			if _, ok := expireAt(time.Now(), float64(seconds)); !ok {
-				L.ArgError(3, fmt.Sprintf("expire time must be -1 (never expires) or a number of seconds from 0 up to %d", maxTTL(time.Now())))
-			}
+		// A negative or NaN ttl is refused whatever the time. Whether a large ttl fits
+		// depends on the clock, so update makes that check once, under the lock.
+		if seconds != -1 && (seconds < 0 || math.IsNaN(float64(seconds))) {
+			L.ArgError(3, ttlRangeError{maxTTL(clock())}.Error())
 		}
 		if !utf8.ValidString(key) {
 			L.Push(lua.LNil)
@@ -199,12 +220,16 @@ func apiNew(L *lua.LState) int {
 			if seconds != -1 {
 				var ok bool
 				if expire, ok = expireAt(now, float64(seconds)); !ok {
-					return errors.New("expire time is out of range")
+					return ttlRangeError{maxTTL(now)}
 				}
 			}
 			items[key] = cache.Item{Val: data, Expire: expire}
 			return nil
 		}); err != nil {
+			var rangeErr ttlRangeError
+			if errors.As(err, &rangeErr) {
+				L.ArgError(3, rangeErr.Error())
+			}
 			L.Push(lua.LNil)
 			L.Push(lua.LString(err.Error()))
 			return 2
@@ -221,7 +246,7 @@ func apiNew(L *lua.LState) int {
 			return 2
 		}
 		item, ok := items[key]
-		if !ok || expired(item, time.Now().UnixNano()) {
+		if !ok || expired(item, clock().UnixNano()) {
 			L.Push(lua.LNil)
 			return 1
 		}
