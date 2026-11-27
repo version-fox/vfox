@@ -17,6 +17,7 @@
 package cache
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -242,4 +243,45 @@ func TestSharedSubtableIsStoredAndCycleIsRejected(t *testing.T) {
 	local ok, err = c.set("loop", loop)
 	assert(ok == nil and type(err) == "string")
 	`, filepath.Join(t.TempDir(), "cache.bin"))
+}
+
+func TestNonUTF8RoundTrip(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	assert(c.set("k", "\255\254binary", -1) == nil)
+	assert(c.get("k") == nil)
+	local ok, err = c.set("\255", "v", -1)
+	assert(ok == nil and err:find("UTF%-8"))
+	ok, err = c.set("k", { nested = { "\255" } }, -1)
+	assert(ok == nil and err:find("UTF%-8"))
+	ok, err = c.set("k", { ["\255"] = 1 }, -1)
+	assert(ok == nil and err:find("UTF%-8"))
+	assert(c.set("k", "plain \226\130\172", -1) == true)
+	assert(c.get("k") == "plain \226\130\172")
+	`, file)
+}
+
+func TestExpireAtUsesOneClockReading(t *testing.T) {
+	// Leave 500ns of slack below the bound, like the case a reviewer reported.
+	const ttl = 7428000000
+	base := int64(math.MaxInt64) - ttl*int64(time.Second) - 500
+	now := time.Unix(0, base)
+	for _, seconds := range []float64{0, 1, ttl - 2, ttl} {
+		expire, ok := expireAt(now, seconds)
+		if ok && expire < now.UnixNano() {
+			t.Fatalf("ttl %v wrapped to %d", seconds, expire)
+		}
+	}
+	if _, ok := expireAt(now, ttl); ok {
+		t.Fatal("a ttl at the bound must keep a margin and be rejected")
+	}
+	if _, ok := expireAt(now, ttl-2); !ok {
+		t.Fatal("a ttl two seconds inside the bound must be accepted")
+	}
+	for _, bad := range []float64{-1, math.NaN(), math.Inf(1), 1e19} {
+		if _, ok := expireAt(time.Now(), bad); ok {
+			t.Fatalf("ttl %v must be rejected", bad)
+		}
+	}
 }

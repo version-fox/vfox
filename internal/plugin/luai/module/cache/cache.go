@@ -19,12 +19,14 @@ package cache
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	lua "github.com/yuin/gopher-lua"
 
@@ -32,10 +34,46 @@ import (
 	"github.com/version-fox/vfox/internal/shared/cache"
 )
 
-// maxSeconds is the largest ttl, in seconds from now, whose absolute expire time still
-// fits in the int64 UnixNano the file stores (until the year 2262).
-func maxSeconds() int64 {
-	return (math.MaxInt64 - time.Now().UnixNano()) / int64(time.Second)
+// expireMargin is kept free below the int64 limit so that float rounding in the
+// seconds to nanoseconds conversion can never push the expire time over it.
+const expireMargin = int64(time.Second)
+
+// expireAt returns the absolute expire time, in UnixNano, for a ttl of seconds counted
+// from now. It reports false when the result would not fit in the int64 the file
+// stores (until the year 2262). The caller reads the clock once and passes it in, so
+// the bound and the result always use the same reading.
+func expireAt(now time.Time, seconds float64) (int64, bool) {
+	left := math.MaxInt64 - now.UnixNano() - expireMargin
+	if left < 0 || seconds < 0 || math.IsNaN(seconds) || seconds >= float64(left/int64(time.Second)) {
+		return 0, false
+	}
+	return now.UnixNano() + int64(seconds*float64(time.Second)), true
+}
+
+// checkStrings reports an error for any string, table key or value that is not valid
+// UTF-8. The JSON encoding would otherwise replace the bad bytes without an error.
+func checkStrings(v lua.LValue, depth int) error {
+	switch x := v.(type) {
+	case lua.LString:
+		if !utf8.ValidString(string(x)) {
+			return errors.New("string is not valid UTF-8")
+		}
+	case *lua.LTable:
+		if depth > 200 {
+			return nil // json.Encode reports nesting that deep
+		}
+		var err error
+		x.ForEach(func(k, val lua.LValue) {
+			if err != nil {
+				return
+			}
+			if err = checkStrings(k, depth+1); err == nil {
+				err = checkStrings(val, depth+1)
+			}
+		})
+		return err
+	}
+	return nil
 }
 
 // writeMu serializes read-modify-write cycles inside this process. Other processes
@@ -112,6 +150,14 @@ func expired(item cache.Item, now int64) bool {
 	return item.Expire != int64(cache.NeverExpired) && now > item.Expire
 }
 
+// loadLocked is load under writeMu. On Windows a rename fails while another handle on
+// the file is open, so readers in this process must not overlap a writer.
+func loadLocked(path string) (map[string]cache.Item, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	return load(path)
+}
+
 // update loads the file again, applies fn and saves the result, dropping expired
 // items on the way. Reloading keeps changes that other cache objects, or other
 // processes, made after this one was created.
@@ -137,7 +183,7 @@ func update(path string, fn func(items map[string]cache.Item)) error {
 // decoded is reported and left alone, never overwritten.
 func apiNew(L *lua.LState) int {
 	path := L.CheckString(1)
-	if _, err := load(path); err != nil {
+	if _, err := loadLocked(path); err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(fmt.Sprintf("open cache %q: %s", path, err)))
 		return 2
@@ -148,18 +194,29 @@ func apiNew(L *lua.LState) int {
 		key := L.CheckString(1)
 		value := L.CheckAny(2)
 		seconds := L.OptNumber(3, -1)
-		if seconds != -1 && (math.IsNaN(float64(seconds)) || seconds < 0 || seconds > lua.LNumber(maxSeconds())) {
-			L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
+		now := time.Now()
+		expire := int64(cache.NeverExpired)
+		if seconds != -1 {
+			var ok bool
+			if expire, ok = expireAt(now, float64(seconds)); !ok {
+				L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
+			}
+		}
+		if err := checkStrings(lua.LString(key), 0); err != nil {
+			L.Push(lua.LNil)
+			L.Push(lua.LString("key: " + err.Error()))
+			return 2
+		}
+		if err := checkStrings(value, 0); err != nil {
+			L.Push(lua.LNil)
+			L.Push(lua.LString("value: " + err.Error()))
+			return 2
 		}
 		data, err := json.Encode(value)
 		if err != nil {
 			L.Push(lua.LNil)
 			L.Push(lua.LString(err.Error()))
 			return 2
-		}
-		expire := int64(cache.NeverExpired)
-		if seconds != -1 {
-			expire = time.Now().Add(time.Duration(float64(seconds) * float64(time.Second))).UnixNano()
 		}
 		if err := update(path, func(items map[string]cache.Item) {
 			items[key] = cache.Item{Val: data, Expire: expire}
@@ -173,7 +230,7 @@ func apiNew(L *lua.LState) int {
 	}))
 	t.RawSetString("get", L.NewFunction(func(L *lua.LState) int {
 		key := L.CheckString(1)
-		items, err := load(path)
+		items, err := loadLocked(path)
 		if err != nil {
 			L.Push(lua.LNil)
 			L.Push(lua.LString(err.Error()))
