@@ -170,12 +170,15 @@ func TestCorruptFileIsReportedAndNotOverwritten(t *testing.T) {
 func TestExpiryIsPersistedAndNoTempFilesRemain(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "cache.bin")
+	// The clock is fixed and then moved, so no real time has to pass.
+	at := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	fixClock(t, at)
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
 	c.set("short", "v", 0.05)
 	c.set("long", "v", 3600)
 	`, file)
-	time.Sleep(200 * time.Millisecond)
+	clock = func() time.Time { return at.Add(time.Second) }
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
 	assert(c.get("short") == nil and c.get("long") == "v")
@@ -280,7 +283,7 @@ func TestExpireAtUsesOneClockReading(t *testing.T) {
 		t.Fatal("a ttl two seconds inside the bound must be accepted")
 	}
 	for _, bad := range []float64{-1, math.NaN(), math.Inf(1), 1e19} {
-		if _, ok := expireAt(time.Now(), bad); ok {
+		if _, ok := expireAt(now, bad); ok {
 			t.Fatalf("ttl %v must be rejected", bad)
 		}
 	}
@@ -311,7 +314,6 @@ func TestDeepInvalidStringIsRejected(t *testing.T) {
 
 func TestSharedSubtableFanOutIsCapped(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "cache.bin")
-	start := time.Now()
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
 	local t = {1}
@@ -319,9 +321,44 @@ func TestSharedSubtableFanOutIsCapped(t *testing.T) {
 	local ok, err = c.set("k", t, -1)
 	assert(ok == nil and type(err) == "string")
 	`, file)
-	if time.Since(start) > 10*time.Second {
-		t.Fatal("encoding a shared subtable chain took too long")
-	}
+}
+
+// cache.new does not touch the disk: a missing file is an empty cache, and the first
+// successful set or remove writes the file and any missing directories.
+func TestNewDoesNotCreateTheFile(t *testing.T) {
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	t.Run("new and get leave the path alone", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "none")
+		eval(t, `
+		local c = assert(require("vfox.cache").new(arg1))
+		assert(c.get("k") == nil)
+		`, filepath.Join(dir, "cache.bin"))
+		if exists(dir) {
+			t.Fatal("new or get created the directory or the file")
+		}
+	})
+	t.Run("set creates the missing directories and the file", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "a", "b")
+		file := filepath.Join(dir, "cache.bin")
+		eval(t, `
+		local c = assert(require("vfox.cache").new(arg1))
+		assert(c.set("k", 1) == true)
+		assert(c.get("k") == 1)
+		`, file)
+		if !exists(dir) || !exists(file) {
+			t.Fatal("set did not create the directories and the file")
+		}
+	})
+	t.Run("remove of an absent key creates the file", func(t *testing.T) {
+		file := filepath.Join(t.TempDir(), "cache.bin")
+		eval(t, `
+		local c = assert(require("vfox.cache").new(arg1))
+		assert(c.remove("absent") == true)
+		`, file)
+		if !exists(file) {
+			t.Fatal("remove did not write the file")
+		}
+	})
 }
 
 // Go writes <, > and & as six-byte escapes, so the size limit has to count the

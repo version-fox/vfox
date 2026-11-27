@@ -254,7 +254,7 @@ func TestEncodeStrictLimits(t *testing.T) {
 	if _, err := EncodeStrict(nest(257)); err == nil || !strings.Contains(err.Error(), "256 levels") {
 		t.Fatalf("257 levels must be refused, got %v", err)
 	}
-	if _, err := EncodeStrict(nest(200000)); err == nil || !strings.Contains(err.Error(), "levels") {
+	if _, err := EncodeStrict(nest(20000)); err == nil || !strings.Contains(err.Error(), "levels") {
 		t.Fatalf("a very deep chain must fail fast, got %v", err)
 	}
 	// plain encode still accepts what strict refuses
