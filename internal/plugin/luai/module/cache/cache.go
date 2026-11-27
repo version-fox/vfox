@@ -44,13 +44,13 @@ const expireMargin = int64(time.Second)
 // the bound and the result always use the same reading.
 func expireAt(now time.Time, seconds float64) (int64, bool) {
 	limit := maxTTL(now)
-	if limit <= 0 || seconds < 0 || math.IsNaN(seconds) || seconds >= float64(limit) {
+	if limit <= 0 || seconds < 0 || math.IsNaN(seconds) || seconds > float64(limit) {
 		return 0, false
 	}
 	return now.UnixNano() + int64(seconds*float64(time.Second)), true
 }
 
-// maxTTL is the number of whole seconds a ttl must stay below at the given time. It is
+// maxTTL is the largest ttl, in whole seconds, that is accepted at the given time. It is
 // about 7.4 billion (roughly 235 years) today and shrinks as the year 2262 gets closer.
 func maxTTL(now time.Time) int64 {
 	return (math.MaxInt64 - now.UnixNano() - expireMargin) / int64(time.Second)

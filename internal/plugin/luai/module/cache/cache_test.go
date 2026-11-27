@@ -450,3 +450,20 @@ func TestReadErrorsAreDescribed(t *testing.T) {
 		t.Fatalf("file was overwritten: %q", data)
 	}
 }
+
+// TestTTLBoundInTheErrorIsAccepted keeps the bound printed in the error and the bound
+// the check enforces from drifting apart: the printed value is accepted, one more is not.
+func TestTTLBoundInTheErrorIsAccepted(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "cache.bin")
+	eval(t, `
+	local c = require("vfox.cache").new(arg1)
+	local _, err = pcall(c.set, "probe", 1, 1e10)
+	local bound = tonumber(err:match("up to (%d+)"))
+	assert(bound and bound > 7e9 and bound < 7.5e9, err)
+	assert(c.set("at", 1, bound) == true, "the printed bound must be accepted")
+	assert(c.set("below", 1, bound - 1) == true)
+	local ok = pcall(c.set, "above", 1, bound + 1)
+	assert(not ok, "one second above the printed bound must be refused")
+	assert(c.get("at") == 1)
+	`, file)
+}
