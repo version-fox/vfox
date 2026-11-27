@@ -328,3 +328,13 @@ function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
 		}
 	})
 }
+
+// A tool typed by its bare name is found in the bin directory of an installed
+// SDK, on Windows as well, where the file is alphatool.cmd (#787).
+func TestExecFindsABareCommandNameInTheInstalledSDK(t *testing.T) {
+	f := newCLIFixture(t, false)
+	f.installOnDisk(t, "alpha", "1.0.0", "alphatool")
+
+	f.runHere(t, "exec", "alpha@1.0.0", "--", "alphatool").mustSucceed(t, "exec with a bare command name")
+	f.runHere(t, "exec", "alpha@1.0.0", "--", "nosuchtool").mustFail(t, "exec with a command that is not there")
+}
