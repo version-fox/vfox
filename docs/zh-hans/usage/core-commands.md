@@ -357,6 +357,8 @@ vfox migrate <path>
 
 `vfox migrate <path>` 会把当前的安装根目录搬过去，并设置 `storage.sdkPath`。`vfox config storage.sdkPath` 只修改这项配置。
 
+当 `VFOX_HOME` 指向与其他用户共享的根目录，且你自己的 `config.yaml` 没有设置 `storage.sdkPath` 时，`vfox migrate` 会拒绝执行，因为它只更新你的配置，其他用户会丢失他们的 SDK。请手动搬移该目录，并在共享的 `config.yaml` 中设置 `storage.sdkPath`。
+
 ## Upgrade
 
 升级 `vfox` 到最新版本。

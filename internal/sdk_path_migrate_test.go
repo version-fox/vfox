@@ -410,3 +410,57 @@ func TestMigrateValidateFailureDoesNotRename(t *testing.T) {
 		t.Fatalf("config was written: %v", err)
 	}
 }
+
+func TestMigrateRefusesInstallRootSharedThroughVfoxHome(t *testing.T) {
+	root := t.TempDir()
+	sharedRoot := filepath.Join(root, "shared")
+	installs := filepath.Join(sharedRoot, "cache")
+	if err := os.MkdirAll(filepath.Join(installs, "alpha", "v-1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(root, "dest")
+	manager := migrateManager(t, installs)
+	meta := manager.RuntimeEnvContext.PathMeta
+	meta.Shared.Root = sharedRoot
+	meta.Shared.Config = filepath.Join(sharedRoot, "config.yaml")
+	calls := silenceInstallRootRewrite(t)
+
+	err := manager.MigrateSdkPath(dest)
+	if err == nil || !strings.Contains(err.Error(), "shared VFOX_HOME") {
+		t.Fatalf("MigrateSdkPath error = %v, want shared VFOX_HOME refusal", err)
+	}
+	if _, err := os.Stat(filepath.Join(installs, "alpha", "v-1")); err != nil {
+		t.Fatalf("shared install moved: %v", err)
+	}
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Fatalf("dest created: %v", err)
+	}
+	if *calls != 0 {
+		t.Fatalf("registry rewritten %d times", *calls)
+	}
+}
+
+func TestMigrateMovesUserChosenRootUnderSharedVfoxHome(t *testing.T) {
+	root := t.TempDir()
+	sharedRoot := filepath.Join(root, "shared")
+	installs := filepath.Join(root, "mine")
+	if err := os.MkdirAll(filepath.Join(installs, "alpha", "v-1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(root, "dest")
+	manager := migrateManager(t, installs)
+	meta := manager.RuntimeEnvContext.PathMeta
+	meta.Shared.Root = sharedRoot
+	meta.Shared.Config = filepath.Join(sharedRoot, "config.yaml")
+	if err := os.WriteFile(meta.User.Config, []byte("storage:\n  sdkPath: "+installs+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	silenceInstallRootRewrite(t)
+
+	if err := manager.MigrateSdkPath(dest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "alpha", "v-1")); err != nil {
+		t.Fatalf("user install not moved: %v", err)
+	}
+}

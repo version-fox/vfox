@@ -356,6 +356,8 @@ The current install root is `storage.sdkPath` when that is set, and `$VFOX_HOME/
 
 `vfox migrate <path>` moves the current install root and sets `storage.sdkPath`. `vfox config storage.sdkPath` only changes the setting.
 
+When `VFOX_HOME` points at a root shared with other users and your own `config.yaml` does not set `storage.sdkPath`, `vfox migrate` refuses, because it only updates your config and the other users would lose their SDKs. Move that root by hand and set `storage.sdkPath` in the shared `config.yaml`.
+
 ## Upgrade
 
 Upgrade `vfox` to the latest version.

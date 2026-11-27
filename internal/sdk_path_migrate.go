@@ -69,6 +69,14 @@ func (m *Manager) MigrateSdkPath(dest string) error {
 	if err != nil {
 		return err
 	}
+	if shared, err := installRootIsShared(meta); err != nil {
+		return err
+	} else if shared {
+		return fmt.Errorf("the install root %s belongs to the shared VFOX_HOME %s; "+
+			"moving it would remove the SDKs of every other user of that home, "+
+			"so move it by hand and update storage.sdkPath in %s",
+			source, meta.Shared.Root, meta.Shared.Config)
+	}
 
 	// Refuse before creating dest, so a destination inside the install root does
 	// not become a new child of the tree that is supposed to stay put.
@@ -137,6 +145,25 @@ func (m *Manager) MigrateSdkPath(dest string) error {
 		pterm.Warning.Printf("Failed to rewrite the install root in the registry: %v\n", err)
 	}
 	return nil
+}
+
+// installRootIsShared reports whether the install root is shared with other
+// users: VFOX_HOME names a root other than this user's vfox home, and this
+// user's own config does not choose the install root. The migration only
+// writes this user's config, so other users would keep resolving the old root
+// after its entries are gone.
+func installRootIsShared(meta *pathmeta.PathMeta) (bool, error) {
+	if meta.Shared.Root == "" || sameFile(meta.Shared.Root, meta.User.Home) {
+		return false, nil
+	}
+	if !util.FileExists(meta.User.Config) {
+		return true, nil
+	}
+	c, err := config.NewConfigWithPath(meta.User.Config)
+	if err != nil {
+		return false, err
+	}
+	return c.Storage == nil || c.Storage.SdkPath == "", nil
 }
 
 func absolutePath(path string) (string, error) {
