@@ -56,7 +56,12 @@ func buildVfox(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("the go command is needed to build vfox for this test: %v", err)
 	}
-	bin := filepath.Join(t.TempDir(), "vfox")
+	name := "vfox"
+	if runtime.GOOS == "windows" {
+		// go build takes an explicit -o name as it is, and Windows runs only .exe files.
+		name += ".exe"
+	}
+	bin := filepath.Join(t.TempDir(), name)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, goTool, "build", "-buildvcs=false", "-o", bin, ".")
