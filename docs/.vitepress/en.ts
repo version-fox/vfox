@@ -52,6 +52,7 @@ function sidebar(): DefaultTheme.Sidebar {
                 {text: 'Quick Start', link: '/guides/quick-start'},
                 {text: 'Configuration', link: '/guides/configuration'},
                 {text: 'Multi-User Sharing', link: '/guides/multi-user-sharing'},
+                {text: 'Using with mise', link: '/guides/mise'},
                 {text: 'Uninstallation', link: '/guides/uninstallation'},
                 {text: 'FAQ', link: '/guides/faq'},
             ]
