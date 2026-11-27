@@ -101,28 +101,28 @@ func installWindowsExecOverrides(L *lua.LState) {
 			shellCmd.Stdin = os.Stdin
 			shellCmd.Stderr = os.Stderr
 			if err := shellCmd.Start(); err != nil {
-				reader.Close()
-				writer.Close()
+				_ = reader.Close()
+				_ = writer.Close()
 				ls.RaiseError("failed to start: %s", err)
 				return 0
 			}
 			// Close the writer in the parent; the child keeps its copy.
 			// Lua retains the reader.
-			writer.Close()
+			_ = writer.Close()
 			luaFile = reader
 		} else {
 			shellCmd.Stdin = reader
 			shellCmd.Stdout = os.Stdout
 			shellCmd.Stderr = os.Stderr
 			if err := shellCmd.Start(); err != nil {
-				reader.Close()
-				writer.Close()
+				_ = reader.Close()
+				_ = writer.Close()
 				ls.RaiseError("failed to start: %s", err)
 				return 0
 			}
 			// Close the reader in the parent; the child keeps its copy.
 			// Lua retains the writer.
-			reader.Close()
+			_ = reader.Close()
 			luaFile = writer
 		}
 
@@ -178,7 +178,9 @@ func installWindowsExecOverrides(L *lua.LState) {
 			return 1
 		}))
 		f.RawSetString("close", ls.NewFunction(func(ls *lua.LState) int {
-			h.f.Close()
+			// A pipe has no buffer to flush, so Write has already reported any
+			// error; the exit status below is the result that matters.
+			_ = h.f.Close()
 			err := h.cmd.Wait()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {

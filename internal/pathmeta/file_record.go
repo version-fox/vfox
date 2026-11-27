@@ -42,7 +42,8 @@ func (m *FileRecord) Save() error {
 	if err != nil {
 		return fmt.Errorf("failed to create file record %s: %w", m.Path, err)
 	}
-	defer file.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = file.Close() }()
 
 	for k, v := range m.Record {
 		_, err := fmt.Fprintf(file, "%s %s\n", k, v)
@@ -50,7 +51,7 @@ func (m *FileRecord) Save() error {
 			return err
 		}
 	}
-	return nil
+	return file.Close()
 }
 
 // NewFileRecord creates a new FileRecord from a file
@@ -62,7 +63,7 @@ func NewFileRecord(path string) (*FileRecord, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()

@@ -49,7 +49,7 @@ func TestRuntimeDirectoryThatIsALink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuntimePackage: %v, although CheckRuntimeExist says the version is there", err)
 	}
-	if pkg.Runtime.Name != "test-sdk" || pkg.Runtime.Path != main || pkg.PackagePath != s.packagePath("ext") {
+	if pkg.Name != "test-sdk" || pkg.Path != main || pkg.PackagePath != s.packagePath("ext") {
 		t.Errorf("runtime package = %+v", pkg.Runtime)
 	}
 }

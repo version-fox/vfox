@@ -269,7 +269,7 @@ func unmarshalWorker(value lua.LValue, reflected reflect.Value) error {
 		for i := 0; i < reflected.NumField(); i++ {
 			f := reflected.Type().Field(i)
 			field := reflected.Field(i)
-			if f.Anonymous && field.CanSet() && field.Kind() == reflect.Ptr && field.IsNil() {
+			if f.Anonymous && field.CanSet() && field.Kind() == reflect.Pointer && field.IsNil() {
 				field.Set(reflect.New(field.Type().Elem()))
 			}
 		}
@@ -314,7 +314,7 @@ func findField(reflected reflect.Value, fieldName string) reflect.Value {
 		f := t.Field(i)
 		if f.Anonymous {
 			embeddedValue := reflected.Field(i)
-			if embeddedValue.Kind() == reflect.Ptr {
+			if embeddedValue.Kind() == reflect.Pointer {
 				if embeddedValue.IsNil() {
 					embeddedValue.Set(reflect.New(embeddedValue.Type().Elem()))
 				}

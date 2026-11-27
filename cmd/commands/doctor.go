@@ -206,14 +206,14 @@ func doctorAdopt(cmd *cli.Command, manager *internal.Manager, name string, versi
 			switch {
 			case err != nil:
 				failed++
-				fmt.Fprintf(cmd.ErrWriter, "Could not adopt %s: %v\n", label, err)
+				_, _ = fmt.Fprintf(cmd.ErrWriter, "Could not adopt %s: %v\n", label, err)
 			case adopted:
 				written++
-				fmt.Fprintf(cmd.Writer, "Adopted %s\n", label)
+				_, _ = fmt.Fprintf(cmd.Writer, "Adopted %s\n", label)
 			}
 		}
 	}
-	fmt.Fprintf(cmd.Writer, "%s written.\n", plural(written, "receipt"))
+	_, _ = fmt.Fprintf(cmd.Writer, "%s written.\n", plural(written, "receipt"))
 	if failed > 0 {
 		return cli.Exit("", 1)
 	}

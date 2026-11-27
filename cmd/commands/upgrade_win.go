@@ -34,21 +34,21 @@ func RequestPermission() error {
 	}
 
 	if !isAdmin {
-		if err = runAsAdmin(); err != nil {
-			return err
-		}
+		// On success it exits, so it only returns an error.
+		return runAsAdmin()
 	}
 	return nil
 }
 
 func isAdmin() (bool, error) {
-	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
+	drive, err := os.Open("\\\\.\\PHYSICALDRIVE0")
 	if err != nil {
 		if os.IsPermission(err) {
 			return false, nil
 		}
 		return false, err
 	}
+	_ = drive.Close()
 
 	return true, nil
 }
@@ -59,7 +59,14 @@ func runAsAdmin() error {
 		return err
 	}
 
-	verb := "runas"
+	verb, err := syscall.UTF16PtrFromString("runas")
+	if err != nil {
+		return err
+	}
+	exe, err := syscall.UTF16PtrFromString(exePath)
+	if err != nil {
+		return err
+	}
 	cwd, err := syscall.UTF16PtrFromString(".")
 	if err != nil {
 		return err
@@ -71,8 +78,8 @@ func runAsAdmin() error {
 	run := windows.NewLazySystemDLL("shell32.dll").NewProc("ShellExecuteW")
 	ret, _, callErr := run.Call(
 		0,
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(verb))),
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(exePath))),
+		uintptr(unsafe.Pointer(verb)),
+		uintptr(unsafe.Pointer(exe)),
 		uintptr(unsafe.Pointer(arg)),
 		uintptr(unsafe.Pointer(cwd)),
 		1,

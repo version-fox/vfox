@@ -19,10 +19,6 @@ jobs:
     name: Test on Windows
     runs-on: windows-latest
 
-    strategy:
-      matrix:
-        go-version: ['1.24']
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -30,9 +26,9 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
 
       - name: Check Go installation
         run: go version
@@ -56,7 +52,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-windows-${{ matrix.go-version }}
+          name: test-results-windows
           path: ${{ runner.temp }}\.vfox
 
   test-msix-windows:
@@ -99,7 +95,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        go-version: ['1.24']
 
     steps:
       - name: Checkout code
@@ -108,9 +103,9 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
 
       - name: Check Go installation
         run: go version
@@ -128,7 +123,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ matrix.os }}-${{ matrix.go-version }}
+          name: test-results-${{ matrix.os }}
           path: ${{ runner.temp }}/.vfox
 
   test-summary:
@@ -145,7 +140,7 @@ jobs:
         run: |
           echo "E2E Tests Summary"
           echo "================"
-          echo "Windows tests: $(ls -d test-results-windows-* 2>/dev/null | wc -l) platform(s)"
+          echo "Windows tests: $(ls -d test-results-windows* 2>/dev/null | wc -l) platform(s)"
           echo "MSIX packaging tests: $(ls -d test-results-msix-windows-* 2>/dev/null | wc -l) platform(s)"
           echo "Unix tests: $(ls -d test-results-* 2>/dev/null | grep -v windows | wc -l) platform(s)"
           echo ""

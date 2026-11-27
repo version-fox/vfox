@@ -52,7 +52,7 @@ func (b *impl) describe(pkg *RuntimePackage) *Installation {
 	}
 	inst.Receipt = receipt
 
-	target, isLink := linkTarget(pkg.Runtime.Path)
+	target, isLink := linkTarget(pkg.Path)
 	switch {
 	case receipt != nil && receipt.Origin != "":
 		// The receipt is the record of how the version got here.
@@ -188,7 +188,7 @@ func (b *impl) fingerprint(version Version, sdkInfo map[string]*plugin.Installed
 }
 
 func sdkInfoOf(pkg *RuntimePackage) map[string]*plugin.InstalledPackageItem {
-	info := map[string]*plugin.InstalledPackageItem{pkg.Runtime.Name: convertRuntime2InstalledPackageItem(pkg.Runtime)}
+	info := map[string]*plugin.InstalledPackageItem{pkg.Name: convertRuntime2InstalledPackageItem(pkg.Runtime)}
 	for _, addition := range pkg.Additions {
 		info[addition.Name] = convertRuntime2InstalledPackageItem(addition)
 	}
@@ -207,7 +207,7 @@ func (b *impl) Adopt(version Version) (bool, error) {
 	}
 	receipt := b.newReceipt(version, inst.Origin)
 	receipt.Target = inst.Target
-	facts, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Runtime.Path)
+	facts, err := b.fingerprint(version, sdkInfoOf(inst.RuntimePackage), inst.Path)
 	if err != nil {
 		logger.Debugf("No facts recorded for %s: %v\n", b.Label(version), err)
 	}

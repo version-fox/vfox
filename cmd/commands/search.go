@@ -30,7 +30,7 @@ import (
 	"github.com/version-fox/vfox/internal/shared/logger"
 	"github.com/version-fox/vfox/internal/shared/printer"
 	"github.com/version-fox/vfox/internal/shared/util"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var Search = &cli.Command{
@@ -68,7 +68,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 		if p.Note != "" {
 			value = fmt.Sprintf("%s (%s)", p.Version, p.Note)
 		} else {
-			value = fmt.Sprintf("%s", p.Version)
+			value = string(p.Version)
 		}
 		if len(p.Additions) != 0 {
 			var additional []string
@@ -104,7 +104,7 @@ func RunSearch(sdkName string, availableArgs []string) error {
 	if prompt.Input != printer.Keyboard {
 		return installChosen(source, prompt, options, installedVersions, sdkName)
 	}
-	_, height, _ := terminal.GetSize(int(os.Stdout.Fd()))
+	_, height, _ := term.GetSize(int(os.Stdout.Fd()))
 	kvSelect := printer.PageKVSelect{
 		TopText:          "Please select a version of " + sdkName + " to install",
 		Filter:           true,

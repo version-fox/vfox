@@ -26,7 +26,8 @@ func applyEnvsToRegistry(envs *Envs) error {
 	if err != nil {
 		return err
 	}
-	defer key.Close()
+	// Closing only releases the handle: the values are already set.
+	defer func() { _ = key.Close() }()
 
 	if err := setPathValue(key, envs.Paths.Slice()); err != nil {
 		return err
@@ -46,7 +47,8 @@ func removeEnvsFromRegistry(envs *Envs) error {
 	if err != nil {
 		return err
 	}
-	defer key.Close()
+	// Closing only releases the handle: the values are already set.
+	defer func() { _ = key.Close() }()
 
 	if err := removePathValue(key, envs.Paths.Slice()); err != nil {
 		return err
@@ -159,11 +161,15 @@ func deleteEnvVariables(key registry.Key, vars Vars) error {
 }
 
 func broadcastEnvironmentChange() error {
+	area, err := syscall.UTF16PtrFromString("Environment")
+	if err != nil {
+		return err
+	}
 	r, _, err := syscall.NewLazyDLL("user32.dll").NewProc("SendMessageTimeoutW").Call(
 		0xffff, // HWND_BROADCAST
 		0x1a,   // WM_SETTINGCHANGE
 		0,
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Environment"))),
+		uintptr(unsafe.Pointer(area)),
 		0x02, // SMTO_ABORTIFHUNG
 		5000, // 5 seconds
 		0,

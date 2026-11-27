@@ -98,7 +98,7 @@ func TestInstallAsKeepsACopyBesideTheVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if inst.Runtime.Version != "3.12-db" || inst.Runtime.Path != main || inst.Origin != OriginInstalled {
+	if inst.Version != "3.12-db" || inst.Path != main || inst.Origin != OriginInstalled {
 		t.Errorf("installation = %+v, want the copy under its name", inst.Runtime)
 	}
 	r := inst.Receipt

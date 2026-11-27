@@ -68,7 +68,7 @@ func (s *PageKVSelect) renderSelect() string {
 	} else {
 		content += pterm.Sprintf("%s:\n", s.TopText)
 	}
-	if (s.pageOptions == nil || len(s.pageOptions) == 0) && len(s.searchOptions) > 0 {
+	if len(s.pageOptions) == 0 && len(s.searchOptions) > 0 {
 		return pterm.Sprintln("No data")
 	}
 
@@ -77,9 +77,7 @@ func (s *PageKVSelect) renderSelect() string {
 	}
 
 	indexMapper := make([]*KV, len(s.pageOptions))
-	for i := 0; i < len(s.pageOptions); i++ {
-		indexMapper[i] = s.pageOptions[i]
-	}
+	copy(indexMapper, s.pageOptions)
 
 	for i, option := range indexMapper {
 		value := option.Value
@@ -125,7 +123,8 @@ func (s *PageKVSelect) Show() (*KV, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not start area: %w", err)
 	}
-	defer area.Stop()
+	// The area only draws on the terminal.
+	defer func() { _ = area.Stop() }()
 
 	s.search()
 	page := 0

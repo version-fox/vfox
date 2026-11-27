@@ -26,7 +26,7 @@ import (
 
 func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 	reflected := reflect.ValueOf(v)
-	if reflected.Kind() == reflect.Ptr {
+	if reflected.Kind() == reflect.Pointer {
 		reflected = reflected.Elem()
 	}
 
@@ -39,7 +39,7 @@ func Marshal(state *lua.LState, v any) (lua.LValue, error) {
 		table := state.NewTable()
 		for i := 0; i < reflected.NumField(); i++ {
 			field := reflected.Field(i)
-			if field.Kind() == reflect.Ptr {
+			if field.Kind() == reflect.Pointer {
 				field = field.Elem()
 			}
 

@@ -148,7 +148,7 @@ func (b *impl) Link(version Version, target string, opts LinkOptions) (linkErr e
 	receipt.Requested = string(version)
 	receipt.Target = abs
 	if pkg, err := b.GetRuntimePackage(version); err == nil {
-		facts, err := b.fingerprint(version, sdkInfoOf(pkg), pkg.Runtime.Path)
+		facts, err := b.fingerprint(version, sdkInfoOf(pkg), pkg.Path)
 		if err != nil {
 			logger.Debugf("No facts recorded for %s: %v\n", label, err)
 		}

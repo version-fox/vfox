@@ -40,22 +40,23 @@ func (c *Checksum) Verify(path string) bool {
 		return false
 	}
 	var hash []byte
-	if c.Type == "sha256" {
+	switch c.Type {
+	case "sha256":
 		hashValue := sha256.Sum256(fileData)
 		hash = hashValue[:]
-	} else if c.Type == "sha512" {
+	case "sha512":
 		hashValue := sha512.Sum512(fileData)
 		hash = hashValue[:]
-	} else if c.Type == "sha1" {
+	case "sha1":
 		hashValue := sha1.Sum(fileData)
 		hash = hashValue[:]
-	} else if c.Type == "md5" {
+	case "md5":
 		hashValue := md5.Sum(fileData)
 		hash = hashValue[:]
-	} else if c.Type == "none" {
+	case "none":
 		pterm.Printf("%s: Checksum is not provided, skip verify...\n", pterm.LightYellow("WARNING"))
 		return true
-	} else {
+	default:
 		return false
 	}
 	checksum := hex.EncodeToString(hash)

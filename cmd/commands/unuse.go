@@ -60,8 +60,6 @@ func unuseCmd(ctx context.Context, cmd *cli.Command) error {
 		scope = env.Global
 	} else if cmd.IsSet("project") {
 		scope = env.Project
-	} else {
-		scope = env.Session
 	}
 
 	manager, err := internal.NewSdkManager()

@@ -151,7 +151,7 @@ func (s *KeySelect) draw(drawn int, filter string, matches []*KV, highlight int,
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
-	fmt.Fprint(s.Out, b.String())
+	_, _ = fmt.Fprint(s.Out, b.String())
 	return len(lines)
 }
 
@@ -176,13 +176,13 @@ func confirmKeys(terminal *os.File, in io.Reader, out io.Writer, p pterm.Interac
 	} else {
 		shownNo = strings.ToUpper(no)
 	}
-	fmt.Fprintf(out, "%s [%s/%s]%s", text, shownYes, shownNo, p.Delimiter)
+	_, _ = fmt.Fprintf(out, "%s [%s/%s]%s", text, shownYes, shownNo, p.Delimiter)
 
 	input := bufio.NewReader(in)
 	for {
 		press, err := readKey(input)
 		if err == io.EOF {
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 			return false, nil
 		}
 		if err != nil {

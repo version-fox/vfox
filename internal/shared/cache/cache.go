@@ -177,9 +177,11 @@ func (c *FileCache) Close() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	encoder := gob.NewEncoder(file)
-	return encoder.Encode(c.items)
+	if err := gob.NewEncoder(file).Encode(c.items); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 // loadFromFile loads the cache from a file
@@ -193,7 +195,7 @@ func (c *FileCache) loadFromFile(filename string) error {
 		}
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	decoder := gob.NewDecoder(file)
 	return decoder.Decode(&c.items)
 }

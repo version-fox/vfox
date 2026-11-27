@@ -123,6 +123,60 @@ jobs:
           fish --version
           go test ./cmd -run '^TestFishCompletion$' -count=1 -v
 
+  lint:
+    if: github.repository == 'version-fox/vfox'
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Releases and the digests of their linux_amd64 archives, so that this job
+      # checks the code against one linter release. Bump a version and its digest
+      # together (the digests are in the release's checksums file), then fix what
+      # the new release reports.
+      GOLANGCI_LINT_VERSION: 2.15.0
+      GOLANGCI_LINT_SHA256: 9b7fe6a6bf6334b98decf8d86b11415ea7889afdabdd1959fdce23af2a9ebcea
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install golangci-lint and actionlint
+        run: |
+          mkdir "${RUNNER_TEMP}/bin"
+          archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/golangci-lint.tar.gz" \
+            "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${archive}.tar.gz"
+          echo "${GOLANGCI_LINT_SHA256}  ${RUNNER_TEMP}/golangci-lint.tar.gz" | sha256sum --check --strict -
+          tar --extract --gzip --file "${RUNNER_TEMP}/golangci-lint.tar.gz" --directory "${RUNNER_TEMP}/bin" \
+            --strip-components 1 "${archive}/golangci-lint"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check --strict -
+          tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}/bin" actionlint
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      - name: Lint Go
+        # Each GOOS builds its own files (registry, junctions and shims are Windows
+        # only, PTY tests are Unix only), so each one is linted.
+        run: |
+          golangci-lint version
+          status=0
+          for goos in linux darwin windows; do
+            echo "::group::GOOS=${goos}"
+            GOOS="${goos}" golangci-lint run ./... || status=1
+            echo "::endgroup::"
+          done
+          exit "${status}"
+      - name: Lint workflows
+        # The shell in run steps isn't linted yet: shellcheck comes with the
+        # shell script linting.
+        run: |
+          actionlint -version
+          actionlint -shellcheck= -pyflakes=
+
   format:
     if: github.repository == 'version-fox/vfox'
     name: Formatting

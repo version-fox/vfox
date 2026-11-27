@@ -42,12 +42,13 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	// Only for the error paths: the success path closes it and checks the error.
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, srcFile)
 	if err != nil {
@@ -58,7 +59,7 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 
-	return nil
+	return dstFile.Close()
 }
 
 // MovePath moves a file or directory to the target path.

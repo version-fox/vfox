@@ -93,7 +93,7 @@ func TestUninstallSwitchesToTheNewestVersionLeft(t *testing.T) {
 	keepRegistry(t)
 
 	list := f.run(t, "list", "alpha").mustSucceed(t, "list alpha").output()
-	if i11, i10, i9 := strings.Index(list, "11.0.0"), strings.Index(list, "10.0.0"), strings.Index(list, "9.0.0"); !(i11 >= 0 && i11 < i10 && i10 < i9) {
+	if i11, i10, i9 := strings.Index(list, "11.0.0"), strings.Index(list, "10.0.0"), strings.Index(list, "9.0.0"); i11 < 0 || i11 >= i10 || i10 >= i9 {
 		t.Errorf("list alpha shows the versions out of order, want 11.0.0, 10.0.0, 9.0.0:\n%s", list)
 	}
 	f.run(t, "uninstall", "alpha@11.0.0").mustSucceed(t, "uninstall alpha@11.0.0")
@@ -369,7 +369,7 @@ func TestUninstallOrdersVersionsWithALeadingV(t *testing.T) {
 	keepRegistry(t)
 
 	list := f.run(t, "list", "alpha").mustSucceed(t, "list alpha").output()
-	if i22, i20, i18 := strings.Index(list, "v22.0.0"), strings.Index(list, "v20.1.0"), strings.Index(list, "18.0.0"); !(i22 >= 0 && i22 < i20 && i20 < i18) {
+	if i22, i20, i18 := strings.Index(list, "v22.0.0"), strings.Index(list, "v20.1.0"), strings.Index(list, "18.0.0"); i22 < 0 || i22 >= i20 || i20 >= i18 {
 		t.Errorf("list alpha shows the versions out of order, want v22.0.0, v20.1.0, 18.0.0:\n%s", list)
 	}
 	f.run(t, "uninstall", "alpha@v22.0.0").mustSucceed(t, "uninstall alpha@v22.0.0")

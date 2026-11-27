@@ -48,7 +48,7 @@ func lineConfirm(in io.Reader, out io.Writer, p pterm.InteractiveConfirmPrinter,
 
 	input := bufio.NewReader(in)
 	for {
-		fmt.Fprintf(out, "%s [%s/%s]%s", text, shownYes, shownNo, p.Delimiter)
+		_, _ = fmt.Fprintf(out, "%s [%s/%s]%s", text, shownYes, shownNo, p.Delimiter)
 		line, readErr := input.ReadString('\n')
 		if readErr != nil && readErr != io.EOF {
 			return false, fmt.Errorf("read answer: %w", readErr)
@@ -57,7 +57,7 @@ func lineConfirm(in io.Reader, out io.Writer, p pterm.InteractiveConfirmPrinter,
 		switch answer {
 		case "":
 			if readErr == io.EOF {
-				fmt.Fprintln(out)
+				_, _ = fmt.Fprintln(out)
 				return false, nil
 			}
 			return p.DefaultValue, nil

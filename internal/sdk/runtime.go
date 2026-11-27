@@ -53,7 +53,7 @@ type RuntimePackage struct {
 
 // ReplacePath returns a new RuntimePackage with all runtimes' paths replaced by joining the parentPath and their names.
 func (r *RuntimePackage) ReplacePath(parentPath string) *RuntimePackage {
-	mainRuntime := r.Runtime.replacePath(parentPath)
+	mainRuntime := r.replacePath(parentPath)
 	additions := make([]*Runtime, 0, len(r.Additions))
 	for _, addition := range r.Additions {
 		additions = append(additions, addition.replacePath(parentPath))

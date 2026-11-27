@@ -589,25 +589,44 @@ func lookPathInEnvWithExt(command, pathEnv, pathExtEnv string) (string, error) {
 	}
 
 	// Search in PATH with PATHEXT on Windows.
-	paths := filepath.SplitList(pathEnv)
+	if found, ok := findInWindowsPath(command, pathEnv, pathExtEnv); ok {
+		return found, nil
+	}
+
+	// If not found in the custom PATH, fall back to the process's own PATH
+	// with the same rules, so that an entry exec.LookPath would accept but
+	// CreateProcess cannot start (a .ps1 or .js that comes first on PATH)
+	// does not win over a later .cmd or .exe.
+	if found, ok := findInWindowsPath(command, os.Getenv("PATH"), os.Getenv("PATHEXT")); ok {
+		return found, nil
+	}
+	return "", &exec.Error{Name: command, Err: exec.ErrNotFound}
+}
+
+// findInWindowsPath walks pathEnv in order and returns the first file that
+// command stands for under windowsPathExts(pathExtEnv).
+func findInWindowsPath(command, pathEnv, pathExtEnv string) (string, bool) {
 	exts := windowsPathExts(pathExtEnv)
-	for _, dir := range paths {
+	for _, dir := range filepath.SplitList(pathEnv) {
 		if dir == "" {
 			continue
 		}
 		if found, ok := findWindowsExecutable(dir, command, exts); ok {
-			return found, nil
+			return found, true
 		}
 	}
-
-	// If not found in custom PATH, fallback to exec.LookPath
-	return exec.LookPath(command)
+	return "", false
 }
 
+// processExts are the PATHEXT entries CreateProcess can start directly. The
+// others (.PS1, .VBS, .JS, .WSF, .MSC and so on) need a host program, so a
+// bare command name never stands for one of them.
+var processExts = []string{".COM", ".EXE", ".BAT", ".CMD"}
+
+// windowsPathExts returns the extensions a bare command name may stand for:
+// the PATHEXT entries, in PATHEXT order, spelled as given, kept only when
+// CreateProcess can start them. Without a usable PATHEXT it is processExts.
 func windowsPathExts(pathExtEnv string) []string {
-	if pathExtEnv == "" {
-		return []string{".COM", ".EXE", ".BAT", ".CMD"}
-	}
 	var exts []string
 	for _, ext := range strings.Split(pathExtEnv, ";") {
 		if ext == "" {
@@ -616,10 +635,15 @@ func windowsPathExts(pathExtEnv string) []string {
 		if ext[0] != '.' {
 			ext = "." + ext
 		}
-		exts = append(exts, ext)
+		for _, allowed := range processExts {
+			if strings.EqualFold(ext, allowed) {
+				exts = append(exts, ext)
+				break
+			}
+		}
 	}
 	if len(exts) == 0 {
-		return []string{".COM", ".EXE", ".BAT", ".CMD"}
+		return append([]string(nil), processExts...)
 	}
 	return exts
 }

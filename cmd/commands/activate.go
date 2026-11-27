@@ -198,7 +198,7 @@ func activateCmd(ctx context.Context, cmd *cli.Command) error {
 	logger.Debugf("Export envs: %+v", exportEnvs)
 
 	vfoxPath := runtimeEnvContext.PathMeta.Executable
-	vfoxPath = strings.Replace(vfoxPath, "\\", "/", -1)
+	vfoxPath = strings.ReplaceAll(vfoxPath, "\\", "/")
 
 	script, err := renderActivateScript(name, vfoxPath, cmd.Args().Tail(), exportEnvs, env.IsMultiplexerEnvironment())
 	if err != nil {

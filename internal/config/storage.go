@@ -46,10 +46,8 @@ func (s *Storage) Validate() error {
 	if err != nil {
 		return err
 	}
-	name := f.Name()
 	closeErr := f.Close()
-	if err := os.Remove(name); err != nil {
-		return err
-	}
+	// Best effort: the file only probes that the directory is writable.
+	_ = os.Remove(f.Name())
 	return closeErr
 }

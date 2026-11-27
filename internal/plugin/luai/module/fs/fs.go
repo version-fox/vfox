@@ -97,7 +97,7 @@ func copyDirectory(src, dest string) error {
 		if err != nil {
 			return err
 		}
-		defer input.Close()
+		defer func() { _ = input.Close() }()
 		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666|info.Mode().Perm())
 		if err != nil {
 			return err
