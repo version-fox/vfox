@@ -19,6 +19,7 @@ package cache
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -134,20 +135,24 @@ func loadLocked(path string) (map[string]cache.Item, error) {
 // update loads the file again, applies fn and saves the result, dropping expired
 // items on the way. Reloading keeps changes that other cache objects, or other
 // processes, made after this one was created.
-func update(path string, fn func(items map[string]cache.Item)) error {
+func update(path string, fn func(items map[string]cache.Item, now time.Time) error) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 	items, err := load(path)
 	if err != nil {
 		return err
 	}
-	now := time.Now().UnixNano()
+	// The clock is read here, after the lock is held, so a ttl counts from the moment
+	// the entry is written and not from before a slow encode or a wait for the lock.
+	now := time.Now()
 	for k, item := range items {
-		if expired(item, now) {
+		if expired(item, now.UnixNano()) {
 			delete(items, k)
 		}
 	}
-	fn(items)
+	if err := fn(items, now); err != nil {
+		return err
+	}
 	return save(path, items)
 }
 
@@ -167,11 +172,8 @@ func apiNew(L *lua.LState) int {
 		key := L.CheckString(1)
 		value := L.CheckAny(2)
 		seconds := L.OptNumber(3, -1)
-		now := time.Now()
-		expire := int64(cache.NeverExpired)
 		if seconds != -1 {
-			var ok bool
-			if expire, ok = expireAt(now, float64(seconds)); !ok {
+			if _, ok := expireAt(time.Now(), float64(seconds)); !ok {
 				L.ArgError(3, "expire time must be -1 (never expires) or a number of seconds >= 0")
 			}
 		}
@@ -186,8 +188,16 @@ func apiNew(L *lua.LState) int {
 			L.Push(lua.LString(err.Error()))
 			return 2
 		}
-		if err := update(path, func(items map[string]cache.Item) {
+		if err := update(path, func(items map[string]cache.Item, now time.Time) error {
+			expire := int64(cache.NeverExpired)
+			if seconds != -1 {
+				var ok bool
+				if expire, ok = expireAt(now, float64(seconds)); !ok {
+					return errors.New("expire time is out of range")
+				}
+			}
 			items[key] = cache.Item{Val: data, Expire: expire}
+			return nil
 		}); err != nil {
 			L.Push(lua.LNil)
 			L.Push(lua.LString(err.Error()))
@@ -220,7 +230,7 @@ func apiNew(L *lua.LState) int {
 	}))
 	t.RawSetString("remove", L.NewFunction(func(L *lua.LState) int {
 		key := L.CheckString(1)
-		if err := update(path, func(items map[string]cache.Item) { delete(items, key) }); err != nil {
+		if err := update(path, func(items map[string]cache.Item, _ time.Time) error { delete(items, key); return nil }); err != nil {
 			L.Push(lua.LFalse)
 			L.Push(lua.LString(err.Error()))
 			return 2

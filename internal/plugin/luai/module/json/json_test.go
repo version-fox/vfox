@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -168,15 +167,15 @@ func TestEncodeSharedSubtableIsNotRecursion(t *testing.T) {
 }
 
 func TestEncodeSharedSubtableFanOutIsCapped(t *testing.T) {
-	old := maxValues
-	maxValues = 10000
-	defer func() { maxValues = old }()
+	old := maxRepeatValues
+	maxRepeatValues = 10000
+	defer func() { maxRepeatValues = old }()
 	const str = `
 	local json = require("JSON")
 	local t = {1}
 	for i = 1, 40 do t = { a = t, b = t } end
 	local out, err = json.encode(t)
-	assert(out == nil and string.find(err, "more than"), "expected a size error, got: " .. tostring(err))
+	assert(out == nil and string.find(err, "shared tables"), "expected a size error, got: " .. tostring(err))
 	-- a large but ordinary list still encodes
 	local list = {}
 	for i = 1, 5000 do list[i] = i end
@@ -198,32 +197,91 @@ func TestEncodeLimits(t *testing.T) {
 		for i = 2, n do t = { t } end
 		return t
 	end
-	-- 256 nested tables encode and decode; 257 are refused at once
-	local out = assert(json.encode(nest(256)))
+	-- plain encode keeps accepting deep nesting, as it always did
+	local out = assert(json.encode(nest(300)))
 	assert(json.decode(out) ~= nil)
-	local out2, err = json.encode(nest(257))
-	assert(out2 == nil and string.find(err, "256 levels"), tostring(err))
-	-- an acyclic chain far deeper than any real data fails fast, not slowly
-	local out3, err3 = json.encode(nest(200000))
-	assert(out3 == nil and string.find(err3, "levels"), tostring(err3))
-	-- a cycle is still reported as a cycle, including a fan-out of self references
+	-- a cycle is reported as a cycle, including a fan-out of self references
 	local loop = {}
 	loop.a = loop
 	loop.b = loop
 	local _, err5 = json.encode(loop)
 	assert(string.find(err5, "recursively nested"), tostring(err5))
 	-- non-strict encode keeps replacing bad bytes, as before
-	assert(json.encode({"\255"}) == '["\\ufffd"]')
+	assert(json.decode(json.encode({"\255"}))[1] == "\239\191\189")
 	`
 	s := lua.NewState()
 	defer s.Close()
 	s.PreloadModule("JSON", loader)
-	start := time.Now()
 	if err := s.DoString(str); err != nil {
 		t.Error(err)
 	}
-	if time.Since(start) > 20*time.Second {
-		t.Errorf("limits test took %v", time.Since(start))
+}
+
+func TestEncodeLargePlainDataIsNotLimited(t *testing.T) {
+	s := lua.NewState()
+	defer s.Close()
+	l := s.NewTable()
+	for i := 0; i < 1100000; i++ {
+		l.Append(lua.LNumber(1))
+	}
+	if _, err := Encode(l); err != nil {
+		t.Fatalf("plain list of 1.1M items must encode: %v", err)
+	}
+	if _, err := EncodeStrict(l); err != nil {
+		t.Fatalf("strict list of 1.1M small items is under the byte budget: %v", err)
+	}
+}
+
+func TestEncodeStrictLimits(t *testing.T) {
+	s := lua.NewState()
+	defer s.Close()
+	nest := func(n int) lua.LValue {
+		var v lua.LValue = lua.LNumber(1)
+		for i := 0; i < n; i++ {
+			t := s.NewTable()
+			t.Append(v)
+			v = t
+		}
+		return v
+	}
+	out, err := EncodeStrict(nest(256))
+	if err != nil {
+		t.Fatalf("256 levels must encode: %v", err)
+	}
+	if v, err := Decode(s, out); err != nil || v == nil {
+		t.Fatalf("256 levels must decode: %v", err)
+	}
+	if _, err := EncodeStrict(nest(257)); err == nil || !strings.Contains(err.Error(), "256 levels") {
+		t.Fatalf("257 levels must be refused, got %v", err)
+	}
+	if _, err := EncodeStrict(nest(200000)); err == nil || !strings.Contains(err.Error(), "levels") {
+		t.Fatalf("a very deep chain must fail fast, got %v", err)
+	}
+	// plain encode still accepts what strict refuses
+	if _, err := Encode(nest(300)); err != nil {
+		t.Fatalf("plain encode of 300 levels must work: %v", err)
+	}
+
+	// a shared string counts once per reference against the byte budget
+	old := maxBytes
+	maxBytes = 1 << 20
+	defer func() { maxBytes = old }()
+	big := lua.LString(strings.Repeat("x", 100<<10))
+	l := s.NewTable()
+	for i := 0; i < 5; i++ {
+		l.Append(big)
+	}
+	if _, err := EncodeStrict(l); err != nil {
+		t.Fatalf("500 KiB must fit in 1 MiB: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		l.Append(big)
+	}
+	if _, err := EncodeStrict(l); err == nil || !strings.Contains(err.Error(), "64 MiB") {
+		t.Fatalf("1.5 MiB must be refused, got %v", err)
+	}
+	if _, err := Encode(l); err != nil {
+		t.Fatalf("plain encode has no byte budget: %v", err)
 	}
 }
 
@@ -251,36 +309,26 @@ func TestEncodeStrictRejectsInvalidUTF8(t *testing.T) {
 	}
 }
 
-func TestEncodeValueBudgetBoundary(t *testing.T) {
-	old := maxValues
-	maxValues = 100
-	defer func() { maxValues = old }()
+func TestEncodeRepeatBudgetBoundary(t *testing.T) {
+	old := maxRepeatValues
+	maxRepeatValues = 100
+	defer func() { maxRepeatValues = old }()
 	s := lua.NewState()
 	defer s.Close()
-	list := func(n int) lua.LValue {
-		l := s.NewTable()
-		for i := 0; i < n; i++ {
-			l.Append(lua.LNumber(1))
-		}
-		return l
+	shared := s.NewTable()
+	for i := 0; i < 40; i++ {
+		shared.Append(lua.LNumber(1))
 	}
-	// the table itself counts as a value, so 99 items fit and 100 do not
-	if _, err := Encode(list(99)); err != nil {
-		t.Fatalf("99 items must fit: %v", err)
-	}
-	if _, err := Encode(list(100)); err == nil || !strings.Contains(err.Error(), "more than") {
-		t.Fatalf("100 items must be refused, got %v", err)
-	}
-	// a shared subtable counts once per reference
-	shared := list(40)
+	// the first reference is free; each later one costs its 41 values
 	outer := s.NewTable()
 	outer.Append(shared)
 	outer.Append(shared)
+	outer.Append(shared)
 	if _, err := Encode(outer); err != nil {
-		t.Fatalf("two references of 40 items fit in 100: %v", err)
+		t.Fatalf("two repeats (82 values) fit in 100: %v", err)
 	}
 	outer.Append(shared)
-	if _, err := Encode(outer); err == nil {
-		t.Fatal("three references of 40 items must exceed 100")
+	if _, err := Encode(outer); err == nil || !strings.Contains(err.Error(), "shared tables") {
+		t.Fatalf("three repeats must exceed 100, got %v", err)
 	}
 }

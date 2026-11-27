@@ -74,25 +74,30 @@ func apiEncode(L *lua.LState) int {
 }
 
 var (
-	errNested      = errors.New("cannot encode recursively nested tables to JSON")
-	errSparseArray = errors.New("cannot encode sparse array")
-	errInvalidKeys = errors.New("cannot encode mixed or invalid key types")
-	errTooLarge    = errors.New("cannot encode more than 1048576 values to JSON")
-	errTooDeep     = errors.New("cannot encode tables nested more than 256 levels deep to JSON")
-	errNotUTF8     = errors.New("cannot encode a string that is not valid UTF-8 to JSON")
+	errNested         = errors.New("cannot encode recursively nested tables to JSON")
+	errSparseArray    = errors.New("cannot encode sparse array")
+	errInvalidKeys    = errors.New("cannot encode mixed or invalid key types")
+	errTooManyRepeats = errors.New("cannot encode: shared tables are referenced too many times")
+	errTooLarge       = errors.New("cannot encode more than 64 MiB of JSON")
+	errTooDeep        = errors.New("cannot encode tables nested more than 256 levels deep to JSON")
+	errNotUTF8        = errors.New("cannot encode a string that is not valid UTF-8 to JSON")
 )
 
-// maxValues caps the values one Encode call may produce. A table that is referenced
-// several times is encoded once per reference, so a few levels of sharing can expand
-// into a tree with exponentially many values. It is a variable only so tests can
-// lower it.
-var maxValues = 1 << 20
+// maxRepeatValues caps the values written for tables that were already encoded once
+// in the same call. A table referenced several times is encoded once per reference,
+// so a few levels of sharing can expand into a tree with exponentially many values.
+// Data without shared tables never counts against it. It is a variable only so tests
+// can lower it.
+var maxRepeatValues = 1 << 20
 
-const (
-	// maxDepth caps table nesting. Each level re-validates the output of the level
-	// below it, so the cost grows with depth, and the Go stack grows with it too.
-	maxDepth = 256
-)
+// maxBytes caps the output of EncodeStrict. A shared string counts once per
+// reference, so a small table can otherwise expand into an output of any size.
+var maxBytes = 64 << 20
+
+// maxDepth caps table nesting in EncodeStrict. Each level re-validates the output of
+// the level below it, so the cost grows with depth, and decode refuses data nested
+// more than 10000 levels, so a deeper value could be stored but never read back.
+const maxDepth = 256
 
 type invalidTypeError lua.LValueType
 
@@ -101,32 +106,54 @@ func (i invalidTypeError) Error() string {
 }
 
 // Encode returns the JSON encoding of value. A string that is not valid UTF-8 is
-// written with each bad byte replaced by U+FFFD, as encoding/json does.
+// written with each bad byte replaced by U+FFFD, as encoding/json does. A table that
+// is referenced more than once is written once per reference, and the values written
+// for such repeat references are capped.
 func Encode(value lua.LValue) ([]byte, error) {
 	return encode(value, false)
 }
 
-// EncodeStrict is Encode, but it returns an error for any string or table key that
-// is not valid UTF-8, so the encoding always decodes back to the same bytes.
+// EncodeStrict is Encode for data that is stored and read back. It also returns an
+// error for any string or table key that is not valid UTF-8, for tables nested more
+// than 256 levels deep, and for output larger than 64 MiB.
 func EncodeStrict(value lua.LValue) ([]byte, error) {
 	return encode(value, true)
 }
 
 func encode(value lua.LValue, strict bool) ([]byte, error) {
-	return json.Marshal(jsonValue{
-		LValue:  value,
+	e := &encoder{
 		visited: make(map[*lua.LTable]bool),
-		count:   new(int),
+		done:    make(map[*lua.LTable]bool),
 		strict:  strict,
-	})
+	}
+	return json.Marshal(jsonValue{LValue: value, enc: e})
+}
+
+// encoder holds the state shared by every value of one encode call.
+type encoder struct {
+	visited map[*lua.LTable]bool // tables on the current path, to find cycles
+	done    map[*lua.LTable]bool // tables already written once
+	repeats int                  // values written inside repeat references
+	bytes   int                  // estimated output size, strict only
+	strict  bool
+}
+
+// add charges n bytes against the strict output budget.
+func (e *encoder) add(n int) error {
+	if !e.strict {
+		return nil
+	}
+	if e.bytes += n; e.bytes > maxBytes {
+		return errTooLarge
+	}
+	return nil
 }
 
 type jsonValue struct {
 	lua.LValue
-	visited map[*lua.LTable]bool
-	count   *int
-	depth   int
-	strict  bool
+	enc    *encoder
+	depth  int
+	repeat bool // inside a table that was already written once
 }
 
 func (j jsonValue) child(v lua.LValue) jsonValue {
@@ -136,31 +163,56 @@ func (j jsonValue) child(v lua.LValue) jsonValue {
 }
 
 func (j jsonValue) MarshalJSON() (data []byte, err error) {
-	if *j.count++; *j.count > maxValues {
-		return nil, errTooLarge
+	e := j.enc
+	if j.repeat {
+		if e.repeats++; e.repeats > maxRepeatValues {
+			return nil, errTooManyRepeats
+		}
 	}
 	switch converted := j.LValue.(type) {
 	case lua.LBool:
 		data, err = json.Marshal(bool(converted))
+		if err == nil {
+			err = e.add(len(data))
+		}
 	case lua.LNumber:
 		data, err = json.Marshal(float64(converted))
+		if err == nil {
+			err = e.add(len(data))
+		}
 	case *lua.LNilType:
 		data = []byte(`null`)
+		err = e.add(len(data))
 	case lua.LString:
-		if j.strict && !utf8.ValidString(string(converted)) {
-			return nil, errNotUTF8
+		if e.strict {
+			if !utf8.ValidString(string(converted)) {
+				return nil, errNotUTF8
+			}
+			// charged before encoding, so a huge string is refused without copying it
+			if err = e.add(len(converted) + 2); err != nil {
+				return nil, err
+			}
 		}
 		data, err = json.Marshal(string(converted))
 	case *lua.LTable:
-		if j.visited[converted] {
+		if e.visited[converted] {
 			return nil, errNested
 		}
-		if j.depth >= maxDepth {
+		if e.strict && j.depth >= maxDepth {
 			return nil, errTooDeep
 		}
-		j.visited[converted] = true
+		e.visited[converted] = true
 		// only a table that contains itself is recursive; the same table twice is not
-		defer delete(j.visited, converted)
+		defer func() {
+			delete(e.visited, converted)
+			e.done[converted] = true
+		}()
+		if e.done[converted] {
+			j.repeat = true
+		}
+		if err = e.add(2); err != nil {
+			return nil, err
+		}
 
 		key, value := converted.Next(lua.LNil)
 
@@ -179,6 +231,9 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errSparseArray
 					return
 				}
+				if err = e.add(1); err != nil {
+					return nil, err
+				}
 				arr = append(arr, j.child(value))
 				expectedKey++
 				key, value = converted.Next(key)
@@ -191,9 +246,12 @@ func (j jsonValue) MarshalJSON() (data []byte, err error) {
 					err = errInvalidKeys
 					return
 				}
-				if j.strict && !utf8.ValidString(key.String()) {
+				if e.strict && !utf8.ValidString(key.String()) {
 					err = errNotUTF8
 					return
+				}
+				if err = e.add(len(key.String()) + 4); err != nil {
+					return nil, err
 				}
 				obj[key.String()] = j.child(value)
 				key, value = converted.Next(key)

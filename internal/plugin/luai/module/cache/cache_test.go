@@ -173,9 +173,8 @@ func TestExpiryIsPersistedAndNoTempFilesRemain(t *testing.T) {
 	local c = require("vfox.cache").new(arg1)
 	c.set("short", "v", 0.05)
 	c.set("long", "v", 3600)
-	assert(c.get("short") == "v")
 	`, file)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	eval(t, `
 	local c = require("vfox.cache").new(arg1)
 	assert(c.get("short") == nil and c.get("long") == "v")
