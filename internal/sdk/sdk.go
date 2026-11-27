@@ -147,8 +147,9 @@ func (b *impl) Available(args []string) ([]*AvailableRuntimePackage, error) {
 	cachePath := filepath.Join(p.InstalledPath, ".available.cache")
 	cacheDuration := envCtx.UserConfig.Cache.AvailableHookDuration
 	logger.Debugf("Available hook cache duration: %v\n", cacheDuration)
-	// Cache is disabled
-	if cacheDuration == 0 {
+	// Cache is disabled. A call with arguments is not cached either: they are
+	// for the plugin, such as --no-cache, so the plugin runs every time.
+	if cacheDuration == 0 || len(args) > 0 {
 		return b.invokeAvailable(args)
 	}
 

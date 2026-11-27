@@ -130,6 +130,8 @@ end
 
 `vfox`会缓存`Available`返回的结果, 默认缓存时间为`12h`。请查看[配置#缓存](../../guides/configuration.md#%E7%BC%93%E5%AD%98)。
 
+带插件参数的搜索（例如 `vfox search <sdk-name> --no-cache`）不使用缓存，每次都会调用该钩子。如果插件通过这类参数刷新列表，也应删除插件目录下的 `.available.cache`，这样之后不带参数的搜索也能得到新结果。
+
 :::
 
 ### EnvKeys
