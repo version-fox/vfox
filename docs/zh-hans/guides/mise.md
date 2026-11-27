@@ -51,11 +51,13 @@ mise 第一次需要插件时会从 GitHub 安装它。`mise use` 会把工具�
 | 删除版本 | `vfox uninstall` | `mise uninstall` |
 | 作用域 | 全局、项目、会话 | 全局、项目，以及 `MISE_ENV` 环境；没有会话作用域 |
 | 版本文件 | `.vfox.toml`、`vfox.toml`；两者都没有时读取 `.tool-versions`，并将其保存为 `.vfox.toml` | `mise.toml`、`.tool-versions` |
-| 安装位置 | `$HOME/.vfox/cache/<sdk>/`，或 `storage.sdkPath` 下 | `~/.local/share/mise/installs/`（`$MISE_DATA_DIR/installs`） |
-| 插件位置 | `$HOME/.vfox/plugin/<name>/` | `~/.local/share/mise/plugins/`（`$MISE_DATA_DIR/plugins`） |
+| 安装位置 | `$VFOX_HOME/cache/<sdk>/`，或 `storage.sdkPath` 下 | `~/.local/share/mise/installs/`；Windows 上为 `%LOCALAPPDATA%\mise\installs`（`$MISE_DATA_DIR/installs`） |
+| 插件位置 | `$VFOX_HOME/plugin/<name>/` | `~/.local/share/mise/plugins/`；Windows 上为 `%LOCALAPPDATA%\mise\plugins`（`$MISE_DATA_DIR/plugins`） |
 | `PATH` 设置 | `vfox activate <shell>` | `mise activate <shell>`、shims 或 `mise exec` |
 | 插件来源 | vfox 注册表、URL 或本地文件 | `vfox:<owner>/<repo>`、Git URL、zip 或本地目录 |
 | 平台 | Linux、macOS、Windows | Linux、macOS、Windows |
+
+`VFOX_HOME` 默认为 `~/.vfox`；如果 `~/.version-fox` 目录存在，则为 `~/.version-fox`。
 
 有些功能只有其中一个有：
 
@@ -72,13 +74,14 @@ mise 不读取 vfox 自己的任何变量。`VFOX_HOME` 不会改变 mise 的安
 
 插件在 mise 下得到的 Lua 全局变量与在 vfox 下相同：`RUNTIME.osType`、`RUNTIME.archType`、
 `RUNTIME.version`、`RUNTIME.pluginDirPath`、`OS_TYPE`、`ARCH_TYPE` 和 `PLUGIN`。
-`RUNTIME.version` 是运行插件的运行时的版本，所以在 mise 下它不是 vfox 的版本。
+在 mise 下，`RUNTIME.version` 是固定字符串 `0.6.0`，检查它的插件看到的是这个 vfox 版本号。
 判断插件运行环境时，请优先使用这些全局变量，而不是环境变量。
 
 在 mise 下有作用的变量：
 
-- `MISE_DATA_DIR`：mise 插件和安装的根目录。mise 会运行的钩子（例如 `PreInstall` 或 `EnvKeys`）
-  可以读取它来找到 mise 的目录。
+- `MISE_DATA_DIR`：mise 插件和安装的根目录。mise 不会设置它，所以只有用户导出了它时，
+  `PreInstall` 或 `EnvKeys` 等钩子才能读到。否则请回退到 `~/.local/share/mise`（Linux 和 macOS）
+  或 `%LOCALAPPDATA%\mise`（Windows）。
 - `MISE_GITHUB_TOKEN`、`GITHUB_API_TOKEN` 或 `GITHUB_TOKEN`：mise 会把第一个已设置的值加到插件发往
   GitHub API（`api.github.com`）的 `http` 请求中，以提高速率限制。下载 Release 文件时不会带上它。
 - `MISE_TOOL_OPTS__<KEY>`：`mise.toml` 中的每个工具选项，插件运行的命令可以读取。

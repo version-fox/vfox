@@ -56,11 +56,14 @@ a vfox plugin, write its `vfox:` identifier.
 | Remove a version | `vfox uninstall` | `mise uninstall` |
 | Scopes | global, project, session | global, project, plus `MISE_ENV` environments; no session scope |
 | Version files | `.vfox.toml`, `vfox.toml`; without either, `.tool-versions`, which vfox then saves as `.vfox.toml` | `mise.toml`, `.tool-versions` |
-| Installs | `$HOME/.vfox/cache/<sdk>/`, or under `storage.sdkPath` | `~/.local/share/mise/installs/` (`$MISE_DATA_DIR/installs`) |
-| Plugins | `$HOME/.vfox/plugin/<name>/` | `~/.local/share/mise/plugins/` (`$MISE_DATA_DIR/plugins`) |
+| Installs | `$VFOX_HOME/cache/<sdk>/`, or under `storage.sdkPath` | `~/.local/share/mise/installs/`; `%LOCALAPPDATA%\mise\installs` on Windows (`$MISE_DATA_DIR/installs`) |
+| Plugins | `$VFOX_HOME/plugin/<name>/` | `~/.local/share/mise/plugins/`; `%LOCALAPPDATA%\mise\plugins` on Windows (`$MISE_DATA_DIR/plugins`) |
 | `PATH` setup | `vfox activate <shell>` | `mise activate <shell>`, shims, or `mise exec` |
 | Plugin sources | the vfox registry, a URL or a local file | `vfox:<owner>/<repo>`, a Git URL, a zip or a local directory |
 | Platforms | Linux, macOS, Windows | Linux, macOS, Windows |
+
+`VFOX_HOME` defaults to `~/.vfox`, or to `~/.version-fox` when that directory
+exists.
 
 Some features exist in only one of them:
 
@@ -81,15 +84,16 @@ effect on mise. A plugin that reads them with `os.getenv` sees them only if
 
 Plugins get the same Lua globals under mise as under vfox: `RUNTIME.osType`,
 `RUNTIME.archType`, `RUNTIME.version`, `RUNTIME.pluginDirPath`, `OS_TYPE`,
-`ARCH_TYPE` and `PLUGIN`. `RUNTIME.version` is the version of the runtime that
-runs the plugin, so it is not a vfox version under mise. Prefer these globals
+`ARCH_TYPE` and `PLUGIN`. Under mise, `RUNTIME.version` is the fixed string
+`0.6.0`, so a plugin that checks it sees that vfox release. Prefer these globals
 over environment variables to find out where the plugin runs.
 
 Variables that matter under mise:
 
-- `MISE_DATA_DIR`: the root of mise's plugins and installs. A hook that mise
-  runs, such as `PreInstall` or `EnvKeys`, can read it to find mise's
-  directories.
+- `MISE_DATA_DIR`: the root of mise's plugins and installs. mise does not set
+  it, so a hook such as `PreInstall` or `EnvKeys` sees it only when the user
+  exported it. Otherwise fall back to `~/.local/share/mise` on Linux and macOS
+  and `%LOCALAPPDATA%\mise` on Windows.
 - `MISE_GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `GITHUB_TOKEN`: mise adds the
   first one that is set to the plugin's `http` requests to the GitHub API
   (`api.github.com`), which raises the rate limit. Release downloads are sent
