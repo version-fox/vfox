@@ -35,8 +35,7 @@ PLUGIN = {
 
 --- Returns some pre-installed information, such as version number, download address, local files, etc.
 --- If checksum is provided, vfox will automatically check it for you.
---- @param ctx table
---- @field ctx.version string User-input version
+--- @param ctx table Context; ctx.version is the user-input version
 --- @return table Version information
 function PLUGIN:PreInstall(ctx)
     print(json.encode(RUNTIME))
@@ -109,8 +108,7 @@ end
 --- Each SDK may have different environment variable configurations.
 --- This allows plugins to define custom environment variables (including PATH settings)
 --- Note: Be sure to distinguish between environment variable settings for different platforms!
---- @param ctx table Context information
---- @field ctx.path string SDK installation directory
+--- @param ctx table Context information; ctx.path is the SDK installation directory
 function PLUGIN:EnvKeys(ctx)
     --- this variable is same as ctx.sdkInfo['plugin-name'].path
     local mainPath = ctx.path

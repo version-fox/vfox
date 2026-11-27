@@ -24,6 +24,8 @@ TEST_COUNT=0
 PASSED=0
 FAILED=0
 
+# Runs on exit (see the trap below).
+# shellcheck disable=SC2329
 cleanup() {
     echo ""
     echo "=========================================="
@@ -76,7 +78,8 @@ echo ""
 echo "=========================================="
 echo "Setup: Activating vfox in current shell"
 echo "=========================================="
-export PATH="$(pwd):${PATH}"
+PATH="$(pwd):${PATH}"
+export PATH
 if ! VFOX_ACTIVATION="$(./vfox activate bash)" 2>&1; then
     echo "Failed to get vfox activation script"
     exit 1

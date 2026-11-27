@@ -102,6 +102,8 @@ type clinkRuntime struct {
 	started []startedCommand
 	// files is the file system behind io.open.
 	files map[string]string
+	// readOnly lists the files that io.open can't open for writing.
+	readOnly map[string]bool
 	// env is the process environment behind os.getenv and os.setenv.
 	env map[string]string
 	// envWrites logs every os.setenv call as "NAME=value", or "NAME" to unset.
@@ -275,6 +277,12 @@ func (rt *clinkRuntime) installIO() {
 				}
 				L.Push(rt.readHandle(content))
 			case "w", "wb":
+				if rt.readOnly[name] {
+					L.Push(lua.LNil)
+					L.Push(lua.LString(name + ": Permission denied"))
+					L.Push(lua.LNumber(13))
+					return 3
+				}
 				rt.files[name] = "" // opening for writing truncates the file
 				L.Push(rt.writeHandle(name))
 			default:

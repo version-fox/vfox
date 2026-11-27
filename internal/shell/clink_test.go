@@ -262,6 +262,23 @@ func TestClinkAvailableCache(t *testing.T) {
 	}
 }
 
+// A cache file that can't be written doesn't stop the completion: the plugins
+// are listed, just not cached.
+func TestClinkAvailableCacheNotWritable(t *testing.T) {
+	rt := newClinkRuntime(t)
+	rt.readOnly = map[string]bool{clinkAvailableCache: true}
+	rt.load()
+
+	assertMatches(t, rt.complete("vfox add "), clinkPlugins)
+
+	if !rt.ran("vfox available") {
+		t.Error("vfox available did not run")
+	}
+	if content, ok := rt.files[clinkAvailableCache]; ok {
+		t.Errorf("cache file = %q, want none", content)
+	}
+}
+
 func TestClinkAvailableOutput(t *testing.T) {
 	plain := readClinkFixture(t, "vfox_available.txt")
 	// The colored output is derived from the fixture. Make sure it is colored, or

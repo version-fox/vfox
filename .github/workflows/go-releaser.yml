@@ -17,7 +17,7 @@ jobs:
       flags: ""
     steps:
       - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: echo "flags=--snapshot" >> $GITHUB_ENV
+        run: echo "flags=--snapshot" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -42,5 +42,5 @@ jobs:
           FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
         run: |
           for filename in dist/vfox*.{rpm,deb}; do
-            curl -F package=@"$filename" https://{$FURY_TOKEN}@push.fury.io/versionfox/
+            curl -F package=@"$filename" "https://${FURY_TOKEN}@push.fury.io/versionfox/"
           done

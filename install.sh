@@ -145,32 +145,28 @@ main() {
   echo "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
   $DOWNLOAD_CMD "${GITHUB_BASE_URL}/version-fox/vfox/releases/download/v${VERSION}/${TAR_FILE}"
 
-  tar -zxvf $TAR_FILE
-  if [ $? -ne 0 ]; then
+  if ! tar -zxvf "$TAR_FILE"; then
     echo "Failed to extract vfox binary. Please check if the downloaded file is a valid tar.gz file."
     exit 1
   fi
 
   # Create installation directory
-  $SUDO_CMD mkdir -p "$INSTALL_DIR"
-  if [ $? -ne 0 ]; then
+  if ! $SUDO_CMD mkdir -p "$INSTALL_DIR"; then
     echo "Failed to create $INSTALL_DIR directory. Please check your permissions and try again."
     exit 1
   fi
 
-  if [ -d "$INSTALL_DIR" ]; then
-    $SUDO_CMD mv "${FILENAME}/vfox" "$INSTALL_DIR"
-  else
+  if [ ! -d "$INSTALL_DIR" ]; then
     echo "$INSTALL_DIR is not a directory. Please make sure it is a valid directory path."
     exit 1
   fi
 
-  if [ $? -ne 0 ]; then
+  if ! $SUDO_CMD mv "${FILENAME}/vfox" "$INSTALL_DIR"; then
     echo "Failed to move vfox to $INSTALL_DIR. Please check your permissions and try again."
     exit 1
   fi
-  rm $TAR_FILE
-  rm -rf $FILENAME
+  rm "$TAR_FILE"
+  rm -rf "$FILENAME"
   echo "vfox installed successfully!"
 
   # Check and update PATH if installing to user directory
@@ -186,7 +182,9 @@ main() {
         echo "To add it to your PATH, run one of the following commands based on your shell:"
         echo ""
 
-        # Common export command for bash/zsh
+        # Common export command for bash/zsh. It's printed for the user to run, so
+        # $HOME and $PATH stay unexpanded.
+        # shellcheck disable=SC2016
         PATH_EXPORT_CMD='export PATH="$HOME/.local/bin:$PATH"'
 
         # Detect the current shell more reliably than using $SHELL alone
