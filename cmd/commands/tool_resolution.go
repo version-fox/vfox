@@ -72,6 +72,21 @@ func versionInEffect(manager *internal.Manager) internal.VersionInEffect {
 	}
 }
 
+// installedVersionInEffect is the version of an SDK that a shell in this
+// directory uses, as `vfox env` puts it on PATH: the first configured version,
+// highest priority first, that is installed. It is "" when there is none, and an
+// error when the version files cannot be read. Sdk.Current is not used, because
+// it stops at the highest-priority version and finds none when that one is not
+// installed.
+func installedVersionInEffect(manager *internal.Manager, s sdk.Sdk) (sdk.Version, error) {
+	chain, err := loadToolChain(manager, env.Global, env.Session, env.Project)
+	if err != nil {
+		return "", err
+	}
+	_, _, version, _ := resolveInstalledToolConfig(chain, s, s.Metadata().Name)
+	return version, nil
+}
+
 func resolveInstalledToolConfig(chain env.VfoxTomlChain, sdkObj sdk.Sdk, sdkName string) (*pathmeta.ToolConfig, env.UseScope, sdk.Version, bool) {
 	toolConfigs := chain.GetToolConfigsByPriority(sdkName)
 	if len(toolConfigs) == 0 {

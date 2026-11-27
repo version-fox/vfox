@@ -324,6 +324,24 @@ vfox current [<sdk-name>]
 vfox c
 ```
 
+## Include and lib paths
+
+Print the `include` or `lib` directory of an installed SDK version, as its plugin reports it. Build tools can use the output directly, since nothing else is printed.
+
+**Usage**
+
+```shell
+vfox include-path <sdk-name>[@<version>]
+vfox lib-path <sdk-name>[@<version>]
+```
+
+Without `@<version>`, the version that `vfox env` puts on PATH in the current directory is used: the highest-priority version set for the SDK that is installed. The command fails if no installed version is set there, if the version named is not installed, if the plugin reports no such directory, or if the directory is not on disk. See [Paths](../plugins/create/howto.md#paths) for how a plugin reports them.
+
+```shell
+CFLAGS="-I$(vfox include-path python)"
+LDFLAGS="-L$(vfox lib-path python)"
+```
+
 ## Cd 
 
 Launch a shell in the `VFOX_HOME` or SDK directory.

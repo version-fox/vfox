@@ -19,6 +19,8 @@ vfox exec <sdk-name>[@<version>]... -- <command> [args...]   Execute a command i
 vfox exec <sdk-name>[@<version>] <command> [args...]         Execute a command in vfox managed environment for a single SDK
 vfox list [<sdk-name>]              List all installed versions of SDK
 vfox current [<sdk-name>]           Show the current version of SDK
+vfox include-path <sdk-name>[@<version>]  Show the include directory of an SDK version, as its plugin reports it
+vfox lib-path <sdk-name>[@<version>]      Show the lib directory of an SDK version, as its plugin reports it
 vfox config [<key>] [<value>]       Setup, view config
 vfox cd [--plugin] [<sdk-name>]     Launch a shell in the VFOX_HOME, SDK directory, or plugin directory
 vfox upgrade                    Upgrade vfox to the latest version

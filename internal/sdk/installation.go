@@ -187,6 +187,43 @@ func (b *impl) fingerprint(version Version, sdkInfo map[string]*plugin.Installed
 	return result.Facts, nil
 }
 
+// ReportedPath asks the plugin's Paths hook for the directory it reports under
+// name. A version that is not installed is an error; a plugin without the hook,
+// or one that reports no such name, yields "" and no error. The directory must
+// be absolute and exist; it is returned cleaned.
+func (b *impl) ReportedPath(version Version, name string) (string, error) {
+	inst, err := b.Installation(version)
+	if err != nil {
+		return "", err
+	}
+	if !b.plugin.HasFunction("Paths") {
+		return "", nil
+	}
+	result, err := b.plugin.Paths(&plugin.PathsHookCtx{
+		Path:    inst.Runtime.Path,
+		Version: string(version),
+		SdkInfo: sdkInfoOf(inst.RuntimePackage),
+	})
+	if b.plugin.IsNoResultProvided(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("plugin [Paths] method error: %w", err)
+	}
+	dir, ok := result.Paths[name]
+	if !ok {
+		return "", nil
+	}
+	if !filepath.IsAbs(dir) {
+		return "", fmt.Errorf("plugin [Paths] reports %s as %q, which is not an absolute path", name, dir)
+	}
+	dir = filepath.Clean(dir)
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("plugin [Paths] reports %s as %q, which is not an existing directory", name, dir)
+	}
+	return dir, nil
+}
+
 func sdkInfoOf(pkg *RuntimePackage) map[string]*plugin.InstalledPackageItem {
 	info := map[string]*plugin.InstalledPackageItem{pkg.Name: convertRuntime2InstalledPackageItem(pkg.Runtime)}
 	for _, addition := range pkg.Additions {

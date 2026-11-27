@@ -180,6 +180,19 @@ type DetectHookResultItem struct {
 	Note    string `json:"note"`    // optional, additional note
 }
 
+// PathsHookCtx is the context of the optional Paths hook.
+type PathsHookCtx struct {
+	Path    string                           `json:"path"` // main runtime directory
+	Version string                           `json:"version"`
+	SdkInfo map[string]*InstalledPackageItem `json:"sdkInfo"`
+}
+
+// PathsHookResult names directories of an installed version that build tools
+// use, such as "include" and "lib". Each value is a directory.
+type PathsHookResult struct {
+	Paths map[string]string `json:"paths"`
+}
+
 // ShadowHint is a plugin-declared explanation for a command of the SDK being
 // shadowed by an executable somewhere else in PATH. Match is a case-insensitive
 // substring of the shadowing executable's path.

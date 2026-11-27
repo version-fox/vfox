@@ -222,6 +222,30 @@ func (l *LuaPlugin) Detect(ctx *DetectHookCtx) ([]*DetectHookResultItem, error) 
 	return hookResult, nil
 }
 
+func (l *LuaPlugin) Paths(ctx *PathsHookCtx) (*PathsHookResult, error) {
+	L := l.vm.Instance
+	ctxTable, err := codec.Marshal(L, ctx)
+	if err != nil {
+		return nil, err
+	}
+	table, err := l.CallFunction("Paths", ctxTable)
+	if err != nil {
+		return nil, err
+	}
+	if table == nil || table.Type() == lua.LTNil {
+		return nil, ErrNoResultProvide
+	}
+	hookResult := PathsHookResult{}
+	err = codec.Unmarshal(table, &hookResult)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the return value: %w", err)
+	}
+	if len(hookResult.Paths) == 0 {
+		return nil, ErrNoResultProvide
+	}
+	return &hookResult, nil
+}
+
 func (l *LuaPlugin) CallFunction(funcName string, args ...lua.LValue) (lua.LValue, error) {
 	if !l.development {
 		logger.Debugf("CallFunction: %s\n", funcName)

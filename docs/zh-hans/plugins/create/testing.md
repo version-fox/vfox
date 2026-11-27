@@ -71,7 +71,7 @@ vfox plugin run . PreInstall --input '{"version":"29.1.2","installedSdks":{"OTP-
 
 如果 shell 的 JSON 引号规则不同，优先使用 `--input-file`。`--input` 与 `--input-file` 互斥，省略输入时使用 `{}`。
 
-hook 名称区分大小写：`Available`、`PreInstall`、`EnvKeys`、`PostInstall`、`PreUse`、`ParseLegacyFile`、`PreUninstall`、`Fingerprint`、`Detect`。输入沿用正式 hook 上下文，所需路径、已安装 SDK 等信息由调用方提供。`ParseLegacyFile` 接收 `installedVersions` 数组，由适配层生成正式的 `getInstalledVersions()` 回调。命令不会自动安装、切换版本或查询已安装 SDK；调用未实现的可选 hook 会报错。
+hook 名称区分大小写：`Available`、`PreInstall`、`EnvKeys`、`PostInstall`、`PreUse`、`ParseLegacyFile`、`PreUninstall`、`Fingerprint`、`Detect`、`Paths`。输入沿用正式 hook 上下文，所需路径、已安装 SDK 等信息由调用方提供。`ParseLegacyFile` 接收 `installedVersions` 数组，由适配层生成正式的 `getInstalledVersions()` 回调。命令不会自动安装、切换版本或查询已安装 SDK；调用未实现的可选 hook 会报错。
 
 因此 `PreInstall` 和 `PreUse` 只能看到输入中提供的 `installedSdks`，未提供时为空表；而 `vfox use` 和普通的 `vfox install` 会传入已安装的版本（`vfox install --reinstall` 和 `--as` 传入空表）。按已安装版本做映射的 hook，在 `run` 中的结果会与正式命令不同，除非像上面最后一个 `PreInstall` 示例那样在输入中列出它们。
 

@@ -71,7 +71,7 @@ vfox plugin run . PreInstall --input '{"version":"29.1.2","installedSdks":{"OTP-
 
 On shells with different JSON quoting rules, prefer `--input-file`. `--input` and `--input-file` are mutually exclusive; omitted input is `{}`.
 
-Hook names are case-sensitive: `Available`, `PreInstall`, `EnvKeys`, `PostInstall`, `PreUse`, `ParseLegacyFile`, `PreUninstall`, `Fingerprint`, `Detect`. Supply the normal hook context, including paths and installed SDK information when needed. For `ParseLegacyFile`, supply an `installedVersions` array; the adapter provides the hook's `getInstalledVersions()` callback. No installation, scope switching or SDK lookup happens automatically. Invoking an unimplemented optional hook is an error.
+Hook names are case-sensitive: `Available`, `PreInstall`, `EnvKeys`, `PostInstall`, `PreUse`, `ParseLegacyFile`, `PreUninstall`, `Fingerprint`, `Detect`, `Paths`. Supply the normal hook context, including paths and installed SDK information when needed. For `ParseLegacyFile`, supply an `installedVersions` array; the adapter provides the hook's `getInstalledVersions()` callback. No installation, scope switching or SDK lookup happens automatically. Invoking an unimplemented optional hook is an error.
 
 `PreInstall` and `PreUse` therefore see only the `installedSdks` the input supplies, and an empty table when it is left out, while `vfox use` and a plain `vfox install` pass the installed versions (`vfox install --reinstall` and `--as` pass an empty table). A hook that maps a version to an installed one answers differently in `run` unless the input lists them, as in the last `PreInstall` example above.
 
