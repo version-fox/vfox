@@ -66,9 +66,11 @@ func NewFileRecord(path string) (*FileRecord, error) {
 		defer func() { _ = file.Close() }()
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			line := scanner.Text()
-			parts := strings.Split(line, " ")
-			if len(parts) == 2 {
+			// As in asdf's .tool-versions: a '#' starts a comment, fields are
+			// separated by any whitespace, and the first of several versions wins.
+			line, _, _ := strings.Cut(scanner.Text(), "#")
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
 				versionsMap[parts[0]] = parts[1]
 			}
 		}
