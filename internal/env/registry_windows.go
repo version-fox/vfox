@@ -59,6 +59,52 @@ func removeEnvsFromRegistry(envs *Envs) error {
 	return broadcastEnvironmentChange()
 }
 
+// rewriteInstallRootInRegistry rewrites HKEY_CURRENT_USER\Environment values
+// that contain oldRoot as a full path segment, then broadcasts the change.
+func rewriteInstallRootInRegistry(oldRoot, newRoot string) error {
+	if oldRoot == "" || newRoot == "" {
+		return nil
+	}
+	key, err := registry.OpenKey(registry.CURRENT_USER, registryEnvironmentKey, registry.SET_VALUE|registry.QUERY_VALUE)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = key.Close() }()
+
+	names, err := key.ReadValueNames(-1)
+	if err != nil {
+		return err
+	}
+	changed := false
+	for _, name := range names {
+		value, typ, err := key.GetStringValue(name)
+		if err != nil {
+			if errors.Is(err, registry.ErrUnexpectedType) || errors.Is(err, registry.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+		updated := ReplaceInstallRootPrefix(value, oldRoot, newRoot)
+		if updated == value {
+			continue
+		}
+		switch typ {
+		case registry.EXPAND_SZ:
+			err = key.SetExpandStringValue(name, updated)
+		default:
+			err = key.SetStringValue(name, updated)
+		}
+		if err != nil {
+			return err
+		}
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return broadcastEnvironmentChange()
+}
+
 func setPathValue(key registry.Key, paths []string) error {
 	if len(paths) == 0 {
 		return nil

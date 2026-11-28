@@ -11,3 +11,8 @@ func applyEnvsToRegistry(envs *Envs) error {
 func removeEnvsFromRegistry(envs *Envs) error {
 	return nil
 }
+
+// rewriteInstallRootInRegistry is a no-op outside Windows.
+func rewriteInstallRootInRegistry(oldRoot, newRoot string) error {
+	return nil
+}

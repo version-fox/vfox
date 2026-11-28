@@ -68,6 +68,8 @@ storage:
 
 `storage.sdkPath` 表示 SDK 的根目录。例如当 `sdkPath` 为 `/tmp` 时，Node.js 会安装到 `/tmp/nodejs/`。
 
+`vfox migrate <path>` 会把当前的安装根目录搬过去，并设置 `storage.sdkPath`。`vfox config storage.sdkPath` 只修改这项配置。
+
 ::: warning 兼容性说明
 `v1.0.2` 到 `v1.0.7` 错误地将 `storage.sdkPath` 当成 shared root 使用，导致 SDK 被安装到 `sdkPath/cache/<sdk>`。
 

@@ -349,7 +349,7 @@ func TestClinkCompletions(t *testing.T) {
 		{"vfox ", []string{
 			"add", "use", "u", "unuse", "info", "remove", "search", "update", "available", "upgrade",
 			"current", "c", "list", "ls", "uninstall", "un", "install", "i", "env", "activate", "config",
-			"cd", "exec", "x", "help", "h",
+			"migrate", "cd", "exec", "x", "help", "h",
 		}},
 		{"vfox -", []string{"--debug", "--help", "-h", "--version", "-v", "-V"}},
 		{"vfox --d", []string{"--debug"}},

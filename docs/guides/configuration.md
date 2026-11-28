@@ -71,6 +71,8 @@ storage:
 
 `storage.sdkPath` is the root directory used to store SDKs. For example, if `sdkPath` is `/tmp`, Node.js will be installed under `/tmp/nodejs/`.
 
+`vfox migrate <path>` moves the current install root and sets `storage.sdkPath`. `vfox config storage.sdkPath` only changes the setting.
+
 ::: warning Compatibility Note
 `v1.0.2` to `v1.0.7` incorrectly treated `storage.sdkPath` as a shared root and installed SDKs under `sdkPath/cache/<sdk>`.
 

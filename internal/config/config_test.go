@@ -82,6 +82,25 @@ func TestStorageWithWritePermission(t *testing.T) {
 	}
 }
 
+func TestStorageValidateKeepsExistingFiles(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, ".tmpfile")
+	if err := os.WriteFile(existing, []byte("user data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&config.Storage{SdkPath: dir}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(existing)
+	if err != nil || string(data) != "user data" {
+		t.Fatalf("existing file changed: %q, %v", data, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected only the existing file, got %v, %v", entries, err)
+	}
+}
+
 func TestGitHubMirrorInheritance(t *testing.T) {
 	dir := t.TempDir()
 	shared, user := filepath.Join(dir, "shared.yaml"), filepath.Join(dir, "config.yaml")

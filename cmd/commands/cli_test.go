@@ -77,7 +77,7 @@ func TestCLIProcess(t *testing.T) {
 // pristine are the commands the tests exercise, copied before any run could
 // change the state cli keeps in them: which flags were set, and the streams.
 var pristine = cloneCommands(
-	Activate, Add, Alias, Config, Current, Doctor, Env, Exec, Info, Install, Link, List, Search, Uninstall, Unuse, Use,
+	Activate, Add, Alias, Config, Migrate, Current, Doctor, Env, Exec, Info, Install, Link, List, Search, Uninstall, Unuse, Use,
 )
 
 // newTestApp is vfox with a fresh copy of those commands.
@@ -244,7 +244,7 @@ func (r cliResult) output() string { return r.stdout + r.stderr }
 // (activate, env) or may hand over to a shell (use), so each run of them gets a
 // process of its own.
 var inProcess = map[string]bool{
-	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "uninstall": true,
+	"alias": true, "config": true, "doctor": true, "info": true, "install": true, "link": true, "list": true, "migrate": true, "uninstall": true,
 }
 
 // run executes `vfox <args>` inside the fixture: in this process for the

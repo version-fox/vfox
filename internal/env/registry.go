@@ -17,10 +17,13 @@
 package env
 
 // ApplyEnvsToRegistry writes envs to the user's environment in the Windows
-// registry, and RemoveEnvsFromRegistry takes them out again. Both do nothing
-// on other systems. They are variables so that a test can replace them and
-// leave the registry of whoever runs it alone.
+// registry, and RemoveEnvsFromRegistry takes them out again.
+// RewriteInstallRootInRegistry rewrites values under
+// HKEY_CURRENT_USER\Environment that contain the old install root as a full
+// path segment. All three do nothing on other systems. They are variables so
+// that a test can replace them and leave the registry of whoever runs it alone.
 var (
-	ApplyEnvsToRegistry    = applyEnvsToRegistry
-	RemoveEnvsFromRegistry = removeEnvsFromRegistry
+	ApplyEnvsToRegistry          = applyEnvsToRegistry
+	RemoveEnvsFromRegistry       = removeEnvsFromRegistry
+	RewriteInstallRootInRegistry = rewriteInstallRootInRegistry
 )
