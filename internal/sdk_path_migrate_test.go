@@ -160,7 +160,7 @@ func TestMigrateCopiesExternalLinkAcrossDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Clean(got) != filepath.Clean(external) && !(runtime.GOOS == "windows" && strings.EqualFold(filepath.Clean(got), filepath.Clean(external))) {
+	if filepath.Clean(got) != filepath.Clean(external) && (runtime.GOOS != "windows" || !strings.EqualFold(filepath.Clean(got), filepath.Clean(external))) {
 		t.Fatalf("link -> %q, want %q", got, external)
 	}
 	note, err := os.ReadFile(filepath.Join(dest, "alpha", "v-hand", "note.txt"))
@@ -352,7 +352,7 @@ func TestMigrateRestoresLinkRemovedDuringRetarget(t *testing.T) {
 	if readErr != nil {
 		t.Fatalf("link missing after rollback: %v (%v)", readErr, err)
 	}
-	if filepath.Clean(got) != filepath.Clean(version) && !(runtime.GOOS == "windows" && strings.EqualFold(filepath.Clean(got), filepath.Clean(version))) {
+	if filepath.Clean(got) != filepath.Clean(version) && (runtime.GOOS != "windows" || !strings.EqualFold(filepath.Clean(got), filepath.Clean(version))) {
 		t.Fatalf("link -> %q, want %q", got, version)
 	}
 	content, readErr := os.ReadFile(filepath.Join(version, "keep.txt"))

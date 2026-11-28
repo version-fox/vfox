@@ -69,7 +69,7 @@ func rewriteInstallRootInRegistry(oldRoot, newRoot string) error {
 	if err != nil {
 		return err
 	}
-	defer key.Close()
+	defer func() { _ = key.Close() }()
 
 	names, err := key.ReadValueNames(-1)
 	if err != nil {
