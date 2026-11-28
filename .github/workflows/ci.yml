@@ -192,6 +192,8 @@ jobs:
       STYLUA_SHA256: a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895
       SHFMT_VERSION: 3.14.1
       SHFMT_SHA256: 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
+      FISH_VERSION: 4.9.3
+      FISH_SHA256: 8f643d10ad1abb0ef7072764c01ceb5cf61b2d373fda400cf60f0bad69b7e095
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -205,7 +207,7 @@ jobs:
             echo "${unformatted}"
             exit 1
           fi
-      - name: Install StyLua and shfmt
+      - name: Install StyLua, shfmt and fish_indent
         run: |
           mkdir "${RUNNER_TEMP}/bin"
           curl --fail --silent --show-error --location --retry 3 \
@@ -218,6 +220,13 @@ jobs:
             "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
           echo "${SHFMT_SHA256}  ${RUNNER_TEMP}/bin/shfmt" | sha256sum --check --strict -
           chmod +x "${RUNNER_TEMP}/bin/stylua" "${RUNNER_TEMP}/bin/shfmt"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/fish.tar.xz" \
+            "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-${FISH_VERSION}-linux-x86_64.tar.xz"
+          echo "${FISH_SHA256}  ${RUNNER_TEMP}/fish.tar.xz" | sha256sum --check --strict -
+          tar --extract --xz --file "${RUNNER_TEMP}/fish.tar.xz" --directory "${RUNNER_TEMP}/bin" fish
+          # The release only ships fish, which runs as fish_indent when it is called by that name.
+          ln -s fish "${RUNNER_TEMP}/bin/fish_indent"
           echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
       - name: Check Lua formatting
         run: |
@@ -227,3 +236,7 @@ jobs:
         run: |
           shfmt --version
           shfmt -d install.sh scripts/*.sh completions/bash_autocomplete
+      - name: Check Fish formatting
+        run: |
+          fish_indent --version
+          fish_indent --check completions/vfox.fish

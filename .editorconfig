@@ -18,3 +18,8 @@ indent_size = 4
 [completions/bash_autocomplete]
 indent_style = space
 indent_size = 2
+
+# fish_indent (the CI check) always indents with 4 spaces; this section is for editors.
+[completions/vfox.fish]
+indent_style = space
+indent_size = 4
