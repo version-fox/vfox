@@ -17,6 +17,10 @@
 package commands
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -194,5 +198,52 @@ func TestExecFollowsTheInstalledVersion(t *testing.T) {
 		if !slices.Contains(envs.Paths.Slice(), wantBin) {
 			t.Errorf("PATH = %v, want entry %q", envs.Paths.Slice(), wantBin)
 		}
+	})
+}
+
+func TestInstallAllAddsMissingPluginAndInstallsSDK(t *testing.T) {
+	const pluginTpl = `PLUGIN = {name=%q, version="0.0.1", description="test", author="test", minRuntimeVersion="0.0.0"}
+function PLUGIN:Available(ctx) return {} end
+function PLUGIN:PreInstall(ctx) return {version=ctx.version} end
+function PLUGIN:EnvKeys(ctx) return {{key="PATH", value=ctx.path .. "/bin"}} end
+`
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ninja.json":
+			fmt.Fprintf(w, `{"name":"ninja","downloadUrl":%q}`, srv.URL+"/plugins/ninja.lua")
+		case "/plugins/ninja.lua":
+			fmt.Fprintf(w, pluginTpl, "ninja")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	t.Run("adds missing plugin and installs recorded SDK version", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		f.writeUserConfig(t, "registry:\n  address: "+srv.URL+"\n")
+		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nninja = \"1.12.1\"\n"), 0644))
+
+		out := f.run(t, "install", "--all", "--yes").mustSucceed(t, "install --all --yes").output()
+		mustContain(t, "install --all output", out, "Plugin:", "ninja", "SDK:", "ninja@1.12.1")
+
+		if !exists(filepath.Join(f.shared, "plugin", "ninja", "main.lua")) {
+			t.Fatalf("expected ninja plugin to be installed")
+		}
+		if !exists(filepath.Join(f.shared, "cache", "ninja", "v-1.12.1", "ninja-1.12.1")) {
+			t.Fatalf("expected ninja@1.12.1 SDK directory to be installed")
+		}
+		listOut := f.run(t, "list", "ninja").mustSucceed(t, "vfox list ninja").output()
+		mustContain(t, "vfox list ninja", listOut, "1.12.1")
+	})
+
+	t.Run("exits non-zero when missing plugin cannot be added", func(t *testing.T) {
+		f := newCLIFixtureWithoutRegistryGuard(t, false)
+		f.writeUserConfig(t, "registry:\n  address: "+srv.URL+"\n")
+		must(t, os.WriteFile(filepath.Join(f.work, ".vfox.toml"), []byte("[tools]\nmissing = \"1.0.0\"\n"), 0644))
+
+		res := f.run(t, "install", "--all", "--yes").mustFail(t, "install --all --yes missing plugin")
+		mustContain(t, "install --all failure output", res.output(), "Plugin:", "missing", "SDK:", "missing@1.0.0", "not found in remote registry")
 	})
 }
