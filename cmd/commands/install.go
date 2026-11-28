@@ -300,6 +300,9 @@ func installAll(autoConfirm bool) error {
 		spinnerInfo.UpdateText(fmt.Sprintf("[%v/%v] %s: %s@%s installing...\033[K", index, count, "SDK", sdkName, version))
 		sdkVersion := fmt.Sprintf("%s@%s", sdkName, version)
 		sdksResult[sdkVersion] = false
+		if added, attempted := pluginsResult[sdkName]; attempted && !added {
+			continue
+		}
 		lookupSdk, err := manager.LookupSdk(sdkName)
 		if err != nil {
 			errorStr = fmt.Sprintf("%s\n%s", errorStr, err)
@@ -324,6 +327,7 @@ func installAll(autoConfirm bool) error {
 
 	if len(errorStr) > 0 {
 		fmt.Println(errorStr)
+		return cli.Exit("", 1)
 	}
 	return nil
 }
@@ -344,8 +348,10 @@ func notInstalled(manager *internal.Manager) (plugins []string, sdks map[string]
 	for name, version := range allTools {
 		lookupSdk, err := manager.LookupSdk(name)
 		if err != nil {
-			// Plugin not installed
+			// Plugin not installed: queue both the plugin and its SDK version so
+			// installAll installs the version once the plugin has been added.
 			plugins = append(plugins, name)
+			sdks[name] = version
 		} else if !lookupSdk.CheckRuntimeExist(sdk.Version(version)) {
 			// SDK not installed
 			sdks[name] = version
