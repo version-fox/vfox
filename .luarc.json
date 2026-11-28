@@ -1,0 +1,6 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "Lua.runtime.version": "Lua 5.1",
+    "Lua.diagnostics.globals": ["OS_TYPE"],
+    "Lua.diagnostics.disable": ["duplicate-set-field"]
+}

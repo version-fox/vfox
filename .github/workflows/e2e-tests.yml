@@ -44,7 +44,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           
           # Run the E2E test script
-          & .\scripts\e2e-test.ps1 -Verbose
+          & .\scripts\e2e-test.ps1
         env:
           VFOX_HOME: ${{ runner.temp }}\.vfox
 
@@ -140,9 +140,9 @@ jobs:
         run: |
           echo "E2E Tests Summary"
           echo "================"
-          echo "Windows tests: $(ls -d test-results-windows* 2>/dev/null | wc -l) platform(s)"
-          echo "MSIX packaging tests: $(ls -d test-results-msix-windows-* 2>/dev/null | wc -l) platform(s)"
-          echo "Unix tests: $(ls -d test-results-* 2>/dev/null | grep -v windows | wc -l) platform(s)"
+          echo "Windows tests: $(find . -maxdepth 1 -name 'test-results-windows*' | wc -l) platform(s)"
+          echo "MSIX packaging tests: $(find . -maxdepth 1 -name 'test-results-msix-windows-*' | wc -l) platform(s)"
+          echo "Unix tests: $(find . -maxdepth 1 -name 'test-results-*' ! -name '*windows*' | wc -l) platform(s)"
           echo ""
           echo "All test artifacts have been uploaded."
 

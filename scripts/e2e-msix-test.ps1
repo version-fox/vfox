@@ -31,6 +31,8 @@
     Directory for artifacts (packages, logs). Defaults to <repo>/msix-e2e-out.
 #>
 
+# The PFX password protects an ephemeral test certificate that is deleted on exit.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '')]
 param(
     [string]$OutputDir = (Join-Path (Split-Path $PSScriptRoot -Parent) "msix-e2e-out")
 )
@@ -40,7 +42,6 @@ $ErrorActionPreference = "Stop"
 
 $GREEN = "`e[32m"
 $RED = "`e[31m"
-$YELLOW = "`e[33m"
 $NC = "`e[0m"
 
 $RepoRoot = Split-Path $PSScriptRoot -Parent
@@ -152,7 +153,7 @@ function Write-Banner {
 
 Write-Banner "vFox MSIX Packaging E2E Test" Cyan
 
-function Run-Test {
+function Invoke-Test {
     param(
         [string]$TestName,
         [scriptblock]$TestScript,
@@ -267,7 +268,7 @@ try {
     # ------------------------------------------------------------------
     $aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\vfox.exe"
 
-    Run-Test "Bundle identity uses the source release version" `
+    Invoke-Test "Bundle identity uses the source release version" `
         {
             foreach ($entry in @(@{ Path = $bundlePath; Version = $TestVersion }, @{ Path = $upgradeBundlePath; Version = $UpgradeVersion })) {
                 $actual = Get-BundleVersion -Path $entry.Path
@@ -279,7 +280,7 @@ try {
         } `
         "BUNDLE_VERSION_OK"
 
-    Run-Test "Signed bundles carry a trusted timestamp" `
+    Invoke-Test "Signed bundles carry a trusted timestamp" `
         {
             foreach ($path in @($bundlePath, $upgradeBundlePath)) {
                 $signature = Get-AuthenticodeSignature -FilePath $path
@@ -290,7 +291,7 @@ try {
         } `
         "TIMESTAMP_OK"
 
-    Run-Test "Per-architecture packages were produced" `
+    Invoke-Test "Per-architecture packages were produced" `
         {
             $missing = @(@("x86", "x64", "arm64") |
                 ForEach-Object { Join-Path $msixOutDir "vfox_${TestVersion}_windows_$_.msix" } |
@@ -303,7 +304,7 @@ try {
         } `
         "ALL_PACKAGES_PRESENT"
 
-    Run-Test "Package registered with normalized version" `
+    Invoke-Test "Package registered with normalized version" `
         {
             $pkg = Get-AppxPackage -Name $PackageIdentityName
             if ($null -eq $pkg) { "PACKAGE_NOT_FOUND" }
@@ -314,7 +315,7 @@ try {
         } `
         "VERSION_OK"
 
-    Run-Test "App execution alias exists" `
+    Invoke-Test "App execution alias exists" `
         {
             $deadline = (Get-Date).AddSeconds(30)
             while (-not (Test-Path $aliasPath) -and (Get-Date) -lt $deadline) {
@@ -324,21 +325,21 @@ try {
         } `
         "ALIAS_EXISTS"
 
-    Run-Test "vfox runs through execution alias" `
+    Invoke-Test "vfox runs through execution alias" `
         {
             $versionOutput = Invoke-PackagedVfox -Arguments @("--version")
             if ($versionOutput -match "\b$([regex]::Escape($TestVersion))\b") { "CLI_OK: $($versionOutput.Trim())" } else { "BAD_OUTPUT: $versionOutput" }
         } `
         "CLI_OK"
 
-    Run-Test "vfox --help through execution alias" `
+    Invoke-Test "vfox --help through execution alias" `
         {
             $helpOutput = Invoke-PackagedVfox -Arguments @("--help")
             if ($helpOutput -match 'Usage') { "HELP_OK" } else { "BAD_OUTPUT: $helpOutput" }
         } `
         "HELP_OK"
 
-    Run-Test "Packaged binary keeps user data outside WindowsApps" `
+    Invoke-Test "Packaged binary keeps user data outside WindowsApps" `
         {
             $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
             $probeHome = Join-Path $tempRoot "vfox-msix-probe-home"
@@ -361,7 +362,7 @@ try {
         } `
         "USER_DATA_OK"
 
-    Run-Test "Packaged self-upgrade explains the installation method" `
+    Invoke-Test "Packaged self-upgrade explains the installation method" `
         {
             $output = & $runnerPath $aliasPath upgrade 2>&1 | Out-String
             if ($LASTEXITCODE -ne 1 -or $output -notmatch 'MSIX package.*cannot self-upgrade') {
@@ -395,7 +396,7 @@ try {
     }
     finally { $key.Dispose() }
 
-    Run-Test "Global SDK selection reaches the host registry and filesystem" `
+    Invoke-Test "Global SDK selection reaches the host registry and filesystem" `
         {
             $null = Invoke-PackagedVfox -Arguments @("install", "msix-probe@1.0.0")
             $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@1.0.0")
@@ -404,7 +405,7 @@ try {
         } `
         "GLOBAL_SDK_OK"
 
-    Run-Test "Switching global SDK versions updates host state without duplicate PATH entries" `
+    Invoke-Test "Switching global SDK versions updates host state without duplicate PATH entries" `
         {
             $null = Invoke-PackagedVfox -Arguments @("install", "msix-probe@2.0.0")
             $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@2.0.0")
@@ -413,7 +414,7 @@ try {
         } `
         "GLOBAL_SWITCH_OK"
 
-    Run-Test "An earlier-built newer release upgrades in place and preserves SDK state" `
+    Invoke-Test "An earlier-built newer release upgrades in place and preserves SDK state" `
         {
             $family = $InstalledPackage.PackageFamilyName
             Add-AppxPackage -Path $upgradeBundlePath
@@ -430,7 +431,7 @@ try {
         } `
         "IN_PLACE_UPGRADE_OK"
 
-    Run-Test "SDK uninstall removes its host environment entries" `
+    Invoke-Test "SDK uninstall removes its host environment entries" `
         {
             $null = Invoke-PackagedVfox -Arguments @("use", "--global", "msix-probe@1.0.0")
             # Remove the inactive version first so the CLI cannot auto-switch
@@ -455,7 +456,7 @@ try {
     # ------------------------------------------------------------------
     Write-Banner "Step 5: Uninstalling MSIX bundle"
 
-    Run-Test "Uninstall removes the package and alias" `
+    Invoke-Test "Uninstall removes the package and alias" `
         {
             $pkg = Get-AppxPackage -Name $PackageIdentityName
             if ($null -eq $pkg) { return "PACKAGE_NOT_FOUND_BEFORE_UNINSTALL" }

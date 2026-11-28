@@ -11,7 +11,7 @@ __vfox_init_completion() {
 
 __vfox_bash_autocomplete() {
   if [[ "${COMP_WORDS[0]}" != "source" ]]; then
-    local cur opts base words
+    local cur opts words requestComp line
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if declare -F _init_completion >/dev/null 2>&1; then
@@ -26,7 +26,10 @@ __vfox_bash_autocomplete() {
       requestComp="${words[*]} --generate-shell-completion"
     fi
     opts=$(SHELL=bash eval "${requestComp}" 2>/dev/null)
-    COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
+    # A read loop rather than mapfile, which bash 3 doesn't have.
+    while IFS='' read -r line; do
+      COMPREPLY+=("${line}")
+    done < <(compgen -W "${opts}" -- "${cur}")
     return 0
   fi
 }

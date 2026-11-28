@@ -3,16 +3,11 @@
 # E2E Test Script for vFox - Windows PowerShell Version
 # Tests vfox functionality directly
 
-param(
-    [switch]$Verbose = $false
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $GREEN = "`e[32m"
 $RED = "`e[31m"
-$YELLOW = "`e[33m"
 $NC = "`e[0m"
 
 $OriginalUserProfile = $env:USERPROFILE
@@ -44,7 +39,7 @@ function Cleanup {
 
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Cleanup }
 
-function Run-Test {
+function Invoke-Test {
     param(
         [string]$TestName,
         [scriptblock]$TestScript,
@@ -100,7 +95,10 @@ catch {
 # Define vfox executable path
 $vfoxExe = Join-Path (Get-Location) "vfox.exe"
 
-function Activate-Vfox {
+function Enable-Vfox {
+    # Running the activation script that vfox prints is how a session is activated.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '')]
+    param()
     $activationScript = (& $vfoxExe activate pwsh 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to activate vfox: $activationScript"
@@ -124,7 +122,7 @@ try {
         New-Item -ItemType Directory -Path $path -Force | Out-Null
     }
 
-    Activate-Vfox
+    Enable-Vfox
     try {
         & $vfoxExe add nodejs 2>&1 | Out-Null
     }
@@ -152,56 +150,56 @@ Write-Host "==========================================" -ForegroundColor White
 $LegacyVfoxDir = Join-Path $UserHomeRoot ".version-fox"
 $GlobalUserVfoxDir = if (Test-Path $LegacyVfoxDir) { $LegacyVfoxDir } else { $VfoxHomeDir }
 
-Run-Test "Check vfox command available" `
+Invoke-Test "Check vfox command available" `
     { Get-Command $vfoxExe -ErrorAction Stop | Select-Object -ExpandProperty Source } `
     "vfox.exe"
 
-Run-Test "Use nodejs in session scope" `
+Invoke-Test "Use nodejs in session scope" `
     {
         & $vfoxExe use -s nodejs@18.19.0 2>&1 | Out-Null
-        Activate-Vfox
+        Enable-Vfox
         & $vfoxExe current nodejs 2>&1
     } `
     "18.19"
 
-Run-Test "Check current version" `
+Invoke-Test "Check current version" `
     { & $vfoxExe current nodejs 2>&1 } `
     "18.19"
 
-Run-Test "List available versions" `
+Invoke-Test "List available versions" `
     { & $vfoxExe available 2>&1 | Select-String "nodejs" } `
     "nodejs"
 
-Run-Test "Use nodejs in global scope" `
+Invoke-Test "Use nodejs in global scope" `
     {
         & $vfoxExe use -g nodejs@18.19.0 2>&1 | Out-Null
-        Activate-Vfox
+        Enable-Vfox
         & $vfoxExe current nodejs 2>&1
     } `
     "18.19"
 
-Run-Test "Verify global symlink exists" `
+Invoke-Test "Verify global symlink exists" `
     {
         $sdkPath = Join-Path $GlobalUserVfoxDir "sdks/nodejs"
         if (Test-Path $sdkPath) { "SYMLINK_EXISTS" } else { "SYMLINK_MISSING" }
     } `
     "SYMLINK_EXISTS"
 
-Run-Test "Verify global config file location" `
+Invoke-Test "Verify global config file location" `
     {
         $configPath = Join-Path $GlobalUserVfoxDir "config.yaml"
         if (Test-Path $configPath) { "CONFIG_EXISTS" } else { "CONFIG_NOT_FOUND" }
     } `
     "CONFIG_EXISTS"
 
-Run-Test "Verify global SDK installation path" `
+Invoke-Test "Verify global SDK installation path" `
     {
         $installPath = Join-Path $VfoxHomeDir "cache/nodejs/v-18.19.0"
         if (Test-Path $installPath) { "INSTALL_PATH_OK" } else { "PATH_NOT_FOUND" }
     } `
     "INSTALL_PATH_OK"
 
-Run-Test "Project scope creates .vfox.toml" `
+Invoke-Test "Project scope creates .vfox.toml" `
     {
         $testDir = Join-Path ([System.IO.Path]::GetTempPath()) "vfox-test-proj"
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -217,7 +215,7 @@ Run-Test "Project scope creates .vfox.toml" `
     } `
     "TOML_CREATED"
 
-Run-Test "Session scope does not create .vfox.toml" `
+Invoke-Test "Session scope does not create .vfox.toml" `
     {
         $testDir = Join-Path ([System.IO.Path]::GetTempPath()) "vfox-session-test"
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -233,7 +231,7 @@ Run-Test "Session scope does not create .vfox.toml" `
     } `
     "NO_TOML_CREATED"
 
-Run-Test "Multiple versions can be installed" `
+Invoke-Test "Multiple versions can be installed" `
     {
         & $vfoxExe install -y nodejs@20.11.0 2>&1 | Out-Null
         $list = & $vfoxExe list nodejs 2>&1
@@ -246,7 +244,7 @@ Run-Test "Multiple versions can be installed" `
     } `
     "MULTI_VERSION_OK"
 
-Run-Test "Use different version in same session" `
+Invoke-Test "Use different version in same session" `
     {
         & $vfoxExe use -s nodejs@20.11.0 2>&1 | Out-Null
         $current = & $vfoxExe current nodejs 2>&1
@@ -254,7 +252,7 @@ Run-Test "Use different version in same session" `
     } `
     "VERSION_SWITCH_OK"
 
-Run-Test "Uninstall removes version" `
+Invoke-Test "Uninstall removes version" `
     {
         & $vfoxExe uninstall nodejs@20.11.0 2>&1 | Out-Null
         $list = & $vfoxExe list nodejs 2>&1
@@ -262,7 +260,7 @@ Run-Test "Uninstall removes version" `
     } `
     "UNINSTALL_OK"
 
-Run-Test "Unuse global removes symlink" `
+Invoke-Test "Unuse global removes symlink" `
     {
         & $vfoxExe unuse -g nodejs 2>&1 | Out-Null
         $sdkPath = Join-Path $VfoxHomeDir "sdks/nodejs"

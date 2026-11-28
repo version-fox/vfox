@@ -20,23 +20,35 @@ clink.argmatcher("vfox"):nofiles():setdelayinit(function(vfox)
     end
 
     if #vfox_sdk_table == 0 then
+        -- Without a writable cache file the list still completes, it's just not cached.
         file_available = io.open(file_name, "w")
-        file_available:write(current_timestamp .. "\n")
-        local vfox_available = io.popen("vfox available")
-        for line in vfox_available:lines() do
-            local name = line:gsub("%c%[%d+m", ""):match("^  (%S+)%s+[✓✗]")
-            if name then
-                table.insert(vfox_sdk_table, name)
-                file_available:write(name .. "\n")
-            end
+        if file_available then
+            file_available:write(current_timestamp .. "\n")
         end
-        vfox_available:close()
-        file_available:close()
+        local vfox_available = io.popen("vfox available")
+        if vfox_available then
+            for line in vfox_available:lines() do
+                local name = line:gsub("%c%[%d+m", ""):match("^  (%S+)%s+[✓✗]")
+                if name then
+                    table.insert(vfox_sdk_table, name)
+                    if file_available then
+                        file_available:write(name .. "\n")
+                    end
+                end
+            end
+            vfox_available:close()
+        end
+        if file_available then
+            file_available:close()
+        end
     end
 
     local function vfox_ls_func()
         local pre, ls = "", {}
         local vfox_ls = io.popen("vfox ls")
+        if not vfox_ls then
+            return ls
+        end
         for line in vfox_ls:lines() do
             line = line:gsub("%c%[%d+m", "")
             local txt = line:match("^[ ┬└│─├]*(%S.*)")
@@ -159,6 +171,9 @@ clink.argmatcher("vfox"):nofiles():setdelayinit(function(vfox)
                 :nofiles()
                 :addarg(function()
                     local res, vfox_config = {}, io.popen("vfox config -l")
+                    if not vfox_config then
+                        return res
+                    end
                     for line in vfox_config:lines() do
                         local txt = line:gsub("%c%[%d+m", ""):match("^(%S+)")
                         if txt then
@@ -190,18 +205,23 @@ end
 local vfox_filter = function() end
 local vfox_task = coroutine.create(function()
     os.setenv("__VFOX_SHELL", "clink")
-    os.setenv("__VFOX_PID", os.getpid())
+    os.setenv("__VFOX_PID", tostring(os.getpid()))
     -- vfox activate only drops the state of another shell when __VFOX_PID is not this shell's.
     os.setenv("__VFOX_CURTMPPATH", nil)
     os.setenv("__VFOX_ORIG_PATH", nil)
     local vfox_activate = io.popen("vfox activate clink")
-    for line in vfox_activate:lines() do
-        vfox_setenv(line)
+    if vfox_activate then
+        for line in vfox_activate:lines() do
+            vfox_setenv(line)
+        end
+        vfox_activate:close()
     end
-    vfox_activate:close()
     os.execute("vfox env -c")
     vfox_filter = function()
         local env = io.popen("vfox env -s clink")
+        if not env then
+            return
+        end
         for line in env:lines() do
             vfox_setenv(line)
         end

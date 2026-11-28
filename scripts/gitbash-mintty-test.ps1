@@ -18,6 +18,8 @@
     It needs a desktop session, which GitHub-hosted Windows runners have, and it
     types into a terminal window. Run it on a disposable runner or VM only.
 #>
+# TimeoutSeconds is read by Wait-Marker, which the rule doesn't follow.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'TimeoutSeconds')]
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
@@ -132,6 +134,9 @@ Write-Host "MSYS for mintty: '$($env:MSYS)' (stdio: $Stdio)"
 # Ends what an earlier launch left running: the windows, the shell and the test. A
 # window left over would be taken for the new one.
 function Stop-MinttyRun {
+    # A helper of this test, not a command: there is nothing for -WhatIf to preview.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
     $test = [IO.Path]::GetFileNameWithoutExtension($TestBinary)
     Get-Process -Name mintty, bash, $test -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
@@ -147,6 +152,8 @@ function Find-MinttyWindow {
 # process started here is never a failure by itself: the window is looked for by its
 # class until 30 seconds have passed. A launch that shows no window is tried once more.
 function Start-MinttyWindow {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
     for ($attempt = 1; $attempt -le 2; $attempt++) {
         Stop-MinttyRun
         Get-ChildItem -LiteralPath $WorkDir -Exclude run.sh | Remove-Item -Force
